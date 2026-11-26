@@ -7,7 +7,7 @@ pub use proc_macro2::{Delimiter, Group, Ident, LineColumn, Literal, Punct, Span,
 pub use quote::{ToTokens, format_ident, quote};
 pub use readers::applied::Applied;
 pub use readers::block_items::BlockItems;
-pub use readers::boundary::{Past, PatEdge, PatSpine, PatTree, Spine, TypeSpine};
+pub use readers::boundary::{PatEdge, PatSpine, PatTree, Spine, TypeSpine};
 pub use readers::expr_shapes::{Application, Constructed};
 pub use readers::macro_tree::MacroTree;
 pub use readers::mentioned::Mentioned;
@@ -18,15 +18,14 @@ pub use syn::ext::IdentExt;
 pub use syn::punctuated::Punctuated;
 pub use syn::spanned::Spanned;
 pub use syn::{
-    AngleBracketedGenericArguments, Arm, Attribute, BinOp, Block, Data, DataStruct, DeriveInput, Error, Expr,
-    ExprAssign, ExprBinary, ExprCall, ExprCast, ExprClosure, ExprConst, ExprForLoop, ExprIf, ExprLit, ExprLoop,
-    ExprMacro, ExprMethodCall, ExprPath, ExprRepeat, ExprWhile, Field, Fields, FieldsNamed, FieldsUnnamed, File, FnArg,
-    ForeignItemFn, GenericArgument, GenericParam, Generics, ImplItem, ImplItemConst, ImplItemFn, ImplItemType, Index,
-    Item, ItemConst, ItemEnum, ItemFn, ItemImpl, ItemMacro, ItemMod, ItemStatic, ItemStruct, ItemTrait, ItemType,
-    ItemUnion, ItemUse, LifetimeParam, Lit, LitFloat, LitInt, LitStr, Local, Macro, Member, Meta, MetaList, Pat,
-    PatIdent, PatType, Path, PathArguments, PathSegment, Result, ReturnType, Signature, Stmt, Token, TraitItem,
-    TraitItemConst, TraitItemFn, TraitItemType, Type, TypeArray, TypeParam, TypeParamBound, TypePath, TypeReference,
-    TypeTuple, UnOp, UseTree, Variant, Visibility, WherePredicate, custom_keyword, token,
+    AngleBracketedGenericArguments, Attribute, BinOp, Block, Data, DataStruct, DeriveInput, Error, Expr, ExprAssign,
+    ExprBinary, ExprCall, ExprClosure, ExprForLoop, ExprIf, ExprLit, ExprLoop, ExprMacro, ExprMethodCall, ExprPath,
+    ExprWhile, Field, Fields, FieldsNamed, FieldsUnnamed, File, FnArg, ForeignItemFn, GenericArgument, GenericParam,
+    Generics, ImplItem, ImplItemConst, ImplItemFn, ImplItemType, Index, Item, ItemConst, ItemEnum, ItemFn, ItemImpl,
+    ItemMacro, ItemMod, ItemStatic, ItemStruct, ItemTrait, ItemType, ItemUnion, ItemUse, LifetimeParam, Lit, LitFloat,
+    LitInt, LitStr, Local, Macro, Member, Meta, MetaList, Pat, PatIdent, PatType, Path, PathArguments, PathSegment,
+    Result, ReturnType, Signature, Stmt, Token, TraitItem, TraitItemConst, TraitItemFn, TraitItemType, Type, TypeParam,
+    TypeParamBound, TypePath, TypeReference, TypeTuple, UseTree, Variant, Visibility, WherePredicate, custom_keyword,
 };
 pub use walk::{Entered, Node};
 

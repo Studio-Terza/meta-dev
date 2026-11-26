@@ -15,26 +15,17 @@ use lint_sweep::{Found, Founds, Gathers, Joined, Joint, Unjoined};
 use timer_ports::Timer;
 
 use lint_bool_methods::BoolMethods;
-use lint_const_shape::ConstShape;
 use lint_enum_predicates::EnumPredicates;
 use lint_expression_flow::ExpressionFlow;
-use lint_fn_shape::FnShape;
-use lint_literal_names::LiteralNames;
 use lint_manual_iteration::ManualIteration;
 use lint_named_lifetimes::NamedLifetimes;
-use lint_named_numbers::NamedNumbers;
 use lint_no_comments::NoComments;
 use lint_no_dyn::NoDyn;
-use lint_no_forwarders::NoForwarders;
 use lint_no_free_fns::NoFreeFns;
-use lint_no_ignored_tests::NoIgnoredTests;
-use lint_no_numbers_in_binaries::NoNumbersInBinaries;
 use lint_no_test_only_api::NoTestOnlyApi;
-use lint_private_fns::PrivateFns;
 use lint_process_starters::ProcessStarters;
 use lint_public_api_tests::PublicApiTests;
 use lint_public_surface::PublicSurface;
-use lint_thin_main::ThinMain;
 use lint_type_shape::TypeShape;
 use lint_vec_out_params::VecOutParams;
 
@@ -87,25 +78,16 @@ struct Listed<Head, Tail> {
 type Registry = registry![
     Filed<NoComments>,
     Swept<NoFreeFns>,
-    Filed<ThinMain>,
     Swept<VecOutParams>,
     Swept<NamedLifetimes>,
     Judged<EnumPredicates>,
-    Swept<ConstShape>,
     Swept<TypeShape>,
     Swept<ExpressionFlow>,
-    Swept<FnShape>,
-    Swept<LiteralNames>,
     Swept<ManualIteration>,
-    Judged<NamedNumbers>,
-    Judged<NoForwarders>,
-    Swept<NoNumbersInBinaries>,
-    Swept<PrivateFns>,
     Filed<ProcessStarters>,
     Ruled<PublicSurface>,
     Judged<PublicApiTests>,
     Judged<NoTestOnlyApi>,
-    Swept<NoIgnoredTests>,
     Swept<BoolMethods>,
     Filed<NoDyn>,
 ];

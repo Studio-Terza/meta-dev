@@ -1,8 +1,0 @@
-free functions are not allowed; make them associated functions or methods:
-src/said.rs:1: fn parse_header; make it an associated function or a method
-src/vague.rs:1: fn get; make it an associated function or a method
-function names say what the function does:
-src/vague.rs:1: fn get names nothing; say what it does
-src/vague.rs:4: fn handle names nothing; say what it does
-src/vague.rs:5: fn go names nothing; say what it does
-fails

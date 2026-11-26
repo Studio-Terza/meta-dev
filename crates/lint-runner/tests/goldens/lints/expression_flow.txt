@@ -22,21 +22,4 @@ src/reassigned.rs:2: mutable local that is only reassigned; a mutable binding is
 src/reassigned.rs:3: assignment to a local; build the value in one expression or give its type an updater method
 src/reassigned.rs:7: mutable local that is only reassigned; a mutable binding is borrowed as &mut or has methods called on it
 src/reassigned.rs:8: compound assignment to a local; build the value in one expression or give its type an updater method
-function names say what the function does:
-src/dropped.rs:1: fn f names nothing; say what it does
-src/early.rs:1: fn f names nothing; say what it does
-src/lonely.rs:1: fn f names nothing; say what it does
-src/loops.rs:1: fn f names nothing; say what it does
-src/loops.rs:6: fn g names nothing; say what it does
-src/mutated.rs:1: fn f names nothing; say what it does
-src/reassigned.rs:1: fn f names nothing; say what it does
-src/reassigned.rs:6: fn g names nothing; say what it does
-src/tail.rs:1: fn f names nothing; say what it does
-a number has a name: outside tests and boundary modules, a literal other than 0 and 1 sits in a const item:
-src/early.rs:3: numeric literal outside a const item; name it as a const so it can be found and tuned
-src/early.rs:5: numeric literal outside a const item; name it as a const so it can be found and tuned
-src/loops.rs:2: numeric literal outside a const item; name it as a const so it can be found and tuned
-src/reassigned.rs:3: numeric literal outside a const item; name it as a const so it can be found and tuned
-src/reassigned.rs:8: numeric literal outside a const item; name it as a const so it can be found and tuned
-src/tail.rs:2: numeric literal outside a const item; name it as a const so it can be found and tuned
 fails

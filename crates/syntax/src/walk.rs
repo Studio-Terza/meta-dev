@@ -11,7 +11,6 @@ use syn::{File, Ident, Macro};
 macro_rules! node_kinds {
     ($callback:ident) => {
         $callback! {
-            Arm on_arm off_arm visit_arm Arm;
             Attribute on_attribute off_attribute visit_attribute Attribute;
             Block on_block off_block visit_block Block;
             ExprAssign on_expr_assign off_expr_assign visit_expr_assign ExprAssign;
@@ -19,16 +18,13 @@ macro_rules! node_kinds {
             ExprCall on_expr_call off_expr_call visit_expr_call ExprCall;
             ExprMacro on_expr_macro off_expr_macro visit_expr_macro ExprMacro;
             ForeignItemFn on_foreign_item_fn off_foreign_item_fn visit_foreign_item_fn ForeignItemFn;
-            ExprCast on_expr_cast off_expr_cast visit_expr_cast ExprCast;
             ExprClosure on_expr_closure off_expr_closure visit_expr_closure ExprClosure;
             Expr on_expr off_expr visit_expr Expr;
-            ExprConst on_expr_const off_expr_const visit_expr_const ExprConst;
             ExprForLoop on_expr_for_loop off_expr_for_loop visit_expr_for_loop ExprForLoop;
             ExprIf on_expr_if off_expr_if visit_expr_if ExprIf;
             ExprLoop on_expr_loop off_expr_loop visit_expr_loop ExprLoop;
             ExprMethodCall on_expr_method_call off_expr_method_call visit_expr_method_call ExprMethodCall;
             ExprPath on_expr_path off_expr_path visit_expr_path ExprPath;
-            ExprRepeat on_expr_repeat off_expr_repeat visit_expr_repeat ExprRepeat;
             ExprWhile on_expr_while off_expr_while visit_expr_while ExprWhile;
             Field on_field off_field visit_field Field;
             ImplItemConst on_impl_item_const off_impl_item_const visit_impl_item_const ImplItemConst;
@@ -56,7 +52,6 @@ macro_rules! node_kinds {
             Stmt on_stmt off_stmt visit_stmt Stmt;
             TraitItemConst on_trait_item_const off_trait_item_const visit_trait_item_const TraitItemConst;
             TraitItemFn on_trait_item_fn off_trait_item_fn visit_trait_item_fn TraitItemFn;
-            TypeArray on_type_array off_type_array visit_type_array TypeArray;
             Type on_type off_type visit_type Type;
             TypePath on_type_path off_type_path visit_type_path TypePath;
             TypeReference on_type_reference off_type_reference visit_type_reference TypeReference;

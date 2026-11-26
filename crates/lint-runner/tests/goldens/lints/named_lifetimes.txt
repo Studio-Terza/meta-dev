@@ -5,7 +5,4 @@ lifetimes are named with a word, never a letter:
 src/accented.rs:1: 'é; name the lifetime with a word that says what it borrows from
 src/short.rs:1: 'a; name the lifetime with a word that says what it borrows from
 src/short.rs:2: 'b; name the lifetime with a word that says what it borrows from
-function names say what the function does:
-src/named.rs:2: fn f names nothing; say what it does
-src/short.rs:2: fn f names nothing; say what it does
 fails

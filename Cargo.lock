@@ -559,18 +559,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lint-const-shape"
-version = "0.1.0"
-dependencies = [
- "lint-core",
- "lint-file",
- "lint-fixtures",
- "lint-layout",
- "lint-sweep",
- "syntax",
-]
-
-[[package]]
 name = "lint-core"
 version = "0.1.0"
 dependencies = [
@@ -631,19 +619,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lint-fn-shape"
-version = "0.1.0"
-dependencies = [
- "lint-core",
- "lint-file",
- "lint-fixtures",
- "lint-layout",
- "lint-sweep",
- "newtype",
- "syntax",
-]
-
-[[package]]
 name = "lint-layout"
 version = "0.1.0"
 dependencies = [
@@ -656,18 +631,6 @@ dependencies = [
  "syntax",
  "thiserror",
  "toml",
-]
-
-[[package]]
-name = "lint-literal-names"
-version = "0.1.0"
-dependencies = [
- "lint-core",
- "lint-file",
- "lint-fixtures",
- "lint-layout",
- "lint-sweep",
- "syntax",
 ]
 
 [[package]]
@@ -684,18 +647,6 @@ dependencies = [
 
 [[package]]
 name = "lint-named-lifetimes"
-version = "0.1.0"
-dependencies = [
- "lint-core",
- "lint-file",
- "lint-fixtures",
- "lint-layout",
- "lint-sweep",
- "syntax",
-]
-
-[[package]]
-name = "lint-named-numbers"
 version = "0.1.0"
 dependencies = [
  "lint-core",
@@ -731,45 +682,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "lint-no-forwarders"
-version = "0.1.0"
-dependencies = [
- "lint-core",
- "lint-file",
- "lint-fixtures",
- "lint-layout",
- "lint-sweep",
- "syntax",
-]
-
-[[package]]
 name = "lint-no-free-fns"
-version = "0.1.0"
-dependencies = [
- "lint-core",
- "lint-file",
- "lint-fixtures",
- "lint-layout",
- "lint-sweep",
- "syntax",
-]
-
-[[package]]
-name = "lint-no-ignored-tests"
-version = "0.1.0"
-dependencies = [
- "invariants",
- "lint-core",
- "lint-file",
- "lint-fixtures",
- "lint-layout",
- "lint-placement",
- "lint-sweep",
- "syntax",
-]
-
-[[package]]
-name = "lint-no-numbers-in-binaries"
 version = "0.1.0"
 dependencies = [
  "lint-core",
@@ -802,18 +715,6 @@ dependencies = [
  "invariants",
  "lint-layout",
  "strum",
- "syntax",
-]
-
-[[package]]
-name = "lint-private-fns"
-version = "0.1.0"
-dependencies = [
- "lint-core",
- "lint-file",
- "lint-fixtures",
- "lint-layout",
- "lint-sweep",
  "syntax",
 ]
 
@@ -893,33 +794,24 @@ dependencies = [
  "file-ports",
  "invariants",
  "lint-bool-methods",
- "lint-const-shape",
  "lint-core",
  "lint-enum-predicates",
  "lint-expression-flow",
  "lint-file",
  "lint-fixtures",
- "lint-fn-shape",
  "lint-layout",
- "lint-literal-names",
  "lint-manual-iteration",
  "lint-named-lifetimes",
- "lint-named-numbers",
  "lint-no-comments",
  "lint-no-dyn",
- "lint-no-forwarders",
  "lint-no-free-fns",
- "lint-no-ignored-tests",
- "lint-no-numbers-in-binaries",
  "lint-no-test-only-api",
- "lint-private-fns",
  "lint-process-starters",
  "lint-public-api-tests",
  "lint-public-surface",
  "lint-reader",
  "lint-sweep",
  "lint-test-budget",
- "lint-thin-main",
  "lint-type-shape",
  "lint-vec-out-params",
  "port-core",
@@ -952,19 +844,6 @@ dependencies = [
  "lint-process-starters",
  "lint-sweep",
  "newtype",
- "syntax",
-]
-
-[[package]]
-name = "lint-thin-main"
-version = "0.1.0"
-dependencies = [
- "lint-core",
- "lint-file",
- "lint-fixtures",
- "lint-layout",
- "lint-placement",
- "lint-sweep",
  "syntax",
 ]
 

@@ -1,7 +1,0 @@
-function names say what the function does:
-src/associated.rs:3: fn make names nothing; say what it does
-src/associated.rs:7: fn make names nothing; say what it does
-methods do their own work, they do not forward to another type of ours:
-src/associated.rs:7: fn make only forwards to Maker::make; expose the part or call that directly
-src/method.rs:7: fn work only forwards to work; expose the part or call that directly
-fails

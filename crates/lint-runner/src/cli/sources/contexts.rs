@@ -3,8 +3,6 @@ use lint_core::SourceFile;
 use lint_core::{Parsed, Unwalked};
 use lint_enum_predicates::EnumPredicates;
 use lint_file::ContextLint;
-use lint_named_numbers::NamedNumbers;
-use lint_no_forwarders::NoForwarders;
 use lint_no_test_only_api::NoTestOnlyApi;
 use lint_public_api_tests::PublicApiTests;
 use lint_public_surface::PublicSurface;
@@ -74,9 +72,7 @@ macro_rules! contexts {
 }
 
 contexts! {
-    named_numbers: NamedNumbers,
     public_surface: PublicSurface,
-    no_forwarders: NoForwarders,
     enum_predicates: EnumPredicates,
     public_api_tests: PublicApiTests,
     no_test_only_api: NoTestOnlyApi,

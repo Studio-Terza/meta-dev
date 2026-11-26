@@ -13,14 +13,12 @@ mod readout;
 mod repo_file;
 mod report;
 mod source_file;
-mod support_modules;
 mod syntax;
 mod test_file;
-mod type_name;
 mod walk;
 mod watch;
 
-pub use boundary::{Bound, Finding, Fix, Message, Problem, Violation};
+pub use boundary::{Finding, Fix, Message, Problem, Violation};
 pub use contents::Contents;
 pub use contribution::{
     Around, Contributed, Contributing, Contribution, Joined, Joint, Scope, Tallied, Unjoined, Visits,
@@ -35,9 +33,7 @@ pub use readout::{Readout, Unwalked};
 pub use repo_file::RepoFile;
 pub use report::Report;
 pub use source_file::{FileHead, Parsed, SourceFile};
-pub use support_modules::SupportScan;
 pub use syntax::Syntax;
-pub use type_name::TypeName;
 pub use walk::Walk;
 pub use watch::{Address, Contribute, Descend, Facts, Kind};
 

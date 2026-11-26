@@ -544,7 +544,7 @@ fn every_path_given_is_checked() -> Result<(), Failed> {
 #[test]
 fn the_binary_root_is_found_whichever_path_is_given() -> Result<(), Failed> {
     let root = Scratch::package()?;
-    root.write("src/main.rs", "struct Extra;\nfn main() {}\n")?;
+    root.write("src/main.rs", "// note\nfn main() {}\n")?;
     assert_eq!(root.reported().violations(), 1);
     assert_eq!(root.reported_at("src").violations(), 1);
     Ok(())
@@ -553,8 +553,8 @@ fn the_binary_root_is_found_whichever_path_is_given() -> Result<(), Failed> {
 #[test]
 fn bin_roots_and_modules_named_like_build_directories_are_read() -> Result<(), Failed> {
     let bins = Scratch::package()?;
-    bins.write("src/bin/tool.rs", "struct Extra;\nfn main() {}\n")?;
-    bins.write("src/bin/other/main.rs", "mod m {}\nfn main() {}\n")?;
+    bins.write("src/bin/tool.rs", "// tool\nfn main() {}\n")?;
+    bins.write("src/bin/other/main.rs", "// other\nfn main() {}\n")?;
     assert_eq!(bins.reported().violations(), 2);
     let build_named = Scratch::package()?;
     build_named.write("src/lib.rs", "pub mod target;\n")?;
@@ -626,7 +626,7 @@ fn a_path_dependency_inside_the_workspace_is_read() -> Result<(), Failed> {
 #[test]
 fn the_verdict_does_not_depend_on_where_the_checkout_lives() -> Result<(), Failed> {
     let root = Scratch::temporary()?;
-    let flow = "#[test]\nfn t() { for i in [2, 3] { if i > 9 { return; } } }\n";
+    let flow = "// flow\n#[test]\nfn t() { for i in [2, 3] { if i > 9 { return; } } }\n";
     let build = "fn main() { println!(\"{}\", 2 + 3); }\n";
     let nested = "pub mod a;\npub mod b;\n";
     let layouts = ["plain/proj", "src/proj", "tests/proj"];
@@ -681,7 +681,7 @@ const TEST_CYCLE: &[[&str; 2]] = &[
 #[test]
 fn a_file_reached_twice_or_in_a_cycle_is_read_once() {
     assert_eq!(Scratch::judged(&PATH_CYCLE), Some(2));
-    assert_eq!(Scratch::judged(&TWO_ROOTS), Some(2));
+    assert_eq!(Scratch::judged(&TWO_ROOTS), Some(1));
     assert_eq!(Scratch::judged(&TEST_THEN_MODULE), Some(1));
     assert_eq!(Scratch::judged(&MODULE_THEN_TEST), Some(2));
     assert_eq!(Scratch::judged(&TEST_CYCLE), Some(1));
@@ -733,20 +733,6 @@ fn targets_declared_with_a_path_are_read() -> Result<(), Failed> {
         assert_eq!(root.reported().violations(), 2, "{file}");
         Ok(())
     })
-}
-
-#[test]
-fn an_example_that_is_not_run_as_a_test_is_not_a_skipped_test() -> Result<(), Failed> {
-    let declared = |kind: &str, file: &str| -> Result<Reported, FileFailure> {
-        let root = Scratch::temporary()?;
-        let table = format!("{MANIFEST}[[{kind}]]\nname = \"e\"\ntest = false\n");
-        root.write("Cargo.toml", &table)?;
-        root.write(file, CLEAN)?;
-        Ok(root.reported())
-    };
-    assert_eq!(declared("example", "examples/e.rs")?, Reported::clean());
-    assert_eq!(declared("test", "tests/e.rs")?.exit, ExitCode::FAILURE);
-    Ok(())
 }
 
 #[test]

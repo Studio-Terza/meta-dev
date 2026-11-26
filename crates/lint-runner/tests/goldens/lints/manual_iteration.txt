@@ -13,12 +13,6 @@ src/counter.rs:2: mutable local that is only reassigned; a mutable binding is bo
 src/filtered.rs:2: for loop; drive the iterator with combinators, const fns excepted
 src/filtered.rs:3: if without else yields nothing; use then_some, filter, or an else branch that produces the value
 src/working.rs:2: for loop; drive the iterator with combinators, const fns excepted
-function names say what the function does:
-src/accumulating.rs:1: fn f names nothing; say what it does
-src/counter.rs:1: fn f names nothing; say what it does
-src/filtered.rs:1: fn f names nothing; say what it does
-src/mutable.rs:1: fn f names nothing; say what it does
-src/working.rs:1: fn f names nothing; say what it does
 iterators are driven by combinators, not by hand:
 src/accumulating.rs:2: loop that only accumulates; extend or collect from an iterator instead
 src/filtered.rs:2: loop that only accumulates; extend or collect from an iterator instead
