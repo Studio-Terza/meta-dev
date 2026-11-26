@@ -240,9 +240,7 @@ impl Lints {
                 .ignoring(Ignored::Unspawned)
         });
         let locating = Helper::spawned(scope, move || Self::locating(sources)).ignoring(Ignored::Unspawned);
-        let recalling =
-            Helper::spawned(scope, move || Worked::timed(sources.recalled().timing())).ignoring(Ignored::Unspawned);
-        Crew { helpers: locating.into_iter().chain(recalling).chain(helpers).collect() }
+        Crew { helpers: locating.into_iter().chain(helpers).collect() }
     }
 
     fn gathered<'run>(
@@ -256,7 +254,8 @@ impl Lints {
     }
 
     fn locating(sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>) -> Worked {
-        Worked::timed(sources.located().timing())
+        let recalled = Worked::timed(sources.recalled().timing());
+        [recalled, Worked::timed(sources.located().timing())].into_iter().collect()
     }
 
     fn helped(
