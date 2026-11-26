@@ -3,7 +3,6 @@ use std::path::Path;
 use design_model::Project;
 use file_ports::{Bytes, FileFailure, Files, Offset};
 use local_config::Kept;
-use newtype::Wrapping;
 use port_core::{Port, Run};
 use store_ports::Store;
 use transcript_ports::ClaudeCodeDir;
@@ -40,7 +39,7 @@ impl<'run, F: Files, S: Store> Ground<'run, F, S> {
         let size = self.files.size(path)?.into_inner();
         let start = match i64::try_from(size.saturating_sub(kept)).map(Offset::try_new) {
             Ok(Ok(offset)) => offset,
-            Ok(Err(_)) | Err(_) => Offset::default(),
+            Ok(Err(_negative)) | Err(_huge) => Offset::default(),
         };
         self.files.read_from(path, start)
     }

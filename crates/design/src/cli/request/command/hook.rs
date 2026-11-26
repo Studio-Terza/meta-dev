@@ -1,6 +1,5 @@
 pub(super) mod answers;
 mod boundary;
-mod waits;
 
 use console_ports::Environment;
 use dispatch_ports::{Clock, Dispatch};
@@ -48,7 +47,7 @@ impl Hook {
         let store = ground.store();
         Ingest::read(store, &ground.transcripts())?;
         let recalled = prompting.recalled(&Answering::new(store, crew));
-        Decision::told(store, HookEvent::UserPromptSubmit, recalled.as_ref(), None, None)
+        Decision::told(store, HookEvent::UserPromptSubmit, recalled.as_ref(), None)
     }
 
     fn stopped<F: Files, S: Store, D: Dispatch, C: Clock>(
@@ -57,9 +56,8 @@ impl Hook {
         crew: &Crew<'_, D, C>,
     ) -> Result<Uttered, Failure> {
         let store = ground.store();
-        let snapshot = stopping.snapshot(&ground);
         Ingest::read(store, &ground.transcripts())?;
         let concluded = Structure::new(store, crew).worked()?.concluded();
-        stopping.decided(concluded, store, &Answering::new(store, crew), snapshot.as_ref())
+        stopping.decided(concluded, store, &Answering::new(store, crew))
     }
 }

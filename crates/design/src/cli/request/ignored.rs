@@ -9,8 +9,6 @@ invariants::ignored! {
         Unclassified => "a classifier reply that does not parse as the asked JSON lets the stop proceed",
         Unpicked => "a selection reply that does not parse as the asked JSON quotes nothing, so the stop proceeds",
         Unanswered => "a failed transcript lookup or model call never blocks a stop; the stop proceeds as before",
-        Unstamped => "a transcript timestamp that does not parse leaves its shell without an age, so it never overruns",
-        Untailed => "a transcript that cannot be read leaves the stop without a snapshot; only the question check runs",
-        Unrecalled =>"a failed node lookup or model call injects no design nodes into the prompt",
+        Unrecalled => "a failed node lookup or model call injects no design nodes into the prompt",
     }
 }

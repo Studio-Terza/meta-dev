@@ -261,10 +261,6 @@ impl Replied<'_> {
         serde_json::from_str(&self.braced('[', ']')).ignoring(Ignored::Unpicked).unwrap_or_default()
     }
 
-    pub fn of(reply: &Reply) -> Replied<'_> {
-        Replied(reply)
-    }
-
     fn braced(self, open: char, close: char) -> String {
         let letters: Vec<char> = self.0.to_string().chars().collect();
         let start = letters.iter().position(|letter| *letter == open).unwrap_or(letters.len());

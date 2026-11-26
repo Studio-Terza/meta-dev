@@ -1,19 +1,15 @@
 use std::collections::BTreeMap;
-use std::path::PathBuf;
 
 use console_ports::{Heard, Shown};
 use design_runs::{Account, FailuresReported, UnreportedFailures};
 use design_store::LastSaid;
 use dispatch_ports::{Clock, Dispatch};
-use file_ports::Files;
 use newtype::Wrapping;
 use serde::{Deserialize, Serialize};
 use store_ports::Store;
 use transcript_ports::{Body, SessionId};
 
-use super::super::Ground;
 use super::answers::{Answering, Answers, Recollection, Remembered};
-use super::waits::{Snapshot, Stall};
 use crate::cli::failure::Failure;
 use crate::cli::output::Count;
 use crate::cli::request::ignored::Ignored;
@@ -51,8 +47,6 @@ pub struct Stopping {
     said: Option<Body>,
     #[serde(rename = "session_id", default)]
     session: Option<SessionId>,
-    #[serde(rename = "transcript_path", default)]
-    transcript: Option<PathBuf>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -122,39 +116,25 @@ impl Stopping {
         serde_json::from_str(&heard.into_inner()).map_err(Failure::Unheard)
     }
 
-    const TAIL: u64 = 4 * 1024 * 1024;
-
-    pub fn snapshot<F: Files, S: Store>(&self, ground: &Ground<'_, F, S>) -> Option<Snapshot> {
-        let tail = self.transcript.as_deref().map(|path| ground.tail(path, Self::TAIL));
-        tail.and_then(|read| read.ignoring(Ignored::Untailed)).map(|bytes| Snapshot::read(bytes.as_ref()))
-    }
-
     pub fn decided<S: Store, D: Dispatch, C: Clock>(
         &self,
         concluded: Result<Count, Failure>,
         store: &S,
         answering: &Answering<'_, S, D, C>,
-        snapshot: Option<&Snapshot>,
     ) -> Result<Uttered, Failure> {
         match self.continuation.0 {
             Some(Continuing) => Self::continued(concluded),
-            None => self.checked(store, answering, snapshot),
+            None => Decision::told(store, HookEvent::Stop, &[], self.answered(store, answering).as_ref()),
         }
     }
 
-    fn checked<S: Store, D: Dispatch, C: Clock>(
+    fn answered<S: Store, D: Dispatch, C: Clock>(
         &self,
         store: &S,
         answering: &Answering<'_, S, D, C>,
-        snapshot: Option<&Snapshot>,
-    ) -> Result<Uttered, Failure> {
+    ) -> Option<Answers> {
         let last = self.said.clone().or_else(|| self.stored(store));
-        let answers = last.as_ref().and_then(|said| answering.answered(said).ignoring(Ignored::Unanswered));
-        let stall = last
-            .as_ref()
-            .zip(snapshot)
-            .and_then(|(said, taken)| answering.stalled(taken, said).ignoring(Ignored::Unanswered));
-        Decision::told(store, HookEvent::Stop, &[], answers.flatten().as_ref(), stall.flatten().as_ref())
+        last.and_then(|said| answering.answered(&said).ignoring(Ignored::Unanswered)).flatten()
     }
 
     fn stored(&self, store: &impl Store) -> Option<Body> {
@@ -184,7 +164,6 @@ impl Decision {
         event: HookEvent,
         recalled: &[Remembered],
         answers: Option<&Answers>,
-        stall: Option<&Stall>,
     ) -> Result<Uttered, Failure> {
         let unreported = store.read(UnreportedFailures)?;
         let accounts = unreported.iter().map(|failure| AsRef::<Account>::as_ref(failure).to_string());
@@ -193,11 +172,7 @@ impl Decision {
             .map(|_first| Self::RECALLED.to_owned())
             .into_iter()
             .chain(recalled.iter().map(Remembered::to_string));
-        let told: Vec<String> = accounts
-            .chain(nodes)
-            .chain(answers.map(ToString::to_string))
-            .chain(stall.map(ToString::to_string))
-            .collect();
+        let told: Vec<String> = accounts.chain(nodes).chain(answers.map(ToString::to_string)).collect();
         told.first().map(|_first| told.join("\n")).map_or(Ok(Uttered::silent(Ok(Outcome::Hooked(event)))), |joined| {
             let decision = Decision::telling(event, joined);
             let said = decision.said()?;
