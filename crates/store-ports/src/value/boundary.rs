@@ -83,12 +83,3 @@ impl FromValue for String {
         }
     }
 }
-
-impl<Inner: FromValue> FromValue for Option<Inner> {
-    fn from_value(value: Value) -> Result<Option<Inner>, ColumnFailure> {
-        match value {
-            Value::Null => Ok(None),
-            Value::Integer(_) | Value::Real(_) | Value::Text(_) | Value::Blob(_) => Inner::from_value(value).map(Some),
-        }
-    }
-}

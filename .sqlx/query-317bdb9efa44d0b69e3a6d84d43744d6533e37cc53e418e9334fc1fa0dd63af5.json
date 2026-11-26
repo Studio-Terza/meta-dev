@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\nSELECT\n  uuid,\n  session,\n  parent,\n  at,\n  author,\n  body\nFROM\n  messages\nWHERE\n  session = ?1\n  AND author = ?2\nORDER BY\n  at DESC\nLIMIT\n  1\n",
+  "query": "\nSELECT\n  uuid,\n  at,\n  author,\n  body\nFROM\n  messages\nWHERE\n  session = ?1\n  AND author = ?2\nORDER BY\n  at DESC\nLIMIT\n  1\n",
   "describe": {
     "columns": [
       {
@@ -15,30 +15,8 @@
         }
       },
       {
-        "name": "session",
-        "ordinal": 1,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "messages",
-            "name": "session"
-          }
-        }
-      },
-      {
-        "name": "parent",
-        "ordinal": 2,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "messages",
-            "name": "parent"
-          }
-        }
-      },
-      {
         "name": "at",
-        "ordinal": 3,
+        "ordinal": 1,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -49,7 +27,7 @@
       },
       {
         "name": "author",
-        "ordinal": 4,
+        "ordinal": 2,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -60,7 +38,7 @@
       },
       {
         "name": "body",
-        "ordinal": 5,
+        "ordinal": 3,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -76,11 +54,9 @@
     "nullable": [
       false,
       false,
-      true,
-      false,
       false,
       false
     ]
   },
-  "hash": "ce12210dd6b1c1154a1d50ccbbbb3cce6ba17d6b4ed3d88abe052aee14d02627"
+  "hash": "317bdb9efa44d0b69e3a6d84d43744d6533e37cc53e418e9334fc1fa0dd63af5"
 }

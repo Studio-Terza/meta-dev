@@ -88,10 +88,16 @@ impl<'run> Merging<'run> {
     }
 }
 
+#[derive(Debug, Default)]
+struct Deposited<'run> {
+    accounted: Vec<FileOrder>,
+    gathered: Vec<Gathered<'run>>,
+}
+
 #[derive(Debug)]
 pub(crate) struct Gathering<'run> {
     heads: &'run OnceLock<Vec<FileHead>>,
-    deposited: Mutex<Vec<Gathered<'run>>>,
+    deposited: Mutex<Deposited<'run>>,
     contexts: OnceLock<Contexts<'run>>,
 }
 
@@ -107,23 +113,31 @@ impl<'run> Gathering<'run> {
         starting: impl Fn(Claimed<'read>) -> Filed,
     ) -> Share<'run, Part> {
         let heads = self.heads.get_or_init(|| table.to_vec());
-        let claims: Vec<Claim<'read, 'run>> = readout
+        let placed: Vec<(usize, &'read SourceFile, &'run FileHead)> = readout
             .files()
             .iter()
-            .zip(readout.unwalked())
-            .filter_map(|(file, unwalked)| {
+            .filter_map(|file| {
                 let index = heads
                     .binary_search_by(|head| AsRef::<Path>::as_ref(head).cmp(AsRef::<Path>::as_ref(file.head())))
                     .ignoring(Ignored::Unclaimed)?;
-                Some(Claim { order: FileOrder::from(index), file, head: heads.get(index)?, unwalked })
+                Some((index, file, heads.get(index)?))
             })
             .collect();
-        let joined: Vec<Joined<'run, Part>> = claims.into_iter().map(|claim| claim.gathered(&starting)).collect();
+        let accounted: Vec<FileOrder> = placed.iter().map(|(index, _, _)| FileOrder::from(*index)).collect();
+        let claims = placed.into_iter().zip(readout.unwalked()).map(|((index, file, head), unwalked)| Claim {
+            order: FileOrder::from(index),
+            file,
+            head,
+            unwalked,
+        });
+        let joined: Vec<Joined<'run, Part>> = claims.map(|claim| claim.gathered(&starting)).collect();
         let (gathered, filed): (Vec<Gathered<'run>>, Vec<Part>) =
             joined.into_iter().map(|found| (found.gathered, found.filed)).unzip();
         let mut held = self.deposited.lock().unpoisoned();
-        held.extend(gathered);
-        let complete = Some(held.len()).filter(|count| *count == heads.len()).map(|_| mem::take(&mut *held));
+        held.accounted.extend(accounted);
+        held.gathered.extend(gathered);
+        let complete =
+            Some(held.accounted.len()).filter(|count| *count == heads.len()).map(|_| mem::take(&mut held.gathered));
         Share { merging: complete.map(Merging), filed }
     }
 

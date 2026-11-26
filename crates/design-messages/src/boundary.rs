@@ -10,11 +10,19 @@ use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Uui
 
 use crate::Said;
 
-#[derive(Debug, Columns)]
+#[derive(Debug)]
 pub struct MessageRow {
     uuid: Uuid,
     session: SessionId,
     parent: Option<Uuid>,
+    at: Instant,
+    author: Authorship,
+    body: Body,
+}
+
+#[derive(Debug, Columns)]
+pub(crate) struct SaidRow {
+    uuid: Uuid,
     at: Instant,
     author: Authorship,
     body: Body,
@@ -41,25 +49,23 @@ impl From<&Record> for MessageRow {
     }
 }
 
-impl From<MessageRow> for Said {
-    fn from(row: MessageRow) -> Said {
+impl From<SaidRow> for Said {
+    fn from(row: SaidRow) -> Said {
         Said::new(row.uuid, row.at, row.body)
     }
 }
 
-impl MessageRow {
+impl SaidRow {
     pub(crate) fn last_in(
         session: &SessionId,
         author: Authorship,
         statements: &mut impl Execute,
-    ) -> Result<Vec<MessageRow>, StoreFailure> {
+    ) -> Result<Vec<SaidRow>, StoreFailure> {
         statements.rows(store_ports::query!(
-            MessageRow,
+            SaidRow,
             r#"
 SELECT
   uuid,
-  session,
-  parent,
   at,
   author,
   body
@@ -79,7 +85,7 @@ LIMIT
     }
 
     pub(crate) fn owned(statements: &mut impl Execute) -> Result<Vec<Said>, StoreFailure> {
-        let owned: BTreeMap<(Instant, Uuid), MessageRow> = MessageRow::all(statements)?
+        let owned: BTreeMap<(Instant, Uuid), SaidRow> = SaidRow::all(statements)?
             .into_iter()
             .filter(|row| row.author == Authorship::Owner)
             .map(|row| ((row.at.clone(), row.uuid.clone()), row))
@@ -87,14 +93,12 @@ LIMIT
         Ok(owned.into_values().map(Said::from).collect())
     }
 
-    fn all(statements: &mut impl Execute) -> Result<Vec<MessageRow>, StoreFailure> {
+    fn all(statements: &mut impl Execute) -> Result<Vec<SaidRow>, StoreFailure> {
         statements.rows(store_ports::query!(
-            MessageRow,
+            SaidRow,
             r#"
 SELECT
   uuid,
-  session,
-  parent,
   at,
   author,
   body
@@ -103,7 +107,9 @@ FROM
 "#
         ))
     }
+}
 
+impl MessageRow {
     pub(crate) fn inserted(&self) -> Prepared<()> {
         let MessageRow { uuid, session, parent, at, author, body } = self;
         store_ports::query!(
