@@ -1,7 +1,7 @@
 mod contexts;
 mod gathering;
 
-pub(crate) use contexts::{Holding, Priming, Settled};
+pub(crate) use contexts::{Holding, Settled};
 use gathering::Merging;
 pub(crate) use gathering::{Claimed, Gathering};
 
@@ -9,18 +9,13 @@ use std::sync::OnceLock;
 
 use cargo_ports::Cargo;
 use file_ports::Files;
-use graph::Model;
-use graph_reader::{FileFacts, Reader};
 use lint_core::{FileHead, Readout};
 use lint_reader::{CrateSources, Crew, Described, Partition, Reads, SharedRead, Stage, Unlocated};
 use lint_sweep::Gathers;
 
 use timer_ports::Timer;
 
-use super::boundary::Queue;
 use super::timings::{Measured, Step, Stopwatch, Table, Timing, Timings, Visiting, Worker};
-use crate::cli::ignored::Ignored;
-use invariants::Ignoring;
 
 #[derive(Debug)]
 pub(crate) struct Wired<'run, F, C, T> {
@@ -36,7 +31,6 @@ pub(crate) struct Sources<'run, F, C, T> {
     wired: &'run Wired<'run, F, C, T>,
     staged: &'run Measured<Stage<'run>>,
     shared: &'run SharedRead<'run>,
-    queue: Queue,
     located: OnceLock<Measured<Result<Described, Unlocated>>>,
     gathering: Gathering<'run>,
 }
@@ -70,7 +64,6 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
             wired,
             staged,
             shared,
-            queue: Queue::default(),
             located: OnceLock::new(),
             gathering: Gathering::new(heads),
         }
@@ -90,10 +83,6 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
 
     pub(crate) fn earlier(&self) -> impl Iterator<Item = Timing> {
         [self.staged.timing()].into_iter()
-    }
-
-    pub(crate) fn queue(&self) -> &Queue {
-        &self.queue
     }
 
     pub(crate) fn located(&self) -> &Measured<Result<Described, Unlocated>> {
@@ -117,29 +106,15 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
         let mut share = self.gathering.gathered(readout, self.shared.heads(), starting);
         let filed = share.filed();
         let lowered = stopwatch.stopped(Step::Lower(worker));
-        let merged = share.into_merging().map_or_default(|complete| self.settled(complete));
+        let merged = share.into_merging().map(|complete| self.settled(complete));
         Lowering { timings: [lowered].into_iter().chain(merged).collect(), filed }
     }
 
-    fn settled(&self, complete: Merging<'run>) -> Vec<Timing>
-    where
-        T: Sync,
-    {
+    fn settled(&self, complete: Merging<'run>) -> Timing {
         let timer = self.wired.timer;
-        let waiting = Stopwatch::started(timer);
-        let described = self.located().done().as_ref().ignoring(Ignored::Unlocated);
-        let waited = waiting.stopped(Step::Model.waited());
-        let settled = complete.settled(
-            &self.gathering,
-            |facts| Stopwatch::measured(timer, Step::Model, || Self::merged(facts, described)),
-            |parts| Stopwatch::measured(timer, Step::Contexts, || parts.into_iter().collect()),
-        );
-        [waited].into_iter().chain(settled).collect()
-    }
-
-    fn merged(facts: Vec<FileFacts>, described: Option<&Described>) -> Option<Model> {
-        let model = FileFacts::merged(facts);
-        described.map(|found| Reader::rooted(model, found.crates()))
+        complete.settled(&self.gathering, |parts| {
+            Stopwatch::measured(timer, Step::Contexts, || parts.into_iter().collect())
+        })
     }
 
     pub(crate) fn gathering(&self) -> &Gathering<'run> {

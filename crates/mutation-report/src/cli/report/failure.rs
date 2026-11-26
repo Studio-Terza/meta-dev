@@ -5,7 +5,7 @@ use std::path::Path;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Failure<'path> {
-    #[error("usage: mutation-report <shards> <sources> <report.md> <report.json>")]
+    #[error("usage: mutation-report <shards> <report.md> <report.json>")]
     Usage(#[source] TryFromSliceError),
     #[error("cannot use {path}: {source}", path = path.display())]
     Io { path: Cow<'path, Path>, source: io::Error },

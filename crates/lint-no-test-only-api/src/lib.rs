@@ -2,28 +2,23 @@ mod feature_word;
 mod finding;
 mod flagged;
 mod gated_items;
-mod offered;
 mod test_features;
 
 use std::borrow::Cow;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use feature_word::FeatureWord;
 use finding::Finding;
 use gated_items::GatedItems;
-use graph::Model;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
-use lint_core::{FileHead, Headline, Parsed, Report};
-use lint_file::WorkspaceLint;
+use lint_core::{Headline, Parsed};
 use lint_file::{ContextLint, Reads, WatchingLint};
-use lint_placement::{CrateName, PackageRoot};
+use lint_placement::PackageRoot;
 use lint_sweep::{Contributing, Finds, Gathers, Watchers};
-use offered::{Offer, Used};
 use test_features::TestFeatures;
-use workspace_metadata::Metadata;
 
 #[derive(Debug)]
 pub struct NoTestOnlyApi;
@@ -140,24 +135,5 @@ pub struct Offered<'file> {
 impl<'file> Gathers<Offered<'file>> for Offering<'file> {
     fn gathered(self, file: &SourceFile) -> Offered<'file> {
         Offered { found: self.watchers.gathered(file) }
-    }
-}
-
-impl WorkspaceLint for NoTestOnlyApi {
-    type Facts<'head> = ();
-
-    fn gathered(_: &[Parsed<'_, '_>]) {}
-
-    fn report<'file, 'head: 'file>(
-        _: &'file [FileHead],
-        workspaces: &'file [Metadata],
-        (): &'file (),
-        model: &'file Model,
-    ) -> Report<'file> {
-        let support: BTreeSet<CrateName> =
-            workspaces.iter().flat_map(Metadata::test_support).map(|name| CrateName::from(name.as_ref())).collect();
-        let used = Used::from(model);
-        let offers = Offer::every(model).into_iter().filter_map(|offer| offer.shipped(&support));
-        Report::new(Self::HEADLINE, offers.filter_map(|offer| offer.tested_only(&used)).collect())
     }
 }

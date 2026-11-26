@@ -1,6 +1,6 @@
 mod ignored;
 
-use algebra::{Monoid, Semigroup};
+use lint_core::Joins;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
 use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Contribution, Descend, Facts, Finds, Kind, Scope};
@@ -104,7 +104,7 @@ struct Flowed<'scan> {
     touched: Vec<Name>,
 }
 
-impl Semigroup for Flowed<'_> {
+impl Joins for Flowed<'_> {
     fn combine(self, other: Self) -> Self {
         Flowed {
             found: self.found.combine(other.found),
@@ -113,8 +113,6 @@ impl Semigroup for Flowed<'_> {
         }
     }
 }
-
-impl Monoid for Flowed<'_> {}
 
 impl Flowed<'_> {
     fn only_reassigned(&self) -> Vec<Span> {

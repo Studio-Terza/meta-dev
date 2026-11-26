@@ -1,7 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use algebra::{Monoid, Semigroup};
-
 use crate::metadata::{Node, NodeDependency};
 use crate::package_id::PackageId;
 
@@ -23,20 +21,12 @@ impl Linkage {
     }
 }
 
-impl Semigroup for Requires<'_> {
-    fn combine(self, other: Self) -> Self {
-        Requires(other.0.into_iter().fold(self.0, |mut all, (dependent, required)| {
-            all.entry(dependent).or_default().extend(required);
-            all
-        }))
-    }
-}
-
-impl Monoid for Requires<'_> {}
-
 impl<'meta> Requires<'meta> {
     pub(super) fn linked(nodes: &'meta [Node], linkage: Linkage) -> Requires<'meta> {
-        Monoid::concat(nodes.iter().map(|node| Requires(BTreeMap::from([(node.package_id(), linkage.required(node))]))))
+        Requires(nodes.iter().fold(BTreeMap::new(), |mut all: BTreeMap<_, BTreeSet<_>>, node| {
+            all.entry(node.package_id()).or_default().extend(linkage.required(node));
+            all
+        }))
     }
 
     pub(super) fn direct(&self, dependent: &PackageId) -> impl Iterator<Item = &'meta PackageId> + use<'_, 'meta> {

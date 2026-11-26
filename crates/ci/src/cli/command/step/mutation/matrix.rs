@@ -17,7 +17,6 @@ use grammar_output::Record;
 #[derive(Debug)]
 pub struct Matrix {
     shards: PathBuf,
-    sources: PathBuf,
     directory: PathBuf,
     markdown: Journal,
     json: PathBuf,
@@ -30,7 +29,7 @@ impl Matrix {
 
     fn written(&self, files: &impl Files) -> Result<&Journal, Failure<'_>> {
         files.create_directories(&self.directory).map_err(|failure| Failure::unusable(&self.directory, failure))?;
-        let arguments = [&self.shards, &self.sources, self.markdown.as_ref(), &self.json];
+        let arguments = [&self.shards, self.markdown.as_ref(), &self.json];
         let answered = mutation_report::Cli::answer(&arguments, files);
         let refusal: &Complaint = answered.as_ref();
         Some(answered.code())
@@ -46,8 +45,6 @@ struct MatrixWords {
     #[field(Location)]
     shards: PathBuf,
     #[field(Location)]
-    sources: PathBuf,
-    #[field(Location)]
     directory: PathBuf,
     #[field(Journaled)]
     summary: Journal,
@@ -57,7 +54,6 @@ impl From<MatrixWords> for Matrix {
     fn from(words: MatrixWords) -> Matrix {
         Matrix {
             shards: words.shards,
-            sources: words.sources,
             markdown: Journal::from(words.directory.join(Matrix::MARKDOWN)),
             json: words.directory.join(Matrix::JSON),
             directory: words.directory,

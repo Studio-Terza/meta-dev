@@ -1,4 +1,4 @@
-use algebra::{Monoid, Semigroup};
+use lint_core::Joins;
 use invariants::{invariant, invariants};
 use lint_core::{SourceFile, SourceText};
 use lint_sweep::{Around, Contribute, Contributed, Contributing, Contribution, Descend, Facts, Kind, Scope};
@@ -15,13 +15,12 @@ const NESTED: &str = "fn f() {\n    {\n        {\n        }\n    }\n}\nfn g() {\
 #[derive(Debug, Default)]
 struct Depth(Option<usize>);
 
-impl Semigroup for Depth {
+impl Joins for Depth {
     fn combine(self, other: Depth) -> Depth {
         Depth(self.0.or(other.0))
     }
 }
 
-impl Monoid for Depth {}
 
 #[derive(Debug)]
 struct Recorder {

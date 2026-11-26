@@ -1,4 +1,4 @@
-use algebra::{Monoid, Semigroup};
+use lint_core::Joins;
 use lint_layout::Failure;
 use lint_roots::Survey;
 
@@ -33,7 +33,7 @@ pub(super) struct Declared {
     failures: Vec<Failure>,
 }
 
-impl Semigroup for Declared {
+impl Joins for Declared {
     fn combine(self, other: Declared) -> Declared {
         Declared {
             modules: self.modules.combine(other.modules),
@@ -42,8 +42,6 @@ impl Semigroup for Declared {
         }
     }
 }
-
-impl Monoid for Declared {}
 
 impl From<Resolution> for Declared {
     fn from(resolution: Resolution) -> Declared {
@@ -57,7 +55,7 @@ impl From<Resolution> for Declared {
 
 impl Declared {
     pub(super) fn resolved(sought: &[Sought], survey: &Survey) -> Declared {
-        Monoid::concat(sought.iter().filter_map(|declaration| declaration.resolution(survey)).map(Declared::from))
+        Joins::concat(sought.iter().filter_map(|declaration| declaration.resolution(survey)).map(Declared::from))
     }
 
     pub(super) fn children(&self, kind: Kind) -> &[Child] {

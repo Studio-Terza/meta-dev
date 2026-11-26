@@ -3,7 +3,7 @@ mod finding;
 
 use syntax::{Attribute, ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, Signature, TraitItemFn};
 
-use algebra::Semigroup;
+use lint_core::Joins;
 use lint_core::{Site, SourceFile, Syntax, Violation, Walk};
 use lint_layout::LineNumber;
 use lint_sweep::{Concludes, Contribute, Contributed, Descend, Facts, Kind};

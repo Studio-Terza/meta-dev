@@ -1,7 +1,7 @@
-use algebra::{Monoid, Semigroup};
 use newtype::{Arbitrary, Counter, Newtype};
 use syntax::Entered;
 
+use crate::joins::Joins;
 use crate::watch::Kind;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -47,7 +47,7 @@ struct Backward {
 
 impl Kinds {
     pub(crate) fn listed(kinds: impl Iterator<Item = Kind>) -> Kinds {
-        Monoid::concat(kinds.map(Kinds::from))
+        Joins::concat(kinds.map(Kinds::from))
     }
 
     pub(crate) fn overlap(self, other: Kinds) -> Option<()> {
@@ -61,13 +61,11 @@ impl From<Kind> for Kinds {
     }
 }
 
-impl Semigroup for Kinds {
+impl Joins for Kinds {
     fn combine(self, other: Kinds) -> Kinds {
         Kinds(self.0 | other.0)
     }
 }
-
-impl Monoid for Kinds {}
 
 impl<'ast> FromIterator<Entered<'ast>> for KindIndex {
     fn from_iter<Preorder: IntoIterator<Item = Entered<'ast>>>(preorder: Preorder) -> KindIndex {
@@ -78,7 +76,7 @@ impl<'ast> FromIterator<Entered<'ast>> for KindIndex {
             let children = backward.open.split_off(backward.open.len().saturating_sub(deeper));
             let size = Offset::new(children.iter().map(|child| child.size.count()).sum());
             let kinds =
-                Monoid::concat(children.iter().map(|child| child.kinds)).combine(Kinds::from(Kind::of(entry.node())));
+                Kinds::concat(children.iter().map(|child| child.kinds)).combine(Kinds::from(Kind::of(entry.node())));
             backward.open.push(Pending { depth, size: size.incremented(), kinds });
             backward.done.push(Subtree { descendants: size, kinds });
             backward

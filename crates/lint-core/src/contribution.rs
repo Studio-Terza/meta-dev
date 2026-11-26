@@ -2,9 +2,9 @@ use std::fmt;
 use std::iter;
 use std::rc::Rc;
 
-use algebra::{Monoid, Semigroup};
 use syntax::Node;
 
+use crate::joins::Joins;
 use crate::kind_index::{Cursors, Indexed, Kinds};
 use crate::macros::Macros;
 use crate::source_file::SourceFile;
@@ -72,13 +72,11 @@ impl Visits {
     const ONE: Visits = Visits(1);
 }
 
-impl Semigroup for Visits {
+impl Joins for Visits {
     fn combine(self, other: Visits) -> Visits {
         Visits(self.0 + other.0)
     }
 }
-
-impl Monoid for Visits {}
 
 impl fmt::Display for Visits {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -129,7 +127,7 @@ impl<'node, 'file, 'index> Visit<'node, 'file, 'index> {
     }
 }
 
-impl<Open: Monoid, Part: Monoid> Contributed<Open, Part> {
+impl<Open: Joins, Part: Joins> Contributed<Open, Part> {
     #[must_use]
     pub fn new(open: Open, part: Part, descend: Descend) -> Contributed<Open, Part> {
         Contributed { within: Contribution { open, part }, descend }
@@ -163,15 +161,13 @@ impl<Open, Part> Contribution<Open, Part> {
     }
 }
 
-impl<Open: Semigroup, Part: Semigroup> Semigroup for Contribution<Open, Part> {
+impl<Open: Joins, Part: Joins> Joins for Contribution<Open, Part> {
     fn combine(self, other: Contribution<Open, Part>) -> Contribution<Open, Part> {
         Contribution { open: self.open.combine(other.open), part: self.part.combine(other.part) }
     }
 }
 
-impl<Open: Monoid, Part: Monoid> Monoid for Contribution<Open, Part> {}
-
-impl<Open: Semigroup, Part: Semigroup> Semigroup for Walked<Open, Part> {
+impl<Open: Joins, Part: Joins> Joins for Walked<Open, Part> {
     fn combine(self, other: Walked<Open, Part>) -> Walked<Open, Part> {
         Walked {
             contribution: self.contribution.combine(other.contribution),
@@ -181,9 +177,7 @@ impl<Open: Semigroup, Part: Semigroup> Semigroup for Walked<Open, Part> {
     }
 }
 
-impl<Open: Monoid, Part: Monoid> Monoid for Walked<Open, Part> {}
-
-impl<Open: Monoid, Part: Monoid> From<Visits> for Walked<Open, Part> {
+impl<Open: Joins, Part: Joins> From<Visits> for Walked<Open, Part> {
     fn from(visits: Visits) -> Walked<Open, Part> {
         Walked { visits, ..Walked::default() }
     }
@@ -363,10 +357,8 @@ impl Scope {
     }
 }
 
-impl Semigroup for WalkPosition {
+impl Joins for WalkPosition {
     fn combine(self, other: WalkPosition) -> WalkPosition {
         WalkPosition(self.0 + other.0)
     }
 }
-
-impl Monoid for WalkPosition {}

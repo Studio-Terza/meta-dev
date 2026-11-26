@@ -1,6 +1,6 @@
 use syntax::{Ident, Macro, Node};
 
-use algebra::Monoid;
+use crate::joins::Joins;
 use lint_layout::Name;
 
 use super::Descend;
@@ -45,8 +45,8 @@ macro_rules! hooks {
         }
 
         pub trait Contribute {
-            type Open: Monoid;
-            type Part: Monoid;
+            type Open: Joins;
+            type Part: Joins;
 
             fn kinds(&self) -> &[Kind];
 

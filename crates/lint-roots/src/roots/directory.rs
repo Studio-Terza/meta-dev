@@ -9,8 +9,6 @@ use file_ports::{Files, Kind};
 use lint_layout::Failure;
 use newtype::{Arbitrary, Newtype, Wrapping};
 
-use algebra::Semigroup;
-
 use crate::survey::{Fact, Failed, Survey};
 use gathered::Gathered;
 use ignored::Ignored;

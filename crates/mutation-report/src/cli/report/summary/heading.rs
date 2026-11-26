@@ -8,8 +8,6 @@ pub enum Heading {
     TimedOut,
     #[strum(serialize = "Tests that kill no mutant")]
     KillingNothing,
-    #[strum(serialize = "Mutants killed while no golden test fails")]
-    KilledWithoutGolden,
     #[strum(serialize = "Unviable mutants by crate")]
     Unviable,
 }

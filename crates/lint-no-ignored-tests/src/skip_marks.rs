@@ -7,7 +7,7 @@ mod ignored;
 use syntax::{Attribute, ItemFn, ItemMod, Macro, MetaList};
 use syntax::{Ident, TokenTree};
 
-use algebra::{Monoid, Semigroup};
+use lint_core::Joins;
 use gate::Gate;
 use lint_core::{Macros, Walk};
 use lint_core::{Site, SourceFile, Violation};
@@ -35,7 +35,7 @@ pub(crate) struct Marks {
     tested: Option<()>,
 }
 
-impl Semigroup for Marks {
+impl Joins for Marks {
     fn combine(self, other: Marks) -> Marks {
         Marks {
             lines: self.lines.combine(other.lines),
@@ -45,7 +45,6 @@ impl Semigroup for Marks {
     }
 }
 
-impl Monoid for Marks {}
 
 impl Marks {
     fn gated(self, gates: Vec<LineNumber>) -> Marks {

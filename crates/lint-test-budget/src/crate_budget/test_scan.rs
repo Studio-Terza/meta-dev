@@ -1,4 +1,4 @@
-use algebra::{Monoid, Semigroup};
+use lint_core::Joins;
 use syntax::Span;
 use syntax::Spanned;
 use syntax::{ItemFn, ItemMod, Macro, PathSegment};
@@ -61,13 +61,12 @@ impl Tally {
     }
 }
 
-impl Semigroup for Tally {
+impl Joins for Tally {
     fn combine(self, other: Tally) -> Tally {
         Tally { tests: self.tests.plus(other.tests), test_lines: self.test_lines.plus(other.test_lines) }
     }
 }
 
-impl Monoid for Tally {}
 
 impl Contribute for TestScan<'_> {
     type Open = ();

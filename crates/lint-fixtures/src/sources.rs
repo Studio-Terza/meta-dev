@@ -7,16 +7,12 @@ mod text;
 
 use std::fmt;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 use file_ports::{Bytes, Memory};
-use graph_reader::Reader;
 use invariants::{invariant, invariants};
-use lint_core::{FileHead, Parsed, Report, SourceFile, SourceText};
-use lint_file::WorkspaceLint;
+use lint_core::{Report, SourceFile, SourceText};
 use lint_placement::Placement;
 use newtype::Wrapping;
-use workspace_metadata::Metadata;
 
 use crate::checks::Checks;
 
@@ -72,16 +68,6 @@ impl Sources {
     #[must_use]
     pub fn placed_flagged<Checked: Checks>(manifests: &[Source], sources: &[Source]) -> Lines {
         Checked::flagged(&Self::placed(manifests, sources))
-    }
-
-    #[must_use]
-    pub fn placed_in<Checked: WorkspaceLint>(manifests: &[Source], sources: &[Source], workspace: Text<'_>) -> Lines {
-        let workspaces = [Self::kept(Metadata::from_str(workspace.into_inner()))];
-        let files = Self::placed(manifests, sources);
-        let parsed: Vec<Parsed<'_, '_>> = files.iter().map(Parsed::from).collect();
-        let heads: Vec<FileHead> = files.iter().map(|file| file.head().clone()).collect();
-        let model = Reader::read_files(&files);
-        Self::lines(&Checked::report(&heads, &workspaces, &Checked::gathered(&parsed), &model))
     }
 
     #[must_use]

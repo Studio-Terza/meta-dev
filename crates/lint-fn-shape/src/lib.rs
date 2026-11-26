@@ -1,7 +1,7 @@
 mod finding;
 mod nesting_depth;
 
-use algebra::{Monoid, Semigroup};
+use lint_core::Joins;
 use finding::Finding;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
@@ -119,13 +119,12 @@ struct Shaped<'scan> {
     nests: Vec<Nest>,
 }
 
-impl Semigroup for Shaped<'_> {
+impl Joins for Shaped<'_> {
     fn combine(self, other: Self) -> Self {
         Shaped { found: self.found.combine(other.found), nests: self.nests.combine(other.nests) }
     }
 }
 
-impl Monoid for Shaped<'_> {}
 
 impl<'scan> Shaped<'scan> {
     fn nested(self, bodies: impl IntoIterator<Item = Option<Span>>, own: Span) -> Shaped<'scan> {

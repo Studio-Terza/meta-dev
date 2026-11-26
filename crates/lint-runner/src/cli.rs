@@ -55,7 +55,7 @@ impl Cli {
         let timings = Timings::of_arguments(&flagged);
         let given = Timings::unflagged(flagged);
         let mode = Mode::of_arguments(&given);
-        let named = mode.roots(&given);
+        let named = Mode::roots(&given);
         let roots = named.first().map(|_| ()).map_or_else(|| vec![PathBuf::from(".")], |()| named);
         Cli { roots, mode, timings }
     }
@@ -89,10 +89,7 @@ impl Cli {
         out: &mut (impl Write + Send),
         err: &mut (impl Write + Send),
     ) -> Verdict {
-        match self.mode.refusal() {
-            Some(refused) => Verdict::refused(refused, err),
-            None => Verdict::ran(StackSize::LINT.ran(|| self.linted(self.staged(wired), wired, out, err)), err),
-        }
+        Verdict::ran(StackSize::LINT.ran(|| self.linted(self.staged(wired), wired, out, err)), err)
     }
 
     fn staged(

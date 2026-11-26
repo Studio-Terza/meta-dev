@@ -1,5 +1,4 @@
 mod failure;
-mod golden_tests;
 mod recorded_mutant;
 mod shard_matrix;
 mod summary;
@@ -11,7 +10,6 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, Files, Kind};
-use golden_tests::GoldenTests;
 use shard_matrix::ShardMatrix;
 use summary::Summary;
 
@@ -20,19 +18,17 @@ pub use failure::Failure;
 #[derive(Debug)]
 pub struct Report<'arguments> {
     shards: &'arguments Path,
-    sources: &'arguments Path,
     markdown: &'arguments Path,
     json: &'arguments Path,
 }
 
 impl<'arguments> Report<'arguments> {
-    const ARGUMENTS: usize = 4;
+    const ARGUMENTS: usize = 3;
 
     pub fn from_arguments(arguments: &'arguments [impl AsRef<OsStr>]) -> Result<Report<'arguments>, Failure<'static>> {
         TryInto::<&[_; Report::<'static>::ARGUMENTS]>::try_into(arguments)
-            .map(|[shards, sources, markdown, json]| Report {
+            .map(|[shards, markdown, json]| Report {
                 shards: Path::new(shards),
-                sources: Path::new(sources),
                 markdown: Path::new(markdown),
                 json: Path::new(json),
             })
@@ -41,7 +37,7 @@ impl<'arguments> Report<'arguments> {
 
     pub fn write_summary(&self, files: &impl Files) -> Result<(), Failure<'arguments>> {
         let matrices = self.matrices(files)?;
-        let summary = Summary::from_results(&matrices, &GoldenTests::under(files, self.sources)?);
+        let summary = Summary::from_results(&matrices);
         files
             .write(self.markdown, Bytes::from(&summary))
             .map_err(|failure| Failure::Io { path: Cow::Borrowed(self.markdown), source: io::Error::from(failure) })?;

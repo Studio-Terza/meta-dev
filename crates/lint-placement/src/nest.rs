@@ -1,7 +1,6 @@
 use std::fmt;
 use std::iter;
 
-use algebra::Semigroup;
 use lint_layout::Name;
 
 use crate::crate_root::CrateRoot;
@@ -73,14 +72,6 @@ impl<'found> Nest<'found> {
     #[must_use]
     pub fn krate(&self) -> Option<Krate<'found>> {
         self.krate
-    }
-}
-
-impl Semigroup for Nest<'_> {
-    fn combine(self, other: Self) -> Self {
-        self.lineage()
-            .find(|outer| other.lineage().any(|enclosing| enclosing == *outer))
-            .unwrap_or(Nest { krate: None, segments: &[] })
     }
 }
 

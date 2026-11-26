@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use syntax::{UseLeaf, UseTree};
 
-use algebra::{Monoid, Semigroup};
+use crate::joins::Joins;
 use lint_layout::Name;
 use lint_layout::Word;
 
@@ -20,13 +20,11 @@ pub struct Aliased {
     names: BTreeSet<Name>,
 }
 
-impl Semigroup for Aliases {
+impl Joins for Aliases {
     fn combine(self, other: Aliases) -> Aliases {
         Aliases(self.0.into_iter().chain(other.0).collect())
     }
 }
-
-impl Monoid for Aliases {}
 
 impl MacroAliases {
     #[must_use]

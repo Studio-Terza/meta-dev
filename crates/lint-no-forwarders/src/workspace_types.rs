@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use algebra::{Monoid, Semigroup};
+use lint_core::Joins;
 use syntax::{ItemEnum, ItemStruct, ItemTrait};
 
 use lint_core::SourceFile;
@@ -24,18 +24,17 @@ impl From<&SourceFile> for TypeGathering {
 
 impl FromIterator<WorkspaceTypes> for WorkspaceTypes {
     fn from_iter<Parts: IntoIterator<Item = WorkspaceTypes>>(parts: Parts) -> WorkspaceTypes {
-        Monoid::concat(parts)
+        Joins::concat(parts)
     }
 }
 
-impl Semigroup for WorkspaceTypes {
+impl Joins for WorkspaceTypes {
     fn combine(mut self, other: WorkspaceTypes) -> WorkspaceTypes {
         self.0.extend(other.0);
         self
     }
 }
 
-impl Monoid for WorkspaceTypes {}
 
 impl WorkspaceTypes {
     pub fn declares(&self, name: &Name) -> Option<&Name> {

@@ -1,12 +1,6 @@
-use std::str::FromStr;
+use lint_core::{Report, SourceFile};
 
-use graph_reader::Reader;
-use lint_core::{FileHead, Parsed, Report, SourceFile};
-use lint_file::WorkspaceLint;
-use newtype::Wrapping;
-use workspace_metadata::Metadata;
-
-use crate::{Checks, Source, Sources, Text};
+use crate::{Checks, Sources, Text};
 
 #[derive(Debug)]
 pub struct Shown;
@@ -28,20 +22,6 @@ impl Shown {
     #[must_use]
     pub fn reported<Checked: Checks>(pair: &[&str]) -> Vec<String> {
         Self::filtered(pair, |files| Checked::reported(files, Self::listed))
-    }
-
-    #[must_use]
-    pub fn placed_in<Checked: WorkspaceLint>(
-        manifests: &[Source],
-        sources: &[Source],
-        workspace: Text<'_>,
-    ) -> Vec<String> {
-        let workspaces = [Sources::kept(Metadata::from_str(workspace.into_inner()))];
-        let files = Sources::placed(manifests, sources);
-        let parsed: Vec<Parsed<'_, '_>> = files.iter().map(Parsed::from).collect();
-        let heads: Vec<FileHead> = files.iter().map(|file| file.head().clone()).collect();
-        let model = Reader::read_files(&files);
-        Self::listed(&Checked::report(&heads, &workspaces, &Checked::gathered(&parsed), &model))
     }
 
     #[must_use]

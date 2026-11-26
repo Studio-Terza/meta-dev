@@ -1,9 +1,9 @@
 use std::path::{Path, PathBuf};
 
-use algebra::{Monoid, Semigroup};
 use syntax::ItemMod;
 
 use crate::contribution::Contributed;
+use crate::joins::Joins;
 use crate::walk::Walk;
 use crate::watch::{Contribute, Facts, Kind};
 use lint_layout::Name;
@@ -43,13 +43,11 @@ impl SupportModules {
     }
 }
 
-impl Semigroup for SupportModules {
+impl Joins for SupportModules {
     fn combine(self, other: SupportModules) -> SupportModules {
         SupportModules { names: self.names.combine(other.names) }
     }
 }
-
-impl Monoid for SupportModules {}
 
 impl Contribute for SupportScan {
     type Open = ();

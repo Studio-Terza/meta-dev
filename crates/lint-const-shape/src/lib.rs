@@ -1,4 +1,4 @@
-use algebra::{Monoid, Semigroup};
+use lint_core::Joins;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
 use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Contribution, Descend, Facts, Finds, Kind, Scope};
@@ -101,7 +101,7 @@ struct Candidates<'scan> {
     loops: Vec<Looped>,
 }
 
-impl Semigroup for Candidates<'_> {
+impl Joins for Candidates<'_> {
     fn combine(self, other: Self) -> Self {
         Candidates {
             found: self.found.combine(other.found),
@@ -111,8 +111,6 @@ impl Semigroup for Candidates<'_> {
         }
     }
 }
-
-impl Monoid for Candidates<'_> {}
 
 impl<'scan> Candidates<'scan> {
     const CAST: Message =

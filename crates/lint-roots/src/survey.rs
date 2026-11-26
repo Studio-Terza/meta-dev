@@ -4,7 +4,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
-use algebra::{Monoid, Semigroup};
 use file_ports::{FileFailure, Files, Kind};
 use lint_layout::Failure;
 use newtype::{Arbitrary, Newtype};
@@ -34,20 +33,6 @@ pub(crate) struct Failed(Vec<Failure>);
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct Position(usize);
-
-impl Semigroup for Survey {
-    fn combine(self, other: Survey) -> Survey {
-        let mut kinds = self.kinds;
-        kinds.extend(other.kinds);
-        let mut canonical = self.canonical;
-        canonical.extend(other.canonical);
-        let mut listed = self.listed;
-        listed.extend(other.listed);
-        Survey { kinds, canonical, listed, failed: self.failed.combine(other.failed) }
-    }
-}
-
-impl Monoid for Survey {}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Settled<'survey>(&'survey Survey);
@@ -80,14 +65,22 @@ impl Survey {
                 ..Survey::default()
             },
             Fact::Followed => Self::followed(files, paths),
-            Fact::Listed => Monoid::concat(
-                paths
-                    .iter()
-                    .cloned()
-                    .zip(files.entries_many(paths))
-                    .map(|(directory, listing)| Self::listing(directory, listing)),
-            ),
+            Fact::Listed => paths
+                .iter()
+                .cloned()
+                .zip(files.entries_many(paths))
+                .map(|(directory, listing)| Self::listing(directory, listing))
+                .fold(Survey::default(), Survey::combine),
         }
+    }
+
+    #[must_use]
+    pub fn combine(mut self, other: Survey) -> Survey {
+        self.kinds.extend(other.kinds);
+        self.canonical.extend(other.canonical);
+        self.listed.extend(other.listed);
+        self.failed.extend(other.failed);
+        self
     }
 
     #[must_use]

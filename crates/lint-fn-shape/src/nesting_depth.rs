@@ -1,4 +1,4 @@
-use algebra::{Monoid, Semigroup};
+use lint_core::Joins;
 use lint_core::Bound;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
@@ -13,10 +13,9 @@ impl NestingDepth {
     }
 }
 
-impl Semigroup for NestingDepth {
+impl Joins for NestingDepth {
     fn combine(self, other: NestingDepth) -> NestingDepth {
         NestingDepth(self.0 + other.0)
     }
 }
 
-impl Monoid for NestingDepth {}

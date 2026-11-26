@@ -11,7 +11,6 @@ mod unit;
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
 
-use algebra::{Monoid, Semigroup};
 use newtype::Wrapping;
 
 use crate::crate_name::CrateName;
@@ -61,28 +60,6 @@ struct Identified<'meta> {
     id: &'meta PackageId,
     package: &'meta Package,
 }
-
-impl Semigroup for Graph<'_> {
-    fn combine(self, other: Self) -> Self {
-        let mut packages = self.packages;
-        packages.extend(other.packages);
-        let named = other.named.into_iter().fold(self.named, |mut named, (name, ids)| {
-            named.entry(name).or_default().extend(ids);
-            named
-        });
-        let mut members = self.members;
-        members.extend(other.members);
-        Graph {
-            packages,
-            named,
-            members,
-            requires: self.requires.combine(other.requires),
-            normal: self.normal.combine(other.normal),
-        }
-    }
-}
-
-impl Monoid for Graph<'_> {}
 
 impl<'meta> Graph<'meta> {
     #[must_use]

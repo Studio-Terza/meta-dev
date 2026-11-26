@@ -7,7 +7,7 @@ mod struct_fields;
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use algebra::{Monoid, Semigroup};
+use lint_core::Joins;
 use impl_target::ImplTarget;
 use parameter::Parameter;
 use struct_fields::StructFields;
@@ -145,22 +145,19 @@ impl Candidate {
     }
 }
 
-impl Semigroup for Unplaced {
+impl Joins for Unplaced {
     fn combine(self, other: Unplaced) -> Unplaced {
         Unplaced(self.0.combine(other.0))
     }
 }
 
-impl Monoid for Unplaced {}
-
-impl Semigroup for Gleaned {
+impl Joins for Gleaned {
     fn combine(mut self, other: Gleaned) -> Gleaned {
         self.structs.extend(other.structs);
         Gleaned { methods: self.methods.combine(other.methods), ..self }
     }
 }
 
-impl Monoid for Gleaned {}
 
 impl Contribute for Forwarders<'_> {
     type Open = Unplaced;

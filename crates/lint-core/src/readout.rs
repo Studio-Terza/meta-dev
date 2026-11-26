@@ -1,8 +1,7 @@
 use std::mem;
 use std::sync::Mutex;
 
-use algebra::{Monoid, Semigroup};
-
+use crate::joins::Joins;
 use crate::repo_file::RepoFile;
 use crate::source_file::SourceFile;
 use invariants::Unpoisoned;
@@ -19,7 +18,7 @@ pub struct Readout {
     failures: Vec<Failure>,
 }
 
-impl Semigroup for Readout {
+impl Joins for Readout {
     fn combine(self, other: Readout) -> Readout {
         Readout {
             files: self.files.combine(other.files),
@@ -31,8 +30,6 @@ impl Semigroup for Readout {
         }
     }
 }
-
-impl Monoid for Readout {}
 
 impl FromIterator<SourceFile> for Readout {
     fn from_iter<Files: IntoIterator<Item = SourceFile>>(read: Files) -> Readout {

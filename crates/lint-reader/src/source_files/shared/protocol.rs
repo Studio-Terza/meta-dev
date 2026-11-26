@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use algebra::{Monoid, Semigroup};
+use lint_core::Joins;
 use file_ports::Files;
 use lint_core::{Readout, RepoFile, SourceFile};
 use lint_layout::Failure;
@@ -136,13 +136,11 @@ pub(super) struct Report<'tree> {
     survey: Survey,
 }
 
-impl Semigroup for Report<'_> {
+impl Joins for Report<'_> {
     fn combine(self, other: Self) -> Self {
         Report { sightings: self.sightings.combine(other.sightings), survey: self.survey.combine(other.survey) }
     }
 }
-
-impl Monoid for Report<'_> {}
 
 impl<'tree> Report<'tree> {
     pub(super) fn concluded<Out>(self, into: impl FnOnce(Vec<Sighting<'tree>>, Survey) -> Out) -> Out {
@@ -156,15 +154,13 @@ pub(super) struct Parsed<'tree> {
     kept: BTreeMap<Located<'tree>, SourceFile>,
 }
 
-impl Semigroup for Parsed<'_> {
+impl Joins for Parsed<'_> {
     fn combine(self, other: Self) -> Self {
         let mut kept = self.kept;
         kept.extend(other.kept);
         Parsed { sightings: self.sightings.combine(other.sightings), kept }
     }
 }
-
-impl Monoid for Parsed<'_> {}
 
 impl<'tree> Parsed<'tree> {
     pub(super) fn read<Out>(
@@ -176,7 +172,7 @@ impl<'tree> Parsed<'tree> {
         let located: Vec<Located<'tree>> = nodes.iter().map(|node| node.located().clone()).collect();
         let sources = Located::parsed_many(files, packages, &located);
         let parsed: Parsed<'tree> =
-            Monoid::concat(nodes.iter().zip(sources).map(|(node, source)| Parsed::sighted(node, source)));
+            Joins::concat(nodes.iter().zip(sources).map(|(node, source)| Parsed::sighted(node, source)));
         let candidates: Vec<PathBuf> = parsed.sightings.iter().flat_map(Sighting::candidates).collect();
         let survey = Survey::learned(files, Fact::Followed, &candidates);
         into(Report { sightings: parsed.sightings, survey }, parsed.kept)

@@ -1,8 +1,4 @@
-use std::marker::PhantomData;
-
-use graph_reader::Reader;
 use lint_core::{Lint, Report, SourceFile};
-use lint_file::ModelLint;
 
 use crate::sources::{Lines, Sources};
 
@@ -14,17 +10,8 @@ pub trait Checks {
     }
 }
 
-#[derive(Debug)]
-pub struct Queried<Checked>(PhantomData<Checked>);
-
 impl<Checked: Lint> Checks for Checked {
     fn reported<Shown>(files: &[SourceFile], shown: impl FnOnce(&Report<'_>) -> Shown) -> Shown {
         shown(&Checked::report(files))
-    }
-}
-
-impl<Checked: ModelLint> Checks for Queried<Checked> {
-    fn reported<Shown>(files: &[SourceFile], shown: impl FnOnce(&Report<'_>) -> Shown) -> Shown {
-        shown(&Checked::report(&Reader::read_files(files)))
     }
 }

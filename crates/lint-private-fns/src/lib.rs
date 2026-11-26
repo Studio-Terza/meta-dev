@@ -1,7 +1,7 @@
 use std::path::Path;
 mod finding;
 
-use algebra::{Monoid, Semigroup};
+use lint_core::Joins;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
 use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Finds, Kind};
@@ -57,14 +57,13 @@ struct PrivateFnCounter<'file> {
 #[derive(Debug, Default)]
 struct PrivateNames(BTreeMap<TypeName, Vec<Name>>);
 
-impl Semigroup for PrivateNames {
+impl Joins for PrivateNames {
     fn combine(mut self, other: PrivateNames) -> PrivateNames {
         other.0.into_iter().for_each(|(type_name, names)| self.0.entry(type_name).or_default().extend(names));
         self
     }
 }
 
-impl Monoid for PrivateNames {}
 
 impl PrivateFnCounter<'_> {
     fn private_names(item: &ItemImpl) -> impl Iterator<Item = Name> {

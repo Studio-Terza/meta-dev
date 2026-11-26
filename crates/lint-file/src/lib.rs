@@ -1,7 +1,5 @@
 mod concluded;
 mod lead;
-mod model_lint;
-mod workspace_lint;
 
 use std::fmt::Debug;
 use std::marker::PhantomData;
@@ -11,8 +9,6 @@ use lint_sweep::{Finds, Gathers, Member, Sweep};
 
 pub use concluded::{Concluded, Listed};
 pub use lead::{Lead, Leader, SortStart, Start};
-pub use model_lint::ModelLint;
-pub use workspace_lint::WorkspaceLint;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Reads {

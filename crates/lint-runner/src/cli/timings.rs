@@ -4,13 +4,12 @@ use std::ffi::OsString;
 use std::fmt;
 use std::sync::OnceLock;
 
-use algebra::Semigroup;
 use lint_reader::Partition;
 use timer_ports::{Elapsed, Moment, Timer};
 
 mod boundary;
 
-pub(crate) use boundary::{Named, Visiting};
+pub(crate) use boundary::Visiting;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Timings {
@@ -51,48 +50,16 @@ pub(crate) enum Step {
     Read(Worker),
     Lower(Worker),
     Judged(Worker),
-    Model,
     Contexts,
-    Lint(Named),
-    Waited(Waited),
+    Waited(Worker),
 }
 
 impl Step {
     pub(crate) fn waited(self) -> Step {
         match self {
-            Step::Model => Step::Waited(Waited::Model),
-            Step::Judged(worker) => Step::Waited(Waited::Judged(worker)),
-            Step::Lint(name) => Step::Waited(Waited::Lint(name)),
-            Step::Total
-            | Step::Stage
-            | Step::Locate
-            | Step::Read(_)
-            | Step::Lower(_)
-            | Step::Contexts
-            | Step::Waited(_) => self,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub(crate) enum Waited {
-    Model,
-    Judged(Worker),
-    Lint(Named),
-}
-
-impl fmt::Display for Waited {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Waited::Model => formatter.write_str("wait model: until cargo metadata has described the workspaces"),
-            Waited::Judged(Worker(index)) => {
-                write!(formatter, "wait judged lints on worker {index}: until the context-lint parts are joined")
-            }
-            Waited::Lint(name) => {
-                write!(
-                    formatter,
-                    "wait lint {name}: until the model, the contexts and the workspaces it reads are ready"
-                )
+            Step::Judged(worker) => Step::Waited(worker),
+            Step::Total | Step::Stage | Step::Locate | Step::Read(_) | Step::Lower(_) | Step::Contexts | Step::Waited(_) => {
+                self
             }
         }
     }
@@ -111,10 +78,10 @@ impl fmt::Display for Step {
             Step::Judged(Worker(index)) => {
                 write!(formatter, "phase judged lints: judge its share of files on worker {index}")
             }
-            Step::Model => formatter.write_str("phase model: merge the lowered files into the code model"),
             Step::Contexts => formatter.write_str("phase contexts: join every file's context-lint parts"),
-            Step::Lint(name) => write!(formatter, "lint {name}"),
-            Step::Waited(waited) => write!(formatter, "{waited}"),
+            Step::Waited(Worker(index)) => {
+                write!(formatter, "wait judged lints on worker {index}: until the context-lint parts are joined")
+            }
         }
     }
 }
@@ -126,7 +93,7 @@ pub(crate) struct Timing {
     took: Elapsed,
 }
 
-impl Semigroup for Timing {
+impl Timing {
     fn combine(self, later: Timing) -> Timing {
         Timing { step: self.step, began: self.began.min(later.began), took: self.took + later.took }
     }

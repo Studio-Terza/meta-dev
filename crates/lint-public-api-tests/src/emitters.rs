@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use algebra::{Monoid, Semigroup};
+use lint_core::Joins;
 use syntax::ItemMacro;
 
 use lint_core::Macros;
@@ -29,18 +29,17 @@ impl Gathers<Emitters> for Contributing<EmitterScan> {
 
 impl FromIterator<Emitters> for Emitters {
     fn from_iter<Parts: IntoIterator<Item = Emitters>>(parts: Parts) -> Emitters {
-        Monoid::concat(parts)
+        Joins::concat(parts)
     }
 }
 
-impl Semigroup for Emitters {
+impl Joins for Emitters {
     fn combine(mut self, other: Emitters) -> Emitters {
         self.names.extend(other.names);
         self
     }
 }
 
-impl Monoid for Emitters {}
 
 impl AsRef<BTreeSet<Name>> for Emitters {
     fn as_ref(&self) -> &BTreeSet<Name> {

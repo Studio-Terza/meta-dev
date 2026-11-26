@@ -2,7 +2,7 @@ mod suffix;
 
 use syntax::ItemMod;
 
-use algebra::Semigroup;
+use crate::joins::Joins;
 
 use lint_layout::{Name, Word};
 use newtype::Wrapping;

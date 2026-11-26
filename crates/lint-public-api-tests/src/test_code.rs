@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 use super::PublicApiTests;
-use algebra::{Monoid, Semigroup};
+use lint_core::Joins;
 use lint_core::Macros;
 use lint_core::Walk;
 use lint_core::{Site, SourceFile, Violation};
@@ -24,13 +24,12 @@ pub struct InSource {
     invoked: Vec<Invoked>,
 }
 
-impl Semigroup for InSource {
+impl Joins for InSource {
     fn combine(self, other: InSource) -> InSource {
         InSource { lines: self.lines.combine(other.lines), invoked: self.invoked.combine(other.invoked) }
     }
 }
 
-impl Monoid for InSource {}
 
 impl InSource {
     fn lines(lines: impl IntoIterator<Item = LineNumber>) -> InSource {

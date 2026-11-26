@@ -1,4 +1,4 @@
-use algebra::{Monoid, Semigroup};
+use lint_core::Joins;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
 use lint_sweep::{
@@ -80,7 +80,7 @@ struct Shapes<'scan> {
     located: Vec<Located>,
 }
 
-impl Semigroup for Shapes<'_> {
+impl Joins for Shapes<'_> {
     fn combine(self, other: Self) -> Self {
         Shapes {
             found: self.found.combine(other.found),
@@ -90,7 +90,6 @@ impl Semigroup for Shapes<'_> {
     }
 }
 
-impl Monoid for Shapes<'_> {}
 
 impl<'scan> Shapes<'scan> {
     fn within(self, ty: &Type) -> Shapes<'scan> {

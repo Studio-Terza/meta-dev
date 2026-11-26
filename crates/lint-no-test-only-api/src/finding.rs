@@ -8,7 +8,6 @@ use lint_layout::Name;
 pub(crate) enum Finding<'name> {
     GatedOnTest,
     DocHidden,
-    OnlyTests,
     Feature(Cow<'name, Name>),
 }
 
@@ -32,7 +31,6 @@ impl fmt::Display for Finding<'_> {
         match self {
             Finding::GatedOnTest => formatter.write_str("visible item gated on test"),
             Finding::DocHidden => formatter.write_str("#[doc(hidden)] on a visible item"),
-            Finding::OnlyTests => formatter.write_str("visible item that only tests call, no shipped code names it"),
             Finding::Feature(name) => write!(formatter, "test feature {name}"),
         }
     }
@@ -43,7 +41,6 @@ impl lint_core::Finding for Finding<'_> {
         match self {
             Finding::GatedOnTest => Fix::new("remove the gate and test through the real public API"),
             Finding::DocHidden => Fix::new("document it as real API, or make it private"),
-            Finding::OnlyTests => Fix::new("remove it and test through the API shipped code uses"),
             Finding::Feature(_) => Fix::new("remove the feature and test through the API every build has"),
         }
     }

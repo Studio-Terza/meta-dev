@@ -5,7 +5,7 @@ use std::iter;
 use std::path::Path;
 use std::sync::OnceLock;
 
-use algebra::{Monoid, Semigroup};
+use lint_core::Joins;
 use file_ports::Files;
 use lint_core::{FileHead, Readout, RepoFile, SourceFile};
 use lint_roots::Survey;
@@ -78,7 +78,7 @@ struct Gathered<'tree> {
     kept: BTreeMap<Located<'tree>, SourceFile>,
 }
 
-impl Semigroup for Gathered<'_> {
+impl Joins for Gathered<'_> {
     fn combine(self, other: Self) -> Self {
         let mut outcomes = self.outcomes;
         outcomes.extend(other.outcomes);
@@ -89,8 +89,6 @@ impl Semigroup for Gathered<'_> {
         Gathered { outcomes, hands, kept }
     }
 }
-
-impl Monoid for Gathered<'_> {}
 
 #[derive(Debug)]
 struct Explored<'tree> {
@@ -157,7 +155,7 @@ impl Reads for Coordinator<'_, '_> {
             Some(found.taken(outcome, &placed))
         });
         let repo_files: Vec<RepoFile> = stage.staged.iter().flatten().flat_map(Staged::repo_files).cloned().collect();
-        <Assembled<'_> as Monoid>::concat(taken).concluded(|mains, failures| {
+        <Assembled<'_> as Joins>::concat(taken).concluded(|mains, failures| {
             let mut assigned = mains;
             let assembling: Vec<_> = self
                 .remotes
@@ -242,7 +240,7 @@ impl<'tree, Port: Files> Exploring<'_, '_, 'tree, Port> {
         let packages = &self.coordinator.shared.stage.packages;
         Parsed::read(self.files, packages, &local, |own, kept| {
             let report: Report<'tree> =
-                Monoid::concat(iter::once(own).chain(waiting.into_iter().map(Dispatched::sighted)));
+                Joins::concat(iter::once(own).chain(waiting.into_iter().map(Dispatched::sighted)));
             report.concluded(|sightings, survey| Sighted { sightings, survey, kept })
         })
     }

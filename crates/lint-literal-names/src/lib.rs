@@ -1,6 +1,6 @@
 mod finding;
 
-use algebra::Semigroup;
+use lint_core::Joins;
 use finding::Finding;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};

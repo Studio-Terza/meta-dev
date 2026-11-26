@@ -2,9 +2,7 @@ mod crate_budget;
 
 use std::collections::BTreeMap;
 use std::fmt;
-use std::iter;
 
-use graph::Model;
 use lint_core::SourceFile;
 use lint_placement::CrateName;
 use lint_process_starters::{CommandPaths, Scope};
@@ -21,18 +19,13 @@ impl TestBudget {
         TestBudget(files.iter().fold(BTreeMap::new(), |mut crates, file| {
             let name = CrateName::from(file.head().placement().package().root());
             let budget: CrateBudget = crates.remove(&name).unwrap_or_default();
-            crates.insert(name, budget + Sweep::gathered(file, BudgetGathering::from(file)));
+            let starts = CommandPaths::found(file, Scope::Everywhere).iter().map(|_| CrateBudget::start()).fold(
+                Sweep::gathered(file, BudgetGathering::from(file)),
+                |gathered, start| gathered + start,
+            );
+            crates.insert(name, budget + starts);
             crates
         }))
-    }
-
-    #[must_use]
-    pub fn started(&self, model: &Model) -> TestBudget {
-        let starts = CommandPaths::queried(model, Scope::Everywhere);
-        let parts = starts
-            .iter()
-            .map(|placed| TestBudget(BTreeMap::from([(CrateName::from(placed.krate()), CrateBudget::start())])));
-        iter::once(self.clone()).chain(parts).collect()
     }
 
     #[must_use]
@@ -45,15 +38,5 @@ impl fmt::Display for TestBudget {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(formatter, "test budget, report only:")?;
         self.0.iter().try_for_each(|(name, budget)| writeln!(formatter, "{name}: {budget}"))
-    }
-}
-
-impl FromIterator<TestBudget> for TestBudget {
-    fn from_iter<Parts: IntoIterator<Item = TestBudget>>(parts: Parts) -> TestBudget {
-        TestBudget(parts.into_iter().flat_map(|part| part.0).fold(BTreeMap::new(), |mut crates, (name, budget)| {
-            let held: CrateBudget = crates.remove(&name).unwrap_or_default();
-            crates.insert(name, held + budget);
-            crates
-        }))
     }
 }
