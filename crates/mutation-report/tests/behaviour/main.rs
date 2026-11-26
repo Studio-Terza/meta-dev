@@ -1,5 +1,6 @@
 mod ignored;
 
+use std::error::Error;
 use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -13,68 +14,6 @@ use serde_json::{Value, json};
 
 const OVERFLOWING_SECTION: usize = 305;
 const FULL_SECTION: usize = 300;
-const GOLDEN_SOURCE: &str = "\
-#[test]
-fn report_is_stable() -> Result<(), golden::Failure> {
-    golden::golden!(\"report.txt\", &render())
-}
-
-#[test]
-fn spaced() {
-    golden!  (\"x\")
-}
-
-#[test]
-fn uses_type() {
-    let found = Golden::in_running_package(\"x\");
-}
-
-#[test]
-fn uses_method() {
-    thing.golden(1);
-}
-
-#[test]
-fn plain() {
-    assert!(true);
-}
-
-#[test]
-#[ignore]
-fn later_attribute_hides_the_body() {
-    golden!(\"y\");
-}
-
-#[tokio::test]
-async fn awaited() {
-    golden!(\"z\");
-}
-
-#[test]
-fn  wide_spacing()  {
-    golden!(\"w\");
-}
-
-#[test]
-fn macro_without_call() {
-    let golden = 1;
-}
-
-#[test]
-fn mention_without_call() {
-    golden! nothing
-}
-
-#[test]
-fnord() {
-    golden!(\"q\");
-}
-
-#[test]
-fn unicode_ünder_score() {
-    golden!(\"u\");
-}
-";
 
 #[derive(Debug, PartialEq)]
 struct Answer {
@@ -109,8 +48,8 @@ impl Shards {
                 "mutants": [
                     Self::mutant("m-missed", "MissedMutant", &[]),
                     Self::mutant("m-timeout", "Timeout", &[]),
-                    Self::mutant("m-killed-golden", "CaughtMutant", &["b1 :: report_is_stable", "b1 :: plain"]),
-                    Self::mutant("m-killed-nongolden", "CaughtMutant", &["b1 :: plain"]),
+                    Self::mutant("m-killed", "CaughtMutant", &["b1 :: report_is_stable", "b1 :: plain"]),
+                    Self::mutant("m-killed-once", "CaughtMutant", &["b1 :: plain"]),
                 ],
             }),
         )?;
@@ -122,21 +61,24 @@ impl Shards {
 }
 
 #[test]
-fn the_report_lists_survivors_idle_tests_and_kills_that_no_golden_saw() -> Result<(), laws::Unmet> {
+fn the_report_lists_survivors_timeouts_and_idle_tests() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
     Shards::two(&checkout)?;
     assert_eq!(checkout.report(), Answer { exit: ExitCode::SUCCESS, err: String::new() });
-    golden::golden!("report.golden", &checkout.markdown());
+    assert_eq!(
+        checkout.markdown(),
+        "## Mutation matrix\n\n5 mutants, 4 tests.\n\n### Surviving mutants (2)\n\n- a-missed\n- m-missed\n\n\
+         ### Timed out mutants (1)\n\n- m-timeout\n\n### Tests that kill no mutant (2)\n\n- b1 :: unused\n- b2 :: other\n\n\
+         ### Unviable mutants by crate (1)\n\n- all crates: 0 of 5 unviable\n"
+    );
     assert_eq!(
         checkout.json(),
         json!({
             "mutants": 5_usize,
             "tests": 4_usize,
-            "golden_tests": 7_usize,
             "surviving": ["a-missed", "m-missed"],
             "timed_out": ["m-timeout"],
             "tests_that_kill_nothing": ["b1 :: unused", "b2 :: other"],
-            "killed_with_no_golden_failing": ["m-killed-nongolden -> b1 :: plain"],
             "unviable": ["all crates: 0 of 5 unviable"],
         })
     );
@@ -144,73 +86,23 @@ fn the_report_lists_survivors_idle_tests_and_kills_that_no_golden_saw() -> Resul
 }
 
 #[test]
-fn no_shards_gives_an_empty_report() -> Result<(), laws::Unmet> {
+fn no_shards_gives_an_empty_report() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
     checkout.write("shards/not-a-shard/readme.txt", "x")?;
     checkout.write("shards/loose-file.json", "{}")?;
-    checkout.write("bare/crates/empty/src/lib.rs", "")?;
-    assert_eq!(checkout.report_of("shards", "bare").exit, ExitCode::SUCCESS);
-    golden::golden!("empty_report.golden", &checkout.markdown());
+    assert_eq!(checkout.report().exit, ExitCode::SUCCESS);
+    assert_eq!(
+        checkout.markdown(),
+        "## Mutation matrix\n\n0 mutants, 0 tests.\n\n### Surviving mutants (0)\n\nnone\n\n\
+         ### Timed out mutants (0)\n\nnone\n\n### Tests that kill no mutant (0)\n\nnone\n\n\
+         ### Unviable mutants by crate (1)\n\n- all crates: 0 of 0 unviable\n"
+    );
     assert_eq!(checkout.field("mutants"), json!(0_usize));
     Ok(())
 }
 
 #[test]
-fn a_source_file_with_a_byte_that_is_not_utf8_does_not_stop_the_report() -> Result<(), laws::Unmet> {
-    let checkout = Checkout::new()?;
-    checkout.write("sources/crates/foo/tests/crash/input.rs", b"\xff\xfe")?;
-    checkout.shard("shard-0", &json!({ "baseline": [], "mutants": [] }))?;
-    assert_eq!(checkout.report().exit, ExitCode::SUCCESS);
-    assert_eq!(checkout.field("golden_tests"), json!(7_usize));
-    Ok(())
-}
-
-#[test]
-fn a_test_name_is_golden_by_its_last_path_segment() -> Result<(), laws::Unmet> {
-    let checkout = Checkout::new()?;
-    checkout.shard(
-        "shard-0",
-        &json!({
-            "baseline": [],
-            "mutants": [
-                Shards::mutant("path", "CaughtMutant", &["bin :: tests::report_is_stable"]),
-                Shards::mutant("bare", "CaughtMutant", &["report_is_stable"]),
-                Shards::mutant("spaced", "CaughtMutant", &["bin ::   spaced"]),
-                Shards::mutant("other", "CaughtMutant", &["bin :: tests::other"]),
-                Shards::mutant("first", "CaughtMutant", &["bin :: plain", "bin :: tests::other"]),
-            ],
-        }),
-    )?;
-    checkout.report();
-    assert_eq!(
-        checkout.field("killed_with_no_golden_failing"),
-        json!(["first -> bin :: plain, bin :: tests::other", "other -> bin :: tests::other"])
-    );
-    Ok(())
-}
-
-#[test]
-fn killed_mutants_are_listed_by_name_and_only_when_they_were_killed() -> Result<(), laws::Unmet> {
-    let checkout = Checkout::new()?;
-    checkout.shard(
-        "shard-0",
-        &json!({
-            "baseline": [],
-            "mutants": [
-                Shards::mutant("b", "CaughtMutant", &["x :: t2"]),
-                Shards::mutant("a", "CaughtMutant", &["x :: t1", "x :: t3"]),
-                Shards::mutant("unkilled", "MissedMutant", &[]),
-            ],
-        }),
-    )?;
-    checkout.report();
-    assert_eq!(checkout.field("killed_with_no_golden_failing"), json!(["a -> x :: t1, x :: t3", "b -> x :: t2"]));
-    assert_eq!(checkout.field("surviving"), json!(["unkilled"]));
-    Ok(())
-}
-
-#[test]
-fn a_section_shows_300_bullets_and_counts_the_rest() -> Result<(), laws::Unmet> {
+fn a_section_shows_300_bullets_and_counts_the_rest() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
     let missed: Vec<Value> =
         (0..OVERFLOWING_SECTION).map(|index| Shards::mutant(&format!("m{index:03}"), "MissedMutant", &[])).collect();
@@ -225,7 +117,7 @@ fn a_section_shows_300_bullets_and_counts_the_rest() -> Result<(), laws::Unmet> 
 }
 
 #[test]
-fn exactly_300_items_are_all_shown_with_no_remainder() -> Result<(), laws::Unmet> {
+fn exactly_300_items_are_all_shown_with_no_remainder() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
     let missed: Vec<Value> =
         (0..FULL_SECTION).map(|index| Shards::mutant(&format!("m{index:03}"), "MissedMutant", &[])).collect();
@@ -238,7 +130,7 @@ fn exactly_300_items_are_all_shown_with_no_remainder() -> Result<(), laws::Unmet
 }
 
 #[test]
-fn a_shard_matrix_that_cannot_be_parsed_is_refused_by_name() -> Result<(), laws::Unmet> {
+fn a_shard_matrix_that_cannot_be_parsed_is_refused_by_name() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
     checkout.write("shards/shard-0/matrix.json", "not json")?;
     let answer = checkout.report();
@@ -250,28 +142,22 @@ fn a_shard_matrix_that_cannot_be_parsed_is_refused_by_name() -> Result<(), laws:
 }
 
 #[test]
-fn shards_or_sources_that_cannot_be_read_are_refused() -> Result<(), laws::Unmet> {
+fn shards_that_cannot_be_read_are_refused() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
-    let absent = checkout.report_of("absent", "sources");
+    let absent = checkout.report_of("absent");
     assert_eq!(absent.exit, ExitCode::FAILURE);
     assert!(absent.err.contains("cannot use"));
     assert!(absent.err.contains("absent"));
-    checkout.directory("bare")?;
-    let bare = checkout.report_of("shards", "bare");
-    assert_eq!(bare.exit, ExitCode::FAILURE);
-    assert!(bare.err.contains("cannot use"));
-    assert!(bare.err.contains("crates"));
     Ok(())
 }
 
 #[test]
-fn a_report_that_cannot_be_written_is_refused() -> Result<(), laws::Unmet> {
+fn a_report_that_cannot_be_written_is_refused() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
     let unwritable_markdown = Answer::to(
         &checkout.files,
         &[
             checkout.path("shards").as_os_str(),
-            checkout.path("sources").as_os_str(),
             "/no/such/dir/report.md".as_ref(),
             checkout.path("report.json").as_os_str(),
         ],
@@ -282,7 +168,6 @@ fn a_report_that_cannot_be_written_is_refused() -> Result<(), laws::Unmet> {
         &checkout.files,
         &[
             checkout.path("shards").as_os_str(),
-            checkout.path("sources").as_os_str(),
             checkout.path("report.md").as_os_str(),
             "/no/such/dir/report.json".as_ref(),
         ],
@@ -292,17 +177,15 @@ fn a_report_that_cannot_be_written_is_refused() -> Result<(), laws::Unmet> {
     Ok(())
 }
 
-const USAGE: &str = "usage: mutation-report <shards> <sources> <report.md> <report.json>";
+const USAGE: &str = "usage: mutation-report <shards> <report.md> <report.json>";
 
-laws::table!(
-    the_wrong_number_of_arguments_is_refused_with_the_usage,
-    |arguments: &[&OsStr]| Answer::to(&Memory::default(), arguments),
-    [
-        [] => Answer::usage(),
-        [OsStr::new("a"), OsStr::new("b"), OsStr::new("c")] => Answer::usage(),
-        [OsStr::new("a"); 5] => Answer::usage(),
-    ]
-);
+#[test]
+fn the_wrong_number_of_arguments_is_refused_with_the_usage() {
+    let memory = Memory::default();
+    assert_eq!(Answer::to(&memory, &[]), Answer::usage());
+    assert_eq!(Answer::to(&memory, &[OsStr::new("a"), OsStr::new("b")]), Answer::usage());
+    assert_eq!(Answer::to(&memory, &[OsStr::new("a"); 4]), Answer::usage());
+}
 
 struct Checkout {
     files: Memory,
@@ -312,8 +195,6 @@ struct Checkout {
 impl Checkout {
     fn new() -> Result<Checkout, FileFailure> {
         let checkout = Checkout { files: Memory::default(), root: PathBuf::from("/checkout") };
-        checkout.write("sources/crates/foo/tests/golden.rs", GOLDEN_SOURCE)?;
-        checkout.write("sources/crates/foo/notes.txt", "#[test]\nfn hidden() { Golden::x }\n")?;
         checkout.directory("shards")?;
         Ok(checkout)
     }
@@ -337,18 +218,13 @@ impl Checkout {
     }
 
     fn report(&self) -> Answer {
-        self.report_of("shards", "sources")
+        self.report_of("shards")
     }
 
-    fn report_of(&self, shards: &str, sources: &str) -> Answer {
+    fn report_of(&self, shards: &str) -> Answer {
         Answer::to(
             &self.files,
-            &[
-                self.path(shards).as_os_str(),
-                self.path(sources).as_os_str(),
-                self.path("report.md").as_os_str(),
-                self.path("report.json").as_os_str(),
-            ],
+            &[self.path(shards).as_os_str(), self.path("report.md").as_os_str(), self.path("report.json").as_os_str()],
         )
     }
 
@@ -372,7 +248,7 @@ impl Checkout {
 }
 
 #[test]
-fn unviable_mutants_are_counted_for_all_crates_and_for_each_crate() -> Result<(), laws::Unmet> {
+fn unviable_mutants_are_counted_for_all_crates_and_for_each_crate() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
     checkout.shard(
         "shard-0",

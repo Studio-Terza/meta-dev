@@ -60,7 +60,6 @@ impl Summary {
             .write(path, Bytes::from(json.as_str()))
             .map_err(|failure| Failure::Io { path: Cow::Borrowed(path), source: io::Error::from(failure) })
     }
-
 }
 
 impl fmt::Display for Summary {
