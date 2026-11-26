@@ -22,6 +22,7 @@ use lint_reader::{SharedRead, SourceFiles, Stage};
 use port_core::Run;
 use timer_ports::{Timer, TimerFiller};
 
+use boundary::Invocation;
 use mode::Mode;
 use outcome::Outcome;
 use sources::{Sources, Wired};
@@ -41,11 +42,12 @@ pub struct Ports<'files, F, C, T> {
     files: &'files F,
     cargo: C,
     timer: T,
+    binary: PathBuf,
 }
 
 impl<'files, F: Files + Sync, C: CargoFiller + Sync, T: TimerFiller + Sync> Ports<'files, F, C, T> {
-    pub fn new(files: &'files F, cargo: C, timer: T) -> Ports<'files, F, C, T> {
-        Ports { files, cargo, timer }
+    pub fn new(files: &'files F, cargo: C, timer: T, binary: PathBuf) -> Ports<'files, F, C, T> {
+        Ports { files, cargo, timer, binary }
     }
 }
 
@@ -80,7 +82,8 @@ impl Cli {
         let cargo = run.port(ports.cargo);
         let timer = run.port(ports.timer);
         let files = Cached::new(ports.files);
-        self.metered(&Wired::new(&files, &cargo, &timer, self.timings), out, err)
+        let invocation = Invocation::new(self.timings, ports.binary, &self.roots);
+        self.metered(&Wired::new(&files, &cargo, &timer, &invocation), out, err)
     }
 
     fn metered(

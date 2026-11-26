@@ -78,7 +78,7 @@ use lint_unconsumed_traits::UnconsumedTraits;
 use lint_vec_out_params::VecOutParams;
 use lint_workflow_run::WorkflowRun;
 
-use crate::cli::boundary::{FileOrder, Helper, Helpers, Rendered, Slot, Worked, Workers};
+use crate::cli::boundary::{FileOrder, Filings, Helper, Helpers, Rendered, Slot, Worked, Workers};
 use crate::cli::ignored::Ignored;
 use crate::cli::sources::{Claimed, Holding, Priming, Settled};
 use crate::cli::timings::{Measured, Named, Step, Stopwatch, Worker};
@@ -103,7 +103,8 @@ impl Crew<'_> {
     ) -> Verdict {
         let mine = Lints::worked(readout.done(), sources, Worker::MAIN);
         let worked: Worked = [mine].into_iter().chain(self.helpers.into_iter().map(Helper::joined)).collect();
-        let first = sources.earlier().chain([readout.timing()]);
+        let remembered = sources.remembered().map(|written| written.timing());
+        let first = sources.earlier().chain([readout.timing()]).chain(remembered);
         let table = sources.wired().table(first.chain(worked.timings().iter().copied()), worked.visited().clone());
         let outcome = Lints::gathered(readout.done(), sources.located().done(), worked);
         outcome.surveyed(&[table], out, err)
@@ -239,7 +240,9 @@ impl Lints {
                 .ignoring(Ignored::Unspawned)
         });
         let locating = Helper::spawned(scope, move || Self::locating(sources)).ignoring(Ignored::Unspawned);
-        Crew { helpers: locating.into_iter().chain(helpers).collect() }
+        let recalling =
+            Helper::spawned(scope, move || Worked::timed(sources.recalled().timing())).ignoring(Ignored::Unspawned);
+        Crew { helpers: locating.into_iter().chain(recalling).chain(helpers).collect() }
     }
 
     fn gathered<'run>(
@@ -538,6 +541,7 @@ struct Admitted {
 #[derive(Debug)]
 pub(crate) struct Filer<'file> {
     claimed: Claimed<'file>,
+    recalled: Option<Filings>,
     rulings: Vec<Ruling<'file>>,
     concluding: Vec<Concluding<'file>>,
     admitted: Vec<Admitted>,
@@ -549,9 +553,10 @@ pub(crate) struct Filer<'file> {
 }
 
 impl<'file> Filer<'file> {
-    pub(crate) fn started(claimed: Claimed<'file>) -> Filer<'file> {
+    pub(crate) fn started(claimed: Claimed<'file>, recalled: Option<Filings>) -> Filer<'file> {
         let file = <&SourceFile>::from(claimed);
-        let admitted: Vec<Admitted> = Lints::LINTS
+        let swept = recalled.as_ref().map_or(&Lints::LINTS[..], |_| &[]);
+        let admitted: Vec<Admitted> = swept
             .iter()
             .enumerate()
             .filter_map(|(index, entry)| Some((Slot::from(index), entry.filing()?)))
@@ -581,7 +586,7 @@ impl<'file> Filer<'file> {
             .filter_map(|(index, entry)| Some((Slot::from(index), entry.ruling()?)))
             .filter_map(|(slot, rules)| Some(Concluding { slot, pending: (rules.conclude)(rules.reads.admits(file)?) }))
             .collect();
-        Filer { claimed, rulings, concluding, admitted, leads, starts, sorting, finds, sorts }
+        Filer { claimed, recalled, rulings, concluding, admitted, leads, starts, sorting, finds, sorts }
     }
 
     fn taken<'found>(
@@ -595,7 +600,7 @@ impl<'file> Filer<'file> {
 
 impl<'file> Gathers<FileWork<'file>> for Filer<'file> {
     fn gathered(self, _: &SourceFile) -> FileWork<'file> {
-        let Filer { claimed, rulings, concluding, admitted, leads, starts, sorting, finds, sorts } = self;
+        let Filer { claimed, recalled, rulings, concluding, admitted, leads, starts, sorting, finds, sorts } = self;
         let file = <&SourceFile>::from(claimed);
         let swept: Vec<(TypeId, Found<'_>)> =
             starts.into_iter().zip(finds).map(|(key, watcher)| (key, watcher.found(file))).collect();
@@ -607,8 +612,15 @@ impl<'file> Gathers<FileWork<'file>> for Filer<'file> {
         let mut sorted: BTreeMap<TypeId, Vec<Vec<Violation<'_>>>> = watched.chain(scanned).collect();
         let found = admitted.into_iter().map(|found| (found.slot, Self::taken(&mut sorted, found.source)));
         let filed = found.map(|(slot, violations)| Worked::filing(slot, claimed.order(), &violations));
-        let worked = filed.chain([visited]).collect();
+        let remembered = recalled.map(|filings| Worked::recalled(filings, claimed.order()));
+        let worked = filed.chain([visited]).chain(remembered).collect();
         FileWork { order: claimed.order(), worked, rulings, concluding }
+    }
+}
+
+impl AsRef<Worked> for FileWork<'_> {
+    fn as_ref(&self) -> &Worked {
+        &self.worked
     }
 }
 

@@ -19,6 +19,8 @@ const SITE_END: &str = ": ";
 const LINE_START: &str = ":";
 const FIX_START: &str = "; ";
 const NO_DEPENDENCIES: &str = "{\"workspace_root\": \"/\", \"packages\": []}";
+const BINARY: &str = "target/release/lint";
+const STORE: &str = "./target/lint-cache/files";
 
 #[test]
 fn every_lint_prints_its_golden_over_its_fixture_and_every_violation_names_its_fix() -> Result<(), laws::Unmet> {
@@ -93,9 +95,25 @@ impl Corpus {
             .map(|copied| (copied.path, copied.bytes))
             .collect();
         let described = Self::described(corpus.read(&fixture.join(METADATA)))?;
+        root.create_directories(Path::new(BINARY).parent().unwrap_or(Path::new("")))?;
+        root.write(Path::new(BINARY), Bytes::from(BINARY))?;
+        let cold = Self::linted(&root, &described)?;
+        let remembered = root.read_text(Path::new(STORE))?;
+        let warm = Self::linted(&root, &described)?;
+        assert_ne!(remembered.as_ref(), "", "{}", fixture.display());
+        assert_eq!(warm, cold, "{}", fixture.display());
+        Ok(cold)
+    }
+
+    fn linted(root: &Memory, described: &Bytes) -> Result<String, laws::Unmet> {
         let (mut printed, mut failed) = (Vec::new(), Vec::new());
         let exit = Cli::from_args(std::iter::empty()).report_to(
-            Ports::new(&root, [(PathBuf::from(""), described)].into_iter().collect::<Recorded>(), Monotonic::default()),
+            Ports::new(
+                root,
+                [(PathBuf::from(""), described.clone())].into_iter().collect::<Recorded>(),
+                Monotonic::default(),
+                PathBuf::from(BINARY),
+            ),
             &mut printed,
             &mut failed,
         );

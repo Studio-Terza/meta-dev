@@ -74,6 +74,7 @@ impl Checkout {
                 files,
                 [(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
                 Monotonic::default(),
+                PathBuf::new(),
             ),
             &mut out,
             &mut err,

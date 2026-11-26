@@ -8,6 +8,10 @@ use timer_ports::Monotonic;
 
 fn main() -> ExitCode {
     Process::stream(|arguments, out, err| {
-        Cli::from_args(arguments.into_iter()).report_to(Ports::new(&Disk, Toolchain, Monotonic::default()), out, err)
+        Cli::from_args(arguments.into_iter()).report_to(
+            Ports::new(&Disk, Toolchain, Monotonic::default(), Process::executable()),
+            out,
+            err,
+        )
     })
 }
