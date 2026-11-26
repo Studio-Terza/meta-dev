@@ -1,5 +1,3 @@
-#![doc = include_str!("compile_fail.md")]
-
 #[macro_export]
 macro_rules! states {
     (
