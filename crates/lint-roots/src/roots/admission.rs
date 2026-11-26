@@ -11,11 +11,8 @@ use lint_layout::Failure;
 use lint_layout::Manifest;
 use workspace::Workspace;
 
-#[derive(Debug, Default)]
-pub struct Admission {
-    loaded: BTreeMap<PathBuf, Result<Workspace, Failure>>,
-    admitted: Vec<Manifest>,
-}
+#[derive(Debug)]
+pub struct Admission;
 
 impl Admission {
     pub fn members_among(
@@ -65,30 +62,62 @@ impl Admission {
             .filter(|manifest| manifest.workspace().is_some())
             .map(|manifest| manifest.directory().to_path_buf())
             .collect();
-        found
+        let placed: Vec<Placed> = found
             .into_iter()
             .filter(|manifest| manifest.package().is_some())
-            .try_fold(Admission { loaded, admitted: Vec::new() }, |admission, package| {
-                let root = Self::enclosing(&workspaces, package.directory()).filter(|_| package.workspace().is_none());
-                admission.placed(root, package)
+            .map(|package| Placed {
+                root: Self::enclosing(&workspaces, package.directory()).filter(|_| package.workspace().is_none()),
+                package,
             })
-            .map(|admission| admission.admitted)
+            .collect();
+        let Loaded { ready, mut failed } = loaded.into_iter().collect();
+        let failing = placed.iter().filter_map(|place| place.root.as_ref()).find(|root| failed.contains_key(*root));
+        let failure = failing.and_then(|root| failed.remove(root));
+        let admitted = placed.into_iter().filter_map(|place| place.admitted(&ready)).collect();
+        failure.map_or(Ok(admitted), Err)
     }
+}
 
-    fn within(self, root: &Path, package: Manifest) -> Result<Admission, Failure> {
-        let mut loaded = self.loaded;
-        let workspace = loaded.remove(root).transpose()?;
-        let member = Some(package).filter(|candidate| {
-            workspace.as_ref().and_then(|enclosing| enclosing.admits(candidate.directory())).is_some()
-        });
-        loaded.extend(workspace.map(|kept| (root.to_path_buf(), Ok(kept))));
-        Ok(Admission { loaded, admitted: self.admitted.into_iter().chain(member).collect() })
+#[derive(Debug)]
+struct Placed {
+    root: Option<PathBuf>,
+    package: Manifest,
+}
+
+impl Placed {
+    fn admitted(self, ready: &BTreeMap<PathBuf, Workspace>) -> Option<Manifest> {
+        let directory = self.package.directory();
+        let enclosing =
+            self.root.as_ref().map(|root| ready.get(root).and_then(|workspace| workspace.admits(directory)));
+        let verdict = enclosing.map(|admits| admits.map(Path::to_path_buf));
+        verdict.as_ref().is_none_or(Option::is_some).then_some(self.package)
     }
+}
 
-    fn placed(self, root: Option<PathBuf>, package: Manifest) -> Result<Admission, Failure> {
-        match root {
-            Some(workspace_root) => self.within(&workspace_root, package),
-            None => Ok(Admission { admitted: self.admitted.into_iter().chain(Some(package)).collect(), ..self }),
+#[derive(Debug, Default)]
+struct Loaded {
+    ready: BTreeMap<PathBuf, Workspace>,
+    failed: BTreeMap<PathBuf, Failure>,
+}
+
+impl FromIterator<(PathBuf, Result<Workspace, Failure>)> for Loaded {
+    fn from_iter<Outcomes: IntoIterator<Item = (PathBuf, Result<Workspace, Failure>)>>(outcomes: Outcomes) -> Loaded {
+        outcomes.into_iter().map(|(root, outcome)| Loaded::of_outcome(root, outcome)).fold(
+            Loaded::default(),
+            |mut loaded, part| {
+                loaded.ready.extend(part.ready);
+                loaded.failed.extend(part.failed);
+                loaded
+            },
+        )
+    }
+}
+
+impl Loaded {
+    fn of_outcome(root: PathBuf, outcome: Result<Workspace, Failure>) -> Loaded {
+        match outcome {
+            Ok(workspace) => Loaded { ready: BTreeMap::from([(root, workspace)]), failed: BTreeMap::new() },
+            Err(failure) => Loaded { ready: BTreeMap::new(), failed: BTreeMap::from([(root, failure)]) },
         }
     }
 }

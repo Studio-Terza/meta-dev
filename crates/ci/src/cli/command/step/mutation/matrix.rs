@@ -1,7 +1,7 @@
 use crate::cli::command::Telling;
 use console_ports::Shown;
 use std::ffi::OsString;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use console_ports::Complaint;
@@ -10,8 +10,9 @@ use file_ports::Files;
 use super::super::journal::Journal;
 use super::Step;
 use crate::cli::command::failure::{Failure, Refusal};
-use crate::cli::command::step::Arguments;
+use crate::cli::command::step::{Arguments, Ended, Journaled, Location};
 use crate::cli::ports::{Exit, Ports, Text};
+use grammar_output::Record;
 
 #[derive(Debug)]
 pub struct Matrix {
@@ -39,22 +40,35 @@ impl Matrix {
     }
 }
 
+#[derive(Debug, Record)]
+#[record(source = Arguments)]
+struct MatrixWords {
+    #[field(Location)]
+    shards: PathBuf,
+    #[field(Location)]
+    sources: PathBuf,
+    #[field(Location)]
+    directory: PathBuf,
+    #[field(Journaled)]
+    summary: Journal,
+}
+
+impl From<MatrixWords> for Matrix {
+    fn from(words: MatrixWords) -> Matrix {
+        Matrix {
+            shards: words.shards,
+            sources: words.sources,
+            markdown: Journal::from(words.directory.join(Matrix::MARKDOWN)),
+            json: words.directory.join(Matrix::JSON),
+            directory: words.directory,
+            summary: words.summary,
+        }
+    }
+}
+
 impl Step for Matrix {
     fn from_arguments(given: Vec<OsString>) -> Result<Matrix, Failure<'static>> {
-        let mut arguments = Arguments::from(given);
-        let shards = &arguments.taken()?;
-        let sources = &arguments.taken()?;
-        let directory = &arguments.taken()?;
-        let summary = &arguments.taken()?;
-        arguments.ended()?;
-        Ok(Matrix {
-            shards: PathBuf::from(shards),
-            sources: PathBuf::from(sources),
-            markdown: Journal::from(Path::new(directory).join(Self::MARKDOWN)),
-            json: Path::new(directory).join(Self::JSON),
-            directory: PathBuf::from(directory),
-            summary: Journal::file(Path::new(summary)),
-        })
+        MatrixWords::read(Arguments::from(given))?.ended().map(Matrix::from)
     }
 
     fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {

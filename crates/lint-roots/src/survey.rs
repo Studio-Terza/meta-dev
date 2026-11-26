@@ -1,13 +1,13 @@
 mod boundary;
 
-use std::collections::BTreeMap;
-use std::iter;
+use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use algebra::{Monoid, Semigroup};
 use file_ports::{FileFailure, Files, Kind};
 use lint_layout::Failure;
+use newtype::{Arbitrary, Newtype};
 
 use crate::ignored::Ignored;
 use boundary::Spot;
@@ -28,6 +28,12 @@ pub struct Survey {
     listed: BTreeMap<Spot, Vec<PathBuf>>,
     failed: Vec<Failure>,
 }
+
+#[derive(Debug)]
+pub(crate) struct Failed(Vec<Failure>);
+
+#[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct Position(usize);
 
 impl Semigroup for Survey {
     fn combine(self, other: Survey) -> Survey {
@@ -56,15 +62,14 @@ impl Deref for Settled<'_> {
 
 impl Survey {
     #[must_use]
-    pub fn learn(self, files: &impl Files, fact: Fact, paths: &[PathBuf]) -> Survey {
+    pub fn learned(files: &impl Files, fact: Fact, paths: &[PathBuf]) -> Survey {
         match fact {
             Fact::Kind => Survey {
-                kinds: Self::extended(self.kinds, paths, files.kinds(paths).into_iter().map(Some).collect()),
-                ..self
+                kinds: Self::found(paths, files.kinds(paths).into_iter().map(Some).collect()),
+                ..Survey::default()
             },
             Fact::Canonical => Survey {
-                canonical: Self::extended(
-                    self.canonical,
+                canonical: Self::found(
                     paths,
                     files
                         .canonical_many(paths)
@@ -72,14 +77,16 @@ impl Survey {
                         .map(|canonical| canonical.ignoring(Ignored::Uncanonical))
                         .collect(),
                 ),
-                ..self
+                ..Survey::default()
             },
-            Fact::Followed => self.learn(files, Fact::Canonical, paths).followed(files, paths),
-            Fact::Listed => paths
-                .iter()
-                .cloned()
-                .zip(files.entries_many(paths))
-                .fold(self, |survey, (directory, listing)| survey.listing(directory, listing)),
+            Fact::Followed => Self::followed(files, paths),
+            Fact::Listed => Monoid::concat(
+                paths
+                    .iter()
+                    .cloned()
+                    .zip(files.entries_many(paths))
+                    .map(|(directory, listing)| Self::listing(directory, listing)),
+            ),
         }
     }
 
@@ -103,50 +110,72 @@ impl Survey {
         self.listed.get(Spot::bytes(directory)).map_or(&[], Vec::as_slice)
     }
 
-    pub fn settled(&mut self, order: &[impl AsRef<Path>]) -> Result<Settled<'_>, Failure> {
-        let latest = order.iter().map(AsRef::as_ref).find_map(|directory| {
-            self.failed.iter().rposition(|failure| matches!(failure, Failure::Io { path, .. } if path == directory))
-        });
-        let removed = latest.map(|index| self.failed.remove(index));
-        removed.map(Err).unwrap_or(Ok(Settled(&*self)))
+    pub(crate) fn settling<Made>(self, settle: impl FnOnce(&Survey, Failed) -> Made) -> Made {
+        let Survey { kinds, canonical, listed, failed } = self;
+        settle(&Survey { kinds, canonical, listed, failed: Vec::new() }, Failed(failed))
     }
 
-    fn extended<Value>(
-        mut found: BTreeMap<Spot, Value>,
-        paths: &[PathBuf],
-        values: Vec<Option<Value>>,
-    ) -> BTreeMap<Spot, Value> {
-        found
-            .extend(paths.iter().cloned().map(Spot::from).zip(values).filter_map(|(path, value)| Some((path, value?))));
-        found
+    fn found<Value>(paths: &[PathBuf], values: Vec<Option<Value>>) -> BTreeMap<Spot, Value> {
+        paths.iter().cloned().map(Spot::from).zip(values).filter_map(|(path, value)| Some((path, value?))).collect()
     }
 
-    fn followed(self, files: &impl Files, paths: &[PathBuf]) -> Survey {
-        let reals: Vec<PathBuf> = paths.iter().filter_map(|path| self.canonical(path)).map(Path::to_path_buf).collect();
-        self.learn(files, Fact::Kind, &reals)
+    fn followed(files: &impl Files, paths: &[PathBuf]) -> Survey {
+        let canonical = Self::learned(files, Fact::Canonical, paths);
+        let reals: Vec<PathBuf> =
+            paths.iter().filter_map(|path| canonical.canonical(path)).map(Path::to_path_buf).collect();
+        canonical.combine(Self::learned(files, Fact::Kind, &reals))
     }
 
-    fn listing(self, directory: PathBuf, listing: Result<Vec<PathBuf>, FileFailure>) -> Survey {
+    fn listing(directory: PathBuf, listing: Result<Vec<PathBuf>, FileFailure>) -> Survey {
         match listing {
-            Ok(entries) => Survey { listed: Self::sorted_into(self.listed, directory, entries), ..self },
-            Err(failure) => Survey {
-                failed: self
-                    .failed
-                    .into_iter()
-                    .chain(iter::once(Failure::Io { path: directory, source: failure.into() }))
-                    .collect(),
-                ..self
+            Ok(entries) => Survey {
+                listed: BTreeMap::from([(Spot::from(directory), BTreeSet::from_iter(entries).into_iter().collect())]),
+                ..Survey::default()
             },
+            Err(failure) => {
+                Survey { failed: vec![Failure::Io { path: directory, source: failure.into() }], ..Survey::default() }
+            }
         }
     }
+}
 
-    fn sorted_into(
-        mut listed: BTreeMap<Spot, Vec<PathBuf>>,
-        directory: PathBuf,
-        mut entries: Vec<PathBuf>,
-    ) -> BTreeMap<Spot, Vec<PathBuf>> {
-        entries.sort();
-        listed.insert(Spot::from(directory), entries);
-        listed
+impl Failed {
+    pub(crate) fn settled<'known>(
+        self,
+        known: &'known Survey,
+        orders: &[Vec<&Path>],
+    ) -> Vec<Result<Settled<'known>, Failure>> {
+        let taken = orders.iter().fold(Vec::new(), |mut taken, order| {
+            let latest = self.latest(order, &taken);
+            taken.push(latest);
+            taken
+        });
+        let mut owned: BTreeMap<Position, Failure> =
+            self.0.into_iter().enumerate().map(|(at, failure)| (Position::new(at), failure)).collect();
+        taken
+            .into_iter()
+            .map(|latest| latest.and_then(|at| owned.remove(&at)).map_or(Ok(Settled(known)), Err))
+            .collect()
     }
+
+    fn latest(&self, order: &[&Path], taken: &[Option<Position>]) -> Option<Position> {
+        order.iter().find_map(|directory| self.latest_at(directory, taken))
+    }
+
+    fn latest_at(&self, directory: &Path, taken: &[Option<Position>]) -> Option<Position> {
+        self.0
+            .iter()
+            .enumerate()
+            .map(|(at, failure)| Positioned { at: Position::new(at), failure })
+            .rev()
+            .filter(|positioned| taken.iter().all(|took| *took != Some(positioned.at)))
+            .find(|positioned| matches!(positioned.failure, Failure::Io { path, .. } if path == directory))
+            .map(|positioned| positioned.at)
+    }
+}
+
+#[derive(Debug)]
+struct Positioned<'failed> {
+    at: Position,
+    failure: &'failed Failure,
 }

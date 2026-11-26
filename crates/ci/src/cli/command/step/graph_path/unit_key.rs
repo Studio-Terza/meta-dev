@@ -21,10 +21,6 @@ impl UnitKey {
     pub(super) fn role(&self) -> &UnitRole {
         &self.role
     }
-
-    pub(super) fn sibling(&self, role: UnitRole) -> UnitKey {
-        UnitKey { package: self.package.clone(), role }
-    }
 }
 
 impl fmt::Display for UnitKey {

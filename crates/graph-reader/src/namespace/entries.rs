@@ -8,7 +8,7 @@ use syntax::{
     Token, VisRestricted,
 };
 
-use graph::{CrateExports, Domain, Exposure, Item as ModelItem, ItemKind, ItemPath, Reexport};
+use graph::{CrateExports, Domain, Exposure, Item as ModelItem, ItemKind, ItemPath, Reexport, Unplaced};
 use lint_layout::{Casing, Dependencies, Name, Whole, Word, words};
 
 use super::Namespace;
@@ -56,11 +56,11 @@ impl From<&VisRestricted> for Visibility {
 }
 
 impl Visibility {
-    fn seen(self, restricted: Admission) -> Admission {
+    fn settled(self) -> Option<Admission> {
         match self {
-            Visibility::Private => Admission::Hidden,
-            Visibility::Visible => Admission::Shown,
-            Visibility::Restricted => restricted,
+            Visibility::Private => Some(Admission::Hidden),
+            Visibility::Visible => Some(Admission::Shown),
+            Visibility::Restricted => None,
         }
     }
 }
@@ -76,15 +76,8 @@ impl Sight {
     pub(super) fn admits(self, visibility: Visibility) -> Admission {
         match self {
             Sight::Inside => Admission::Shown,
-            Sight::ByPath => visibility.seen(Admission::Shown),
-            Sight::ByGlob => visibility.seen(Admission::Obscured),
-        }
-    }
-
-    pub(super) fn beyond(self, reach: Option<ScopeId>) -> Sight {
-        match reach {
-            Some(_) => Sight::Inside,
-            None => self,
+            Sight::ByPath => visibility.settled().unwrap_or(Admission::Shown),
+            Sight::ByGlob => visibility.settled().unwrap_or(Admission::Obscured),
         }
     }
 }
@@ -161,11 +154,11 @@ impl DeclaredKind {
         }
     }
 
-    fn above(self, base: ScopeId) -> DeclaredKind {
+    fn module(self) -> Option<ScopeId> {
         match self {
-            DeclaredKind::Module(module) => DeclaredKind::Module(module.above(base)),
+            DeclaredKind::Module(module) => Some(module),
             DeclaredKind::OpaqueModule | DeclaredKind::Item(_) | DeclaredKind::Rules(_) | DeclaredKind::Alias(_) => {
-                self
+                None
             }
         }
     }
@@ -215,12 +208,7 @@ impl Declared {
 
     fn issued(&self, krate: Option<&Name>) -> Option<ModelItem> {
         let kind = self.kind.item_kind()?;
-        Some(
-            ModelItem::new(self.name.clone(), kind)
-                .marked(self.marks.clone())
-                .homed(krate.cloned())
-                .exposed(self.exposure),
-        )
+        Some(Unplaced::new(self.name.clone(), kind).placed(self.marks.clone(), krate.cloned(), self.exposure))
     }
 }
 
@@ -372,7 +360,7 @@ struct Import {
 
 impl Import {
     fn row<'rows>(&'rows self, resolution: &'rows Resolution) -> Option<Keyed<'rows, Row<'rows>>> {
-        let row = Row::new(Layer::Imported, self.visibility, View::from(resolution.present()?));
+        let row = Row::new(Layer::Imported, self.visibility, Option::<View>::from(resolution)?);
         Some(Keyed::new(Key::new(self.domain, &self.name), row))
     }
 }
@@ -455,6 +443,25 @@ impl Glob {
             source: GlobSource::Invoked(UsePath::from(&invoked.path), Written::from(invoked)),
             visibility: Visibility::Visible,
         }
+    }
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct Local(Entries);
+
+impl From<Entries> for Local {
+    fn from(entries: Entries) -> Local {
+        Local(entries)
+    }
+}
+
+impl Local {
+    pub(super) fn placed(self, base: ScopeId) -> Entries {
+        let rebased = |declared: Declared| {
+            let kind = declared.kind.module().map_or(declared.kind, |module| DeclaredKind::Module(module.above(base)));
+            Declared { kind, ..declared }
+        };
+        Entries { declared: self.0.declared.into_iter().map(rebased).collect(), ..self.0 }
     }
 }
 
@@ -587,15 +594,6 @@ impl Entries {
             .collect()
     }
 
-    pub(super) fn above(self, base: ScopeId) -> Entries {
-        let declared = self
-            .declared
-            .into_iter()
-            .map(|declared| Declared { kind: declared.kind.above(base), ..declared })
-            .collect();
-        Entries { declared, ..self }
-    }
-
     pub(super) fn issued(&self, krate: Option<&Name>) -> Vec<Option<ModelItem>> {
         self.declared.iter().map(|declared| declared.issued(krate)).collect()
     }
@@ -653,7 +651,7 @@ impl Entries {
             self.imports
                 .iter()
                 .map(|import| {
-                    resolver.importing(Key::new(import.domain, &import.name)).path(&import.path, scope, import.domain)
+                    resolver.importer(Key::new(import.domain, &import.name)).path(&import.path, scope, import.domain)
                 })
                 .collect(),
             self.globs
@@ -709,11 +707,9 @@ impl Entries {
             .iter()
             .filter(|glob| shown(glob.visibility))
             .map(|glob| glob.source.reexport(dependencies, &declared));
-        let with_declared =
-            declared.iter().fold(CrateExports::default(), |exports, name| exports.with_declared((*name).clone()));
-        let with_named =
-            imported.chain(externs).fold(with_declared, |exports, (name, reexport)| exports.with_named(name, reexport));
-        globs.fold(with_named, CrateExports::with_glob)
+        let own: CrateExports = declared.iter().map(|name| (*name).clone()).collect();
+        let named: CrateExports = imported.chain(externs).collect();
+        own.combine(named).combine(globs.collect())
     }
 }
 

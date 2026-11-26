@@ -36,19 +36,19 @@ pub use external::External;
 
 pub use found::Found;
 pub use function::definition::{
-    Argument, CallOwner, Definition, Infix, Invocation, Looping, Operator, Prefix, Reached, Read, Reader, Receiving,
-    Repeating, Repetition,
+    Argument, CallOwner, Definition, Infix, Invocation, Invoking, Looping, Operator, Prefix, Reached, Read, Reader,
+    Receiving, Repeating, Repetition, Unpassed,
 };
 pub use function::{
-    Entry, Evaluation, Function, Input, MethodShape, Mutated, Mutation, Output, Owner, Parameter, Receiver, Returned,
-    Signature, Taken,
+    Entry, Evaluation, Function, Input, MethodShape, Monomorphic, Mutated, Mutation, Output, Owner, Parameter,
+    Receiver, Returned, Signature, Signed, Taken,
 };
-pub use holding::{Held, Holding};
-pub use implementation::{Assigned, Implementation, Interface, Origin, Subject};
-pub use item::{Alias, AliasParameter, Exposure, Item, ItemKind};
+pub use holding::{Held, Holding, Unsited};
+pub use implementation::{Assigned, Implementation, Interface, Origin, Subject, Unparameterised};
+pub use item::{Alias, AliasParameter, Exposure, Item, ItemKind, Unplaced};
 pub use item_declaration::ItemDeclaration;
 pub use item_graph::ItemGraph;
-pub use item_path::ItemPath;
+pub use item_path::{ItemPath, Segment};
 pub use law::{Law, LawKind, Operation, OperationOwner, Property, Route, Side};
 pub use lint_layout::Site;
 pub use member::Member;
@@ -58,7 +58,7 @@ pub use placed::{FileHome, Harness, Placed};
 pub use primitive::Primitive;
 pub use quoted::Quoted;
 pub use references::{Consumers, References};
-pub use region::{Ground, Reach, Region, Seat, Within, Writing, Zone};
+pub use region::{Ground, Reach, Region, Seat, Unowned, Within, Writing, Zone};
 pub use resolved::{Nominal, Resolved};
 pub use sited::{Sited, Spelling};
 pub use traversal::{Event, Trees};

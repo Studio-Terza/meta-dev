@@ -17,15 +17,6 @@ struct Linkage {
     kind: Option<DependencyKind>,
 }
 
-impl Linkage {
-    fn normal(&self) -> Option<&Linkage> {
-        match self.kind {
-            None => Some(self),
-            Some(DependencyKind::Dev | DependencyKind::Build | DependencyKind::Other) => None,
-        }
-    }
-}
-
 #[derive(Clone, Debug, Deserialize)]
 pub struct NodeDependency {
     name: CrateName,
@@ -63,6 +54,6 @@ impl Node {
     }
 
     pub fn normal(&self) -> impl Iterator<Item = &NodeDependency> {
-        self.deps.iter().filter(|dependency| dependency.dep_kinds.iter().find_map(Linkage::normal).is_some())
+        self.deps.iter().filter(|dependency| dependency.dep_kinds.iter().any(|linkage| linkage.kind.is_none()))
     }
 }

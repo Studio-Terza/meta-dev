@@ -2,6 +2,8 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt;
 
+use newtype::Wrapping;
+
 use super::unit_key::UnitKey;
 use crate::cli::command::step::seconds::Seconds;
 
@@ -26,7 +28,7 @@ impl Weighed {
 
     pub(super) fn heaviest(self, mut weights: BTreeMap<UnitKey, Seconds>) -> BTreeMap<UnitKey, Seconds> {
         let held = weights.entry(self.key).or_default();
-        *held = held.longer(self.seconds);
+        *held = Seconds::new(held.into_inner().max(self.seconds.into_inner()));
         weights
     }
 }

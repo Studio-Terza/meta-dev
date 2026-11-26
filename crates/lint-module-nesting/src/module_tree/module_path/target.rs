@@ -61,27 +61,24 @@ impl<'path> Target<'path> {
         self.prefixes().rev().find_map(|prefix| modules.same_as(self.crate_root, prefix))
     }
 
-    pub fn crossed_directory(&self, user: &ModulePath<'_>, modules: &ModuleIndex<'_>) -> Option<&Target<'path>> {
+    pub fn crossed_directory(&self, user: &ModulePath<'_>, modules: &ModuleIndex<'_>) -> Option<&[&'path Name]> {
         self.prefixes()
             .take(self.segments.len())
             .skip(1)
             .filter(|boundary| modules.directory_same_as(self.crate_root, boundary).is_some())
             .find(|boundary| self.enclosing(boundary, user).is_none())
-            .map(|_| self)
     }
 
     fn prefixes(&self) -> impl DoubleEndedIterator<Item = &[&'path Name]> {
         (0..=self.segments.len()).filter_map(|length| self.segments.get(..length))
     }
 
-    fn enclosing<'user>(&self, boundary: &[&Name], user: &'user ModulePath<'_>) -> Option<&'user ModulePath<'user>> {
-        Some(user).filter(|candidate| AsRef::<Nest<'_>>::as_ref(candidate).krate() == Some(self.crate_root)).filter(
-            |in_crate| {
-                <&[Name]>::from(*AsRef::<Nest<'_>>::as_ref(in_crate))
-                    .get(..boundary.len())
-                    .is_some_and(|head| head.iter().eq(boundary.iter().copied()))
-            },
-        )
+    fn enclosing<'user>(&self, boundary: &[&Name], user: &'user ModulePath<'user>) -> Option<&'user [Name]> {
+        let nest = *AsRef::<Nest<'user>>::as_ref(user);
+        Some(nest)
+            .filter(|in_crate| in_crate.krate() == Some(self.crate_root))
+            .and_then(|in_crate| <&[Name]>::from(in_crate).get(..boundary.len()))
+            .filter(|head| head.iter().eq(boundary.iter().copied()))
     }
 
     fn start<'file>(start: Start, file: &ModulePath<'file>) -> Option<&'file [Name]> {

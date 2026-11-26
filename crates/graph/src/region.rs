@@ -144,27 +144,25 @@ pub struct Seat {
     traited: Option<Resolved>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Unowned {
+    region: Region,
+    subject: Option<TypeRef>,
+}
+
+impl Unowned {
+    #[must_use]
+    pub fn new(region: Region, subject: Option<TypeRef>) -> Unowned {
+        Unowned { region, subject }
+    }
+
+    #[must_use]
+    pub fn owned(self, owner: Option<ItemId>, implemented: Option<Name>, traited: Option<Resolved>) -> Seat {
+        Seat { region: self.region, subject: self.subject, owner, implemented, traited }
+    }
+}
+
 impl Seat {
-    #[must_use]
-    pub fn new(region: Region, subject: Option<TypeRef>) -> Seat {
-        Seat { region, subject, owner: None, implemented: None, traited: None }
-    }
-
-    #[must_use]
-    pub fn owned(self, owner: Option<ItemId>) -> Seat {
-        Seat { owner, ..self }
-    }
-
-    #[must_use]
-    pub fn implementing(self, implemented: Option<Name>) -> Seat {
-        Seat { implemented, ..self }
-    }
-
-    #[must_use]
-    pub fn traited(self, traited: Option<Resolved>) -> Seat {
-        Seat { traited, ..self }
-    }
-
     #[must_use]
     pub fn implemented_trait(&self) -> Option<&Resolved> {
         self.traited.as_ref()

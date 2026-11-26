@@ -37,10 +37,10 @@ impl Endpoints<'_, '_, '_> {
         });
         let stringly = last
             .matches::<Whole>(&Self::STRINGS)
-            .map(|_| Resolved::Found(Endpoint::new(Nature::Primitive, last.clone())));
-        wrapped.or(stringly).unwrap_or_else(|| {
-            Resolved::Found(Endpoint::new(Nature::Named, last.clone()).originating(Some(Name::from(Self::STD))))
-        })
+            .map(|_| Resolved::Found(Endpoint::new(Nature::Primitive, last.clone(), None)));
+        wrapped
+            .or(stringly)
+            .unwrap_or_else(|| Resolved::Found(Endpoint::new(Nature::Named, last.clone(), Some(Name::from(Self::STD)))))
     }
 
     fn parameter(self, name: &Name) -> Resolved {
@@ -55,7 +55,7 @@ impl Endpoints<'_, '_, '_> {
 
     fn written(named: &Named<Sited>, origin: Option<Name>) -> Resolved {
         let name = named.last_spelled().cloned().unwrap_or_default();
-        Resolved::Found(Endpoint::new(Nature::Named, name).originating(origin))
+        Resolved::Found(Endpoint::new(Nature::Named, name, origin))
     }
 
     fn bound(self, bound: &TypeRef) -> Option<Resolved> {
@@ -67,7 +67,7 @@ impl Endpoints<'_, '_, '_> {
                 .iterated()
                 .map_or(Resolved::Found(Endpoint::from(Unnamed::Opaque)), |inner| inner.as_ref().outlined(self))
         });
-        Some(iterating.unwrap_or_else(|| Resolved::Found(Endpoint::new(Nature::Interface, last.clone()))))
+        Some(iterating.unwrap_or_else(|| Resolved::Found(Endpoint::new(Nature::Interface, last.clone(), None))))
     }
 }
 
@@ -102,7 +102,11 @@ impl Outline for Endpoints<'_, '_, '_> {
         let std = || target.std().map(|path| self.std(named, path));
         let primitive = || {
             target.primitive().map(|_| {
-                Resolved::Found(Endpoint::new(Nature::Primitive, named.last_spelled().cloned().unwrap_or_default()))
+                Resolved::Found(Endpoint::new(
+                    Nature::Primitive,
+                    named.last_spelled().cloned().unwrap_or_default(),
+                    None,
+                ))
             })
         };
         let declared = || {

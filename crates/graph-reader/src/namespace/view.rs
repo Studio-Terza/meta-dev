@@ -1,8 +1,9 @@
+use algebra::{Monoid, Semigroup};
 use graph::Unresolved;
 
 use super::binding::Binding;
 use super::entries::Admission;
-use super::resolver::{Outer, Resolution};
+use super::resolver::{Deference, Dispute, Outer, Resolution};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 enum Found<'rows> {
@@ -12,23 +13,19 @@ enum Found<'rows> {
     Conflict,
 }
 
-impl<'rows> Found<'rows> {
-    fn union(self, other: Found<'rows>) -> Found<'rows> {
+impl Semigroup for Found<'_> {
+    fn combine(self, other: Self) -> Self {
         match self {
             Found::Nothing => other,
-            Found::One(left) => other.met(left),
+            Found::One(left) => other.joined(left),
             Found::Conflict => Found::Conflict,
         }
     }
+}
 
-    fn met(self, left: &'rows Binding) -> Found<'rows> {
-        match self {
-            Found::Nothing => Found::One(left),
-            Found::One(right) => Found::agreed(left, right),
-            Found::Conflict => Found::Conflict,
-        }
-    }
+impl Monoid for Found<'_> {}
 
+impl<'rows> Found<'rows> {
     fn undisputed(self) -> Found<'rows> {
         match self {
             Found::Conflict => Found::Nothing,
@@ -36,11 +33,17 @@ impl<'rows> Found<'rows> {
         }
     }
 
-    fn agreed(left: &'rows Binding, right: &'rows Binding) -> Found<'rows> {
-        match [left].into_iter().find(|binding| *binding == right) {
-            Some(agreed) => Found::One(agreed),
-            None => Found::Conflict,
+    fn joined(self, left: &'rows Binding) -> Found<'rows> {
+        match self {
+            Found::Nothing => Found::agreeing(left, None),
+            Found::One(right) => Found::agreeing(left, Some(right)),
+            Found::Conflict => Found::Conflict,
         }
+    }
+
+    fn agreeing(left: &'rows Binding, right: Option<&'rows Binding>) -> Found<'rows> {
+        let agreed = right.map_or(Some(left), |found| Some(left).filter(|binding| *binding == found));
+        agreed.map_or(Found::Conflict, Found::One)
     }
 }
 
@@ -53,14 +56,6 @@ enum Determinacy {
 }
 
 impl Determinacy {
-    fn or_else<'rows>(self, next: impl FnOnce() -> View<'rows>) -> View<'rows> {
-        match self {
-            Determinacy::Determined => next(),
-            Determinacy::Weak => View::UNEXPANDED.union(next()),
-            Determinacy::Strong => View::WAITING,
-        }
-    }
-
     fn bound(self, binding: &Binding) -> Resolution {
         match self {
             Determinacy::Determined => Resolution::Bound(binding.clone()),
@@ -68,10 +63,10 @@ impl Determinacy {
         }
     }
 
-    fn deferring<'rows>(self, disputed: View<'rows>, deferred: impl FnOnce() -> View<'rows>) -> View<'rows> {
+    fn deference(self) -> Deference {
         match self {
-            Determinacy::Determined => disputed,
-            Determinacy::Weak | Determinacy::Strong => deferred(),
+            Determinacy::Determined => Deference::Stands,
+            Determinacy::Weak | Determinacy::Strong => Deference::Defers,
         }
     }
 
@@ -90,36 +85,36 @@ pub(super) struct View<'rows> {
     pending: Determinacy,
 }
 
+impl Semigroup for View<'_> {
+    fn combine(self, other: Self) -> Self {
+        View { found: self.found.combine(other.found), pending: self.pending.max(other.pending) }
+    }
+}
+
+impl Monoid for View<'_> {}
+
 impl<'rows> View<'rows> {
     pub(super) const ABSENT: View<'static> = View { found: Found::Nothing, pending: Determinacy::Determined };
     pub(super) const WAITING: View<'static> = View { found: Found::Nothing, pending: Determinacy::Strong };
     pub(super) const UNEXPANDED: View<'static> = View { found: Found::Nothing, pending: Determinacy::Weak };
     pub(super) const CONFLICT: View<'static> = View { found: Found::Conflict, pending: Determinacy::Determined };
 
-    pub(super) fn union(self, other: View<'rows>) -> View<'rows> {
-        View { found: self.found.union(other.found), pending: self.pending.max(other.pending) }
-    }
-
     pub(super) fn undisputed(self) -> View<'rows> {
         View { found: self.found.undisputed(), pending: self.pending }
     }
 
-    pub(super) fn disputed(
-        self,
-        explicit: impl FnOnce() -> View<'rows>,
-        deferred: impl FnOnce() -> View<'rows>,
-    ) -> View<'rows> {
+    pub(super) fn dispute(self) -> Dispute {
         match self.found {
-            Found::Conflict => explicit().deferring(self, deferred),
-            Found::Nothing | Found::One(_) => self,
+            Found::Conflict => Dispute::Contested,
+            Found::Nothing | Found::One(_) => Dispute::Clear,
         }
     }
 
-    fn deferring(self, disputed: View<'rows>, deferred: impl FnOnce() -> View<'rows>) -> View<'rows> {
+    pub(super) fn deference(self) -> Deference {
         match self.found {
-            Found::One(_) => deferred(),
-            Found::Conflict => disputed,
-            Found::Nothing => self.pending.deferring(disputed, deferred),
+            Found::One(_) => Deference::Defers,
+            Found::Conflict => Deference::Stands,
+            Found::Nothing => self.pending.deference(),
         }
     }
 
@@ -128,13 +123,6 @@ impl<'rows> View<'rows> {
             Admission::Hidden => View::ABSENT,
             Admission::Shown => shown(),
             Admission::Obscured => View::CONFLICT,
-        }
-    }
-
-    pub(super) fn or_else(self, next: impl FnOnce() -> View<'rows>) -> View<'rows> {
-        match self.found {
-            Found::Nothing => self.pending.or_else(next),
-            Found::One(_) | Found::Conflict => self,
         }
     }
 
@@ -156,6 +144,34 @@ impl<'rows> View<'rows> {
             Found::One(binding) => self.pending.bound(binding),
             Found::Conflict => Resolution::Bound(Binding::Unknown(absent().unresolved(expanded))),
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub(super) struct Nearest<'rows>(View<'rows>);
+
+impl Semigroup for Nearest<'_> {
+    fn combine(self, next: Self) -> Self {
+        match self.0.found {
+            Found::Nothing => Some(self)
+                .filter(|held| held.0.pending == Determinacy::Strong)
+                .unwrap_or_else(|| Nearest(self.0.combine(next.0))),
+            Found::One(_) | Found::Conflict => self,
+        }
+    }
+}
+
+impl Monoid for Nearest<'_> {}
+
+impl<'rows> From<View<'rows>> for Nearest<'rows> {
+    fn from(view: View<'rows>) -> Nearest<'rows> {
+        Nearest(view)
+    }
+}
+
+impl<'rows> From<Nearest<'rows>> for View<'rows> {
+    fn from(nearest: Nearest<'rows>) -> View<'rows> {
+        nearest.0
     }
 }
 

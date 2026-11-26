@@ -9,6 +9,7 @@ use std::io;
 use std::path::Path;
 use std::str::FromStr;
 
+use algebra::{Monoid, Semigroup};
 use boundary::GoldenTest;
 use file_ports::Files;
 use newtype::Wrapping;
@@ -34,7 +35,7 @@ impl GoldenTests {
         found.into_iter().zip(read).try_fold(GoldenTests::default(), |tests, (file, outcome)| {
             let bytes =
                 outcome.map_err(|failure| Failure::Io { path: Cow::Owned(file), source: io::Error::from(failure) })?;
-            Ok(tests.merged(
+            Ok(tests.combine(
                 LossyText::from(bytes.as_ref())
                     .as_ref()
                     .parse::<GoldenTests>()
@@ -47,11 +48,15 @@ impl GoldenTests {
     pub(crate) fn names(&self) -> &BTreeSet<TestName> {
         &self.0
     }
+}
 
-    fn merged(self, other: GoldenTests) -> GoldenTests {
+impl Semigroup for GoldenTests {
+    fn combine(self, other: GoldenTests) -> GoldenTests {
         GoldenTests(self.0.into_iter().chain(other.0).collect())
     }
 }
+
+impl Monoid for GoldenTests {}
 
 impl FromStr for GoldenTests {
     type Err = Infallible;

@@ -11,6 +11,10 @@ impl<'stream> Reply<'stream> {
         Reply { replying, replied }
     }
 
+    pub fn replied(&self) -> &'stream Message {
+        self.replied
+    }
+
     pub fn link(&self) -> MechanicalLink {
         MechanicalLink::new(
             Anchor::Message(self.replying.record().uuid().clone()),

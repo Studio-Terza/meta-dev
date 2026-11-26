@@ -22,7 +22,7 @@ pub use claude_code_dir::ClaudeCodeDir;
 pub use cursor::Cursor;
 pub use instant::Instant;
 pub use kind::Kind;
-pub use line::{Gather, Line};
+pub use line::Line;
 pub use message_id::Uuid;
 pub use read::Read;
 pub use read_failure::ReadFailure;

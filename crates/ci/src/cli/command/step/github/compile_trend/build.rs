@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+use algebra::{Monoid, Semigroup};
 use file_ports::{FileFailure, Files};
 use text_lines::OneLine;
 
@@ -54,10 +55,32 @@ impl AsRef<Path> for Source {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Build {
     total: Seconds,
     crates: BTreeMap<OneLine, Seconds>,
+}
+
+impl Semigroup for Build {
+    fn combine(self, later: Build) -> Build {
+        let crates = later.crates.into_iter().fold(self.crates, |mut all, (name, seconds)| {
+            let total: &mut Seconds = all.entry(name).or_default();
+            *total = [*total, seconds].into_iter().sum();
+            all
+        });
+        Build { total: [self.total, later.total].into_iter().sum(), crates }
+    }
+}
+
+impl Monoid for Build {}
+
+impl From<Part> for Build {
+    fn from(part: Part) -> Build {
+        match part {
+            Part::Stages(stages) => Build { total: stages.into_values().sum(), crates: BTreeMap::new() },
+            Part::Crates(crates) => Build { total: Seconds::default(), crates },
+        }
+    }
 }
 
 impl Build {
@@ -110,22 +133,6 @@ impl Build {
             .zip(read)
             .map(|(source, text)| source.parsed(text))
             .collect::<Result<Vec<Part>, Failure<'static>>>()?;
-        Ok(parts.into_iter().fold(Build { total: Seconds::default(), crates: BTreeMap::new() }, Build::adding))
-    }
-
-    fn adding(self, part: Part) -> Build {
-        match part {
-            Part::Stages(stages) => {
-                Build { total: [self.total, stages.into_values().sum()].into_iter().sum(), crates: self.crates }
-            }
-            Part::Crates(crates) => Build {
-                total: self.total,
-                crates: crates.into_iter().fold(self.crates, |mut all, (name, seconds)| {
-                    let total: &mut Seconds = all.entry(name).or_default();
-                    *total = [*total, seconds].into_iter().sum();
-                    all
-                }),
-            },
-        }
+        Ok(Monoid::concat(parts.into_iter().map(Build::from)))
     }
 }

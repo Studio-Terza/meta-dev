@@ -2,7 +2,7 @@ mod error_types;
 mod finding;
 mod narrowed;
 
-use graph::{Function, Model, Placed};
+use graph::{Entry, Function, Model, Placed};
 use lint_core::{Headline, Report, Violation};
 use lint_file::ModelLint;
 
@@ -31,7 +31,7 @@ impl NarrowedReturns {
         errors: &ErrorTypes,
         found: Placed<'model, &'model Function>,
     ) -> Option<Violation<'model>> {
-        let function = found.entity().called()?;
+        let function = Some(found.entity()).filter(|function| function.entry() == Entry::Called)?;
         let narrowed = Narrowed::returned(model, errors, function.signed_here()?.output())?;
         Some(Violation::new(found.site(), Finding::new(function.as_ref(), narrowed)))
     }

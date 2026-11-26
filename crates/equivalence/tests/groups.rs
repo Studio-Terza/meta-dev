@@ -57,7 +57,7 @@ impl Grouping {
             let path = Path::new(Self::FILES.get(usize::from(*file))?);
             Some(Span { length: *length, from: *from, site: Site::of_file(path) })
         });
-        Groups::grouped(found).outermost(|length| *length).listed().iter().map(|group| *group.key()).collect()
+        Groups::grouped(found).outermost(|length| *length).iter().map(|group| *group.key()).collect()
     }
 
     fn holes(sequences: &[&[u8]]) -> String {

@@ -1,6 +1,8 @@
 use std::iter;
 use std::ops::ControlFlow;
 
+use algebra::Semigroup;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct ScopeId(usize);
 
@@ -41,23 +43,10 @@ impl GlobId {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct Reach(usize);
-
-impl Reach {
-    pub(super) const FIRST: Reach = Reach(0);
-
-    pub(super) fn next(self) -> Reach {
-        Reach(self.0 + 1)
-    }
-}
-
-pub(super) trait Lattice: Eq + Sized {
-    fn joined(&self, computed: Self) -> Self;
-
+pub(super) trait Lattice: Semigroup + Eq + Clone {
     fn settled(self, advanced: impl Fn(&Self) -> Self) -> Self {
         Self::reached(iter::repeat(()).try_fold(self, |state, ()| {
-            let next = state.joined(advanced(&state));
+            let next = state.clone().combine(advanced(&state));
             Self::stepped(&state, next)
         }))
     }
@@ -76,9 +65,32 @@ pub(super) trait Lattice: Eq + Sized {
     }
 }
 
-impl<Entry: Lattice> Lattice for Vec<Entry> {
-    fn joined(&self, computed: Vec<Entry>) -> Vec<Entry> {
-        self.iter().zip(computed).map(|(held, found)| held.joined(found)).collect()
+impl<Joined: Semigroup + Eq + Clone> Lattice for Joined {}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) struct Pointwise<Entry>(Vec<Entry>);
+
+impl<Entry: Semigroup> Semigroup for Pointwise<Entry> {
+    fn combine(self, other: Self) -> Self {
+        Pointwise(self.0.into_iter().zip(other.0).map(|(held, found)| held.combine(found)).collect())
+    }
+}
+
+impl<Entry> From<Vec<Entry>> for Pointwise<Entry> {
+    fn from(entries: Vec<Entry>) -> Pointwise<Entry> {
+        Pointwise(entries)
+    }
+}
+
+impl<Entry> From<Pointwise<Entry>> for Vec<Entry> {
+    fn from(pointwise: Pointwise<Entry>) -> Vec<Entry> {
+        pointwise.0
+    }
+}
+
+impl<Entry> AsRef<[Entry]> for Pointwise<Entry> {
+    fn as_ref(&self) -> &[Entry] {
+        &self.0
     }
 }
 

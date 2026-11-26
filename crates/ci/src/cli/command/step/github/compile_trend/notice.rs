@@ -4,6 +4,9 @@ mod range;
 use std::cmp::Ordering;
 use std::fmt;
 
+use algebra::Semigroup;
+
+use super::Pace;
 use super::build::Build;
 use super::fortnight::Fortnight;
 use crate::cli::ports::Text;
@@ -33,12 +36,12 @@ impl<'builds> Notice<'builds> {
         earlier: &'builds [Build],
         fortnight: &'builds Fortnight,
     ) -> Notice<'builds> {
-        let range = earlier.iter().map(Build::total).map(Range::from).reduce(Range::spanning);
+        let range = earlier.iter().map(Build::total).map(Range::from).reduce(Range::combine);
         Notice { today, earlier, fortnight, range }
     }
 
-    pub(super) fn slower(&self) -> Option<&Notice<'builds>> {
-        self.range.and_then(|range| range.below(self.today.total())).map(|_| self)
+    pub(super) fn pace(&self) -> Pace {
+        self.range.map_or(Pace::Steady, |range| range.pace(self.today.total()))
     }
 
     pub(super) fn reported<'notice>(&'notice self, merged: &'notice Text) -> Report<'notice> {
@@ -50,28 +53,33 @@ impl<'builds> Notice<'builds> {
             .today
             .crates()
             .iter()
-            .filter_map(|(name, today)| Growth::against(name, *today, self.earlier).grew())
+            .filter_map(|(name, today)| Growth::against(name, *today, self.earlier))
             .collect();
         grown.sort_by(|left, right| right.grown().partial_cmp(&left.grown()).unwrap_or(Ordering::Equal));
         grown.into_iter().take(Self::GROWN_LEN).collect()
     }
+}
 
-    fn compared(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.range {
+#[derive(Debug)]
+struct Compared<'notice, 'builds>(&'notice Notice<'builds>);
+
+impl fmt::Display for Compared<'_, '_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.0.range {
             Some(range) => write!(
                 formatter,
                 "{}{}s in all today; the {} runs of {} took {range}",
-                Self::TOOK,
-                self.today.total(),
-                self.earlier.len(),
-                self.fortnight
+                Notice::TOOK,
+                self.0.today.total(),
+                self.0.earlier.len(),
+                self.0.fortnight
             ),
             None => write!(
                 formatter,
                 "{}{}s in all today; no run of {} to compare with",
-                Self::TOOK,
-                self.today.total(),
-                self.fortnight
+                Notice::TOOK,
+                self.0.today.total(),
+                self.0.fortnight
             ),
         }
     }
@@ -79,15 +87,13 @@ impl<'builds> Notice<'builds> {
 
 impl fmt::Display for Notice<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.compared(formatter)?;
-        formatter.write_str(", so no trend issue.")
+        write!(formatter, "{}, so no trend issue.", Compared(self))
     }
 }
 
 impl fmt::Display for Report<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.notice.compared(formatter)?;
-        writeln!(formatter, ": slower than every one of them.")?;
+        writeln!(formatter, "{}: slower than every one of them.", Compared(self.notice))?;
         writeln!(formatter)?;
         writeln!(formatter, "Crates that grew most, seconds today against their average over those runs:")?;
         self.notice.grown().iter().try_for_each(|growth| writeln!(formatter, "{growth}"))?;

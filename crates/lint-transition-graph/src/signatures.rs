@@ -22,7 +22,7 @@ impl<'system, 'found, 'file> Alike<'system, 'found, 'file> {
     ) -> Vec<Alike<'system, 'found, 'file>> {
         let types = system.types();
         let methods = system.edges().iter().filter_map(|edge| Method::of_edge(types, edge, equivalence));
-        Groups::grouped(methods).listed().into_iter().map(Alike).filter_map(Alike::named_apart).collect()
+        Groups::grouped(methods).listed().into_iter().filter_map(Alike::named_apart).collect()
     }
 
     #[must_use]
@@ -30,9 +30,9 @@ impl<'system, 'found, 'file> Alike<'system, 'found, 'file> {
         self.0.sites().first().map(|site| **site)
     }
 
-    fn named_apart(self) -> Option<Alike<'system, 'found, 'file>> {
-        let names: BTreeSet<&Name> = self.0.members().iter().map(AsRef::as_ref).collect();
-        names.iter().nth(1).map(|_| ()).map(|()| self)
+    fn named_apart(group: Group<Method<'system, 'found, 'file>>) -> Option<Alike<'system, 'found, 'file>> {
+        let names: BTreeSet<&Name> = group.members().iter().map(AsRef::as_ref).collect();
+        names.iter().nth(1).map(|_| ()).map(|()| Alike(group))
     }
 }
 

@@ -5,6 +5,7 @@ use crate::transitions::{Ground, Wrapping};
 use body_lifts::Body;
 use graph::Mutation;
 use lint_layout::Name;
+use newtype::Counter;
 
 use crate::algebra::Totality;
 use crate::count::Count;
@@ -12,11 +13,49 @@ use crate::edge::Edge;
 use crate::end::{End, Node};
 use operators::Operators;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum Role {
+    Written,
+    Operation,
+    Port,
+    Lift,
+    Store,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Acting<'found> {
     subject: Node<'found>,
     held: Count,
     parameters: Vec<End<'found>>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Unwrapped<'found>(Node<'found>);
+
+#[derive(Debug)]
+struct Candidate<'found> {
+    subject: Node<'found>,
+    held: Count,
+    parameters: Vec<End<'found>>,
+}
+
+impl<'found> Candidate<'found> {
+    fn about(unwrapped: Unwrapped<'found>, given: &End<'found>, takes: &[End<'found>]) -> Candidate<'found> {
+        let (held, parameters): (Vec<End<'found>>, Vec<End<'found>>) =
+            takes.iter().copied().partition(|taken| taken.alike(given).is_some());
+        Candidate { subject: unwrapped.0, held: Count::new(held.len()), parameters }
+    }
+
+    fn admitted(self, fixed_by: Option<&Name>) -> Option<Acting<'found>> {
+        let operating = fixed_by.map(|fixing| Operators::named(fixing).is_some_and(|_| self.parameters.is_empty()));
+        let held = Some(self.held);
+        let grounded = self.parameters.first().map_or(held, |_| held.filter(|count| *count > Count::zero()));
+        grounded.filter(|_| operating.is_none_or(|operator| operator)).map(|count| Acting {
+            subject: self.subject,
+            held: count,
+            parameters: self.parameters,
+        })
+    }
 }
 
 impl<'found> Acting<'found> {
@@ -28,32 +67,17 @@ impl<'found> Acting<'found> {
             .node()
             .copied()
             .and_then(|node| Acting::unwrapped(node, ends.takes(), function.takings()))
-            .map(|node| Acting::about(node, subject, ends.takes()))
-            .filter(|acting| acting.grounded().is_some())
-            .filter(|acting| acting.admitted(edge.fixed_by()).is_some())
+            .map(|unwrapped| Candidate::about(unwrapped, subject, ends.takes()))
+            .and_then(|candidate| candidate.admitted(edge.fixed_by()))
     }
 
-    fn unwrapped(subject: Node<'found>, takes: &[End<'found>], takings: &[Wrapping]) -> Option<Node<'found>> {
+    fn unwrapped(subject: Node<'found>, takes: &[End<'found>], takings: &[Wrapping]) -> Option<Unwrapped<'found>> {
         let wrapped = takes
             .iter()
             .zip(takings)
             .filter(|(_, taking)| **taking != Wrapping::Plain)
             .find(|(taken, _)| taken.node() == Some(&subject));
-        wrapped.map_or(Some(subject), |_| None)
-    }
-
-    fn grounded(&self) -> Option<Count> {
-        self.held.nonzero().or_else(|| self.pure().map(|_| self.held))
-    }
-
-    fn admitted(&self, fixed_by: Option<&Name>) -> Option<&Acting<'found>> {
-        fixed_by.map_or(Some(self), |fixing| Operators::named(fixing).and(self.pure()))
-    }
-
-    fn about(subject: Node<'found>, given: &End<'found>, takes: &[End<'found>]) -> Acting<'found> {
-        let (held, parameters): (Vec<End<'found>>, Vec<End<'found>>) =
-            takes.iter().copied().partition(|taken| taken.alike(given).is_some());
-        Acting { subject, held: Count::new(held.len()), parameters }
+        wrapped.map_or(Some(Unwrapped(subject)), |_| None)
     }
 
     pub(crate) fn held(&self) -> Count {
@@ -61,8 +85,8 @@ impl<'found> Acting<'found> {
     }
 
     #[must_use]
-    pub fn pure(&self) -> Option<&Acting<'found>> {
-        Some(self).filter(|acting| acting.parameters.is_empty())
+    pub fn parameters(&self) -> &[End<'found>] {
+        &self.parameters
     }
 
     #[must_use]
@@ -70,9 +94,6 @@ impl<'found> Acting<'found> {
         &self.subject
     }
 }
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct Effect;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Form<'found> {
@@ -119,23 +140,13 @@ impl<'found> Form<'found> {
         }
     }
 
-    pub(crate) fn sorted<Sorted>(&self, written: Sorted, lifted: Sorted, stored: Sorted) -> Sorted {
+    pub(crate) fn role(&self) -> Role {
         match self {
-            Form::Operation(_) | Form::Partial(_) | Form::Transition | Form::Port => written,
-            Form::Lift => lifted,
-            Form::Store => stored,
-        }
-    }
-
-    #[must_use]
-    pub fn hand_written(&self) -> Option<&Form<'found>> {
-        self.sorted(Some(self), None, None)
-    }
-
-    pub(crate) fn ported(&self) -> Option<Effect> {
-        match self {
-            Form::Port => Some(Effect),
-            Form::Operation(_) | Form::Partial(_) | Form::Transition | Form::Lift | Form::Store => None,
+            Form::Operation(_) | Form::Partial(_) => Role::Operation,
+            Form::Port => Role::Port,
+            Form::Lift => Role::Lift,
+            Form::Store => Role::Store,
+            Form::Transition => Role::Written,
         }
     }
 

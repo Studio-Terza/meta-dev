@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+algebra = { path = "../algebra" }
 invariants = { path = "../invariants" }
 console-ports = { path = "../console-ports" }
 file-ports = { path = "../file-ports" }
@@ -17,6 +18,7 @@ gate-limits = { path = "../gate-limits" }
 grammar-assignment = { path = "../grammar-assignment" }
 grammar-branch = { path = "../grammar-branch" }
 grammar-cargo-option = { path = "../grammar-cargo-option" }
+grammar-output = { path = "../grammar-output" }
 grammar-hunk = { path = "../grammar-hunk" }
 grammar-shard = { path = "../grammar-shard" }
 grammar-spec-line = { path = "../grammar-spec-line" }

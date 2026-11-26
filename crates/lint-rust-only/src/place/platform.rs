@@ -13,10 +13,7 @@ impl Platform {
     pub(super) const NAME: &'static str = "platform";
 
     pub(super) fn tests_covering(file: &RepoFile) -> Option<&RepoFile> {
-        file.lies_under(Path::new(Self::NAME))
-            .and_then(|inside| inside.beneath_named(Path::new(Self::NAME)))
-            .and_then(|below| Self::tests_named_in(&below))
-            .map(|_| file)
+        file.beneath_named(Path::new(Self::NAME)).and_then(|below| Self::tests_named_in(&below)).map(|_| file)
     }
 
     fn tests_named_in(below: &Path) -> Option<Part> {

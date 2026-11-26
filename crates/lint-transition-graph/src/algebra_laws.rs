@@ -32,7 +32,7 @@ impl GraphLint for AlgebraLaws {
         );
         Report::new(
             Headline::new(
-                "report only, algebra laws: every algebra operation (value inputs and output one type, acted on by any external parameter) and partial operation (Option or Result of the type) declares a law, with laws::associative!, commutative!, identity!, inverse!, idempotent!, absorbing! or distributive! in a test of the same package that calls the operation as Type::function, Trait::function on the generated type, <Type as Trait>::function, Self::function or a use alias, or in a closure that calls it on its parameters; operations a foreign trait fixes are left out unless it is a std::ops operator, and every shipped same-type operation counts whatever its visibility; listed per crate and type",
+                "report only, algebra laws: every algebra operation (value inputs and output one type, acted on by any external parameter) and partial operation (Option or Result of the type) declares a law, with laws::associative!, commutative!, identity!, inverse!, idempotent!, absorbing!, distributive! or action! in a test of the same package that calls the operation as Type::function, Trait::function on the generated type, <Type as Trait>::function, Self::function or a use alias, or in a closure that calls it on its parameters; operations a foreign trait fixes are left out unless it is a std::ops operator, and every shipped same-type operation counts whatever its visibility; listed per crate and type",
             ),
             by_crate
                 .iter()
@@ -100,7 +100,7 @@ impl fmt::Display for CrateLaws<'_, '_> {
 impl lint_core::Finding for CrateLaws<'_, '_> {
     fn fix(&self) -> Fix {
         Fix::new(
-            "declare the law with laws::associative!, commutative!, identity!, inverse!, idempotent!, absorbing! or distributive! in a test of the same package, calling the operation as Type::function, <Type as Trait>::function or a closure that calls it on its parameters",
+            "declare the law with laws::associative!, commutative!, identity!, inverse!, idempotent!, absorbing!, distributive! or action! in a test of the same package, calling the operation as Type::function, <Type as Trait>::function or a closure that calls it on its parameters",
         )
     }
 }

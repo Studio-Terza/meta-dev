@@ -1,11 +1,11 @@
 use super::{Frame, Grain, Grains};
-use algebra::{Monoid, Semigroup};
+use algebra::{Act, Monoid, Semigroup};
 mod tokens;
 
 use syntax::Spanned;
 use syntax::{ExprPath, ExprStruct, Macro, Pat, PatTree, QSelf, Type, TypeParamBound};
 
-use graph::{Domain, Member, Mention, ModelPart, PathUse, Region, Resolved, Seat};
+use graph::{Domain, ItemPath, Member, Mention, ModelPart, PathUse, Region, Resolved, Seat, Segment};
 use lint_layout::{Name, Position, Whole, Word, words};
 
 use crate::namespace::{Invoked, Invoker, UsePath};
@@ -91,7 +91,9 @@ impl Lowers for UseRow {
             .zip(self.written.tail().last());
         let declared = footing.aliases();
         let target = |parent: &Resolved| declared.target(parent).map(AsRef::<Resolved>::as_ref);
-        let aliased = head.as_ref().and_then(|(parent, last)| target(parent)?.joined(last));
+        let aliased = head
+            .as_ref()
+            .and_then(|(parent, last)| target(parent)?.clone().acted(ItemPath::from(Segment::from(*last))));
         let seat = footing.places().seat(self.region.combine(footing.outer()), self.place.as_ref());
         let member = head.as_ref().and_then(|(parent, last)| {
             let owner = target(parent).and_then(Resolved::crate_item).or_else(|| parent.crate_item())?;
@@ -165,7 +167,7 @@ impl Qualified {
     fn under_type(qself: &QSelf, path: &syntax::Path) -> Option<UsePath> {
         let trait_named = qself.position.checked_sub(1);
         let own = trait_named.map_or(Some(&*qself.ty), |_| None);
-        own.and_then(Self::type_path).map(|inner| UsePath::from(inner).extended(&UsePath::from(path)))
+        own.and_then(Self::type_path).map(|inner| UsePath::from(inner).combine(UsePath::from(path)))
     }
 
     fn type_path(ty: &Type) -> Option<&syntax::Path> {
@@ -220,7 +222,7 @@ impl Frame<'_> {
             self.generics.traits_of(&lint_layout::Name::from(&first.ident)).into_iter().cloned().collect()
         });
         let traits = qualified.into_iter().chain(bounded);
-        member.map_or_default(|named| traits.map(|traited| traited.extended(&named)).collect())
+        member.map_or_default(|named| traits.map(|traited| traited.combine(named.clone())).collect())
     }
 
     pub(super) fn macro_used(&self, invoked: &Macro) -> Grains {

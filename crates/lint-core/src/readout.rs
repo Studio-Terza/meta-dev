@@ -1,6 +1,7 @@
 use std::mem;
-use std::path::Path;
 use std::sync::Mutex;
+
+use algebra::{Monoid, Semigroup};
 
 use crate::repo_file::RepoFile;
 use crate::source_file::SourceFile;
@@ -16,6 +17,41 @@ pub struct Readout {
     unwalked: Mutex<Vec<Unwalked>>,
     repo_files: Vec<RepoFile>,
     failures: Vec<Failure>,
+}
+
+impl Semigroup for Readout {
+    fn combine(self, other: Readout) -> Readout {
+        Readout {
+            files: self.files.combine(other.files),
+            unwalked: Mutex::new(
+                self.unwalked.into_inner().unpoisoned().combine(other.unwalked.into_inner().unpoisoned()),
+            ),
+            repo_files: self.repo_files.combine(other.repo_files),
+            failures: self.failures.combine(other.failures),
+        }
+    }
+}
+
+impl Monoid for Readout {}
+
+impl FromIterator<SourceFile> for Readout {
+    fn from_iter<Files: IntoIterator<Item = SourceFile>>(read: Files) -> Readout {
+        let files: Vec<SourceFile> = read.into_iter().collect();
+        let unwalked = files.iter().map(|_| Unwalked(())).collect();
+        Readout { files, unwalked: Mutex::new(unwalked), ..Readout::default() }
+    }
+}
+
+impl FromIterator<RepoFile> for Readout {
+    fn from_iter<Found: IntoIterator<Item = RepoFile>>(found: Found) -> Readout {
+        Readout { repo_files: found.into_iter().collect(), ..Readout::default() }
+    }
+}
+
+impl FromIterator<Failure> for Readout {
+    fn from_iter<Failures: IntoIterator<Item = Failure>>(failures: Failures) -> Readout {
+        Readout { failures: failures.into_iter().collect(), ..Readout::default() }
+    }
 }
 
 impl Readout {
@@ -37,34 +73,5 @@ impl Readout {
     #[must_use]
     pub fn unwalked(&self) -> Vec<Unwalked> {
         mem::take(&mut *self.unwalked.lock().unpoisoned())
-    }
-
-    #[must_use]
-    pub fn with_file(mut self, file: SourceFile) -> Readout {
-        self.files.push(file);
-        self.unwalked.get_mut().unpoisoned().push(Unwalked(()));
-        self
-    }
-
-    #[must_use]
-    pub fn with_repo_files(self, found: Vec<RepoFile>) -> Readout {
-        let mut repo_files = self.repo_files;
-        repo_files.extend(found);
-        Readout { repo_files, ..self }
-    }
-
-    #[must_use]
-    pub fn with_failure(self, failure: Failure) -> Readout {
-        let mut failures = self.failures;
-        failures.push(failure);
-        Readout { failures, ..self }
-    }
-
-    #[must_use]
-    pub fn sorted(mut self) -> Readout {
-        self.files.sort_by(|left, right| AsRef::<Path>::as_ref(left.head()).cmp(AsRef::<Path>::as_ref(right.head())));
-        self.repo_files.sort();
-        self.repo_files.dedup();
-        self
     }
 }

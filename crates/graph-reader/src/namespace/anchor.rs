@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 
+use algebra::Semigroup;
 use graph::{ItemPath, Reexport};
 use lint_layout::{Name, Whole, Word};
 
@@ -57,12 +58,18 @@ pub(crate) struct Anchors {
     root: Option<ScopeId>,
 }
 
-impl Anchors {
-    pub(super) fn rooted(root: ScopeId) -> Anchors {
-        Anchors { module: Some(root), above: None, root: Some(root) }
+impl From<ScopeId> for Anchors {
+    fn from(module: ScopeId) -> Anchors {
+        Anchors { module: Some(module), above: None, root: Some(module) }
     }
+}
 
-    pub(super) fn nested(self, module: ScopeId) -> Anchors {
-        Anchors { module: Some(module), above: self.module, root: self.root }
+impl Semigroup for Anchors {
+    fn combine(self, inner: Anchors) -> Anchors {
+        Anchors {
+            module: inner.module.or(self.module),
+            above: inner.above.or(inner.module.and(self.module)).or(self.above),
+            root: self.root,
+        }
     }
 }

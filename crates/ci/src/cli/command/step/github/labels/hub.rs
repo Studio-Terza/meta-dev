@@ -3,7 +3,7 @@ mod pull_request;
 use super::super::pull_number::PullNumber;
 use crate::cli::command::failure::Failure;
 use crate::cli::ports::{Invocation, Ports};
-pub use pull_request::PullRequest;
+pub use pull_request::{PullRequest, Purpose};
 
 #[derive(Debug)]
 pub struct Hub<'ports, Host: Ports> {

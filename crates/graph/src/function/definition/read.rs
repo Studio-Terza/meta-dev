@@ -63,17 +63,28 @@ pub struct Read {
     line: LineNumber,
 }
 
-impl Read {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Unpassed {
+    reader: Reader,
+    parameter: ParamIndex,
+    fields: Vec<Name>,
+    line: LineNumber,
+}
+
+impl Unpassed {
     #[must_use]
-    pub fn new(reader: Reader, parameter: ParamIndex, fields: Vec<Name>, line: LineNumber) -> Read {
-        Read { reader, parameter, fields, arguments: Vec::new(), line }
+    pub fn new(reader: Reader, parameter: ParamIndex, fields: Vec<Name>, line: LineNumber) -> Unpassed {
+        Unpassed { reader, parameter, fields, line }
     }
 
     #[must_use]
     pub fn passing(self, arguments: Vec<Argument>) -> Read {
-        Read { arguments, ..self }
+        let Unpassed { reader, parameter, fields, line } = self;
+        Read { reader, parameter, fields, arguments, line }
     }
+}
 
+impl Read {
     #[must_use]
     pub fn comparable(&self) -> Option<&[Argument]> {
         let opaque = self.arguments.iter().find(|argument| matches!(argument, Argument::Opaque));

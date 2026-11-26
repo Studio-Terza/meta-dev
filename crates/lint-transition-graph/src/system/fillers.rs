@@ -27,7 +27,7 @@ pub(crate) struct Fillers<'file> {
 
 impl<'file> Fillers<'file> {
     pub(crate) fn read(parsed: Parsed<'_, 'file>, equivalence: Equivalence) -> Fillers<'file> {
-        let shipped = <&SourceFile>::from(parsed).shipped().map(|_| parsed);
+        let shipped = <&SourceFile>::from(parsed).head().shipped().map(|_| parsed);
         shipped.map_or_default(|found| {
             let krate = found.head().placement().package().crate_name();
             let erasure = Erasure::reading(<&SourceFile>::from(found).tokens(), equivalence);

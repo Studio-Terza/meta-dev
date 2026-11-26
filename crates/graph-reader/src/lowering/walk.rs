@@ -7,7 +7,7 @@ use syntax::{
     Macro, Signature as SynSignature, TraitItemFn, Visibility as SynVisibility,
 };
 
-use algebra::{Monoid, Semigroup};
+use algebra::{Catenation, Monoid, Semigroup};
 use graph::{Evaluation, Looping, Reach};
 use lint_core::SourceFile;
 use lint_layout::{Name, Position};
@@ -34,16 +34,8 @@ pub(crate) struct Lowering<'read> {
 type Grown<'read> = Contributed<Framed<'read>, Grains>;
 
 impl<'read> Frame<'read> {
-    pub(super) fn in_table(&self) -> Frame<'read> {
-        Frame { tabled: Some(()), ..self.clone() }
-    }
-
     pub(super) fn framed(self, grains: Grains, descend: Descend) -> Grown<'read> {
         Contributed::new(Framed(Some(Box::new(self))), grains, descend)
-    }
-
-    pub(super) fn with_context(&self, context: Context) -> Frame<'read> {
-        Frame { context, ..self.clone() }
     }
 
     fn entered(&self, kind: ScopeKind, entries: Entries, children: Arc<Path>) -> Opened<'read> {
@@ -59,7 +51,7 @@ impl<'read> Frame<'read> {
         visibility: &SynVisibility,
         signature: &SynSignature,
     ) -> Functioned {
-        let generics = self.generics.extended(&signature.generics);
+        let generics = InScope::clone(&self.generics).combine(InScope::from(&signature.generics));
         let name = Name::from(&signature.ident);
         let row = FnRow {
             located: self.here.located(Position::from(signature.ident.span())),
@@ -87,10 +79,10 @@ impl<'read> Frame<'read> {
         visibility: &SynVisibility,
         signature: &SynSignature,
     ) -> Grown<'read> {
-        let inner = self.with_context(self.context.within_item(attributes));
+        let inner = Frame { context: self.context.within_item(attributes), ..self.clone() };
         let Functioned { row, generics } = inner.function(attributes, visibility, signature);
         let frame = Frame { enclosure: Enclosure::Body, generics: Arc::new(generics), ..inner };
-        frame.framed(Grains::from(Grain::Function(row)), Descend::Into)
+        frame.framed(Grains::from(row), Descend::Into)
     }
 
     pub(super) fn module_entered(&self, item: &ItemMod, items: &[syntax::Item]) -> Grown<'read> {
@@ -121,14 +113,11 @@ impl<'read> Frame<'read> {
     ) -> Grains {
         inner.concluded(|framed, grown| {
             let generics = framed.0.map_or_else(|| Arc::clone(&self.generics), |frame| frame.generics);
-            let kept: Vec<Grain> = grown.grains.into_iter().collect();
-            let part: BodyPart = Monoid::concat(grown.bodies);
+            let Grains { sown, bodies, opened } = grown;
+            let part: BodyPart = Monoid::concat(bodies);
             let definition = body.map(|block| BodyGroup::opened(&generics, signature, block).lowered(part));
-            let own = kept.iter().position(|grain| grain.function().is_some());
-            let mut ahead = kept;
-            let rest = ahead.split_off(own.map_or(ahead.len(), |found| found + 1));
-            let defined = own.and_then(|_| ahead.pop()).map(|function| function.defined(definition));
-            Grains { grains: ahead.into_iter().chain(defined).chain(rest).collect(), ..Grains::default() }
+            let defined = opened.map(|row| FnRow::defined(*row, definition));
+            Grains { sown: defined.into_iter().collect::<Catenation<Grain>>().combine(sown), ..Grains::default() }
         })
     }
 }
@@ -152,7 +141,7 @@ impl<'read> Lowering<'read> {
             source,
             here: Seat::new(ScopeKey::default(), shape.children),
             enclosure: shape.enclosure,
-            generics: Arc::new(InScope::outside()),
+            generics: Arc::new(InScope::default()),
             context: Context::outermost(Regions::of_file(source, reach)),
             calling: None,
             tabled: None,
@@ -259,7 +248,7 @@ impl<'read> Contribute for Lowering<'read> {
         around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
         let frame = self.frame(around);
-        frame.with_context(frame.context.within_item(&block.attrs)).impl_entered(block)
+        Frame { context: frame.context.within_item(&block.attrs), ..frame.clone() }.impl_entered(block)
     }
 
     fn on_item_trait(
@@ -269,7 +258,7 @@ impl<'read> Contribute for Lowering<'read> {
         around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
         let frame = self.frame(around);
-        let generics = frame.generics.subjectless().extended(&item.generics);
+        let generics = InScope::from(frame.generics.declared().clone()).combine(InScope::from(&item.generics));
         let bounds = frame.trait_bounds(item, &generics);
         let owning = frame.trait_owning(&item.ident, &item.attrs);
         let filler = frame.filler_owning(item);
@@ -281,10 +270,11 @@ impl<'read> Contribute for Lowering<'read> {
     fn on_item_fn(&self, item: &ItemFn, _: &Facts<'_, ItemFn>, around: &Around<'_, Framed<'read>>) -> Grown<'read> {
         let frame = self.frame(around);
         let owning = frame.owning(&item.sig.ident, Domain::Values, &item.attrs);
-        let inner = frame.with_context(owning.within(&frame.context.within_item(&item.attrs)));
+        let context = owning.within(&frame.context.within_item(&item.attrs));
+        let inner = Frame { context, ..frame.clone() };
         let Functioned { row, generics } = inner.function(&item.attrs, &item.vis, &item.sig);
         let body = Frame { enclosure: Enclosure::Body, generics: Arc::new(generics), ..inner };
-        body.framed(owning.grains.combine(Grains::from(Grain::Function(row))), Descend::Into)
+        body.framed(owning.grains.combine(Grains::from(row)), Descend::Into)
     }
 
     fn off_item_fn(&self, item: &ItemFn, _: &Facts<'_, ItemFn>, inner: Contribution<Framed<'read>, Grains>) -> Grains {
@@ -345,9 +335,10 @@ impl<'read> Contribute for Lowering<'read> {
         around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
         let frame = self.frame(around);
-        let generics = InScope::outside().extended(&item.generics);
+        let generics = InScope::from(&item.generics);
         let target = generics.lowered(&item.ty);
-        let held = frame.hold(Holder::named(&item.ident, Held::Alias), Link::declaring(&item.ident), target.clone());
+        let link = Link::declaring(&item.ident, Domain::Types);
+        let held = frame.hold(Holder::named(&item.ident, Held::Alias), link, target.clone());
         let alias = AliasRow {
             scope: frame.here.scope().clone(),
             name: UsePath::from(&item.ident),
@@ -365,8 +356,8 @@ impl<'read> Contribute for Lowering<'read> {
         around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
         let frame = self.frame(around);
-        let scope = frame.generics.extended(&item.generics);
-        let link = Link::declaring(&item.ident);
+        let scope = InScope::clone(&frame.generics).combine(InScope::from(&item.generics));
+        let link = Link::declaring(&item.ident, Domain::Types);
         let rows = frame
             .attributed(&Attributes::from(item.attrs.as_slice()), &item.ident)
             .combine(frame.parameters(&Holder::named(&item.ident, Held::StructParameter), &item.generics, &link))
@@ -381,8 +372,8 @@ impl<'read> Contribute for Lowering<'read> {
         around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
         let frame = self.frame(around);
-        let scope = frame.generics.extended(&item.generics);
-        let link = Link::declaring(&item.ident);
+        let scope = InScope::clone(&frame.generics).combine(InScope::from(&item.generics));
+        let link = Link::declaring(&item.ident, Domain::Types);
         let variants = item.variants.iter().map(|variant| {
             let unit = frame.hold(
                 Holder::named(&variant.ident, Held::Variant),
@@ -406,8 +397,8 @@ impl<'read> Contribute for Lowering<'read> {
         around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
         let frame = self.frame(around);
-        let scope = frame.generics.extended(&item.generics);
-        let link = Link::declaring(&item.ident);
+        let scope = InScope::clone(&frame.generics).combine(InScope::from(&item.generics));
+        let link = Link::declaring(&item.ident, Domain::Types);
         let rows = frame.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident).combine(frame.fields_held(
             &Holder::named(&item.ident, Held::UnionField),
             &link,
@@ -423,8 +414,7 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ItemConst>,
         around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        let tabled = self.frame(around).in_table();
-        tabled.valued(&item.ident, &item.ty, &item.attrs)
+        self.frame(around).valued(&item.ident, &item.ty, &item.attrs)
     }
 
     fn on_item_static(
@@ -433,8 +423,7 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ItemStatic>,
         around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        let tabled = self.frame(around).in_table();
-        tabled.valued(&item.ident, &item.ty, &item.attrs)
+        self.frame(around).valued(&item.ident, &item.ty, &item.attrs)
     }
 
     fn on_impl_item_const(
@@ -443,8 +432,7 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ImplItemConst>,
         around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        let tabled = self.frame(around).in_table();
-        tabled.framed(Grains::default(), Descend::Into)
+        Frame { tabled: Some(()), ..self.frame(around) }.framed(Grains::default(), Descend::Into)
     }
 
     fn on_expr_method_call(

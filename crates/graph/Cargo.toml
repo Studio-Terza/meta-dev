@@ -16,5 +16,8 @@ body-lifts = { path = "../body-lifts" }
 lint-layout = { path = "../lint-layout" }
 newtype = { path = "../newtype" }
 
+[dev-dependencies]
+laws = { path = "../laws" }
+
 [lints]
 workspace = true

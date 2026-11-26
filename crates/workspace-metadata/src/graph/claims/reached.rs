@@ -13,7 +13,7 @@ impl<'meta> Reached<'_, 'meta> {
     pub(super) fn owners(&self, dependent: &PackageId, required: &PackageId) -> BTreeSet<&'meta PackageId> {
         let held = self.0.get(required).map_or(&[][..], Vec::as_slice);
         held.iter()
-            .find_map(|claim| claim.unit().holds(dependent))
+            .find(|claim| claim.unit().members().contains(dependent))
             .map_or_else(|| held.iter().filter_map(Claim::open).collect(), |_| BTreeSet::new())
     }
 }

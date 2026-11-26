@@ -1,5 +1,7 @@
 use std::cmp::Ordering;
 
+use algebra::{Monoid, Semigroup};
+
 use grammar_message::Number;
 
 use crate::segment::Segment;
@@ -29,18 +31,22 @@ impl Item {
 
 impl FromIterator<Segment> for NumberedList {
     fn from_iter<Segments: IntoIterator<Item = Segment>>(segments: Segments) -> NumberedList {
-        segments.into_iter().filter_map(Item::top_level).fold(NumberedList::default(), NumberedList::continued)
+        Monoid::concat(segments.into_iter().filter_map(Item::top_level).map(|item| NumberedList(vec![item])))
     }
 }
 
-impl NumberedList {
-    fn continued(self, item: Item) -> NumberedList {
-        match self.0.last().map(|last| last.number.cmp(&item.number)) {
-            Some(Ordering::Less) => NumberedList(self.0.into_iter().chain([item]).collect()),
-            Some(Ordering::Equal | Ordering::Greater) | None => NumberedList(vec![item]),
+impl Semigroup for NumberedList {
+    fn combine(self, later: NumberedList) -> NumberedList {
+        match self.0.last().zip(later.0.first()).map(|(last, first)| last.number.cmp(&first.number)) {
+            Some(Ordering::Less) | None => NumberedList(self.0.combine(later.0)),
+            Some(Ordering::Equal | Ordering::Greater) => later,
         }
     }
+}
 
+impl Monoid for NumberedList {}
+
+impl NumberedList {
     pub fn numbered(&self, number: Number) -> Option<&Item> {
         self.0.iter().find(|item| item.number == number)
     }

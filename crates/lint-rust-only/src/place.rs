@@ -23,11 +23,14 @@ impl Place {
     const VENDOR: &'static str = "vendor";
 
     pub(crate) fn locating(file: &RepoFile) -> Place {
-        file.lies_under(Path::new(Self::VENDOR))
+        let under = |directory: &str| {
+            file.beneath_named(Path::new(directory)).filter(|below| below.components().next().is_some())
+        };
+        under(Self::VENDOR)
             .map(|_| Place::Vendored)
             .or_else(|| Platform::tests_covering(file).map(|_| Place::PlatformTests))
-            .or_else(|| file.lies_under(Path::new(Self::ASSETS)).map(|_| Place::Assets))
-            .or_else(|| file.lies_under(Path::new(Platform::NAME)).map(|_| Place::Platform))
+            .or_else(|| under(Self::ASSETS).map(|_| Place::Assets))
+            .or_else(|| under(Platform::NAME).map(|_| Place::Platform))
             .unwrap_or(Place::Outside)
     }
 

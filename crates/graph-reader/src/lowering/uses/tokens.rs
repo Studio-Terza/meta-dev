@@ -5,7 +5,7 @@ use std::str::FromStr;
 use syntax::parse::Speculative;
 use syntax::parse::{Parse, ParseBuffer, ParseStream};
 use syntax::{Group, Ident, Literal, Punct, Span, TokenStream, TokenTree};
-use syntax::{LitStr, Macro, Path};
+use syntax::{LitStr, Macro, Path, braced, bracketed, parenthesized, token};
 
 use lint_layout::Position;
 
@@ -117,7 +117,7 @@ impl TokenPaths {
     fn attempted(input: ParseStream, attempt: &ParseBuffer) -> syntax::Result<Vec<Spelled>> {
         match attempt.call(Path::parse_mod_style) {
             Ok(path) => Ok(Self::spelled(&path)).inspect(|_| input.advance_to(attempt)),
-            Err(_) => Self::skipped(input.parse()?, input),
+            Err(_) => Bracketing::peeked(input).inside(input),
         }
     }
 
@@ -140,6 +140,79 @@ impl TokenPaths {
         Some(punct.as_char())
             .filter(|spelled| *spelled == Self::ACCESS)
             .map_or_else(|| Ok(Vec::new()), |_| input.parse::<Option<Ident>>().map(|_| Vec::new()))
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum Bracketing {
+    Brace,
+    Bracket,
+    Paren,
+    Loose,
+}
+
+impl Bracketing {
+    fn peeked(input: ParseStream) -> Bracketing {
+        input
+            .peek(token::Brace)
+            .then_some(Bracketing::Brace)
+            .or_else(|| input.peek(token::Bracket).then_some(Bracketing::Bracket))
+            .or_else(|| input.peek(token::Paren).then_some(Bracketing::Paren))
+            .unwrap_or(Bracketing::Loose)
+    }
+
+    fn inside(self, input: ParseStream) -> syntax::Result<Vec<Spelled>> {
+        match self {
+            Bracketing::Brace => Braces::opened(input).and_then(|content| content.parse::<TokenPaths>()).map(Vec::from),
+            Bracketing::Bracket => {
+                Brackets::opened(input).and_then(|content| content.parse::<TokenPaths>()).map(Vec::from)
+            }
+            Bracketing::Paren => Parens::opened(input).and_then(|content| content.parse::<TokenPaths>()).map(Vec::from),
+            Bracketing::Loose => TokenPaths::skipped(input.parse()?, input),
+        }
+    }
+}
+
+impl From<TokenPaths> for Vec<Spelled> {
+    fn from(paths: TokenPaths) -> Vec<Spelled> {
+        paths.0
+    }
+}
+
+trait Opens {
+    fn opened(input: ParseStream<'_>) -> syntax::Result<ParseBuffer<'_>>;
+}
+
+#[derive(Debug)]
+struct Braces;
+
+#[derive(Debug)]
+struct Brackets;
+
+#[derive(Debug)]
+struct Parens;
+
+impl Opens for Braces {
+    fn opened(input: ParseStream<'_>) -> syntax::Result<ParseBuffer<'_>> {
+        let content;
+        braced!(content in input);
+        Ok(content)
+    }
+}
+
+impl Opens for Brackets {
+    fn opened(input: ParseStream<'_>) -> syntax::Result<ParseBuffer<'_>> {
+        let content;
+        bracketed!(content in input);
+        Ok(content)
+    }
+}
+
+impl Opens for Parens {
+    fn opened(input: ParseStream<'_>) -> syntax::Result<ParseBuffer<'_>> {
+        let content;
+        parenthesized!(content in input);
+        Ok(content)
     }
 }
 

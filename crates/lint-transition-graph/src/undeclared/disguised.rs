@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
-use graph::{Domain, Implementation, ItemPath, Model, Placed, Reach, Region, Resolved, TypeRef};
+use graph::{Domain, Implementation, ItemPath, Model, Origin, Placed, Reach, Region, Resolved, TypeRef};
 use lint_core::{Finding, Fix, Site, Violation};
 use lint_layout::{Name, Whole, Word, words};
 
@@ -50,14 +50,18 @@ impl<'model> Disguised<'model> {
     pub(super) fn found(model: &'model Model) -> Vec<Disguised<'model>> {
         let core: Vec<Placed<'model, &'model Implementation>> = model
             .implementations()
-            .filter(|placed| placed.entity().hand_written().is_some())
+            .filter(|placed| placed.entity().origin() == Origin::Written)
             .filter(|placed| AsRef::<Region>::as_ref(placed.entity()).reach() == Reach::Shipped)
             .filter(|placed| Ground::from(*AsRef::<Region>::as_ref(placed.entity())) == Ground::Core)
             .collect();
         let declared = Declared::collected(model, &core);
         core.into_iter()
             .filter_map(|placed| Disguised::std_of(placed).map(|std| Disguised { placed, std }))
-            .filter(|disguised| disguised.closed().is_some())
+            .filter(|disguised| {
+                disguised
+                    .subject()
+                    .is_some_and(|subject| disguised.closing().and_then(Declared::identity) == Some(subject))
+            })
             .filter(|disguised| declared.declares(disguised.std.wanted(), disguised.subject()).is_none())
             .collect()
     }
@@ -73,11 +77,6 @@ impl<'model> Disguised<'model> {
 
     fn subject(&self) -> Option<&'model Resolved> {
         Declared::identity(self.placed.entity().subject_type())
-    }
-
-    fn closed(&self) -> Option<&Disguised<'model>> {
-        let subject = self.subject();
-        subject.filter(|_| self.closing().and_then(Declared::identity) == subject).map(|_| self)
     }
 
     fn closing(&self) -> Option<&'model TypeRef> {

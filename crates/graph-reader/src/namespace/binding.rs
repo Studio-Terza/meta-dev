@@ -1,4 +1,5 @@
-use graph::{External, ItemId, ItemPath, Primitive, Resolved, Unresolved};
+use algebra::Semigroup;
+use graph::{External, ItemId, ItemPath, Primitive, Resolved, Segment, Unresolved};
 use lint_layout::{Dependencies, Name};
 
 use super::boundary::ScopeId;
@@ -23,8 +24,10 @@ impl Binding {
     pub(super) fn stepped(self, segment: &Name, entered: impl FnOnce(ScopeId) -> Resolution) -> Resolution {
         match self {
             Binding::Module(module) => entered(module),
-            Binding::Std(path) => Resolution::Bound(Binding::Std(path.joined(segment))),
-            Binding::External(external) => Resolution::Bound(Binding::External(external.joined(segment))),
+            Binding::Std(path) => Resolution::Bound(Binding::Std(path.combine(ItemPath::from(Segment::from(segment))))),
+            Binding::External(external) => Resolution::Bound(Binding::External(
+                external.combine(External::from(ItemPath::from(Segment::from(segment)))),
+            )),
             Binding::Unknown(cause) => Resolution::Bound(Binding::Unknown(cause)),
             Binding::Item(..) | Binding::Primitive(_) | Binding::Absent => Resolution::Bound(Binding::UNBOUND),
         }
@@ -54,13 +57,6 @@ impl Binding {
         }
     }
 
-    pub(super) fn agreed(&self, found: Binding) -> Binding {
-        match [found].into_iter().find(|candidate| candidate == self) {
-            Some(agreed) => agreed,
-            None => Binding::UNBOUND,
-        }
-    }
-
     pub(super) fn resolved(self, ids: &ItemIds, written: ItemPath) -> Resolved {
         match self {
             Binding::Item(scope, item) => Binding::issued(ids.issued(scope, item), written),
@@ -76,21 +72,9 @@ impl Binding {
 impl Binding {
     pub(super) const UNBOUND: Binding = Binding::Unknown(Unresolved::Unbound);
 
-    pub(super) fn present(&self) -> Option<&Binding> {
-        match self {
-            Binding::Absent => None,
-            Binding::Module(_)
-            | Binding::Item(..)
-            | Binding::Std(_)
-            | Binding::External(_)
-            | Binding::Primitive(_)
-            | Binding::Unknown(_) => Some(self),
-        }
-    }
-
     pub(super) fn external(first: &Name, dependencies: Option<&Dependencies>) -> Binding {
         let package = dependencies.and_then(|declared| declared.package(first)).cloned();
-        Binding::External(External::new(package, ItemPath::default().joined(first)))
+        Binding::External(External::new(package, ItemPath::from(Segment::from(first))))
     }
 
     fn issued(item: Option<ItemId>, written: ItemPath) -> Resolved {
@@ -98,6 +82,12 @@ impl Binding {
             Some(issued) => Resolved::Crate(issued),
             None => Resolved::Unknown(written, Unresolved::Unbound),
         }
+    }
+}
+
+impl Semigroup for Binding {
+    fn combine(self, found: Binding) -> Binding {
+        Some(found).filter(|candidate| *candidate == self).unwrap_or(Binding::UNBOUND)
     }
 }
 

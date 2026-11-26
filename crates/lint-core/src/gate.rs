@@ -5,7 +5,6 @@ use syntax::ItemMod;
 use algebra::Semigroup;
 
 use lint_layout::{Name, Word};
-use lint_placement::Placement;
 use newtype::Wrapping;
 
 use crate::source_file::FileHead;
@@ -25,39 +24,29 @@ impl Gate {
     pub const STORE: Gate = Gate { module: Word::new("store"), package_suffix: Some(Word::new("store")) };
 
     #[must_use]
-    pub fn admits<'head>(&self, file: &'head FileHead) -> Option<&'head FileHead> {
+    pub fn admits<Verdict: Copy>(&self, file: &FileHead, verdict: Verdict) -> Option<Verdict> {
         let placement = file.placement();
+        let module =
+            AsRef::<[Name]>::as_ref(placement.module()).iter().find(|segment| **segment == Name::from(self.module));
         self.package_suffix
             .and_then(|suffix| placement.crate_root().package()?.matches::<Suffix>(&[suffix]))
-            .map(|_| file)
-            .or_else(|| {
-                AsRef::<[Name]>::as_ref(placement.module())
-                    .iter()
-                    .find(|segment| **segment == Name::from(self.module))
-                    .map(|_| file)
-            })
+            .map(|_| verdict)
+            .or_else(|| module.map(|_| verdict))
     }
 
     #[must_use]
-    pub fn owns<'placement>(&self, placement: &'placement Placement) -> Option<&'placement Placement> {
-        self.package_suffix
-            .and_then(|suffix| placement.package().root().package()?.matches::<Suffix>(&[suffix]))
-            .map(|_| placement)
-    }
-
-    #[must_use]
-    pub fn names_crate<'name>(&self, krate: &'name Name) -> Option<&'name Name> {
-        self.package_suffix.and_then(|suffix| krate.matches::<Suffix>(&[suffix])).map(|_| krate)
+    pub fn names_crate<Verdict>(&self, krate: &Name, verdict: Verdict) -> Option<Verdict> {
+        self.package_suffix.and_then(|suffix| krate.matches::<Suffix>(&[suffix])).map(|_| verdict)
     }
 
     #[must_use]
     pub fn outside(&self, module: &ItemMod) -> Descend {
         Descend::from(Walk::outside_tests(&module.attrs))
-            .combine(self.names(module).map_or(Descend::Into, |_| Descend::Over))
+            .combine(self.names(module, Descend::Over).unwrap_or(Descend::Into))
     }
 
     #[must_use]
-    pub fn names<'module>(&self, module: &'module ItemMod) -> Option<&'module ItemMod> {
-        (module.ident == self.module.into_inner()).then_some(module)
+    pub fn names<Verdict>(&self, module: &ItemMod, verdict: Verdict) -> Option<Verdict> {
+        (module.ident == self.module.into_inner()).then_some(verdict)
     }
 }

@@ -15,6 +15,7 @@ pub enum Property {
     Absorbing,
     Distributive,
     Preserves,
+    Acting,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

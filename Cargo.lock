@@ -140,6 +140,7 @@ dependencies = [
 name = "ci"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "console-ports",
  "file-ports",
  "gate-limits",
@@ -147,6 +148,7 @@ dependencies = [
  "grammar-branch",
  "grammar-cargo-option",
  "grammar-hunk",
+ "grammar-output",
  "grammar-shard",
  "grammar-spec-line",
  "grammar-test-summary",
@@ -544,6 +546,7 @@ dependencies = [
 name = "equivalence"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "graph",
  "laws",
  "newtype",
@@ -917,6 +920,7 @@ dependencies = [
 name = "grammar-message"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "grammar",
  "laws",
  "newtype",
@@ -1075,6 +1079,7 @@ dependencies = [
  "algebra",
  "body-lifts",
  "invariants",
+ "laws",
  "lint-layout",
  "newtype",
 ]
@@ -1083,6 +1088,7 @@ dependencies = [
 name = "graph-query"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "graph",
  "graph-reader",
  "invariants",
@@ -1655,6 +1661,7 @@ dependencies = [
 name = "lint-mandatory-laws"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "graph",
  "graph-reader",
  "laws",
@@ -1909,6 +1916,7 @@ dependencies = [
 name = "lint-placement"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "file-ports",
  "invariants",
  "laws",
@@ -2458,6 +2466,7 @@ dependencies = [
 name = "mutation-report"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "console-ports",
  "file-ports",
  "golden",
@@ -3198,6 +3207,7 @@ dependencies = [
 name = "stream"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "file-ports",
  "grammar-anchor",
  "grammar-message",
@@ -3636,6 +3646,7 @@ checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
 name = "workspace-metadata"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "golden",
  "invariants",
  "laws",

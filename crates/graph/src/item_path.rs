@@ -1,3 +1,4 @@
+use algebra::{Monoid, Semigroup};
 use lint_layout::{Name, PathTail, Word};
 use newtype::Wrapping;
 
@@ -18,12 +19,30 @@ impl<'word> FromIterator<Word<'word>> for ItemPath {
     }
 }
 
-impl ItemPath {
-    #[must_use]
-    pub fn joined(&self, segment: &Name) -> ItemPath {
-        self.segments.iter().chain([segment]).cloned().collect()
-    }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Segment<'name>(&'name Name);
 
+impl<'name> From<&'name Name> for Segment<'name> {
+    fn from(name: &'name Name) -> Segment<'name> {
+        Segment(name)
+    }
+}
+
+impl From<Segment<'_>> for ItemPath {
+    fn from(segment: Segment<'_>) -> ItemPath {
+        ItemPath { segments: vec![segment.0.clone()] }
+    }
+}
+
+impl Semigroup for ItemPath {
+    fn combine(self, other: ItemPath) -> ItemPath {
+        ItemPath { segments: self.segments.combine(other.segments) }
+    }
+}
+
+impl Monoid for ItemPath {}
+
+impl ItemPath {
     #[must_use]
     pub fn last(&self) -> Option<&Name> {
         self.segments.last()

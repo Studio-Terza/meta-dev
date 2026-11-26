@@ -29,7 +29,6 @@ pub struct Contribution<Open, Part> {
 #[derive(Debug)]
 pub struct Contributing<Contributor: Contribute> {
     contributor: Contributor,
-    kinds: Vec<Kind>,
     mask: Kinds,
 }
 
@@ -55,6 +54,12 @@ pub(crate) struct Walked<Open, Part> {
     contribution: Contribution<Open, Part>,
     entered: WalkPosition,
     visits: Visits,
+}
+
+#[derive(Debug, Default)]
+struct Stepping<'index, Open, Part> {
+    walked: Walked<Open, Part>,
+    cursors: Option<Cursors<'index>>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -186,10 +191,9 @@ impl<Open: Monoid, Part: Monoid> From<Visits> for Walked<Open, Part> {
 
 impl<Contributor: Contribute> Contributing<Contributor> {
     pub fn new(contributor: Contributor) -> Contributing<Contributor> {
-        let kinds: Vec<Kind> =
-            contributor.kinds().iter().copied().chain(contributor.scopes().iter().map(|scope| scope.0)).collect();
-        let mask = Kinds::listed(&kinds);
-        Contributing { contributor, kinds, mask }
+        let mask =
+            Kinds::listed(contributor.kinds().iter().copied().chain(contributor.scopes().iter().map(|scope| scope.0)));
+        Contributing { contributor, mask }
     }
 
     pub fn concluded<Out>(
@@ -269,11 +273,18 @@ impl<Contributor: Contribute> Contributing<Contributor> {
         cursors: Option<Cursors<'_>>,
         around: &Around<'_, Contributor::Open>,
     ) -> Walked<Contributor::Open, Contributor::Part> {
-        self.siblings(file, node.children(), cursors, around)
+        let start = Stepping { walked: Walked::default(), cursors };
+        node.folded(start, |Stepping { walked, cursors: mut rest }, child| {
+            let cursor = rest.as_mut().and_then(Iterator::next);
+            let position = around.position.combine(walked.entered);
+            let next = self.walked(file, child, cursor, &Around { frame: around.frame, position });
+            Stepping { walked: walked.combine(next), cursors: rest }
+        })
+        .walked
     }
 
     pub(crate) fn watches(&self, kind: Kind) -> Option<Kind> {
-        self.kinds.contains(&kind).then_some(kind)
+        self.mask.overlap(Kinds::from(kind)).map(|()| kind)
     }
 
     pub(crate) fn entered<On, Off>(
@@ -294,9 +305,9 @@ impl<Contributor: Contribute> Contributing<Contributor> {
             frame: scoping.framed(&frame).or(around.frame),
             position: around.position.combine(WalkPosition::ONE),
         };
-        let children = descend.descending(visit.node).map_or_default(|node| {
-            self.siblings(visit.file, node.children(), visit.indexed.map(Indexed::children), &inner)
-        });
+        let children = descend
+            .descending(visit.node)
+            .map_or_default(|node| self.unwatched(visit.file, node, visit.indexed.map(Indexed::children), &inner));
         let after = Around { frame: inner.frame, position: inner.position.combine(children.entered) };
         let expansion = self.siblings(visit.file, visit.expanded(descend).iter().map(Node::Stmt), None, &after);
         let below = children.combine(expansion);

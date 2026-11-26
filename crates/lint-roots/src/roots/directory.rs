@@ -9,7 +9,9 @@ use file_ports::{Files, Kind};
 use lint_layout::Failure;
 use newtype::{Arbitrary, Newtype, Wrapping};
 
-use crate::survey::{Fact, Survey};
+use algebra::Semigroup;
+
+use crate::survey::{Fact, Failed, Survey};
 use gathered::Gathered;
 use ignored::Ignored;
 use kept::Kept;
@@ -49,68 +51,79 @@ impl Surveyed {
     }
 }
 
+#[derive(Debug)]
+struct Walk<'root> {
+    root: &'root Path,
+    below: Vec<Directory>,
+}
+
 impl Directory {
     pub fn trees(files: &impl Files, roots: &[PathBuf]) -> Vec<Result<Vec<Directory>, Failure>> {
-        Self::walked(files, roots, &Ignored::FOR_PACKAGES, |_, _, order| order)
+        Self::surveyed(files, roots, &Ignored::FOR_PACKAGES).settling(|known, failed| Walk::trees(known, failed, roots))
     }
 
     pub fn shared(files: &impl Files, roots: &[PathBuf]) -> Surveyed {
-        let mut survey = Self::surveyed(files, roots, &Ignored::FOR_FILES, Survey::default());
-        let below = Self::found(&mut survey, roots, &Ignored::FOR_PACKAGES, |_, _, order| order);
-        let listing = Self::found(&mut survey, roots, &Ignored::FOR_FILES, |kept, root, _| kept.files(root));
-        Surveyed { below: Below(below), listing: Listing(listing) }
+        Self::surveyed(files, roots, &Ignored::FOR_FILES).settling(|known, failed| Walk::shared(known, failed, roots))
     }
 
-    fn walked<Found>(
-        files: &impl Files,
-        roots: &[PathBuf],
-        ignored: &[Ignored],
-        found: impl Fn(&Gathered<'_>, &Path, Vec<Directory>) -> Found,
-    ) -> Vec<Result<Found, Failure>> {
-        let mut survey = Self::surveyed(files, roots, ignored, Survey::default());
-        Self::found(&mut survey, roots, ignored, found)
-    }
-
-    fn found<Found>(
-        survey: &mut Survey,
-        roots: &[PathBuf],
-        ignored: &[Ignored],
-        found: impl Fn(&Gathered<'_>, &Path, Vec<Directory>) -> Found,
-    ) -> Vec<Result<Found, Failure>> {
-        roots
-            .iter()
-            .map(|root| {
-                let kept = Kept::new(survey, ignored);
-                let below = kept.preorder(kept.below(root));
-                let order: Vec<&Path> = iter::once(root.as_path()).chain(below.iter().map(AsRef::as_ref)).collect();
-                survey.settled(&order).map(|settled| found(&Gathered::new(settled, ignored), root, below))
-            })
-            .collect()
-    }
-
-    fn surveyed(files: &impl Files, level: &[PathBuf], ignored: &[Ignored], known: Survey) -> Survey {
-        let listed = known.learn(files, Fact::Listed, level);
+    fn surveyed(files: &impl Files, level: &[PathBuf], ignored: &[Ignored]) -> Survey {
+        let listed = Survey::learned(files, Fact::Listed, level);
         let entries: Vec<PathBuf> = level.iter().flat_map(|directory| listed.entries(directory)).cloned().collect();
-        let with_kinds = listed.learn(files, Fact::Kind, &entries);
+        let with_kinds = listed.combine(Survey::learned(files, Fact::Kind, &entries));
         let manifests: Vec<PathBuf> = Ignored::manifests(level)
             .into_iter()
             .filter(|manifest| with_kinds.kind(manifest) != Kind::Missing)
             .collect();
-        let survey = with_kinds.learn(files, Fact::Followed, &manifests);
+        let survey = with_kinds.combine(Survey::learned(files, Fact::Followed, &manifests));
         let kept = Kept::new(&survey, ignored);
         let next: Vec<Directory> = level.iter().flat_map(|directory| kept.below(directory)).collect();
-        Self::descended(files, next, ignored, survey)
+        survey.combine(Self::descended(files, next, ignored))
     }
 
-    fn descended(files: &impl Files, next: Vec<Directory>, ignored: &[Ignored], survey: Survey) -> Survey {
+    fn descended(files: &impl Files, next: Vec<Directory>, ignored: &[Ignored]) -> Survey {
         match next.first() {
-            Some(_) => Self::surveyed(
-                files,
-                &next.into_iter().map(Wrapping::into_inner).collect::<Vec<PathBuf>>(),
-                ignored,
-                survey,
+            Some(_) => {
+                Self::surveyed(files, &next.into_iter().map(Wrapping::into_inner).collect::<Vec<PathBuf>>(), ignored)
+            }
+            None => Survey::default(),
+        }
+    }
+}
+
+impl<'root> Walk<'root> {
+    fn all(known: &Survey, roots: &'root [PathBuf], ignored: &[Ignored]) -> Vec<Walk<'root>> {
+        let kept = Kept::new(known, ignored);
+        roots.iter().map(|root| Walk { root, below: kept.preorder(kept.below(root)) }).collect()
+    }
+
+    fn order(&self) -> Vec<&Path> {
+        iter::once(self.root).chain(self.below.iter().map(AsRef::as_ref)).collect()
+    }
+
+    fn trees(known: &Survey, failed: Failed, roots: &'root [PathBuf]) -> Vec<Result<Vec<Directory>, Failure>> {
+        let walks = Walk::all(known, roots, &Ignored::FOR_PACKAGES);
+        let orders: Vec<Vec<&Path>> = walks.iter().map(Walk::order).collect();
+        let outcomes = failed.settled(known, &orders);
+        outcomes.into_iter().zip(walks).map(|(outcome, walk)| outcome.map(|_| walk.below)).collect()
+    }
+
+    fn shared(known: &Survey, failed: Failed, roots: &'root [PathBuf]) -> Surveyed {
+        let packages = Walk::all(known, roots, &Ignored::FOR_PACKAGES);
+        let listed = Walk::all(known, roots, &Ignored::FOR_FILES);
+        let orders: Vec<Vec<&Path>> = packages.iter().chain(&listed).map(Walk::order).collect();
+        let mut below = failed.settled(known, &orders);
+        let listing = below.split_off(packages.len());
+        Surveyed {
+            below: Below(below.into_iter().zip(packages).map(|(outcome, walk)| outcome.map(|_| walk.below)).collect()),
+            listing: Listing(
+                listing
+                    .into_iter()
+                    .zip(listed)
+                    .map(|(outcome, walk)| {
+                        outcome.map(|settled| Gathered::new(settled, &Ignored::FOR_FILES).files(walk.root))
+                    })
+                    .collect(),
             ),
-            None => survey,
         }
     }
 }

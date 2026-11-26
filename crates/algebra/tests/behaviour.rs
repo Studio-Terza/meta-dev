@@ -1,4 +1,4 @@
-use algebra::{Catenation, Monoid, Semigroup};
+use algebra::{Act, Catenation, Monoid, Semigroup};
 use laws::proptest::collection::vec;
 use laws::proptest::prelude::any;
 use laws::proptest::strategy::Strategy;
@@ -15,6 +15,33 @@ impl Semigroup for Joined {
 impl Monoid for Joined {}
 
 laws::monoid!(joined_bytes_form_a_monoid, Joined, vec(any::<u8>(), 0..4).prop_map(Joined));
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Capped(usize);
+
+impl Capped {
+    const MOST: usize = 4;
+}
+
+impl Act<Joined> for Capped {
+    fn acted(self, by: Joined) -> Option<Capped> {
+        Some(Capped(self.0 + by.0.len())).filter(|grown| grown.0 <= Capped::MOST)
+    }
+}
+
+laws::action!(
+    bytes_act_on_a_capped_count,
+    (0..=Capped::MOST).prop_map(Capped),
+    <Capped as Act<Joined>>::acted,
+    vec(any::<u8>(), 0..3).prop_map(Joined)
+);
+
+#[test]
+fn an_optional_target_is_acted_on_when_present_and_stays_absent_otherwise() {
+    assert_eq!(Some(Capped(1)).acted(Joined(vec![7])), Some(Some(Capped(2))));
+    assert_eq!(Some(Capped(Capped::MOST)).acted(Joined(vec![7])), Some(None));
+    assert_eq!(None::<Capped>.acted(Joined(vec![7])), Some(None));
+}
 
 #[test]
 fn concatenating_nothing_gives_the_identity_and_keeps_order() {

@@ -11,6 +11,7 @@ mod unit;
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
 
+use algebra::{Monoid, Semigroup};
 use newtype::Wrapping;
 
 use crate::crate_name::CrateName;
@@ -22,7 +23,7 @@ use chain::Chain;
 pub use chain::Chained;
 use claims::Claims;
 use closure::Closure;
-use requires::Requires;
+use requires::{Linkage, Requires};
 use roles::{Expansion, RoleBreaches};
 use served::Served;
 pub use stale::Stale;
@@ -37,22 +38,51 @@ pub struct Graph<'meta> {
     normal: Requires<'meta>,
 }
 
-impl<'meta> FromIterator<&'meta Metadata> for Graph<'meta> {
-    fn from_iter<Workspaces: IntoIterator<Item = &'meta Metadata>>(workspaces: Workspaces) -> Graph<'meta> {
-        workspaces.into_iter().fold(Graph::default(), |mut graph, metadata| {
-            metadata.packages().iter().filter_map(|package| Some((package.package_id()?, package))).for_each(
-                |(id, package)| {
-                    graph.packages.insert(id, package);
-                    graph.named.entry(AsRef::<CrateName>::as_ref(package)).or_default().insert(id);
-                },
-            );
-            graph.members.extend(metadata.members());
-            graph.requires.extend(metadata.nodes());
-            graph.normal.joined(Requires::normal(metadata.nodes()));
-            graph
-        })
+impl<'meta> From<&'meta Metadata> for Graph<'meta> {
+    fn from(metadata: &'meta Metadata) -> Graph<'meta> {
+        let listed: Vec<&'meta Package> = metadata.packages().iter().collect();
+        let identified = listed.iter().filter_map(|package| package.package_id().map(|id| Identified { id, package }));
+        let named = identified.clone().fold(BTreeMap::new(), |mut named: BTreeMap<_, BTreeSet<_>>, found| {
+            named.entry(AsRef::<CrateName>::as_ref(found.package)).or_default().insert(found.id);
+            named
+        });
+        Graph {
+            packages: identified.map(|found| (found.id, found.package)).collect(),
+            named,
+            members: metadata.members().iter().collect(),
+            requires: Requires::linked(metadata.nodes(), Linkage::Every),
+            normal: Requires::linked(metadata.nodes(), Linkage::Normal),
+        }
     }
 }
+
+#[derive(Clone, Copy, Debug)]
+struct Identified<'meta> {
+    id: &'meta PackageId,
+    package: &'meta Package,
+}
+
+impl Semigroup for Graph<'_> {
+    fn combine(self, other: Self) -> Self {
+        let mut packages = self.packages;
+        packages.extend(other.packages);
+        let named = other.named.into_iter().fold(self.named, |mut named, (name, ids)| {
+            named.entry(name).or_default().extend(ids);
+            named
+        });
+        let mut members = self.members;
+        members.extend(other.members);
+        Graph {
+            packages,
+            named,
+            members,
+            requires: self.requires.combine(other.requires),
+            normal: self.normal.combine(other.normal),
+        }
+    }
+}
+
+impl Monoid for Graph<'_> {}
 
 impl<'meta> Graph<'meta> {
     #[must_use]
@@ -114,7 +144,7 @@ impl<'meta> Graph<'meta> {
         self.members
             .iter()
             .copied()
-            .filter(|id| self.package(id).and_then(|package| package.declares(role)).is_some())
+            .filter(|id| self.package(id).is_some_and(|package| package.roles().contains(&role)))
             .collect()
     }
 

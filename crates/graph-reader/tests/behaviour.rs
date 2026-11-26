@@ -1,10 +1,13 @@
 use graph::{
     Domain, Entry, Exposure, External, Function, Item, ItemKind, ItemPath, Model, Named, Owner, Primitive, Projection,
-    Resolved, Sited, TypeRef, Unresolved,
+    Resolved, Sited, TypeRef, Unplaced, Unresolved,
 };
 use graph_reader::Reader;
 use lint_core::{SourceFile, SourceText};
 use lint_layout::Name;
+use std::sync::mpsc::{self, RecvTimeoutError};
+use std::thread;
+use std::time::Duration;
 
 const DERIVED: &str = "#[derive(Clone,\n    Debug)]\nstruct A;\n#[derive(PartialEq)]\nenum B {\n    C,\n}\n#[derive(Copy)]\nunion D {\n    e: u8,\n}\n";
 const WRITTEN: &str = "mod m {\n    impl Clone for A {}\n}\nfn f() {\n    impl A {}\n}\n";
@@ -273,7 +276,11 @@ enum Seen {
 impl Seen {
     fn of(model: &Model, resolved: Resolved) -> Seen {
         match resolved.crate_item().and_then(|id| model.declared(id)) {
-            Some(item) => Seen::Item(item.clone().homed(None).exposed(Exposure::Hidden)),
+            Some(item) => Seen::Item(Unplaced::new(AsRef::<Name>::as_ref(item).clone(), item.kind()).placed(
+                item.marks().to_vec(),
+                None,
+                Exposure::Hidden,
+            )),
             None => Seen::Resolved(resolved),
         }
     }
@@ -328,7 +335,7 @@ impl Expect {
     }
 
     fn item(name: &str, kind: ItemKind) -> Seen {
-        Seen::Item(Item::new(Name::from(name), kind))
+        Seen::Item(Unplaced::new(Name::from(name), kind).placed(Vec::new(), None, Exposure::Hidden))
     }
 
     fn external(path: &[&str]) -> Seen {
@@ -372,6 +379,8 @@ impl Expect {
 struct Read;
 
 impl Read {
+    const PROMPTLY: Duration = Duration::from_secs(10);
+
     fn file(path: &str, text: &str) -> SourceFile {
         match SourceFile::parse(path, SourceText::new(text.to_owned())) {
             Ok(file) => file,
@@ -471,7 +480,8 @@ impl Read {
     fn written_sites(files: &[SourceFile]) -> Vec<String> {
         Reader::read_files(files)
             .implementations()
-            .filter_map(|found| found.entity().hand_written().map(|_| found.site().to_string()))
+            .filter(|found| found.entity().origin() == graph::Origin::Written)
+            .map(|found| found.site().to_string())
             .collect()
     }
 }
@@ -693,6 +703,14 @@ laws::table!(a_glob_import_decides_what_a_bare_trait_name_means, |text: &&str| R
     GLOB_RESTRICTED_IN => [Expect::unknown(&["Debug"])],
     PATH_RESTRICTED => [Expect::item("T", ItemKind::Struct)],
 ]);
+
+#[test]
+fn two_globs_that_agree_settle_promptly() -> Result<(), RecvTimeoutError> {
+    let (sending, receiving) = mpsc::channel();
+    thread::spawn(move || sending.send(Read::resolved(GLOB_MODULES_AGREE)));
+    assert_eq!(receiving.recv_timeout(Read::PROMPTLY)?, [Expect::krate(&["crate", "a", "T"])]);
+    Ok(())
+}
 
 laws::table!(a_block_looks_past_its_glob_to_the_enclosing_module, |text: &&str| Read::resolved(text), [
     BLOCK_GLOB_FALLS_THROUGH => [Expect::krate(&["crate", "Clone"])],

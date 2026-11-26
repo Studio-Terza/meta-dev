@@ -10,15 +10,25 @@ use std::path::PathBuf;
 use super::Step;
 use super::issue::{Issue, Title};
 use crate::cli::command::failure::Failure;
-use crate::cli::command::step::Arguments;
+use crate::cli::command::step::{Arguments, Ended, Location};
 use crate::cli::ports::{Exit, Invocation, Ports};
 use build::Build;
 use fortnight::Fortnight;
+use grammar_output::Record;
 use notice::{Notice, Report};
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Pace {
+    Slower,
+    Steady,
+}
+
+#[derive(Debug, Record)]
+#[record(source = Arguments)]
 pub struct CompileTrend {
+    #[field(Location)]
     today: PathBuf,
+    #[field(Location, via = Fortnight::downloading_to)]
     fortnight: Fortnight,
 }
 
@@ -27,9 +37,9 @@ impl CompileTrend {
         Title::new("compile-time trend: the cold build is slower than every run of the previous 14 days");
 
     fn concluded<'step>(notice: &Notice<'_>, ports: &impl Ports) -> Result<Telling<'step>, Failure<'step>> {
-        match notice.slower() {
-            Some(slower) => Self::filed(&slower.reported(&Fortnight::merged(ports)?), ports),
-            None => Ok(Telling::reported(vec![Shown::said(format_args!("{notice}\n"))], Ok(Exit::Success))),
+        match notice.pace() {
+            Pace::Slower => Self::filed(&notice.reported(&Fortnight::merged(ports)?), ports),
+            Pace::Steady => Ok(Telling::reported(vec![Shown::said(format_args!("{notice}\n"))], Ok(Exit::Success))),
         }
     }
 
@@ -46,11 +56,7 @@ impl CompileTrend {
 
 impl Step for CompileTrend {
     fn from_arguments(given: Vec<OsString>) -> Result<CompileTrend, Failure<'static>> {
-        let mut arguments = Arguments::from(given);
-        let today = &arguments.taken()?;
-        let downloads = &arguments.taken()?;
-        arguments.ended()?;
-        Ok(CompileTrend { today: PathBuf::from(today), fortnight: Fortnight::downloading_to(PathBuf::from(downloads)) })
+        CompileTrend::read(Arguments::from(given))?.ended()
     }
 
     fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {

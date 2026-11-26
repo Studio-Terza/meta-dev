@@ -3,6 +3,7 @@ mod whole;
 use syntax::Punctuated;
 use syntax::{Attribute, Macro, PathSegment, Token};
 
+use crate::matching::Fitted;
 use crate::name::Name;
 use crate::word::Word;
 use crate::words;
@@ -13,7 +14,8 @@ pub struct TestMarks;
 
 impl TestMarks {
     const ATTRIBUTE: [Word<'static>; 3] = words!["test", "rstest", "test_case"];
-    const LAWS: [Word<'static>; 12] = words![
+    const LAWS: [Word<'static>; 13] = words![
+        "action",
         "crud",
         "law",
         "roundtrip",
@@ -49,7 +51,7 @@ impl TestMarks {
             .map(|_| invocation)
     }
 
-    fn ends_in<'word>(segments: &Punctuated<PathSegment, Token![::]>, words: &[Word<'word>]) -> Option<Word<'word>> {
+    fn ends_in<'word>(segments: &Punctuated<PathSegment, Token![::]>, words: &[Word<'word>]) -> Option<Fitted<'word>> {
         segments.last().and_then(|segment| Name::from(&segment.ident).matches::<Whole>(words))
     }
 }

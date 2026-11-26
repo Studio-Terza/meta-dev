@@ -1,6 +1,5 @@
 use std::collections::BTreeSet;
 use std::fmt;
-use std::ptr;
 
 use equivalence::{Group, Holes};
 use lint_core::{Fix, Site, Violation};
@@ -8,18 +7,17 @@ use lint_layout::Name;
 use newtype::Counter;
 
 use super::leg::Leg;
-use super::stops::Stops;
+use super::stops::{Outside, Stops};
 use super::walk::Walk;
 use crate::count::Count;
 use crate::coverage::Share;
-use crate::edge::Edge;
 use crate::listed::Listed;
 
 #[derive(Debug)]
 pub(super) struct Route<'walk, 'graph, 'found, 'file> {
     group: Group<Leg<'walk, 'graph, 'found, 'file>>,
     places: Vec<Site<'file>>,
-    joined: Option<&'graph Edge<'found, 'file>>,
+    joined: Option<Outside<'graph, 'found, 'file>>,
 }
 
 impl<'walk, 'graph, 'found, 'file> Route<'walk, 'graph, 'found, 'file> {
@@ -36,17 +34,8 @@ impl<'walk, 'graph, 'found, 'file> Route<'walk, 'graph, 'found, 'file> {
             .first()
             .zip(called.last())
             .and_then(|(first, last)| stops.joining(first, last))
-            .filter(|joined| Self::outside(&group, joined).is_some());
+            .and_then(|joined| joined.outside(&group));
         Some(Route { group, places, joined }).filter(|route| route.places.len() >= Self::LEAST_PLACES)
-    }
-
-    fn outside<'edge>(
-        group: &Group<Leg<'walk, 'graph, 'found, 'file>>,
-        joined: &'edge Edge<'found, 'file>,
-    ) -> Option<&'edge Edge<'found, 'file>> {
-        let walkers = group.members().iter().map(|member| member.walk().edge());
-        let called = group.members().iter().flat_map(|member| member.called().iter().copied());
-        walkers.chain(called).find(|edge| ptr::eq(*edge, joined)).map_or(Some(joined), |_| None)
     }
 
     fn holes(&self) -> Holes {
@@ -81,7 +70,7 @@ impl fmt::Display for Route<'_, '_, '_, '_> {
             Count::new(self.places.len()),
             self.holes()
         )?;
-        self.joined.map_or(Ok(()), |edge| write!(formatter, "; {} already joins its ends", edge.transition()))
+        self.joined.map_or(Ok(()), |outside| write!(formatter, "{outside}"))
     }
 }
 

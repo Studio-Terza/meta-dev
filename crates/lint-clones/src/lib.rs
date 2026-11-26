@@ -43,7 +43,12 @@ impl Gleaning for Clones {
     type Gleaner<'run, 'head: 'run> = Contributing<CloneSites<'head>>;
 
     fn gleaner<'run, 'head: 'run>(parsed: Parsed<'run, 'head>) -> Contributing<CloneSites<'head>> {
-        let core = <&SourceFile>::from(parsed).shipped().filter(|found| Gate::BOUNDARY.admits(found.head()).is_none());
+        let file = <&SourceFile>::from(parsed);
+        let core = file
+            .head()
+            .shipped()
+            .map(|_| file)
+            .and_then(|found| Gate::BOUNDARY.admits(found.head(), None).unwrap_or(Some(found)));
         Contributing::new(CloneSites::new(AsRef::<Path>::as_ref(parsed.head()), core.map(|_| ())))
     }
 }

@@ -20,16 +20,11 @@ impl<'found> Cut<'found> {
         members: &BTreeSet<Member<'found>>,
         users: &BTreeMap<Member<'found>, BTreeSet<Member<'found>>>,
     ) -> Cut<'found> {
-        let outgoing: Vec<Link<'found>> = members
-            .iter()
-            .flat_map(|export| {
-                users
-                    .get(export)
-                    .into_iter()
-                    .flatten()
-                    .filter(|user| cluster.holding(user.cluster()).is_none())
-                    .map(|user| Link::new(*user, *export))
-            })
+        let used =
+            members.iter().flat_map(|export| users.get(export).into_iter().flatten().map(|user| (*user, *export)));
+        let outgoing: Vec<Link<'found>> = used
+            .filter(|(user, _)| user.cluster().lineage().all(|outer| outer != cluster))
+            .map(|(user, export)| Link::new(user, export))
             .collect();
         let exports = outgoing
             .iter()
@@ -126,6 +121,6 @@ impl<'found> Slice<'found> {
     }
 
     pub(crate) fn components(&self, view: &Containment<'found, '_>, toward: Toward) -> Option<Groups<'found>> {
-        Groups::linked(&self.members, view.links_within(&self.members, toward).into_iter()).split()
+        Groups::split(&self.members, view.links_within(&self.members, toward).into_iter())
     }
 }
