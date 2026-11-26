@@ -39,7 +39,6 @@ const SHALLOW_NESTING: usize = 100;
 const MIDDLING_NESTING: usize = 200;
 const MANIFEST: &str = "[package]\nname = \"r\"\n";
 const MOST_READERS: usize = 4;
-const SWEPT_CONTRIBUTOR: &str = "lint_no_free_fns::FreeFns";
 const NO_DEPENDENCIES: &str = "{\"workspace_root\": \"/\", \"packages\": []}";
 
 #[test]
@@ -100,22 +99,6 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), laws::Unmet> {
             .map(|call| elegance.matches(call).count())
             .sum::<usize>();
     assert_eq!(listed_by_the_runner, implemented - listed_by_the_mode - listed_by_elegance);
-    Ok(())
-}
-
-#[test]
-fn a_warm_run_recalls_the_file_lints_instead_of_sweeping_and_a_new_binary_sweeps_again() -> Result<(), laws::Unmet> {
-    let root = Scratch::package()?;
-    root.write("src/lib.rs", DIRTY)?;
-    root.write(Scratch::BINARY, "one build")?;
-    let cold = root.remembered();
-    let warm = root.remembered();
-    root.write(Scratch::BINARY, "another build")?;
-    let rebuilt = root.remembered();
-    let swept = [&cold, &warm, &rebuilt].map(|run| run.out.matches(SWEPT_CONTRIBUTOR).count());
-    assert_eq!(swept, [1, 0, 1], "{}\n{}", cold.out, warm.out);
-    assert_eq!([&warm.err, &rebuilt.err], [&cold.err; 2]);
-    assert!(cold.err.contains("src/lib.rs:1"), "{}", cold.err);
     Ok(())
 }
 
@@ -249,7 +232,6 @@ fn the_gate_refuses_a_workspace_cargo_cannot_describe() -> Result<(), laws::Unme
             &root.files,
             [(PathBuf::from("/"), Bytes::from("not json"))].into_iter().collect::<Recorded>(),
             Monotonic::default(),
-            PathBuf::new(),
         ),
         &mut out,
         &mut err,
@@ -260,7 +242,6 @@ fn the_gate_refuses_a_workspace_cargo_cannot_describe() -> Result<(), laws::Unme
             &root.files,
             [(PathBuf::from("/"), Bytes::from("not json"))].into_iter().collect::<Recorded>(),
             Monotonic::default(),
-            PathBuf::new(),
         ),
         &mut report_out,
         &mut report_err,
@@ -287,7 +268,6 @@ fn the_verdict_names_what_the_run_decided() -> Result<(), laws::Unmet> {
                         &root.files,
                         [(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
                         Monotonic::default(),
-                        PathBuf::new(),
                     ),
                     &mut <&mut [u8]>::default(),
                     &mut err,
@@ -310,7 +290,7 @@ fn a_cargo_metadata_failure_refuses_the_run_once_rather_than_flagging_each_deriv
     let mut err = Vec::new();
     let arguments = [OsString::from(&root.root)].into_iter();
     let verdict = Cli::from_args(arguments).verdict(
-        Ports::new(&root.files, Recorded::default(), Monotonic::default(), PathBuf::new()),
+        Ports::new(&root.files, Recorded::default(), Monotonic::default()),
         &mut Vec::new(),
         &mut err,
     );
@@ -328,7 +308,7 @@ fn a_workspace_located_through_cargo_resolves_a_derive_through_its_dependencies_
     let (mut out, mut err) = (Vec::new(), Vec::new());
     let arguments = [Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/.workspace").into_os_string()].into_iter();
     let exit = Cli::from_args(arguments).report_to(
-        Ports::new(&workspace, Toolchain, Monotonic::default(), PathBuf::new()),
+        Ports::new(&workspace, Toolchain, Monotonic::default()),
         &mut out,
         &mut err,
     );
@@ -421,14 +401,17 @@ impl Trees {
     }
 
     fn described(files: &(impl Files + Sync), root: &Path, flags: &[&str], metadata: &str) -> Printed {
-        let recorded = [(PathBuf::from("/"), Bytes::from(metadata))].into_iter().collect::<Recorded>();
-        Trees::printed(root, flags, Ports::new(files, recorded, Monotonic::default(), PathBuf::new()))
-    }
-
-    fn printed(root: &Path, flags: &[&str], ports: Ports<'_, impl Files + Sync, Recorded, Monotonic>) -> Printed {
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let arguments = flags.iter().map(OsString::from).chain([OsString::from(root)]);
-        let exit = Cli::from_args(arguments).report_to(ports, &mut out, &mut err);
+        let exit = Cli::from_args(arguments).report_to(
+            Ports::new(
+                files,
+                [(PathBuf::from("/"), Bytes::from(metadata))].into_iter().collect::<Recorded>(),
+                Monotonic::default(),
+            ),
+            &mut out,
+            &mut err,
+        );
         Printed {
             exit,
             out: String::from_utf8(out).ignoring(Ignored::NotUtf8).unwrap_or_default(),
@@ -444,7 +427,6 @@ impl Trees {
                 files,
                 [(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
                 Monotonic::default(),
-                PathBuf::new(),
             ),
             &mut out,
             &mut Vec::new(),
@@ -460,7 +442,6 @@ impl Trees {
                 files,
                 [(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
                 Monotonic::default(),
-                PathBuf::new(),
             ),
             &mut Vec::new(),
             &mut Vec::new(),
@@ -475,7 +456,6 @@ impl Trees {
                 files,
                 [(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
                 Monotonic::default(),
-                PathBuf::new(),
             ),
             &mut out,
             &mut err,
@@ -491,7 +471,6 @@ struct Scratch {
 
 impl Scratch {
     const ROOT: &'static str = "/scratch";
-    const BINARY: &'static str = "target/release/lint";
 
     fn temporary() -> Result<Scratch, FileFailure> {
         let files = Memory::default();
@@ -534,12 +513,6 @@ impl Scratch {
         let root = Scratch::package().ignoring(Ignored::Unwritten)?;
         let written = sources.iter().try_for_each(|[path, text]| root.write(path, text).map(|_| ()));
         written.ignoring(Ignored::Unwritten).map(|()| root.reported().violations())
-    }
-
-    fn remembered(&self) -> Printed {
-        let recorded = [(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>();
-        let ports = Ports::new(&self.files, recorded, Monotonic::default(), self.at(Self::BINARY));
-        Trees::printed(&self.root, &["--timings"], ports)
     }
 
     fn reported_at(&self, below: &str) -> Reported {

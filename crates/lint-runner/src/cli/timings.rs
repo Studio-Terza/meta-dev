@@ -48,8 +48,6 @@ pub(crate) enum Step {
     Total,
     Stage,
     Locate,
-    Recall,
-    Remember,
     Read(Worker),
     Lower(Worker),
     Judged(Worker),
@@ -68,8 +66,6 @@ impl Step {
             Step::Total
             | Step::Stage
             | Step::Locate
-            | Step::Recall
-            | Step::Remember
             | Step::Read(_)
             | Step::Lower(_)
             | Step::Contexts
@@ -108,10 +104,6 @@ impl fmt::Display for Step {
             Step::Total => formatter.write_str("phase total"),
             Step::Stage => formatter.write_str("phase stage: list the trees and their packages"),
             Step::Locate => formatter.write_str("phase locate: describe the workspaces through cargo metadata"),
-            Step::Recall => formatter.write_str("phase recall: hash the lint binary and read the remembered files"),
-            Step::Remember => {
-                formatter.write_str("phase remember: write every file's file-lint findings for the next run")
-            }
             Step::Read(Worker(index)) => write!(formatter, "phase read: read and parse the sources on worker {index}"),
             Step::Lower(Worker(index)) => {
                 write!(formatter, "phase lower: lower and file-lint its share of files on worker {index}")

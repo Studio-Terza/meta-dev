@@ -3,7 +3,6 @@ mod ignored;
 use std::env;
 use std::ffi::{OsStr, OsString};
 use std::io::{self, Stderr, Stdout, Write};
-use std::path::PathBuf;
 use std::process::ExitCode;
 
 use crate::process::ignored::Ignored;
@@ -16,11 +15,6 @@ pub struct Process;
 impl Process {
     pub fn stream<Ended>(respond: impl FnOnce(Vec<OsString>, &mut Stdout, &mut Stderr) -> Ended) -> Ended {
         respond(env::args_os().skip(1).collect(), &mut io::stdout(), &mut io::stderr())
-    }
-
-    #[must_use]
-    pub fn executable() -> PathBuf {
-        env::current_exe().ignoring(Ignored::Unlocatable).unwrap_or_default()
     }
 
     pub fn tell<Told: Teller>(parse: impl FnOnce(Vec<OsString>) -> Told) -> ExitCode {

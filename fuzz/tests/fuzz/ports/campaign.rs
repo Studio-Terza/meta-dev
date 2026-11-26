@@ -60,7 +60,7 @@ impl Campaign {
     fn ran(files: &Memory) -> Run {
         let mut err = Vec::new();
         let verdict = Cli::from_args(iter::once(OsString::from(ROOT))).verdict(
-            Ports::new(files, Workspace::described(), Monotonic::default(), PathBuf::new()),
+            Ports::new(files, Workspace::described(), Monotonic::default()),
             &mut Vec::new(),
             &mut err,
         );

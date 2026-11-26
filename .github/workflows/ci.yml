@@ -169,20 +169,8 @@ jobs:
       - uses: ./.github/actions/tools
       - name: dependency sources
         run: cargo fetch --locked
-      - name: lint store restore
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ github.workspace }}/target/lint-cache
-          key: lint-cache-${{ runner.os }}-${{ hashFiles('target/ci/tools/lint') }}-${{ github.sha }}
-          restore-keys: lint-cache-${{ runner.os }}-${{ hashFiles('target/ci/tools/lint') }}-
       - name: lint
         run: '"$TOOLS/ci" logged "$BUDGET" "$TOOLS/ci" timed "$MEASURED" lint "$TOOLS/lint" --timings .'
-      - name: lint store save
-        if: github.ref == 'refs/heads/main' && always()
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ github.workspace }}/target/lint-cache
-          key: lint-cache-${{ runner.os }}-${{ hashFiles('target/ci/tools/lint') }}-${{ github.sha }}
       - name: generate laws from the graph
         run: '"$TOOLS/lint" laws .'
       - name: stage new law runners for the diff

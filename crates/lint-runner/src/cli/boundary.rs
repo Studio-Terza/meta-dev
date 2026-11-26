@@ -1,5 +1,3 @@
-mod remembered;
-
 use std::fmt;
 use std::io;
 use std::iter;
@@ -13,17 +11,13 @@ use std::collections::BTreeMap;
 use algebra::{Monoid, Semigroup};
 use lint_core::{Headline, Report, Violation};
 use lint_sweep::Visited;
-use newtype::Checked;
-use serde::{Deserialize, Serialize};
-
-pub(crate) use remembered::{Invocation, Kept, Store};
 
 use super::stack_size::StackSize;
 use super::timings::{Timing, Visiting};
 use crate::cli::ignored::Ignored;
 use invariants::{Ignoring, Rejoined};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Slot(usize);
 
 impl Slot {
@@ -60,7 +54,7 @@ impl fmt::Display for Rendered {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct FileOrder(usize);
 
 impl From<usize> for FileOrder {
@@ -73,37 +67,12 @@ impl FileOrder {
     pub(crate) const LAST: FileOrder = FileOrder(usize::MAX);
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 struct FileLines {
     slot: Slot,
     order: FileOrder,
-    text: WholeLines,
+    text: String,
 }
-
-#[derive(newtype::Newtype, newtype::Arbitrary, newtype::Serialize, newtype::CheckedDeserialize, Clone, Debug)]
-#[newtype(checked, strategy = "([^\\n]*\\n)+")]
-struct WholeLines(String);
-
-#[derive(Debug, PartialEq, Eq, thiserror::Error)]
-#[error("filed text is one or more whole lines, each ending in a line break")]
-struct Torn;
-
-impl Checked for WholeLines {
-    type Error = Torn;
-
-    fn checked(text: &String) -> Result<&String, Torn> {
-        text.chars().next_back().filter(|last| *last == Worked::LINE_END).map(|_| text).ok_or(Torn)
-    }
-}
-
-impl AsRef<str> for WholeLines {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub(crate) struct Filings(Vec<FileLines>);
 
 #[derive(Debug, Default)]
 pub(crate) struct Worked {
@@ -122,23 +91,13 @@ impl Worked {
     }
 
     pub(crate) fn filing(slot: Slot, order: FileOrder, violations: &[Violation<'_>]) -> Worked {
-        let joined = violations.iter().map(ToString::to_string).fold(String::new(), |mut text, line| {
+        let text = violations.iter().map(ToString::to_string).fold(String::new(), |mut text, line| {
             text.push_str(&line);
             text.push(Self::LINE_END);
             text
         });
-        let filed =
-            WholeLines::try_new(joined).ignoring(Ignored::Unviolated).map(|text| FileLines { slot, order, text });
+        let filed = violations.first().map(|_| FileLines { slot, order, text });
         Worked { filed: filed.into_iter().collect(), ..Worked::default() }
-    }
-
-    pub(crate) fn recalled(filings: Filings, order: FileOrder) -> Worked {
-        let filed = filings.0.into_iter().map(|lines| FileLines { order, ..lines }).collect();
-        Worked { filed, ..Worked::default() }
-    }
-
-    pub(crate) fn remembered(&self) -> Filings {
-        Filings(self.filed.clone())
     }
 
     pub(crate) fn timed(timing: Timing) -> Worked {
@@ -161,7 +120,7 @@ impl Worked {
         let mut filed = self.filed;
         filed.sort_by_key(|part| (part.slot, part.order));
         let grouped = filed.into_iter().fold(BTreeMap::new(), |mut slots: BTreeMap<Slot, String>, part| {
-            slots.entry(part.slot).or_default().push_str(part.text.as_ref());
+            slots.entry(part.slot).or_default().push_str(&part.text);
             slots
         });
         let assembled = grouped.into_iter().filter_map(|(slot, lines)| {

@@ -8,7 +8,6 @@ use graph_reader::{FileFacts, GroupLowering, ListedGroup, Listing};
 use lint_core::{FileHead, Parsed, Readout, SourceFile, Unwalked};
 use lint_sweep::Gathers;
 
-use super::super::boundary::{Filings, Kept, Store, Worked};
 use super::super::timings::{Measured, Timing};
 use super::contexts::{Contexts, Contributed};
 use crate::cli::ignored::Ignored;
@@ -26,21 +25,14 @@ struct Claim<'listing, 'read, 'run> {
 }
 
 impl<'read, 'run> Claim<'_, 'read, 'run> {
-    fn gathered<Part: AsRef<Worked>, Filed: Gathers<Part>>(
-        self,
-        store: &Store,
-        starting: &impl Fn(Claimed<'read>, Option<Filings>) -> Filed,
-    ) -> Joined<'run, Part> {
-        let key = store.key(self.file);
-        let recalled = key.as_ref().and_then(|found| store.recalled(found));
+    fn gathered<Part, Filed: Gathers<Part>>(self, starting: &impl Fn(Claimed<'read>) -> Filed) -> Joined<'run, Part> {
         let parsed = Parsed::new(self.file, self.head);
         let lowering: GroupLowering<'_> = self.group.lowering();
-        let filing = starting(Claimed { order: self.order, file: self.file }, recalled);
+        let claimed = Claimed { order: self.order, file: self.file };
+        let filing = starting(claimed);
         let contexts = Contributed::joined(parsed, self.unwalked);
         let gathered = Gathered { head: self.head, facts: lowering.gathered(self.file), contexts };
-        let filed = filing.gathered(self.file);
-        let kept = key.map(|found| Kept::remembered(found, filed.as_ref()));
-        Joined { gathered, filed, kept }
+        Joined { gathered, filed: filing.gathered(self.file) }
     }
 }
 
@@ -48,7 +40,6 @@ impl<'read, 'run> Claim<'_, 'read, 'run> {
 struct Joined<'run, Part> {
     gathered: Gathered<'run>,
     filed: Part,
-    kept: Option<Kept>,
 }
 
 #[derive(Debug)]
@@ -126,28 +117,20 @@ impl<'run> Merging<'run> {
 pub(crate) struct Gathering<'run> {
     heads: &'run OnceLock<Vec<FileHead>>,
     deposited: Mutex<Vec<Gathered<'run>>>,
-    kept: Mutex<Vec<Kept>>,
     model: OnceLock<Option<Model>>,
     contexts: OnceLock<Contexts<'run>>,
 }
 
 impl<'run> Gathering<'run> {
     pub(crate) fn new(heads: &'run OnceLock<Vec<FileHead>>) -> Gathering<'run> {
-        Gathering {
-            heads,
-            deposited: Mutex::default(),
-            kept: Mutex::default(),
-            model: OnceLock::new(),
-            contexts: OnceLock::new(),
-        }
+        Gathering { heads, deposited: Mutex::default(), model: OnceLock::new(), contexts: OnceLock::new() }
     }
 
-    pub(crate) fn gathered<'read, Part: AsRef<Worked>, Filed: Gathers<Part>>(
+    pub(crate) fn gathered<'read, Part, Filed: Gathers<Part>>(
         &self,
         readout: &'read Readout,
         table: &[FileHead],
-        store: &Store,
-        starting: impl Fn(Claimed<'read>, Option<Filings>) -> Filed,
+        starting: impl Fn(Claimed<'read>) -> Filed,
     ) -> Share<'run, Part> {
         let heads = self.heads.get_or_init(|| table.to_vec());
         let listing = Listing::of_files(readout.files());
@@ -163,17 +146,10 @@ impl<'run> Gathering<'run> {
                 Some(Claim { order: FileOrder::from(index), group, file, head: heads.get(index)?, unwalked })
             })
             .collect();
-        let joined: Vec<Joined<'run, Part>> =
-            claims.into_iter().map(|claim| claim.gathered(store, &starting)).collect();
-        let (parts, kept): (Vec<(Gathered<'run>, Part)>, Vec<Option<Kept>>) =
-            joined.into_iter().map(|found| ((found.gathered, found.filed), found.kept)).unzip();
-        self.kept.lock().unpoisoned().extend(kept.into_iter().flatten());
-        let (gathered, filed): (Vec<Gathered<'run>>, Vec<Part>) = parts.into_iter().unzip();
+        let joined: Vec<Joined<'run, Part>> = claims.into_iter().map(|claim| claim.gathered(&starting)).collect();
+        let (gathered, filed): (Vec<Gathered<'run>>, Vec<Part>) =
+            joined.into_iter().map(|found| (found.gathered, found.filed)).unzip();
         Share { merging: self.deposited(gathered, heads), filed }
-    }
-
-    pub(crate) fn kept(&self) -> Vec<Kept> {
-        mem::take(&mut *self.kept.lock().unpoisoned())
     }
 
     pub(crate) fn model(&self) -> Option<&Model> {

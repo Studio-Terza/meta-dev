@@ -8,7 +8,7 @@ pub(crate) use gathering::{Claimed, Gathering};
 use std::sync::OnceLock;
 
 use cargo_ports::Cargo;
-use file_ports::{FileFailure, Files};
+use file_ports::Files;
 use graph::Model;
 use graph_reader::{FileFacts, Reader};
 use lint_core::{FileHead, Readout};
@@ -17,8 +17,8 @@ use lint_sweep::Gathers;
 
 use timer_ports::Timer;
 
-use super::boundary::{Filings, Invocation, Queue, Store, Worked};
-use super::timings::{Measured, Step, Stopwatch, Table, Timing, Visiting, Worker};
+use super::boundary::Queue;
+use super::timings::{Measured, Step, Stopwatch, Table, Timing, Timings, Visiting, Worker};
 use crate::cli::ignored::Ignored;
 use invariants::Ignoring;
 
@@ -28,7 +28,7 @@ pub(crate) struct Wired<'run, F, C, T> {
     cargo: &'run C,
     timer: &'run T,
     total: Stopwatch<'run, T>,
-    invocation: &'run Invocation,
+    shown: Timings,
 }
 
 #[derive(Debug)]
@@ -38,18 +38,12 @@ pub(crate) struct Sources<'run, F, C, T> {
     shared: &'run SharedRead<'run>,
     queue: Queue,
     located: OnceLock<Measured<Result<Described, Unlocated>>>,
-    recalled: OnceLock<Measured<Store>>,
     gathering: Gathering<'run>,
 }
 
 impl<'run, F: Files, C: Cargo, T: Timer> Wired<'run, F, C, T> {
-    pub(crate) fn new(
-        files: &'run F,
-        cargo: &'run C,
-        timer: &'run T,
-        invocation: &'run Invocation,
-    ) -> Wired<'run, F, C, T> {
-        Wired { files, cargo, timer, total: Stopwatch::started(timer), invocation }
+    pub(crate) fn new(files: &'run F, cargo: &'run C, timer: &'run T, shown: Timings) -> Wired<'run, F, C, T> {
+        Wired { files, cargo, timer, total: Stopwatch::started(timer), shown }
     }
 
     pub(crate) fn files(&self) -> &'run F {
@@ -61,7 +55,7 @@ impl<'run, F: Files, C: Cargo, T: Timer> Wired<'run, F, C, T> {
     }
 
     pub(crate) fn table(&self, timings: impl Iterator<Item = Timing>, visited: Visiting) -> Table {
-        Table::new(self.invocation.shown(), timings.chain([self.total.stopped(Step::Total)]).collect(), visited)
+        Table::new(self.shown, timings.chain([self.total.stopped(Step::Total)]).collect(), visited)
     }
 }
 
@@ -78,24 +72,8 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
             shared,
             queue: Queue::default(),
             located: OnceLock::new(),
-            recalled: OnceLock::new(),
             gathering: Gathering::new(heads),
         }
-    }
-
-    pub(crate) fn recalled(&self) -> &Measured<Store> {
-        self.recalled.get_or_init(|| {
-            Stopwatch::measured(self.wired.timer, Step::Recall, || self.wired.invocation.recalled(self.wired.files))
-        })
-    }
-
-    pub(crate) fn remembered(&self) -> Option<Measured<Result<(), FileFailure>>> {
-        let kept = self.gathering.kept();
-        kept.first().map(|_| {
-            Stopwatch::measured(self.wired.timer, Step::Remember, || {
-                self.recalled().done().written(&kept, self.wired.files)
-            })
-        })
     }
 
     pub(crate) fn wired(&self) -> &'run Wired<'run, F, C, T> {
@@ -126,18 +104,17 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
         })
     }
 
-    pub(crate) fn gathered<'read, Part: AsRef<Worked>, Filed: Gathers<Part>>(
+    pub(crate) fn gathered<'read, Part, Filed: Gathers<Part>>(
         &self,
         readout: &'read Readout,
         worker: Worker,
-        starting: impl Fn(Claimed<'read>, Option<Filings>) -> Filed,
+        starting: impl Fn(Claimed<'read>) -> Filed,
     ) -> Lowering<Part>
     where
         T: Sync,
     {
-        let store = self.recalled().done();
         let stopwatch = Stopwatch::started(self.wired.timer);
-        let mut share = self.gathering.gathered(readout, self.shared.heads(), store, starting);
+        let mut share = self.gathering.gathered(readout, self.shared.heads(), starting);
         let filed = share.filed();
         let lowered = stopwatch.stopped(Step::Lower(worker));
         let merged = share.into_merging().map_or_default(|complete| self.settled(complete));

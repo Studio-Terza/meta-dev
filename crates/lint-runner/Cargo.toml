@@ -86,10 +86,6 @@ port-core = { path = "../port-core" }
 timer-ports = { path = "../timer-ports" }
 thiserror.workspace = true
 workspace-metadata = { path = "../workspace-metadata" }
-newtype = { path = "../newtype" }
-serde.workspace = true
-serde_json.workspace = true
-sha2.workspace = true
 
 [[test]]
 name = "behaviour"
