@@ -119,10 +119,8 @@ impl Marked {
         }
     }
 
-    fn among(attributes: &[Attribute], law: Option<&Macro>) -> Marked {
-        law.map(|_| Marked::Test)
-            .or_else(|| TestMarks::mark_test(attributes).map(|_| Marked::Test))
-            .unwrap_or(Marked::Other)
+    fn among(attributes: &[Attribute]) -> Marked {
+        TestMarks::mark_test(attributes).map_or(Marked::Other, |_| Marked::Test)
     }
 }
 
@@ -157,17 +155,17 @@ impl Contribute for SkipMarks<'_> {
         _: &Facts<'_, ItemFn>,
         _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<Vec<LineNumber>, Marks> {
-        Contributed::parted(Self::skips(&function.attrs, Marked::among(&function.attrs, None)))
+        Contributed::parted(Self::skips(&function.attrs, Marked::among(&function.attrs)))
     }
 
     fn on_macro(
         &self,
         invocation: &Macro,
-        facts: &Facts<'_, Macro>,
+        _: &Facts<'_, Macro>,
         _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<Vec<LineNumber>, Marks> {
         let attributes = Macros::attributes_in_file(self.file, invocation);
-        let marks = Self::skips(&attributes, Marked::among(&attributes, facts.law()));
+        let marks = Self::skips(&attributes, Marked::among(&attributes));
         Contributed::new(Vec::new(), marks, Descend::Over)
     }
 

@@ -2,7 +2,7 @@ mod boundary;
 
 use std::cell::OnceCell;
 
-use syntax::{Attribute, ItemImpl, Macro};
+use syntax::{Attribute, ItemImpl};
 
 use lint_layout::{LineNumber, Name, TestMarks, Word};
 
@@ -58,13 +58,6 @@ impl<'node> Facts<'node, ItemImpl> {
     #[must_use]
     pub fn inherent(&self) -> Option<&'node ItemImpl> {
         *self.marked.get_or_init(|| Syntax::inherent(self.node))
-    }
-}
-
-impl<'node> Facts<'node, Macro> {
-    #[must_use]
-    pub fn law(&self) -> Option<&'node Macro> {
-        *self.marked.get_or_init(|| TestMarks::law(self.node))
     }
 }
 

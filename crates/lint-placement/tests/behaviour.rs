@@ -38,21 +38,24 @@ impl Placed {
     }
 }
 
-laws::table!(a_source_file_is_placed_in_the_module_its_path_names, Placed::module, [
-    ["/p", "/p/src/main.rs"] => Some(String::new()),
-    ["/p", "/p/src/lib.rs"] => Some(String::new()),
-    ["/p", "/p/src/bin/tool.rs"] => Some(String::from("bin::tool")),
-    ["/p", "/p/src/outer/inner.rs"] => Some(String::from("outer::inner")),
-]);
+#[test]
+fn a_source_file_is_placed_in_the_module_its_path_names() {
+    assert_eq!(Placed::module(&["/p", "/p/src/main.rs"]), Some(String::new()));
+    assert_eq!(Placed::module(&["/p", "/p/src/lib.rs"]), Some(String::new()));
+    assert_eq!(Placed::module(&["/p", "/p/src/bin/tool.rs"]), Some(String::from("bin::tool")));
+    assert_eq!(Placed::module(&["/p", "/p/src/outer/inner.rs"]), Some(String::from("outer::inner")));
+}
 
-laws::table!(a_file_outside_a_crate_directory_is_its_own_crate_root, Placed::crate_root, [
-    ["/p", "/p/build.rs"] => Some(PathBuf::from("/p")),
-    ["/p", "/p/loose.rs"] => Some(PathBuf::from("/p/loose.rs")),
-    ["/p", "/p/build.rs/inner.rs"] => Some(PathBuf::from("/p/build.rs/inner.rs")),
-]);
+#[test]
+fn a_file_outside_a_crate_directory_is_its_own_crate_root() {
+    assert_eq!(Placed::crate_root(&["/p", "/p/build.rs"]), Some(PathBuf::from("/p")));
+    assert_eq!(Placed::crate_root(&["/p", "/p/loose.rs"]), Some(PathBuf::from("/p/loose.rs")));
+    assert_eq!(Placed::crate_root(&["/p", "/p/build.rs/inner.rs"]), Some(PathBuf::from("/p/build.rs/inner.rs")));
+}
 
-laws::table!(a_module_file_belongs_to_its_library_and_a_build_script_to_itself, Placed::crate_file, [
-    ["/p", "/p/src/outer/inner.rs"] => Some(PathBuf::from("/p/src/lib.rs")),
-    ["/p", "/p/build.rs"] => Some(PathBuf::from("/p/build.rs")),
-    ["/p", "/p/src/main.rs"] => Some(PathBuf::from("/p/src/main.rs")),
-]);
+#[test]
+fn a_module_file_belongs_to_its_library_and_a_build_script_to_itself() {
+    assert_eq!(Placed::crate_file(&["/p", "/p/src/outer/inner.rs"]), Some(PathBuf::from("/p/src/lib.rs")));
+    assert_eq!(Placed::crate_file(&["/p", "/p/build.rs"]), Some(PathBuf::from("/p/build.rs")));
+    assert_eq!(Placed::crate_file(&["/p", "/p/src/main.rs"]), Some(PathBuf::from("/p/src/main.rs")));
+}

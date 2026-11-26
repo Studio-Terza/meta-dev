@@ -132,17 +132,15 @@ impl Contribute for TestCode<'_> {
     fn on_macro(
         &self,
         invocation: &Macro,
-        facts: &Facts<'_, Macro>,
+        _: &Facts<'_, Macro>,
         _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), InSource> {
         let line = LineNumber::from(invocation.bang_token.span);
-        let law = facts.law().map(|_| line);
         let called =
             Some(invocation).filter(|candidate| candidate.path.get_ident().is_none_or(|name| name != Self::DEFINITION));
-        let marked = called.and_then(|call| {
+        let settled = called.and_then(|call| {
             Macros::attributes_in_file(self.file, call).iter().find_map(TestMarks::test).map(|_| line)
         });
-        let settled = law.or(marked);
         let named = invocation.path.get_ident().map(|name| Invoked { name: Name::from(name), line });
         let invoked = settled.map_or(named, |_| None).into_iter().collect();
         Contributed::new((), InSource { lines: settled.into_iter().collect(), invoked }, Descend::Over)

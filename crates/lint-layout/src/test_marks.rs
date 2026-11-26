@@ -1,7 +1,7 @@
 mod whole;
 
 use syntax::Punctuated;
-use syntax::{Attribute, Macro, PathSegment, Token};
+use syntax::{Attribute, PathSegment, Token};
 
 use crate::matching::Fitted;
 use crate::name::Name;
@@ -14,22 +14,6 @@ pub struct TestMarks;
 
 impl TestMarks {
     const ATTRIBUTE: [Word<'static>; 3] = words!["test", "rstest", "test_case"];
-    const LAWS: [Word<'static>; 13] = words![
-        "action",
-        "crud",
-        "law",
-        "roundtrip",
-        "idempotent",
-        "table",
-        "associative",
-        "commutative",
-        "identity",
-        "inverse",
-        "absorbing",
-        "distributive",
-        "preserves"
-    ];
-    const LAW_CRATE: &'static str = "laws";
 
     #[must_use]
     pub fn test(attribute: &Attribute) -> Option<&Attribute> {
@@ -39,16 +23,6 @@ impl TestMarks {
     #[must_use]
     pub fn mark_test(attributes: &[Attribute]) -> Option<&Attribute> {
         attributes.iter().find_map(Self::test)
-    }
-
-    #[must_use]
-    pub fn law(invocation: &Macro) -> Option<&Macro> {
-        let segments = &invocation.path.segments;
-        let named = Self::ends_in(segments, &Self::LAWS).and(segments.first());
-        named
-            .filter(|_| segments.len() == 1)
-            .or_else(|| named.filter(|first| first.ident == Self::LAW_CRATE))
-            .map(|_| invocation)
     }
 
     fn ends_in<'word>(segments: &Punctuated<PathSegment, Token![::]>, words: &[Word<'word>]) -> Option<Fitted<'word>> {

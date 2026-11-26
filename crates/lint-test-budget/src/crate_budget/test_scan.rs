@@ -38,16 +38,9 @@ impl<'file> TestScan<'file> {
     }
 
     fn tests_in(&self, invocation: &Macro) -> Count {
-        TestMarks::law(invocation)
-            .map(|_| Count::new(1))
-            .or_else(|| {
-                Self::property_block(invocation).map(|_| {
-                    Count::new(
-                        Macros::attributes_in_file(self.file, invocation).iter().filter_map(TestMarks::test).count(),
-                    )
-                })
-            })
-            .unwrap_or_default()
+        Self::property_block(invocation).map_or_default(|_| {
+            Count::new(Macros::attributes_in_file(self.file, invocation).iter().filter_map(TestMarks::test).count())
+        })
     }
 }
 

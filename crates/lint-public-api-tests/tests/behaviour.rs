@@ -9,7 +9,6 @@ const COMBINED: &str = "#[cfg(all(test, unix))]\nmod tests {}\n";
 const NOT_TEST: &str = "#[cfg(not(test))]\nmod real {}\n";
 const BARE_TEST: &str = "#[test]\nfn t() {}\n";
 const NESTED: &str = "mod inner {\n    #[test]\n    fn t() {}\n}\n";
-const LAW: &str = "laws::table!(t, f, [1 => 2]);\n";
 const DEFINED: &str = "macro_rules! m {\n    () => {\n        #[test]\n        fn t() {}\n    };\n}\n";
 const PLAIN: &str = "mod inner {\n    fn f() {}\n}\n";
 
@@ -33,7 +32,7 @@ const GATED_IMPL: &str = "pub struct W;\n#[cfg(test)]\nimpl W {\n    fn probe(&s
 const GATED_METHOD: &str = "pub struct W;\nimpl W {\n    #[cfg(test)]\n    fn probe(&self) {}\n}\n";
 const GATED_FN: &str = "#[cfg(all(test, unix))]\nfn probe() {}\n";
 
-const CASES: [Case; 26] = [
+const CASES: [Case; 24] = [
     Case::new(
         Title::new("inline module"),
         &[Source::new(Located::new("src/a.rs"), Text::new(MODULE))],
@@ -87,11 +86,6 @@ const CASES: [Case; 26] = [
         Flagged::new(&["src/a.rs:3"]),
     ),
     Case::new(
-        Title::new("law in src"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(LAW))],
-        Flagged::new(&["src/a.rs:1"]),
-    ),
-    Case::new(
         Title::new("macro definition"),
         &[Source::new(Located::new("src/a.rs"), Text::new(DEFINED))],
         Flagged::new(&[]),
@@ -104,11 +98,6 @@ const CASES: [Case; 26] = [
     Case::new(
         Title::new("test in tests"),
         &[Source::new(Located::new("tests/a.rs"), Text::new(BARE_TEST))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("law in tests"),
-        &[Source::new(Located::new("tests/a.rs"), Text::new(LAW))],
         Flagged::new(&[]),
     ),
     Case::new(

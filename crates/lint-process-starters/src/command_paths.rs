@@ -4,7 +4,7 @@ use lint_core::{
     Address, Around, Contribute, Contributed, Contributing, Descend, Facts, Gate, Joins, Kind, Site, SourceFile,
 };
 use lint_layout::{LineNumber, Name, Word};
-use syntax::{Ident, ItemMod, ItemUse, Macro, Spanned, UseLeaf};
+use syntax::{Ident, ItemMod, ItemUse, Macro, Spanned, TokenStream, TokenTree, UseLeaf};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum Scope {
@@ -218,10 +218,74 @@ impl Contribute for Scan {
 
     fn on_macro(
         &self,
-        _: &Macro,
+        invocation: &Macro,
         _: &Facts<'_, Macro>,
-        _: &Around<'_, Vec<Enclosing>>,
+        around: &Around<'_, Vec<Enclosing>>,
     ) -> Contributed<Vec<Enclosing>, Spotted> {
-        Contributed::descending(Descend::Expand)
+        let module = Scan::module(around);
+        let spelled = self.scope.inside(Scan::ported(around)).map_or_default(|_| {
+            Run::spelled(invocation.tokens.clone())
+                .into_iter()
+                .map(|(line, segments)| Spelled { module, line, segments })
+                .collect()
+        });
+        Contributed::new(Vec::new(), Spotted { imports: Vec::new(), spelled }, Descend::Over)
+    }
+}
+
+#[derive(Debug, Default)]
+struct Run {
+    segments: Vec<Name>,
+    line: Option<LineNumber>,
+    colons: usize,
+    found: Vec<(LineNumber, Vec<Name>)>,
+}
+
+impl Run {
+    const SEPARATOR: usize = 2;
+    const COLON: char = ':';
+
+    fn spelled(tokens: TokenStream) -> Vec<(LineNumber, Vec<Name>)> {
+        tokens.into_iter().fold(Run::default(), Run::read).ended().found
+    }
+
+    fn read(self, tree: TokenTree) -> Run {
+        match tree {
+            TokenTree::Group(group) => {
+                let mut ended = self.ended();
+                ended.found.extend(Run::spelled(group.stream()));
+                ended
+            }
+            TokenTree::Ident(ident) => self.named(&ident),
+            TokenTree::Punct(punct) => self.punctuated(punct.as_char()),
+            TokenTree::Literal(_) => self.ended(),
+        }
+    }
+
+    fn named(self, ident: &Ident) -> Run {
+        let joined = self.segments.first().map_or(Some(()), |_| (self.colons == Self::SEPARATOR).then_some(()));
+        let mut run = match joined {
+            Some(()) => self,
+            None => self.ended(),
+        };
+        run.line = run.line.or(Some(LineNumber::from(ident.span())));
+        run.segments.push(Name::from(ident));
+        run.colons = 0;
+        run
+    }
+
+    fn punctuated(self, mark: char) -> Run {
+        let colons = self.colons;
+        match (mark == Self::COLON).then_some(()).filter(|()| colons < Self::SEPARATOR) {
+            Some(()) => Run { colons: colons + 1, ..self },
+            None => self.ended(),
+        }
+    }
+
+    fn ended(self) -> Run {
+        let Run { segments, line, colons, mut found } = self;
+        let whole = line.filter(|_| colons == 0).filter(|_| segments.len() >= Self::SEPARATOR);
+        found.extend(whole.map(|at| (at, segments)));
+        Run { found, ..Run::default() }
     }
 }
