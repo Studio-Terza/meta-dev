@@ -1,5 +1,5 @@
 use port_core::Op;
-use store_ports::{Batch, Counts, Done, Execute, StoreFailure};
+use store_ports::{Counts, Done, Execute, StoreFailure};
 use transcript_ports::{Authorship, Cursor, Kind, Line, SessionId};
 
 use crate::boundary::{CursorRow, MessageRow};
@@ -41,17 +41,9 @@ impl SessionRecords {
     }
 }
 
-impl Batch for SessionRecords {
+impl Counts for SessionRecords {
     type Failure = StoreFailure;
 
-    type Done = ();
-
-    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
-        self.counted(statements)
-    }
-}
-
-impl Counts for SessionRecords {
     fn counted<D: Done>(self, statements: &mut impl Execute) -> Result<D, StoreFailure> {
         let messages = statements.counted_all(self.messages.iter().map(MessageRow::inserted))?;
         Ok(D::total([messages, self.cursor.written(statements)?].into_iter()))

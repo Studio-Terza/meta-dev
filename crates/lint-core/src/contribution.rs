@@ -197,7 +197,7 @@ impl<Contributor: Contribute> Contributing<Contributor> {
     }
 
     pub fn tallied(self, file: &SourceFile) -> Tallied<Contributor> {
-        let Walked { contribution, visits, .. } = self.walked_file(file);
+        let Walked { contribution, visits } = self.walked_file(file);
         Tallied { contributor: self.contributor, contribution, visits }
     }
 

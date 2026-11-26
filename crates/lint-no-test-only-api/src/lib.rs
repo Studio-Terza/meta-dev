@@ -70,8 +70,7 @@ impl<'head> FromIterator<FileManifest<'head>> for TestOnly<'head> {
     fn from_iter<Parts: IntoIterator<Item = FileManifest<'head>>>(parts: Parts) -> TestOnly<'head> {
         let manifests =
             parts.into_iter().fold(BTreeMap::new(), |mut last: BTreeMap<&'head PackageRoot, &'head Path>, part| {
-                let kept = last.get(part.package).copied().filter(|held| *held > part.path).unwrap_or(part.path);
-                last.insert(part.package, kept);
+                last.entry(part.package).and_modify(|held| *held = (*held).max(part.path)).or_insert(part.path);
                 last
             });
         TestOnly { manifests }

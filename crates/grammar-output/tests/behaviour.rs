@@ -1,14 +1,10 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
 use grammar::{Ignoring, Unlexed};
-use grammar_output::field::{Bare, Id, Integer, Quoted};
+use grammar_output::field::{Id, Integer, Phrase, Word};
 use grammar_output::{Fields, Record};
-use newtype::Newtype;
 use proptest::prelude::{prop_assert_eq, proptest};
 use proptest::test_runner::{Config, RngSeed};
-
-#[derive(Newtype, Clone, Debug, PartialEq, Eq)]
-struct Term(String);
 
 struct Read;
 
@@ -16,22 +12,22 @@ struct Read;
 struct Read5 {
     #[field(Id<Node>, via = Node::number)]
     node: i64,
-    #[field(Quoted<Term>)]
-    quoted: Term,
-    #[field(Bare<Term>)]
-    bare: Term,
+    #[field(Phrase<String>)]
+    quoted: String,
+    #[field(Word<String>)]
+    bare: String,
     #[past("to".to_owned())]
     #[field(Integer<u64>)]
     integer: u64,
-    #[field(Bare<Term>)]
-    message: Term,
+    #[field(Word<String>)]
+    message: String,
 }
 
 impl Read {
-    fn quoted(text: &str) -> Option<Term> {
+    fn quoted(text: &str) -> Option<String> {
         Fields::lexed(&Fields::quoting(text))
             .ignoring(Unlexed::NotThisGrammar)?
-            .field::<Quoted<Term>>()
+            .field::<Phrase<String>>()
             .ignoring(Unlexed::NotThisGrammar)?
             .ended()
             .ignoring(Unlexed::NotThisGrammar)
@@ -47,13 +43,7 @@ impl Read {
     }
 
     fn of(quoted: &str, integer: u64, message: &str) -> Read5 {
-        Read5 {
-            node: 4,
-            quoted: Term::new(quoted.to_owned()),
-            bare: Term::new("feature".to_owned()),
-            integer,
-            message: Term::new(message.to_owned()),
-        }
+        Read5 { node: 4, quoted: quoted.to_owned(), bare: "feature".to_owned(), integer, message: message.to_owned() }
     }
 }
 
@@ -77,7 +67,7 @@ proptest! {
     #![proptest_config(Config { failure_persistence: None, rng_seed: RngSeed::Fixed(0), ..Config::default() })]
     #[test]
     fn any_text_is_quoted_and_lexed_back_as_one_quoted_field(text in "(?s).{0,40}") {
-        prop_assert_eq!(Read::quoted(&text), Some(Term::new(text)));
+        prop_assert_eq!(Read::quoted(&text), Some(text));
     }
 }
 

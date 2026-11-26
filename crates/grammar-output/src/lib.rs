@@ -4,7 +4,7 @@ mod boundary;
 pub mod field;
 mod record;
 
-pub(crate) use boundary::{Decimal, Field, Kind, Numbered, Token, Unwrapping};
+pub(crate) use boundary::{Decimal, Field, Kind, Numbered, Token};
 pub use boundary::{Fields, Source};
 pub use record::{Parsed, Record};
 pub use record_derive::Record;

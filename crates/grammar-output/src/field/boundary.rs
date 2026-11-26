@@ -1,9 +1,7 @@
 use std::marker::PhantomData;
 use std::str::FromStr;
 
-use newtype::Stored;
-
-use crate::{Decimal, Field, Kind, Numbered, Token, Unwrapping};
+use crate::{Decimal, Field, Kind, Numbered, Token};
 
 #[derive(Debug)]
 pub struct Word<T>(PhantomData<T>);
@@ -16,12 +14,6 @@ pub struct Id<T>(PhantomData<T>);
 
 #[derive(Debug)]
 pub struct Checked<T>(PhantomData<T>);
-
-#[derive(Debug)]
-pub struct Bare<T>(PhantomData<T>);
-
-#[derive(Debug)]
-pub struct Quoted<T>(PhantomData<T>);
 
 #[derive(Debug)]
 pub struct Integer<T>(PhantomData<T>);
@@ -55,22 +47,6 @@ impl<T: FromStr> Field for Checked<T> {
 
     fn taken(token: Token) -> Result<Result<T, T::Err>, Token> {
         token.spelled::<Numbered>().and_then(|numbered| numbered.expected(Kind::Bare)).map(|text| text.parse())
-    }
-}
-
-impl<T: Stored<Kind: Unwrapping<T>>> Field for Bare<T> {
-    type Value = T;
-
-    fn taken(token: Token) -> Result<T, Token> {
-        token.wrapped(Kind::Bare)
-    }
-}
-
-impl<T: Stored<Kind: Unwrapping<T>>> Field for Quoted<T> {
-    type Value = T;
-
-    fn taken(token: Token) -> Result<T, Token> {
-        token.wrapped(Kind::Quoted)
     }
 }
 

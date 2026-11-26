@@ -1,10 +1,6 @@
-mod boundary;
-
 use std::sync::LazyLock;
 
-use store_ports::{Migrator, Schema, Version};
-
-pub use boundary::Rewrite;
+use store_ports::{Migrator, Schema};
 
 static MIGRATOR: LazyLock<Migrator> = LazyLock::new(|| store_ports::migrate!());
 
@@ -12,13 +8,7 @@ static MIGRATOR: LazyLock<Migrator> = LazyLock::new(|| store_ports::migrate!());
 pub struct StreamSchema;
 
 impl Schema for StreamSchema {
-    type Rewrite = Rewrite;
-
     fn migrator() -> &'static Migrator {
         &MIGRATOR
-    }
-
-    fn rewrite(_: Version) -> Option<Rewrite> {
-        None
     }
 }

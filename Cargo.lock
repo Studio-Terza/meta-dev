@@ -149,6 +149,7 @@ dependencies = [
  "design",
  "dispatch-ports",
  "file-ports",
+ "grammar-slug",
  "serde_json",
  "sqlite-ports",
  "tempfile",
@@ -360,15 +361,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "grammar-message"
-version = "0.1.0"
-dependencies = [
- "grammar",
- "newtype",
- "proptest",
-]
-
-[[package]]
 name = "grammar-migration"
 version = "0.1.0"
 dependencies = [
@@ -381,7 +373,6 @@ name = "grammar-output"
 version = "0.1.0"
 dependencies = [
  "grammar",
- "newtype",
  "proptest",
  "record-derive",
  "thiserror",
@@ -1378,7 +1369,6 @@ version = "0.1.0"
 dependencies = [
  "file-ports",
  "grammar-lines",
- "grammar-message",
  "grammar-output",
  "invariants",
  "message-id",

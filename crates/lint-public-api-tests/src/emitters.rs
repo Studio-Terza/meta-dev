@@ -14,7 +14,7 @@ pub struct Emitters {
     names: BTreeSet<Name>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct EmitterScan;
 
 impl EmitterScan {

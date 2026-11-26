@@ -77,10 +77,6 @@ impl Contribute for PathReach<'_> {
     type Open = ();
     type Part = Vec<Reached>;
 
-    fn kinds(&self) -> &'static [Kind] {
-        &[Kind::ItemMod]
-    }
-
     fn scopes(&self) -> &'static [Scope] {
         const { &[Scope::new(Kind::ItemMod)] }
     }

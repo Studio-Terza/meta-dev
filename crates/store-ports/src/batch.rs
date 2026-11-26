@@ -10,7 +10,9 @@ pub trait Batch: Op {
     fn written(self, statements: &mut impl Execute) -> Result<Self::Done, Self::Failure>;
 }
 
-pub trait Counts: Batch {
+pub trait Counts: Op {
+    type Failure: From<StoreFailure>;
+
     fn counted<D: Done>(self, statements: &mut impl Execute) -> Result<D, Self::Failure>;
 }
 

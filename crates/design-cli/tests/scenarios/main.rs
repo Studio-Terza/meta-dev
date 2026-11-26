@@ -5,6 +5,7 @@ mod ports;
 use test_failure::Failed;
 
 use design::Failure;
+use grammar_slug::Letters;
 use ports::Design;
 use serde_json::Value;
 use tempfile::TempDir;
@@ -27,6 +28,21 @@ fn the_hook_settings_are_printed_as_json_at_exit_zero() -> Result<(), Failed> {
     let settings: Value = serde_json::from_slice(&output.stdout)?;
     assert_eq!((output.status.code(), output.stderr), (Some(0_i32), Vec::new()));
     assert!(settings.pointer("/hooks/Stop/0/hooks/0/command").and_then(Value::as_str).is_some());
+    Ok(())
+}
+
+#[test]
+fn a_stop_hook_reads_its_event_from_standard_input() -> Result<(), Failed> {
+    let home = TempDir::new()?;
+    let workspace = home.path().join("work");
+    let slug = Letters::slugged(&workspace.to_string_lossy());
+    std::fs::create_dir_all(home.path().join(".claude/projects").join(slug))?;
+    let rooted = ["--workspace", &workspace.to_string_lossy(), "hook", "stop"].map(str::to_owned);
+    let words: Vec<&str> = rooted.iter().map(String::as_str).collect();
+    let continuing = Design::fed(home.path(), &words, "{\"stop_hook_active\":true}")?;
+    let unreadable = Design::fed(home.path(), &words, "not json")?;
+    assert_eq!((continuing.status.code(), continuing.stdout, continuing.stderr), (Some(0_i32), Vec::new(), Vec::new()));
+    assert!(String::from_utf8(unreadable.stderr)?.contains("cannot read the hook input: "));
     Ok(())
 }
 

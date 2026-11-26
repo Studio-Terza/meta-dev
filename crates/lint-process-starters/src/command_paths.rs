@@ -284,9 +284,8 @@ impl Run {
     }
 
     fn punctuated(self, mark: char) -> Run {
-        let colons = self.colons;
-        match (mark == Self::COLON).then_some(()).filter(|()| colons < Self::SEPARATOR) {
-            Some(()) => Run { colons: colons + 1, ..self },
+        match (mark == Self::COLON).then_some(()) {
+            Some(()) => Run { colons: self.colons + 1, ..self },
             None => self.ended(),
         }
     }

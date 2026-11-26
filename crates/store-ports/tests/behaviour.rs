@@ -5,10 +5,9 @@ use test_failure::Failed;
 
 use design_messages::{Fate, Halt, SessionCursors, StreamSchema};
 use dispatch_ports::{Pid, Tokens, Wall};
-use file_ports::{Bytes, Offset};
+use file_ports::Offset;
 use invariants::{Ignoring, ignored};
 use newtype::Enumerated;
-use newtype::{Arbitrary, Newtype};
 use port_core::{Op, Run};
 use proptest::option;
 use proptest::prelude::{any, prop_assert, prop_assert_eq, proptest};
@@ -129,19 +128,6 @@ impl Place {
     }
 }
 
-#[derive(Op)]
-enum Rewriteless {}
-
-impl Batch for Rewriteless {
-    type Failure = StoreFailure;
-
-    type Done = ();
-
-    fn written(self, _: &mut impl Execute) -> Result<(), StoreFailure> {
-        match self {}
-    }
-}
-
 struct Older;
 
 static OLDER: LazyLock<Migrator> = LazyLock::new(|| {
@@ -159,14 +145,8 @@ impl Older {
 }
 
 impl Schema for Older {
-    type Rewrite = Rewriteless;
-
     fn migrator() -> &'static Migrator {
         &OLDER
-    }
-
-    fn rewrite(_pending: Version) -> Option<Rewriteless> {
-        None
     }
 }
 
@@ -175,14 +155,8 @@ struct Untouched;
 static UNTOUCHED: LazyLock<Migrator> = LazyLock::new(|| Migrator::from(Vec::new()).ignoring_missing());
 
 impl Schema for Untouched {
-    type Rewrite = Rewriteless;
-
     fn migrator() -> &'static Migrator {
         &UNTOUCHED
-    }
-
-    fn rewrite(_pending: Version) -> Option<Rewriteless> {
-        None
     }
 }
 
@@ -194,14 +168,8 @@ static BROKEN: LazyLock<Migrator> =
     LazyLock::new(|| Migrator::from(StreamSchema::migrator().iter().chain(BREAKS.iter()).copied().collect::<Vec<_>>()));
 
 impl Schema for Broken {
-    type Rewrite = Rewriteless;
-
     fn migrator() -> &'static Migrator {
         &BROKEN
-    }
-
-    fn rewrite(_pending: Version) -> Option<Rewriteless> {
-        None
     }
 }
 
@@ -293,10 +261,6 @@ fn a_held_memory_lock_refuses_a_second_lock_until_it_is_dropped() -> Result<(), 
     Ok(())
 }
 
-#[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq)]
-#[newtype(strategy = -1.0e300_f64..1.0e300_f64)]
-struct Score(f64);
-
 struct Stored;
 
 impl Stored {
@@ -332,18 +296,8 @@ proptest! {
     }
 
     #[test]
-    fn a_bytes_column_reads_back(value in any::<Bytes>()) {
-        prop_assert_eq!(Stored::back::<Bytes>(&value.raw()), Some(value));
-    }
-
-    #[test]
     fn an_offset_column_reads_back(value in any::<Offset>()) {
         prop_assert_eq!(Stored::back::<Offset>(&value.raw()), Some(value));
-    }
-
-    #[test]
-    fn a_float_column_reads_back(value in any::<Score>()) {
-        prop_assert_eq!(Stored::back::<Score>(&value.raw()), Some(value));
     }
 
     #[test]
@@ -393,24 +347,3 @@ fn every_named_column_reads_back_as_its_variant() {
 }
 
 type Sqlite = <SqliteOpener as store_ports::Opens>::Store;
-
-struct Checked;
-
-impl Checked {
-    fn clause<Checking: Column>(column: &str) -> Option<String> {
-        Checking::check(column).map(|clause| clause.to_string())
-    }
-}
-
-#[test]
-fn each_generated_clause_spells_its_whole_predicate() {
-    assert_eq!(Checked::clause::<Halt>("halt").as_deref(), Some("halt IN ('live', 'stalled', 'overrun')"));
-    assert_eq!(
-        Checked::clause::<Option<Halt>>("halt").as_deref(),
-        Some("halt IS NULL OR (halt IN ('live', 'stalled', 'overrun'))")
-    );
-    assert_eq!(
-        Checked::clause::<Option<Option<Fate>>>("fate").as_deref(),
-        Some("fate IS NULL OR (fate IS NULL OR (fate IN ('blocked', 'passed')))")
-    );
-}

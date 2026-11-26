@@ -50,7 +50,9 @@ macro_rules! hooks {
             type Open: Joins;
             type Part: Joins;
 
-            fn kinds(&self) -> &[Kind];
+            fn kinds(&self) -> &[Kind] {
+                &[]
+            }
 
             fn scopes(&self) -> &[Scope] {
                 &[]

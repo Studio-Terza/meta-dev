@@ -1,6 +1,3 @@
-mod boundary;
-
-use grammar_message::Span;
 use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype};
 
 #[derive(Debug, thiserror::Error)]
@@ -25,15 +22,6 @@ impl Checked for Body {
 }
 
 impl Body {
-    pub fn sliced(&self, span: Span) -> Result<Body, Malformed> {
-        Body::try_new(span.slice(&self.0).to_owned())
-    }
-
-    #[must_use]
-    pub fn nonempty(&self) -> Option<&Body> {
-        self.0.chars().next().map(|_| self)
-    }
-
     pub fn joined(&self, after: &Body) -> Result<Body, Malformed> {
         Body::try_new(format!("{self} {after}"))
     }

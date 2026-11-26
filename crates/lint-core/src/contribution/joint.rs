@@ -221,7 +221,7 @@ impl<Contributor: Contribute> From<Contributing<Contributor>> for Lane<Contribut
 
 impl<Contributor: Contribute> From<Lane<Contributor>> for Tallied<Contributor> {
     fn from(lane: Lane<Contributor>) -> Tallied<Contributor> {
-        let Walked { contribution, visits, .. } = lane.entries.root;
+        let Walked { contribution, visits } = lane.entries.root;
         Tallied { contributor: lane.contributing.contributor, contribution, visits }
     }
 }

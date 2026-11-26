@@ -1,3 +1,3 @@
 mod boundary;
 
-pub use boundary::{Bare, Checked, Id, Integer, Phrase, Quoted, Word};
+pub use boundary::{Checked, Id, Integer, Phrase, Word};

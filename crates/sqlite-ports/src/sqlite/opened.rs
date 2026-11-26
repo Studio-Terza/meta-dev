@@ -66,10 +66,7 @@ impl Opened {
     }
 
     fn migrated(self, migrations: Migrations) -> Result<Opened, StoreFailure> {
-        self.settled(|connected| {
-            let pending = migrations.applied(connected.connection())?;
-            migrations.rewritten(&pending, connected)
-        })?;
+        self.settled(|connected| migrations.applied(connected.connection()).map(drop))?;
         Ok(self)
     }
 

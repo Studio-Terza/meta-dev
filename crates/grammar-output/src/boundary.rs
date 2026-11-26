@@ -6,7 +6,6 @@ use grammar::logos::{Lexer, Logos};
 use grammar::{Ignoring, Unlexed};
 
 use crate::record::{Parsed, Record};
-use newtype::{Guarded, Inner, Listed, Newtype, Stored, Validated};
 
 #[derive(Logos, Clone, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
@@ -114,30 +113,6 @@ pub trait Field {
     fn taken(token: Token) -> Result<Self::Value, Token>;
 }
 
-pub trait Unwrapping<T> {
-    fn unwrapped(text: String) -> Option<T>;
-}
-
-impl<T: Newtype<Inner = String>> Unwrapping<T> for Inner {
-    fn unwrapped(text: String) -> Option<T> {
-        Some(T::new(text))
-    }
-}
-
-impl<T: FromStr> Unwrapping<T> for Listed {
-    fn unwrapped(text: String) -> Option<T> {
-        text.parse().ignoring(Unlexed::NotThisGrammar)
-    }
-}
-
-impl<T: Guarded<Inner: FromStr>> Unwrapping<T> for Validated {
-    fn unwrapped(text: String) -> Option<T> {
-        text.parse()
-            .ignoring(Unlexed::NotThisGrammar)
-            .and_then(|inner| T::try_new(inner).ignoring(Unlexed::NotThisGrammar))
-    }
-}
-
 impl Fields {
     pub fn lexed(text: &str) -> Result<Fields, Stray> {
         let tokens = Lexeme::lexer(text)
@@ -230,11 +205,6 @@ impl Token {
     pub(crate) fn parsed<T: FromStr>(self, kind: Kind) -> Result<T, Token> {
         let kept = self.clone();
         self.expected(kind).and_then(|text| text.parse().map_err(|_unparsed| kept))
-    }
-
-    pub(crate) fn wrapped<T: Stored<Kind: Unwrapping<T>>>(self, kind: Kind) -> Result<T, Token> {
-        let kept = self.clone();
-        self.expected(kind).and_then(|text| T::Kind::unwrapped(text).ok_or(kept))
     }
 }
 

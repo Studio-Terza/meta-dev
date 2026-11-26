@@ -3,7 +3,7 @@ use std::vec;
 
 use port_core::Op;
 
-use crate::{Argument, Batch, ColumnFailure, Columns, Counts, Done, Query, StoreFailure, Value};
+use crate::{Argument, Batch, ColumnFailure, Columns, Counts, Done, StoreFailure, Value};
 
 pub trait Execute: Debug {
     fn fetched(&mut self, sql: &'static str, arguments: Vec<Argument>) -> Result<Vec<Vec<Value>>, StoreFailure>;
@@ -28,13 +28,6 @@ pub trait Execute: Debug {
 
     fn done<D: Done>(&mut self, query: Prepared<()>) -> Result<D, StoreFailure> {
         self.executed(query.sql, query.arguments)
-    }
-
-    fn read_all<Q: Query>(&mut self, queries: impl IntoIterator<Item = Q>) -> Result<Vec<Q::Rows>, StoreFailure>
-    where
-        Self: Sized,
-    {
-        queries.into_iter().map(|query| query.rows(self)).collect()
     }
 
     fn written_all<B: Batch>(&mut self, batches: impl IntoIterator<Item = B>) -> Result<B::Done, B::Failure>
@@ -83,14 +76,6 @@ impl<Row: Columns> Prepared<Row> {
     }
 }
 
-impl<Row: Columns> Query for Prepared<Row> {
-    type Rows = Vec<Row>;
-
-    fn rows(self, statements: &mut impl Execute) -> Result<Vec<Row>, StoreFailure> {
-        statements.rows(self)
-    }
-}
-
 impl Batch for Prepared<()> {
     type Failure = StoreFailure;
 
@@ -102,6 +87,8 @@ impl Batch for Prepared<()> {
 }
 
 impl Counts for Prepared<()> {
+    type Failure = StoreFailure;
+
     fn counted<D: Done>(self, statements: &mut impl Execute) -> Result<D, StoreFailure> {
         statements.done(self)
     }

@@ -4,8 +4,6 @@ use crate::{Cause, ColumnFailure};
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreFailure {
-    #[error("cannot start the store's runtime: {0}")]
-    Runtime(#[source] io::Error),
     #[error("cannot create the store's directory: {0}")]
     Directory(#[source] io::Error),
     #[error("cannot open the store: {0}")]
@@ -20,6 +18,4 @@ pub enum StoreFailure {
     Column(#[from] ColumnFailure),
     #[error("a statement that reads one row found none")]
     Missing,
-    #[error("the store's rewrite refuses to open it: {0}")]
-    Refused(#[source] Cause),
 }

@@ -617,6 +617,31 @@ fn a_crate_is_named_by_its_manifest_not_its_directory() -> Result<(), Failed> {
 }
 
 #[test]
+fn each_binary_and_its_modules_name_the_library_as_another_crate() -> Result<(), Failed> {
+    let naming = "use engine::Unused;\npub struct Cli;\n";
+    let binary = "mod cli;\nfn main() {}\n";
+    let cases: [(&[[&str; 2]], usize); 4] = [
+        (&[["src/main.rs", binary], ["src/cli.rs", naming]], 0),
+        (&[["src/main.rs", binary], ["src/cli.rs", "pub struct Cli;\n"]], 1),
+        (&[["src/bin/tool.rs", "use engine::Unused;\nfn main() {}\n"]], 0),
+        (&[["src/bin/other/main.rs", "use engine::Unused;\nfn main() {}\n"]], 0),
+    ];
+    cases.iter().try_for_each(|(written, violations)| {
+        let root = Scratch::temporary()?;
+        root.write("Cargo.toml", "[workspace]\nmembers = [\"crates/*\"]\n")?;
+        root.write("crates/engine/Cargo.toml", "[package]\nname = \"engine\"\n")?;
+        root.write("crates/engine/src/lib.rs", "mod x;\npub use x::{Used, Unused};\n")?;
+        root.write("crates/engine/src/x.rs", "pub struct Used;\npub struct Unused;\n")?;
+        written.iter().try_for_each(|[path, text]| root.write_below("crates/engine", path, text).map(|_| ()))?;
+        root.write("crates/app/Cargo.toml", "[package]\nname = \"app\"\n")?;
+        root.write("crates/app/src/lib.rs", "pub use engine::Used;\n")?;
+        let run = root.reported();
+        assert_eq!(run.violations(), *violations, "{}", run.err);
+        Ok(())
+    })
+}
+
+#[test]
 fn inline_modules_and_path_attributes_lead_to_the_file_read() -> Result<(), Failed> {
     let layouts = [
         ("mod outer {\n    mod inner;\n}\n", "src/outer/inner.rs"),
@@ -771,7 +796,7 @@ fn source_nested_past_what_anyone_writes_is_refused_not_parsed() -> Result<(), F
         let run = root.reported();
         assert_eq!(run.failures(), 1);
         assert!(run.err.contains("src/lib.rs:1"));
-        assert!(run.err.contains("nested more than"));
+        assert!(run.err.contains("nested more than 256 levels deep, which no handwritten code is"), "{}", run.err);
         Ok(())
     })
 }

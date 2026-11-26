@@ -101,6 +101,26 @@ fn a_pinned_macro_reads_its_nested_calls_once_and_a_copy_reads_them_afresh() -> 
     Ok(())
 }
 
+#[test]
+fn nested_calls_are_found_inside_groups_and_never_behind_a_metavariable() -> Result<(), Failed> {
+    let file = SourceFile::parse("crates/x/src/lib.rs", SourceText::new(NESTED.to_owned()))?;
+    let cases = [
+        ("m!(inner!(a))", vec!["inner"]),
+        ("m!((first!(a), [second!(b)]))", vec!["first", "second"]),
+        ("m!(a + b)", vec![]),
+        ("m!($inner!(a))", vec![]),
+    ];
+    for (text, expected) in cases {
+        let invocation = syntax::parse::parse_str::<Macro>(text)?;
+        let found: Vec<String> = Macros::nested(&file, &invocation)
+            .iter()
+            .map(|call| syntax::ToTokens::to_token_stream(&call.path).to_string())
+            .collect();
+        assert_eq!(found, expected, "{text}");
+    }
+    Ok(())
+}
+
 const RULES: &str = "macro_rules! made {\n    ($($name:ident),*) => {\n        $(impl $crate::Kind for $name {\n            fn f() -> ::a::B { c::d() }\n        })*\n        fn tail() -> e::F {}\n    };\n}";
 
 const NOT_RULES: &str = "other! {\n    fn f() -> a::B {}\n}";

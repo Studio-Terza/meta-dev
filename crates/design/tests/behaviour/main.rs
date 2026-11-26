@@ -2,18 +2,20 @@
 
 use std::ffi::OsString;
 use std::fs::{self, File};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::time::{Duration, SystemTime};
 use test_failure::Failed;
 
 use console_ports::{Heard, Shown, Variables};
 use design::{Agents, Cli, Failure, HookEvent, Outcome};
 use dispatch_ports::{
-    AgentRun, DispatchFailure, DispatchFiller, Ended, Finished, Job, Output, Pid, Prompt, Reply, Started, SystemClock,
-    Tokens, Usage, dispatch_ops,
+    AgentRun, Bell, ClockFiller, DispatchFailure, DispatchFiller, Ended, Errored, Finished, Job, Moment, Output, Pause,
+    Pid, Prompt, Reply, Started, Tokens, Told, Usage, Wall, clock_ops, dispatch_ops,
 };
-use file_ports::Disk;
+use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Offset, Size, Stamps, Text};
 use grammar_slug::Letters;
 use invariants::Unpoisoned;
 use port_core::Pass;
@@ -27,20 +29,49 @@ const STALLED: &str = "Nothing is running: no background shell or agent will wak
 const OVERRUN: &str =
     "OVERRUN: these background tasks ran 20 minutes without finishing or writing output; check and stop them:";
 const TRAIL_HEADER: &str = "session\tshells\tagents\thalt\tread\tquoted\tkept\tfate\ttokens\tmillis";
-const LONG_AGO: Duration = Duration::from_secs(3600);
+const QUIET: Duration = Duration::from_mins(20);
+const BUSY: Duration = Duration::from_mins(19);
+const ASKED: &str = "{\"type\":\"user\"}\n";
+const TEMPORARY: &str = "/private/tmp";
 const TRIMMING: u32 = 1;
 const READING: u32 = 2;
+const STEP: i64 = 5;
+
+#[derive(Debug)]
+struct Stepping {
+    now: SystemTime,
+    moments: AtomicI64,
+}
+
+impl ClockFiller for Stepping {
+    fn now(&self, _pass: Pass<'_, clock_ops::Now>) -> Wall {
+        Wall::from(self.now)
+    }
+
+    fn moment(&self, _pass: Pass<'_, clock_ops::Moment>) -> Moment {
+        Moment::new(self.moments.fetch_add(STEP, Ordering::Relaxed))
+    }
+
+    fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, _pause: Pause, _bell: &Bell) -> Wall {
+        Wall::from(SystemTime::now())
+    }
+}
 
 #[derive(Debug, Default)]
 struct Replies {
     quotes: String,
     kept: String,
+    refused: Option<Told>,
     asked: Mutex<Vec<String>>,
 }
 
 impl Replies {
     fn quoting(quotes: &str, kept: &str) -> Replies {
-        Replies { quotes: quotes.to_owned(), kept: kept.to_owned(), asked: Mutex::new(Vec::new()) }
+        Replies { quotes: quotes.to_owned(), kept: kept.to_owned(), refused: None, asked: Mutex::new(Vec::new()) }
+    }
+
+    fn refusing() -> Result<Replies, Failed> {
+        Ok(Replies { refused: Some(Told::try_new("refused".to_owned())?), ..Replies::default() })
     }
 
     fn prompts(&self) -> Vec<String> {
@@ -73,7 +104,10 @@ impl DispatchFiller for Agent<'_> {
     ) -> Result<Option<Output>, DispatchFailure> {
         let reply = if run.pid() == Pid::new(TRIMMING) { &self.replies.kept } else { &self.replies.quotes };
         let usage = Usage::new(Tokens::new(3), Tokens::new(4), Tokens::new(0), Tokens::new(0));
-        Ok(Some(Output::Finished(Finished::new(Reply::new(reply.clone()), usage))))
+        Ok(Some(self.replies.refused.clone().map_or_else(
+            || Output::Finished(Finished::new(Reply::new(reply.clone()), usage)),
+            |told| Output::Errored(Errored::new(told, usage)),
+        )))
     }
 
     fn started(&self, _pass: Pass<'_, dispatch_ops::Started>, _pid: Pid) -> Result<Option<Started>, DispatchFailure> {
@@ -102,13 +136,78 @@ impl Said {
 }
 
 #[derive(Debug)]
+struct Rerooted {
+    temporary: PathBuf,
+}
+
+impl Rerooted {
+    fn real(&self, path: &Path) -> PathBuf {
+        match path.strip_prefix(TEMPORARY) {
+            Ok(below) => self.temporary.join(below),
+            Err(_elsewhere) => path.to_path_buf(),
+        }
+    }
+}
+
+impl Files for Rerooted {
+    fn read(&self, path: &Path) -> Result<Bytes, FileFailure> {
+        Disk.read(&self.real(path))
+    }
+
+    fn read_text(&self, path: &Path) -> Result<Text, FileFailure> {
+        Disk.read_text(&self.real(path))
+    }
+
+    fn read_from(&self, path: &Path, offset: Offset) -> Result<Bytes, FileFailure> {
+        Disk.read_from(&self.real(path), offset)
+    }
+
+    fn write(&self, path: &Path, bytes: Bytes) -> Result<(), FileFailure> {
+        Disk.write(&self.real(path), bytes)
+    }
+
+    fn append(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure> {
+        Disk.append(&self.real(path), bytes)
+    }
+
+    fn create_directories(&self, path: &Path) -> Result<(), FileFailure> {
+        Disk.create_directories(&self.real(path))
+    }
+
+    fn copy(&self, from: &Path, to: &Path) -> Result<(), FileFailure> {
+        Disk.copy(&self.real(from), &self.real(to))
+    }
+
+    fn entries(&self, directory: &Path) -> Result<Vec<PathBuf>, FileFailure> {
+        Disk.entries(&self.real(directory))
+    }
+
+    fn canonical(&self, path: &Path) -> Result<PathBuf, FileFailure> {
+        Disk.canonical(&self.real(path))
+    }
+
+    fn kind(&self, path: &Path) -> Kind {
+        Disk.kind(&self.real(path))
+    }
+
+    fn size(&self, path: &Path) -> Result<Size, FileFailure> {
+        Disk.size(&self.real(path))
+    }
+
+    fn stamps(&self, path: &Path) -> Result<Stamps, FileFailure> {
+        Disk.stamps(&self.real(path))
+    }
+}
+
+#[derive(Debug)]
 struct Home {
     directory: TempDir,
+    at: SystemTime,
 }
 
 impl Home {
     fn new() -> Result<Home, Failed> {
-        let home = Home { directory: TempDir::new()? };
+        let home = Home { directory: TempDir::new()?, at: SystemTime::now() };
         fs::create_dir_all(home.workspace())?;
         Ok(home)
     }
@@ -161,8 +260,10 @@ impl Home {
         .collect::<Variables>()
         .hearing(Heard::new(input.to_owned()));
         let words = ["--workspace", "work"].iter().chain(arguments).map(OsString::from);
+        let files = Rerooted { temporary: self.path().join("tmp") };
+        let clock = Stepping { now: self.at, moments: AtomicI64::default() };
         let uttered =
-            Cli::new(&environment, Disk, SqliteOpener, Agents::new(|_kept: PathBuf| Agent { replies }, SystemClock))
+            Cli::new(&environment, files, SqliteOpener, Agents::new(|_kept: PathBuf| Agent { replies }, clock))
                 .rooted(words);
         let shown = AsRef::<Shown>::as_ref(&uttered).to_string();
         Said { shown, ended: uttered.ended().map_err(|failure| Refusal(failure.to_string())) }
@@ -179,12 +280,25 @@ impl Home {
         self.stop(&format!(",\"last_assistant_message\":\"{QUESTION}\""))
     }
 
-    fn agent_task(&self, name: &str, touched: SystemTime) -> Result<(), Failed> {
+    fn appended(&self, line: &str) -> Result<(), Failed> {
+        File::options().append(true).open(self.transcript())?.write_all(line.as_bytes())?;
+        Ok(())
+    }
+
+    fn agent_task(&self, file: &str, text: &str, quiet: Duration) -> Result<(), Failed> {
         let folder = self.transcript().with_extension("").join("subagents");
         fs::create_dir_all(&folder)?;
-        let task = folder.join(format!("{name}.jsonl"));
-        fs::write(&task, "{\"type\":\"user\"}\n")?;
-        File::options().write(true).open(&task)?.set_modified(touched)?;
+        let task = folder.join(file);
+        fs::write(&task, text)?;
+        File::options().write(true).open(&task)?.set_modified(self.at - quiet)?;
+        Ok(())
+    }
+
+    fn shell_task(&self, file: &str, text: &str) -> Result<(), Failed> {
+        let slug = Letters::slugged(&self.workspace().to_string_lossy());
+        let folder = self.path().join("tmp/claude-501").join(slug).join("s/tasks");
+        fs::create_dir_all(&folder)?;
+        fs::write(folder.join(file), text)?;
         Ok(())
     }
 }
@@ -265,11 +379,39 @@ fn a_stop_with_nothing_running_is_blocked_as_stalled() -> Result<(), Failed> {
 }
 
 #[test]
-fn a_stop_with_an_agent_still_writing_passes() -> Result<(), Failed> {
+fn a_stop_with_an_agent_quiet_under_twenty_minutes_passes_and_trails_it_as_live() -> Result<(), Failed> {
     let home = Home::answered()?;
-    home.agent_task("agent-busy", SystemTime::now())?;
-    let said = home.said(&["hook", "stop"], &home.stop(""), &Replies::default());
+    home.agent_task("agent-busy.jsonl", ASKED, BUSY)?;
+    let replies = Replies::default();
+    let said = home.said(&["hook", "stop"], &home.stop(""), &replies);
+    let trail = home.said(&["stops"], "", &replies);
     assert_eq!((said.shown.as_str(), said.ended), ("", Ok(Outcome::Hooked(HookEvent::Stop))));
+    assert!(trail.shown.contains("\ns\t0\t1\tlive\t"), "{}", trail.shown);
+    Ok(())
+}
+
+#[test]
+fn a_stop_with_a_shell_still_running_passes_and_trails_it_as_live() -> Result<(), Failed> {
+    let home = Home::answered()?;
+    home.shell_task("b1.output", "building\n")?;
+    let replies = Replies::default();
+    let said = home.said(&["hook", "stop"], &home.stop(""), &replies);
+    let trail = home.said(&["stops"], "", &replies);
+    assert_eq!((said.shown.as_str(), said.ended), ("", Ok(Outcome::Hooked(HookEvent::Stop))));
+    assert!(trail.shown.contains("\ns\t1\t0\tlive\t"), "{}", trail.shown);
+    Ok(())
+}
+
+#[test]
+fn finished_tasks_and_files_that_are_not_tasks_leave_the_stop_stalled() -> Result<(), Failed> {
+    let home = Home::answered()?;
+    let ended = "{\"type\":\"assistant\",\"message\":{\"stop_reason\":\"end_turn\"}}\n";
+    home.shell_task("b1.output", &["x".repeat(1024), "\n[exited with code 0]\n".to_owned()].concat())?;
+    home.shell_task("b2.log", "building\n")?;
+    home.agent_task("agent-done.jsonl", &[ASKED, ended].concat(), QUIET)?;
+    home.agent_task("agent-done.meta.json", "{}\n", QUIET)?;
+    let said = home.said(&["hook", "stop"], &home.stop(""), &Replies::default());
+    assert_eq!(said.reason()?.as_deref(), Some(STALLED));
     Ok(())
 }
 
@@ -284,7 +426,7 @@ fn a_stop_without_a_transcript_sees_no_tasks_and_passes() -> Result<(), Failed> 
 #[test]
 fn an_agent_quiet_for_twenty_minutes_is_reported_once_as_an_overrun() -> Result<(), Failed> {
     let home = Home::answered()?;
-    home.agent_task("agent-hung", SystemTime::now() - LONG_AGO)?;
+    home.agent_task("agent-hung.jsonl", ASKED, QUIET)?;
     let replies = Replies::default();
     let first = home.said(&["hook", "stop"], &home.stop(""), &replies);
     let second = home.said(&["hook", "stop"], &home.stop(""), &replies);
@@ -326,11 +468,48 @@ fn the_stops_trail_lists_each_stop_with_its_reading() -> Result<(), Failed> {
     let trail = home.said(&["stops"], "", &replies);
     assert_eq!(trail.ended, Ok(Outcome::Trailed));
     assert!(
-        trail.shown.contains(&format!("{TRAIL_HEADER}\ns\t0\t0\tstalled\t1\t1\t1\tblocked\t14\t")),
+        trail.shown.contains(&format!("{TRAIL_HEADER}\ns\t0\t0\tstalled\t1\t1\t1\tblocked\t14\t{STEP}\n")),
         "{}",
         trail.shown
     );
     assert_eq!(trail.shown.matches('\n').count(), 2);
+    Ok(())
+}
+
+#[test]
+fn a_refused_reading_still_counts_its_tokens_in_the_trail() -> Result<(), Failed> {
+    let home = Home::answered()?;
+    let replies = Replies::refusing()?;
+    let said = home.said(&["hook", "stop"], &home.asking(), &replies);
+    let trail = home.said(&["stops"], "", &replies);
+    assert_eq!(said.reason()?.as_deref(), Some(STALLED));
+    assert_eq!(trail.shown, format!("{TRAIL_HEADER}\ns\t0\t0\tstalled\t1\t0\t0\tblocked\t7\t{STEP}\n"));
+    Ok(())
+}
+
+#[test]
+fn a_stop_without_its_last_message_reads_with_the_leads_stored_words() -> Result<(), Failed> {
+    let home = Home::answered()?;
+    let replies = Replies::quoting(&format!("[{{\"uuid\": \"o1\", \"quote\": \"{OWNER}\"}}]"), "[1]");
+    home.said(&["hook", "stop"], &home.stop(""), &replies);
+    let prompts = replies.prompts();
+    assert_eq!(prompts.len(), 2);
+    assert!(prompts.iter().all(|prompt| prompt.contains("Understood.")), "{prompts:?}");
+    Ok(())
+}
+
+#[test]
+fn an_ingest_after_the_transcript_grows_moves_the_cursor_once() -> Result<(), Failed> {
+    let home = Home::answered()?;
+    let replies = Replies::default();
+    home.said(&["ingest"], "", &replies);
+    let added = Home::line("user", "o2", "Ship it.");
+    home.appended(&added)?;
+    let grown = home.said(&["ingest"], "", &replies);
+    let settled = home.said(&["ingest"], "", &replies);
+    let read = Home::conversation().concat().len() + added.len();
+    assert_eq!(grown.shown, format!("session s read to {read}\nauthorship owner 1\nwritten 2\n"));
+    assert_eq!(settled.shown, "written 0\n");
     Ok(())
 }
 
