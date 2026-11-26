@@ -1,3 +1,4 @@
+pub(super) mod answers;
 mod boundary;
 
 use console_ports::Environment;
@@ -11,6 +12,7 @@ use super::ingest::Ingest;
 use super::structure::{Crew, Structure};
 use crate::cli::failure::Failure;
 use crate::{HookEvent, Uttered};
+use answers::Answering;
 use boundary::{Decision, Prompting, Settings, Stopping};
 use design_store::Recall;
 
@@ -43,7 +45,7 @@ impl Hook {
         Ingest::read(store, &ground.transcripts())?;
         let recalled =
             prompting.terms().map(|terms| store.read(Recall::telling(&terms))).transpose()?.unwrap_or_default();
-        Decision::told(store, HookEvent::UserPromptSubmit, &recalled)
+        Decision::told(store, HookEvent::UserPromptSubmit, &recalled, None)
     }
 
     fn stopped<F: Files, S: Store, D: Dispatch, C: Clock>(
@@ -54,6 +56,6 @@ impl Hook {
         let store = ground.store();
         Ingest::read(store, &ground.transcripts())?;
         let concluded = Structure::new(store, crew).worked()?.concluded();
-        stopping.decided(concluded, store)
+        stopping.decided(concluded, store, &Answering::new(store, crew))
     }
 }

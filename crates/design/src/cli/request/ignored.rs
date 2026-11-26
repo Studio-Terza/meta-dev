@@ -6,5 +6,8 @@ invariants::ignored! {
         Unclosed => "an unclosed quote names no segment here; it is reported as unclosed when sought",
         Missed => "a citation or quote that is not found contributes nothing here; it is reported as missed",
         Unlooked => "a start-time lookup that failed records no start; the watch reports the failure",
+        Unclassified => "a classifier reply that does not parse as the asked JSON lets the stop proceed",
+        Unpicked => "a selection reply that does not parse as the asked JSON quotes nothing, so the stop proceeds",
+        Unanswered => "a failed transcript lookup or model call never blocks a stop; the stop proceeds as before",
     }
 }

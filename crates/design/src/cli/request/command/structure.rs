@@ -12,8 +12,8 @@ use design_runs::{
 };
 use design_store::{Asked, AskedEarlier, ContextNodes, Remit};
 use dispatch_ports::{
-    AgentRun, Clock, Deadline, Dispatch, DispatchFailure, Due, Ended, Fault, Finished, Job, Prompt, Stall, Timeout,
-    Watch, Watched, Watching,
+    AgentRun, Clock, Deadline, Dispatch, DispatchFailure, Due, Ended, Fault, Finished, Job, Prompt, Reply, Stall,
+    Timeout, Watch, Watched, Watching,
 };
 use port_core::Held;
 use store_ports::{Store, StoreFailure};
@@ -135,6 +135,27 @@ pub struct Structured {
 impl<'ports, D: Dispatch, C: Clock> Crew<'ports, D, C> {
     pub fn new(dispatch: &'ports D, clock: &'ports C) -> Crew<'ports, D, C> {
         Crew { dispatch, clock }
+    }
+
+    pub fn replied(&self, prompt: &Prompt, timeout: Timeout) -> Result<Option<Reply>, Failure> {
+        let deadline = Deadline::after(self.clock.now(), timeout);
+        let held = self.dispatch.dispatch(&Job::due_by(deadline), prompt)?;
+        Ok(Watch::over(self.dispatch, self.clock).watched(held)?.visited(Replying))
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Replying;
+
+impl Watching for Replying {
+    type Output = Option<Reply>;
+
+    fn finished(self, finished: &Finished) -> Option<Reply> {
+        Some(finished.reply().clone())
+    }
+
+    fn stalled(self, _stall: &Stall) -> Option<Reply> {
+        None
     }
 }
 

@@ -1,5 +1,6 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
+mod answers;
 #[path = "../generated/laws.rs"]
 mod generated_laws;
 mod ignored;

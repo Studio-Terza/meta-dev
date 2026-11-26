@@ -7,8 +7,8 @@ pub use design_graph::{
     Refusal, Refused, Remit, Resolved, Resolving, Restaged, Seen, Sees, ShownNode, Spoken, Started, Unpaid, Unseen,
 };
 pub use design_messages::{
-    Asked, AskedEarlier, Cursors, EarlierLines, Hit, Holding, ImportedEnding, ImportedNotes, LinkRow, Noted, Prefixes,
-    Quoted, QuotedSegments, Scope, SearchSegments, SessionCursors, SessionRecords, Shortest, ShownMessage, Stored,
-    StreamSchema,
+    Asked, AskedEarlier, Cursors, EarlierLines, Hit, Holding, ImportedEnding, ImportedNotes, LastSaid, LinkRow, Noted,
+    OwnerSaid, Prefixes, Quote, Quoted, QuotedSegments, Said, Scope, SearchSegments, SessionCursors, SessionRecords,
+    Shortest, ShownMessage, Stored, StreamSchema,
 };
 pub use recall::{Recall, Recalled, Recollection};

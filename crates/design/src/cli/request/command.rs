@@ -30,6 +30,7 @@ use crate::{Outcome, Uttered};
 pub use apply::{Application, Unresolved};
 use console_ports::Shown;
 pub use hook::Hook;
+use hook::answers::Answering;
 use import::Import;
 use ingest::Ingest;
 use init::Init;
@@ -40,6 +41,7 @@ use search::Search;
 pub use structure::Crew;
 use structure::Structure;
 use subject::Subject;
+use transcript_ports::Body;
 use view::View;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -47,6 +49,7 @@ pub enum Command {
     Ingest(Persistence),
     Show(Subject),
     Search(Terms, Scope),
+    Answer(Body),
     Recall(Terms),
     Init(Init),
     Apply(PathBuf),
@@ -64,6 +67,7 @@ pub enum Verb {
     Ingest,
     Show,
     Search,
+    Answer,
     Recall,
     Init,
     Apply,
@@ -85,10 +89,11 @@ impl FromStr for Verb {
 }
 
 impl Verb {
-    const NAMED: [(&'static str, Verb); 16] = [
+    const NAMED: [(&'static str, Verb); 17] = [
         ("ingest", Verb::Ingest),
         ("show", Verb::Show),
         ("search", Verb::Search),
+        ("answer", Verb::Answer),
         ("recall", Verb::Recall),
         ("init", Verb::Init),
         ("apply", Verb::Apply),
@@ -113,6 +118,7 @@ impl Verb {
             Verb::Move(Moving::Drop) => &[Flag::Valued(Valued::Reason)],
             Verb::Hook => &[Flag::Settings],
             Verb::Show
+            | Verb::Answer
             | Verb::Recall
             | Verb::Apply
             | Verb::Move(Moving::Refine | Moving::Reopen)
@@ -141,6 +147,7 @@ impl Verb {
                 .and_then(Terms::lexed)
                 .ok_or(Failure::Usage)
                 .map(|terms| Command::Search(terms, scope)),
+            Verb::Answer => Self::spoken(rest).map(Command::Answer),
             Verb::Recall => rest
                 .iter()
                 .map(Token::text)
@@ -162,6 +169,12 @@ impl Verb {
             Verb::Retry => Token::only(rest).and_then(str::parse).map(Command::Retry),
         }
     }
+
+    fn spoken(rest: &[Token]) -> Result<Body, Failure> {
+        let words = rest.iter().map(Token::text).collect::<Option<Vec<&str>>>().ok_or(Failure::Usage)?;
+        words.first().ok_or(Failure::Usage)?;
+        Body::try_new(words.join(" ")).map_err(|_malformed| Failure::Usage)
+    }
 }
 
 impl Command {
@@ -170,6 +183,7 @@ impl Command {
             Command::Ingest(persistence) => persistence.opened(path, opens),
             Command::Show(_)
             | Command::Search(..)
+            | Command::Answer(_)
             | Command::Recall(_)
             | Command::Init(_)
             | Command::Apply(_)
@@ -197,6 +211,9 @@ impl Command {
             }
             Command::Search(terms, scope) => Search::found(ground.store(), terms, scope)
                 .map(|lines| Uttered::new(Shown::said(Lines::from(&lines)), Ok(Outcome::Searched))),
+            Command::Answer(said) => Answering::new(ground.store(), crew)
+                .traced(&said)
+                .map(|traced| Uttered::new(Shown::said(traced), Ok(Outcome::Answered))),
             Command::Recall(terms) => {
                 ground.store().read(Recall::telling(&terms)).map_err(Failure::from).map(|recalled| {
                     Uttered::new(Shown::said(Recollection::from(recalled.as_slice())), Ok(Outcome::Recalled))

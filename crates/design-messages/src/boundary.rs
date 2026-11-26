@@ -14,8 +14,8 @@ use store_ports::{Columns, Released, Statements, StoreFailure, Written};
 use stream::{Anchor, Anchors, MechanicalLink, Message, Relation, SegmentId, Shape};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Skipped, Uuid};
 
-use crate::Scope;
 use crate::boundary::ignored::Ignored;
+use crate::{Said, Scope};
 use design_closure::Keyed;
 use invariants::Ignoring;
 
@@ -105,6 +105,12 @@ impl From<MessageRow> for Record {
     }
 }
 
+impl From<MessageRow> for Said {
+    fn from(row: MessageRow) -> Said {
+        Said::new(row.uuid, row.at, row.body)
+    }
+}
+
 impl From<EdgeRow> for Skipped {
     fn from(row: EdgeRow) -> Skipped {
         Skipped::new(row.uuid, row.parent)
@@ -155,6 +161,54 @@ WHERE
 "#,
             uuid: Uuid
         ))
+    }
+
+    pub(crate) fn last_in(
+        session: &SessionId,
+        author: Authorship,
+        statements: &mut Statements<'_>,
+    ) -> Result<Vec<MessageRow>, StoreFailure> {
+        statements.rows(store_ports::query!(
+            MessageRow,
+            r#"
+SELECT
+  uuid,
+  session,
+  parent,
+  at,
+  author,
+  body
+FROM
+  messages
+WHERE
+  session = ?1
+  AND author = ?2
+ORDER BY
+  at DESC
+LIMIT
+  1
+"#,
+            session: SessionId,
+            author: Authorship
+        ))
+    }
+
+    pub(crate) fn answering(self, statements: &mut Statements<'_>) -> Result<Vec<MessageRow>, StoreFailure> {
+        let answers = [&self]
+            .into_iter()
+            .filter(|row| row.author == Authorship::Lead)
+            .map(|row| LinkRow::replies_to(&row.uuid, statements))
+            .collect::<Result<Vec<Vec<Uuid>>, StoreFailure>>()?;
+        let answered = answers
+            .into_iter()
+            .flatten()
+            .map(|reply| MessageRow::named(&reply, statements))
+            .collect::<Result<Vec<Vec<MessageRow>>, StoreFailure>>()?;
+        Ok([self]
+            .into_iter()
+            .chain(answered.into_iter().flatten())
+            .filter(|row| row.author == Authorship::Owner)
+            .collect())
     }
 
     pub(crate) fn every(statements: &mut Statements<'_>) -> Result<Vec<Message>, StoreFailure> {
@@ -302,6 +356,16 @@ ORDER BY
         ))
     }
 
+    pub(crate) fn replies_to(uuid: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<Uuid>, StoreFailure> {
+        let links = LinkRow::touching(uuid, statements)?;
+        Ok(links
+            .into_iter()
+            .filter(|link| link.target_message == *uuid)
+            .filter(|link| matches!(link.relation, Relation::RepliesTo | Relation::Answers))
+            .map(|link| link.source_message)
+            .collect())
+    }
+
     #[must_use]
     pub fn anchors(&self) -> [Anchor; 2] {
         [self.source.clone(), self.target.clone()]
@@ -397,6 +461,14 @@ WHERE
 
     pub(crate) fn ranking(&self, other: &Hit) -> Ordering {
         self.rank.ordered(other.rank).then(self.id.cmp(&other.id))
+    }
+
+    pub(crate) fn best_per_message(hits: Vec<Hit>) -> BTreeMap<Uuid, f64> {
+        hits.into_iter().fold(BTreeMap::new(), |mut best: BTreeMap<Uuid, f64>, hit| {
+            let rank = hit.rank.0;
+            best.entry(hit.uuid).and_modify(|held| *held = held.min(rank)).or_insert(rank);
+            best
+        })
     }
 }
 
