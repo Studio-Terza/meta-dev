@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT name AS \"name!\", place AS \"place!\", consideration AS \"consideration!\" FROM features WHERE name = ?1",
+  "describe": {
+    "columns": [
+      {
+        "name": "name!",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "features",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "place!",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "features",
+            "name": "place"
+          }
+        }
+      },
+      {
+        "name": "consideration!",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "features",
+            "name": "consideration"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "68c52e310732e1d9103e9c2d38bb8741d2842564abb566039f2e814c547bb0eb"
+}

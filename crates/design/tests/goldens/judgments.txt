@@ -1,0 +1,5 @@
+feature	ideal	verdict	evidence
+ideal-verifier	i2	violated	crates/design/src/lib.rs:2
+ideal-verifier	i3	holds	crates/design/src/cli.rs:1
+ideal-verifier	i4	unclear	-
+ideal-verifier	i5	unclear	-

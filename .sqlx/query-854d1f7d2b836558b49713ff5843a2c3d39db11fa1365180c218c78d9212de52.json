@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  judgments (feature, ideal, verdict, file, line, revision)\nVALUES\n  (?1, ?2, ?3, ?4, ?5, ?6)\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "854d1f7d2b836558b49713ff5843a2c3d39db11fa1365180c218c78d9212de52"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  ideals (id, superseded_by)\nVALUES\n  (?1, ?2)\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "5f16b36c5c6fc5c14656ce489802d44b9173838820b45d43459dea7a23e94351"
+}

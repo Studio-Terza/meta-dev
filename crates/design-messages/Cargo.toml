@@ -21,7 +21,10 @@ grammar-search = { path = "../grammar-search" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 store-ports = { path = "../store-ports" }
+serde.workspace = true
+serde_json.workspace = true
 stream = { path = "../stream" }
+thiserror.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 
 [build-dependencies]

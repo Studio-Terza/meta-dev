@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nDELETE FROM\n  ideal_quotes\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "885e8376101b12a27cd91902295fa2ffac0a9e34a3ee81281779b9729666cb61"
+}

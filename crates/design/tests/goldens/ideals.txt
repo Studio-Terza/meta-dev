@@ -1,0 +1,6 @@
+ideal	standing	message	excerpt
+i1	superseded:i3	o1	"every check runs in CI"
+i2	current	o2	"models quote the owner"
+i3	current	o3	"checks may now be skipped when CI is slow"
+i4	current	o4	"tests go through the real CLI"
+i5	current	o5	"no exceptions to any check"

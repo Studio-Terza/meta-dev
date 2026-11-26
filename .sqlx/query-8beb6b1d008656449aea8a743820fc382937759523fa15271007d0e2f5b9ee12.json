@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  features.name,\n  features.consideration,\n  feature_quotes.message,\n  messages.at,\n  feature_quotes.excerpt\nFROM\n  features\n  JOIN feature_quotes ON feature_quotes.feature = features.name\n  JOIN messages ON messages.uuid = feature_quotes.message\nORDER BY\n  features.place,\n  feature_quotes.place\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "name",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "features",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "consideration",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "features",
+            "name": "consideration"
+          }
+        }
+      },
+      {
+        "name": "message",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "feature_quotes",
+            "name": "message"
+          }
+        }
+      },
+      {
+        "name": "at",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "messages",
+            "name": "at"
+          }
+        }
+      },
+      {
+        "name": "excerpt",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "feature_quotes",
+            "name": "excerpt"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "8beb6b1d008656449aea8a743820fc382937759523fa15271007d0e2f5b9ee12"
+}

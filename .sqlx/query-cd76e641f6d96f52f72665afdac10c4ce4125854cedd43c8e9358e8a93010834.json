@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT\n  OR IGNORE INTO feature_crates (feature, member)\nVALUES\n  (?1, ?2)\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "cd76e641f6d96f52f72665afdac10c4ce4125854cedd43c8e9358e8a93010834"
+}

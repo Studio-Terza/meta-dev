@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO features (name, place, consideration) VALUES (?1, ?2, ?3) RETURNING name AS \"name!\", place AS \"place!\", consideration AS \"consideration!\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "name!",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "features",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "place!",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "features",
+            "name": "place"
+          }
+        }
+      },
+      {
+        "name": "consideration!",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "features",
+            "name": "consideration"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ea40a9131fbc3f0d5f0fc5b8260bb3f73a48979ba533e7270396ab52d8f1c5d1"
+}

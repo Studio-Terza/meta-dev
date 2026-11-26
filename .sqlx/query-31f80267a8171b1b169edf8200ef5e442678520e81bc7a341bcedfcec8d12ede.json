@@ -1,0 +1,86 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  feature,\n  ideal,\n  verdict,\n  file,\n  line,\n  revision\nFROM\n  judgments\nORDER BY\n  id\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "feature",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "judgments",
+            "name": "feature"
+          }
+        }
+      },
+      {
+        "name": "ideal",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "judgments",
+            "name": "ideal"
+          }
+        }
+      },
+      {
+        "name": "verdict",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "judgments",
+            "name": "verdict"
+          }
+        }
+      },
+      {
+        "name": "file",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "judgments",
+            "name": "file"
+          }
+        }
+      },
+      {
+        "name": "line",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "judgments",
+            "name": "line"
+          }
+        }
+      },
+      {
+        "name": "revision",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "judgments",
+            "name": "revision"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "31f80267a8171b1b169edf8200ef5e442678520e81bc7a341bcedfcec8d12ede"
+}

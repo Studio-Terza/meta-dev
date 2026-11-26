@@ -11,14 +11,16 @@ mod search;
 mod stops;
 mod structure;
 mod subject;
+mod verifier;
 mod view;
 
 use std::path::PathBuf;
 use std::str::FromStr;
 
 use console_ports::Environment;
+use design_model::FeatureName;
 use design_store::Scope;
-use design_store::{StopTrail, StreamSchema};
+use design_store::{Judgments, StopTrail, StreamSchema};
 use dispatch_ports::{Clock, Dispatch};
 use file_ports::Files;
 use grammar_search::Terms;
@@ -44,6 +46,7 @@ pub use structure::Crew;
 use structure::Structure;
 use subject::Subject;
 use transcript_ports::Body;
+use verifier::Verifier;
 use view::View;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -63,6 +66,10 @@ pub enum Command {
     View(View),
     Import(PathBuf),
     Retry(Retry),
+    Ideals,
+    Features,
+    Judge(FeatureName),
+    Judgments,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -82,6 +89,10 @@ pub enum Verb {
     View,
     Import,
     Retry,
+    Ideals,
+    Features,
+    Judge,
+    Judgments,
 }
 
 impl FromStr for Verb {
@@ -93,7 +104,7 @@ impl FromStr for Verb {
 }
 
 impl Verb {
-    const NAMED: [(&'static str, Verb); 18] = [
+    const NAMED: [(&'static str, Verb); 22] = [
         ("ingest", Verb::Ingest),
         ("show", Verb::Show),
         ("search", Verb::Search),
@@ -112,6 +123,10 @@ impl Verb {
         ("view", Verb::View),
         ("import-notes", Verb::Import),
         ("retry", Verb::Retry),
+        ("ideals", Verb::Ideals),
+        ("features", Verb::Features),
+        ("judge", Verb::Judge),
+        ("judgments", Verb::Judgments),
     ];
 
     pub fn options(self) -> &'static [Flag] {
@@ -132,7 +147,11 @@ impl Verb {
             | Verb::Stops
             | Verb::View
             | Verb::Import
-            | Verb::Retry => &[],
+            | Verb::Retry
+            | Verb::Ideals
+            | Verb::Features
+            | Verb::Judge
+            | Verb::Judgments => &[],
         }
     }
 
@@ -168,6 +187,10 @@ impl Verb {
             Verb::View => View::read(rest).map(Command::View),
             Verb::Import => Token::only(rest).map(PathBuf::from).map(Command::Import),
             Verb::Retry => Token::only(rest).and_then(str::parse).map(Command::Retry),
+            Verb::Ideals => rest.first().map_or(Ok(Command::Ideals), |_extra| Err(Failure::Usage)),
+            Verb::Features => rest.first().map_or(Ok(Command::Features), |_extra| Err(Failure::Usage)),
+            Verb::Judge => Token::feature(rest).map(Command::Judge),
+            Verb::Judgments => rest.first().map_or(Ok(Command::Judgments), |_extra| Err(Failure::Usage)),
         }
     }
 
@@ -195,7 +218,11 @@ impl Command {
             | Command::Hook(_)
             | Command::View(_)
             | Command::Import(_)
-            | Command::Retry(_) => opens.file::<StreamSchema>(path),
+            | Command::Retry(_)
+            | Command::Ideals
+            | Command::Features
+            | Command::Judge(_)
+            | Command::Judgments => opens.file::<StreamSchema>(path),
         }
     }
 
@@ -237,6 +264,10 @@ impl Command {
             Command::View(view) => view.written(&ground),
             Command::Import(path) => Import::written(&ground, &path),
             Command::Retry(retry) => retry.released(ground.store()),
+            Command::Ideals => Verifier::new(&ground, crew).idealised().map(Uttered::from),
+            Command::Features => Verifier::new(&ground, crew).featured().map(Uttered::from),
+            Command::Judge(name) => Verifier::new(&ground, crew).judged(&name).map(Uttered::from),
+            Command::Judgments => ground.store().read(Judgments).map(Uttered::from).map_err(Failure::from),
         }
     }
 }

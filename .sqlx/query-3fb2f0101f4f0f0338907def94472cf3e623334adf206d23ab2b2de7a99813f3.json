@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  feature,\n  member\nFROM\n  feature_crates\nORDER BY\n  feature,\n  member\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "feature",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "feature_crates",
+            "name": "feature"
+          }
+        }
+      },
+      {
+        "name": "member",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "feature_crates",
+            "name": "member"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "3fb2f0101f4f0f0338907def94472cf3e623334adf206d23ab2b2de7a99813f3"
+}

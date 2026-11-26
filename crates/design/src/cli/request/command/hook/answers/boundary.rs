@@ -209,9 +209,17 @@ impl AsRef<Body> for Asked {
     }
 }
 
+impl<'reply> From<&'reply Reply> for Replied<'reply> {
+    fn from(reply: &'reply Reply) -> Replied<'reply> {
+        Replied(reply)
+    }
+}
+
 impl Replied<'_> {
     pub fn listed<T: DeserializeOwned>(self) -> Vec<T> {
-        serde_json::from_str(&self.braced('[', ']')).ignoring(Ignored::Unpicked).unwrap_or_default()
+        let entries: Vec<serde_json::Value> =
+            serde_json::from_str(&self.braced('[', ']')).ignoring(Ignored::Unpicked).unwrap_or_default();
+        entries.into_iter().filter_map(|entry| serde_json::from_value(entry).ignoring(Ignored::Undrafted)).collect()
     }
 
     fn braced(self, open: char, close: char) -> String {

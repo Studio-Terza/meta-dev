@@ -38,6 +38,7 @@ mod stop;
 mod supersession;
 mod title;
 mod transition;
+mod verifier;
 
 pub use artifact::{Artifact, Unspecified};
 pub use artifact_kind::ArtifactKind;
@@ -76,3 +77,4 @@ pub use stop::{Fate, Halt};
 pub use supersession::{Straddling, Supersession};
 pub use title::Title;
 pub use transition::Transition;
+pub use verifier::{Consideration, CrateName, FeatureName, Verdict};

@@ -6,6 +6,7 @@ mod generated_laws;
 mod ignored;
 mod notes;
 mod structure;
+mod verifier;
 mod view;
 
 use std::collections::BTreeSet;
@@ -1584,6 +1585,10 @@ impl Lifecycle {
             | Failure::Unheard(_)
             | Failure::Render(_)
             | Failure::Released(_)
+            | Failure::Unfeatured(_)
+            | Failure::Unidealised
+            | Failure::Unsourced(_)
+            | Failure::Unrevised(_)
             | Failure::Unreleased { .. } => None,
         }
     }
@@ -1836,6 +1841,10 @@ impl Ruled {
             | Failure::Unheard(_)
             | Failure::Render(_)
             | Failure::Released(_)
+            | Failure::Unfeatured(_)
+            | Failure::Unidealised
+            | Failure::Unsourced(_)
+            | Failure::Unrevised(_)
             | Failure::Unreleased { .. } => None,
         }
     }

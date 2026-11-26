@@ -1,5 +1,9 @@
 use laws::proptest::prelude::any;
 
+laws::generates!(crate_name_generates, any::<design_model::CrateName>());
+
+laws::generates!(feature_name_generates, any::<design_model::FeatureName>());
+
 laws::generates!(job_id_generates, any::<design_model::JobId>());
 
 laws::generates!(node_id_generates, any::<design_model::NodeId>());

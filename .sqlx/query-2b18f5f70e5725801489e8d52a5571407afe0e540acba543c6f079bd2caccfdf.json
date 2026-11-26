@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  features (name, place, consideration)\nVALUES\n  (?1, ?2, ?3)\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "2b18f5f70e5725801489e8d52a5571407afe0e540acba543c6f079bd2caccfdf"
+}

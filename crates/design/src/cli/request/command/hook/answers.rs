@@ -8,7 +8,7 @@ use transcript_ports::Body;
 use super::super::structure::{Crew, Heard};
 use crate::cli::failure::Failure;
 use boundary::Recalling;
-pub use boundary::{Answers, Asked, Reading, Recollection, Remembered, Search};
+pub use boundary::{Answers, Asked, Recollection, Remembered, Replied, Search};
 
 #[derive(Debug)]
 pub struct Answering<'ports, S: Store, D: Dispatch, C: Clock> {
@@ -34,7 +34,7 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Answering<'ports, S, D, C> {
         let asked = Asked::from(said);
         let history: Vec<Said> = self.store.read(OwnerHistory)?;
         let reading = asked.reading(&history);
-        let fanned = self.crew.fanned(&reading, Self::TIMEOUT)?;
+        let fanned = self.crew.fanned(reading.prompts(), Self::TIMEOUT, Model::Haiku)?;
         let quoted: Vec<Quote> = reading.quoted(&fanned).into_iter().flatten().collect();
         let trimmed = quoted
             .first()

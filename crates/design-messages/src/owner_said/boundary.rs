@@ -81,9 +81,27 @@ impl AsRef<Body> for Said {
     }
 }
 
+impl Quote {
+    pub(crate) fn new(uuid: Uuid, at: Instant, excerpt: Body) -> Quote {
+        Quote { uuid, at, excerpt }
+    }
+}
+
 impl AsRef<Uuid> for Quote {
     fn as_ref(&self) -> &Uuid {
         &self.uuid
+    }
+}
+
+impl AsRef<Instant> for Quote {
+    fn as_ref(&self) -> &Instant {
+        &self.at
+    }
+}
+
+impl AsRef<Body> for Quote {
+    fn as_ref(&self) -> &Body {
+        &self.excerpt
     }
 }
 

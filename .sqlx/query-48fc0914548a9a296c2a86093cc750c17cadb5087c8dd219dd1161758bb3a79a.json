@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  feature_quotes (feature, place, message, excerpt)\nVALUES\n  (?1, ?2, ?3, ?4)\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "48fc0914548a9a296c2a86093cc750c17cadb5087c8dd219dd1161758bb3a79a"
+}

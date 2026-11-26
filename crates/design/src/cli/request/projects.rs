@@ -108,7 +108,7 @@ impl Projects {
             .to_path_buf()
     }
 
-    fn resolved(path: &Path) -> PathBuf {
+    pub(crate) fn resolved(path: &Path) -> PathBuf {
         path.components().fold(PathBuf::new(), Self::stepped)
     }
 

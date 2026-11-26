@@ -279,6 +279,7 @@ dependencies = [
  "golden",
  "grammar-cited",
  "grammar-flag",
+ "grammar-git",
  "grammar-lines",
  "grammar-notes",
  "grammar-output",
@@ -381,9 +382,12 @@ dependencies = [
  "laws",
  "newtype",
  "port-core",
+ "serde",
+ "serde_json",
  "sqlite-ports",
  "store-ports",
  "stream",
+ "thiserror",
  "transcript-ports",
 ]
 
@@ -879,6 +883,15 @@ name = "grammar-flag"
 version = "0.1.0"
 dependencies = [
  "grammar",
+ "laws",
+]
+
+[[package]]
+name = "grammar-git"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "grammar-lines",
  "laws",
 ]
 

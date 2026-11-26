@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  ideal_quotes (ideal, place, message, excerpt)\nVALUES\n  (?1, ?2, ?3, ?4)\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "3bb4cfb27b60d74586856bb267abf0a6e41ba7942e0fab7ea310268cfc235e81"
+}

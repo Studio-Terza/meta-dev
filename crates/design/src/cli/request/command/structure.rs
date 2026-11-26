@@ -22,7 +22,6 @@ use structurer::{Attempt, Directives, Lapse, Readings, Said, SegmentRef};
 use transcript_ports::{Body, SessionId};
 
 use super::apply::{Application, Parsed};
-use super::hook::answers::Reading;
 use crate::Outcome;
 use crate::cli::failure::{Failure, Flail, Flails};
 use crate::cli::output::{Attempted, Count, Flailing, Lapsed, Line};
@@ -152,9 +151,9 @@ impl<'ports, D: Dispatch, C: Clock> Crew<'ports, D, C> {
         Ok(Watch::over(self.dispatch, self.clock).watched(held)?.visited(Replying))
     }
 
-    pub fn fanned(&self, reading: &Reading<'_>, timeout: Timeout) -> Result<Vec<Heard>, Failure> {
-        let job = Job::due_by(Deadline::after(self.clock.now(), timeout), Model::Haiku);
-        let watched = Watch::over(self.dispatch, self.clock).fanned(&job, reading.prompts())?;
+    pub fn fanned(&self, prompts: &[Prompt], timeout: Timeout, model: Model) -> Result<Vec<Heard>, Failure> {
+        let job = Job::due_by(Deadline::after(self.clock.now(), timeout), model);
+        let watched = Watch::over(self.dispatch, self.clock).fanned(&job, prompts)?;
         Ok(watched.iter().map(|each| each.visited(Replying)).collect())
     }
 }

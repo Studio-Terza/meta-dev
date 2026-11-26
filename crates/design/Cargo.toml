@@ -21,6 +21,7 @@ dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports" }
 grammar-cited = { path = "../grammar-cited" }
 grammar-flag = { path = "../grammar-flag" }
+grammar-git = { path = "../grammar-git" }
 grammar-lines = { path = "../grammar-lines" }
 grammar-notes = { path = "../grammar-notes" }
 grammar-output = { path = "../grammar-output" }
@@ -35,6 +36,7 @@ store-ports = { path = "../store-ports" }
 stream = { path = "../stream" }
 structurer = { path = "../structurer" }
 strum.workspace = true
+text-lines = { path = "../text-lines" }
 thiserror.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 
@@ -44,7 +46,6 @@ e2e = { path = "../../e2e" }
 golden = { path = "../golden" }
 laws = { path = "../laws" }
 sqlite-ports = { path = "../sqlite-ports" }
-text-lines = { path = "../text-lines" }
 
 [lints]
 workspace = true

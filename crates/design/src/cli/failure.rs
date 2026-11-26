@@ -4,8 +4,8 @@ use std::io;
 use std::path::PathBuf;
 
 use design_model::{
-    Ending, Inversion, JobId, Misstaged, NodeEdge, NodeId, Prefix, Project, Stage, Unnamed, Unnumbered, Unspecified,
-    Unstated,
+    Ending, FeatureName, Inversion, JobId, Misstaged, NodeEdge, NodeId, Prefix, Project, Stage, Unnamed, Unnumbered,
+    Unspecified, Unstated,
 };
 use design_store::{Cycle, Refusal, Refused, Unpaid};
 use dispatch_ports::{DispatchFailure, Stall};
@@ -26,7 +26,7 @@ use crate::Outcome;
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
     #[error(
-        "usage: design [--workspace <dir>] (ingest [--dry-run] | show <node-id | message-ref | segment-ref | job <job-id>> | search [--all] <words...> | init <project> [--consumes <project>] | apply <file> | structure | refine <node-id> | specify <node-id> --artifact <lint|hook|tool|behaviour>:<name> --condition <text> | reopen <node-id> | drop <node-id> --reason <text> | role <node-id> <core|secondary> | hook (user-prompt-submit | stop | --settings) | view (current-decision | open-questions | outline) [<node-id>] | view (unplaced | notes) | import-notes <file> | retry <job-id>)"
+        "usage: design [--workspace <dir>] (ingest [--dry-run] | show <node-id | message-ref | segment-ref | job <job-id>> | search [--all] <words...> | init <project> [--consumes <project>] | apply <file> | structure | refine <node-id> | specify <node-id> --artifact <lint|hook|tool|behaviour>:<name> --condition <text> | reopen <node-id> | drop <node-id> --reason <text> | role <node-id> <core|secondary> | hook (user-prompt-submit | stop | --settings) | view (current-decision | open-questions | outline) [<node-id>] | view (unplaced | notes) | import-notes <file> | retry <job-id> | ideals | features | judge <feature> | judgments)"
     )]
     Usage,
     #[error("usage: project {0} cannot consume itself; --consumes names another project, one it builds on")]
@@ -114,6 +114,14 @@ pub enum Failure {
     Render(#[source] serde_json::Error),
     #[error("a resource was not released cleanly: {0}")]
     Released(#[from] ReleaseFailures),
+    #[error("no feature {0} in the design store; run design features first")]
+    Unfeatured(FeatureName),
+    #[error("no current ideals in the design store; run design ideals first")]
+    Unidealised,
+    #[error("feature {0} names no crate with Rust sources in this workspace; nothing was judged")]
+    Unsourced(FeatureName),
+    #[error("cannot read the checked-out commit of {0:?} from git; nothing was judged")]
+    Unrevised(PathBuf),
     #[error("{command}; on the way out, a resource was not released cleanly either: {released}")]
     Unreleased { command: Box<Failure>, released: ReleaseFailures },
 }
@@ -241,6 +249,10 @@ impl Failure {
             | Failure::Unheard(..)
             | Failure::Render(..)
             | Failure::Released(..)
+            | Failure::Unfeatured(..)
+            | Failure::Unidealised
+            | Failure::Unsourced(..)
+            | Failure::Unrevised(..)
             | Failure::Unreleased { .. }) => Err(other),
         }
     }

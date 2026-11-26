@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE features SET place = ?1, consideration = ?2 WHERE name = ?3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "921d99eb00d536be3ee11d6a24639795b953c54a269064fd40c909f49e2ba8e7"
+}

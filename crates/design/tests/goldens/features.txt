@@ -1,0 +1,2 @@
+feature	consideration	crates	message	excerpt
+ideal-verifier	checks	design	o2	"models quote the owner"

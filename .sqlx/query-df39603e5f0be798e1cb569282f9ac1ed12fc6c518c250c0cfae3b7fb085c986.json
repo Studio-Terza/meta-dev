@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  ideals.id AS ideal,\n  ideals.superseded_by,\n  ideal_quotes.message,\n  messages.at,\n  ideal_quotes.excerpt\nFROM\n  ideals\n  JOIN ideal_quotes ON ideal_quotes.ideal = ideals.id\n  JOIN messages ON messages.uuid = ideal_quotes.message\nORDER BY\n  ideals.id,\n  ideal_quotes.place\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "ideal",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "ideals",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "superseded_by",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "ideals",
+            "name": "superseded_by"
+          }
+        }
+      },
+      {
+        "name": "message",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ideal_quotes",
+            "name": "message"
+          }
+        }
+      },
+      {
+        "name": "at",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "messages",
+            "name": "at"
+          }
+        }
+      },
+      {
+        "name": "excerpt",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ideal_quotes",
+            "name": "excerpt"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "df39603e5f0be798e1cb569282f9ac1ed12fc6c518c250c0cfae3b7fb085c986"
+}

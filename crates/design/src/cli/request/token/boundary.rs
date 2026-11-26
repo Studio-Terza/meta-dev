@@ -1,7 +1,7 @@
 use std::ffi::OsString;
 use std::str::FromStr;
 
-use design_model::Project;
+use design_model::{FeatureName, Project};
 
 use super::super::command::Hook;
 use super::super::persistence::Persistence;
@@ -82,6 +82,10 @@ impl Token {
 
     pub fn only(rest: &[Token]) -> Result<&str, Failure> {
         <&[Token; 1]>::try_from(rest).ignoring(Ignored::OtherShape).and_then(|[word]| word.text()).ok_or(Failure::Usage)
+    }
+
+    pub fn feature(rest: &[Token]) -> Result<FeatureName, Failure> {
+        Token::only(rest)?.parse().map_err(|_misnamed| Failure::Usage)
     }
 
     pub fn shaped<'rest, const WORDS: usize>(

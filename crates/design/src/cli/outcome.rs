@@ -24,4 +24,8 @@ pub enum Outcome {
     Trailed,
     Imported,
     Retried { segments: Count },
+    Idealised { ideals: Count },
+    Featured { features: Count },
+    Judged { findings: Count },
+    Judgments,
 }
