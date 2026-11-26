@@ -19,6 +19,7 @@ use crate::cli::command::step::mutation::cargo_mutants::CargoMutants;
 use crate::cli::command::step::mutation::shard_summary::outcome::Outcome;
 use crate::cli::ports::{Exit, Invocation, Ports, Text};
 use boundary::Narrowed;
+use strum::VariantArray;
 
 #[derive(Debug)]
 pub(super) struct Pass {
@@ -83,7 +84,7 @@ impl Pass {
         files: &impl Files,
         expected: &Survivors,
     ) -> Result<Vec<Told<'static>>, Failure<'static>> {
-        let journals: Vec<Journal> = Outcome::ALL.into_iter().map(|outcome| self.journal(outcome)).collect();
+        let journals: Vec<Journal> = Outcome::VARIANTS.iter().copied().map(|outcome| self.journal(outcome)).collect();
         let read: Vec<Option<Text>> =
             Journal::read_present(files, journals).into_iter().map(Option::transpose).collect::<Result<_, _>>()?;
         let tested: BTreeSet<Text> = read.iter().flatten().flat_map(Self::names).collect();

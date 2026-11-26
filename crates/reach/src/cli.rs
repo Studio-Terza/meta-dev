@@ -27,7 +27,7 @@ impl Cli {
             .as_deref()
             .and_then(OsStr::to_str)
             .ok_or(Failure::Usage)
-            .and_then(str::parse::<Command>)
+            .and_then(|name| name.parse::<Command>().map_err(|_unnamed| Failure::Usage))
             .and_then(|parsed| Request::parsed(parsed, arguments))
             .and_then(|request| request.written(files, &metadata))
     }

@@ -749,6 +749,7 @@ dependencies = [
  "file-ports",
  "newtype",
  "serde",
+ "strum",
  "text-lines",
  "thiserror",
  "toml",
@@ -785,6 +786,7 @@ dependencies = [
  "invariants",
  "laws",
  "newtype",
+ "strum",
  "text-lines",
  "thiserror",
 ]
@@ -1084,6 +1086,7 @@ dependencies = [
  "laws",
  "lint-layout",
  "newtype",
+ "strum",
 ]
 
 [[package]]
@@ -1102,6 +1105,7 @@ dependencies = [
  "lint-transition-graph",
  "newtype",
  "serde_json",
+ "strum",
  "syntax",
  "text-lines",
  "thiserror",
@@ -1459,6 +1463,7 @@ dependencies = [
  "lint-layout",
  "lint-placement",
  "newtype",
+ "strum",
  "syntax",
  "syntax-lexer",
 ]
@@ -1497,6 +1502,7 @@ dependencies = [
  "lint-layout",
  "lint-placement",
  "newtype",
+ "strum",
 ]
 
 [[package]]
@@ -1628,6 +1634,7 @@ dependencies = [
  "laws",
  "newtype",
  "serde_core",
+ "strum",
  "syntax",
  "thiserror",
  "toml",
@@ -1645,6 +1652,7 @@ dependencies = [
  "lint-placement",
  "lint-sweep",
  "newtype",
+ "strum",
  "syntax",
 ]
 
@@ -1715,6 +1723,7 @@ dependencies = [
  "lint-placement",
  "lint-sweep",
  "newtype",
+ "strum",
  "syntax",
 ]
 
@@ -1789,6 +1798,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-sweep",
+ "strum",
  "syntax",
 ]
 
@@ -1942,6 +1952,7 @@ dependencies = [
  "laws",
  "lint-layout",
  "lint-mandatory-laws",
+ "strum",
  "syntax",
 ]
 
@@ -2114,6 +2125,7 @@ dependencies = [
  "lint-layout",
  "lint-placement",
  "lint-sweep",
+ "strum",
  "syntax",
  "syntax-lexer",
 ]
@@ -2221,6 +2233,7 @@ dependencies = [
  "invariants",
  "lint-core",
  "newtype",
+ "strum",
 ]
 
 [[package]]
@@ -2237,6 +2250,7 @@ dependencies = [
  "lint-layout",
  "lint-sweep",
  "newtype",
+ "strum",
  "syntax",
 ]
 
@@ -2319,6 +2333,7 @@ dependencies = [
  "lint-placement",
  "lint-sweep",
  "newtype",
+ "strum",
  "syntax",
 ]
 
@@ -2373,6 +2388,7 @@ dependencies = [
  "lint-mandatory-laws",
  "newtype",
  "saphyr",
+ "strum",
 ]
 
 [[package]]
@@ -2497,6 +2513,7 @@ dependencies = [
  "newtype",
  "serde",
  "serde_json",
+ "strum",
  "text-lines",
  "thiserror",
 ]
@@ -2626,6 +2643,7 @@ dependencies = [
  "laws",
  "newtype",
  "port-derive",
+ "strum",
  "thiserror",
 ]
 
@@ -2634,6 +2652,7 @@ name = "port-derive"
 version = "0.1.0"
 dependencies = [
  "grammar-ident",
+ "strum",
  "syntax",
 ]
 
@@ -2681,6 +2700,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "strum",
  "thiserror",
 ]
 
@@ -2774,6 +2794,7 @@ dependencies = [
  "laws",
  "newtype",
  "serde_json",
+ "strum",
  "text-lines",
  "thiserror",
  "workspace-metadata",
@@ -2783,6 +2804,7 @@ dependencies = [
 name = "record-derive"
 version = "0.1.0"
 dependencies = [
+ "strum",
  "syntax",
 ]
 
@@ -3677,6 +3699,7 @@ dependencies = [
  "newtype",
  "serde",
  "serde_json",
+ "strum",
  "text-lines",
  "thiserror",
 ]

@@ -7,16 +7,19 @@ use lint_layout::{Name, Whole, Word, words};
 
 use crate::transitions::Ground;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(strum::Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Algebra {
     Semigroup,
     Monoid,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(strum::Display, Clone, Copy, Debug)]
 enum Std {
+    #[strum(serialize = "std::ops::Add with Output = Self")]
     Add,
+    #[strum(serialize = "Extend<Self>")]
     Extend,
+    #[strum(serialize = "FromIterator<Self>")]
     FromIterator,
 }
 
@@ -169,24 +172,5 @@ impl Finding for Hidden<'_> {
         Fix::new(
             "declare the algebra this impl hides: implement algebra::Semigroup, and algebra::Monoid when there is an identity, for the type",
         )
-    }
-}
-
-impl fmt::Display for Std {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Std::Add => write!(formatter, "std::ops::Add with Output = Self"),
-            Std::Extend => write!(formatter, "Extend<Self>"),
-            Std::FromIterator => write!(formatter, "FromIterator<Self>"),
-        }
-    }
-}
-
-impl fmt::Display for Algebra {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Algebra::Semigroup => write!(formatter, "Semigroup"),
-            Algebra::Monoid => write!(formatter, "Monoid"),
-        }
     }
 }

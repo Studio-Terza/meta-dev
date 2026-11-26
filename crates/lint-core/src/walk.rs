@@ -3,6 +3,7 @@ use syntax::Punctuated;
 use crate::ignored::Ignored;
 use crate::syntax::Syntax;
 use invariants::Ignoring;
+use strum::{IntoStaticStr, VariantArray};
 use syntax::{Attribute, ItemImpl, Meta, MetaList, Token};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -11,9 +12,23 @@ pub enum Walk {
     Skipped,
 }
 
-impl Walk {
-    const DECIDING: [(&'static str, Walk); 2] = [("all", Walk::Skipped), ("any", Walk::Entered)];
+#[derive(IntoStaticStr, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
+enum Junction {
+    All,
+    Any,
+}
 
+impl Junction {
+    fn deciding(self) -> Walk {
+        match self {
+            Junction::All => Walk::Skipped,
+            Junction::Any => Walk::Entered,
+        }
+    }
+}
+
+impl Walk {
     #[must_use]
     pub fn inherent_impls(item: &ItemImpl) -> Walk {
         Syntax::inherent(item).map_or(Walk::Skipped, |_| Walk::Entered)
@@ -46,10 +61,11 @@ impl Walk {
 
     fn of_nested(list: &MetaList, nested: &Punctuated<Meta, Token![,]>) -> Walk {
         let walks: Vec<Walk> = nested.iter().map(Self::of_condition).collect();
-        Self::DECIDING
-            .into_iter()
-            .find(|(junction, _)| list.path.is_ident(junction))
-            .and_then(|(_, deciding)| walks.iter().find(|walk| **walk == deciding).or(walks.first()))
+        Junction::VARIANTS
+            .iter()
+            .find(|junction| list.path.is_ident(<&str>::from(**junction)))
+            .map(|junction| junction.deciding())
+            .and_then(|deciding| walks.iter().find(|walk| **walk == deciding).or(walks.first()))
             .copied()
             .unwrap_or(Walk::Entered)
     }

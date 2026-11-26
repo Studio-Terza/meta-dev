@@ -1,8 +1,10 @@
+use strum::{IntoStaticStr, VariantArray};
 use syntax::parse::ParseStream;
 use syntax::quote;
 use syntax::{Attribute, Error, Expr, Field, Ident, Meta, Punctuated, Token, TokenStream, Type};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(IntoStaticStr, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
 enum Keyword {
     Field,
     Optional,
@@ -33,15 +35,8 @@ pub struct Reading {
 }
 
 impl Keyword {
-    const NAMED: [(&'static str, Keyword); 4] = [
-        ("field", Keyword::Field),
-        ("optional", Keyword::Optional),
-        ("repeated", Keyword::Repeated),
-        ("record", Keyword::Record),
-    ];
-
     fn named(attribute: &Attribute) -> Option<Keyword> {
-        Self::NAMED.iter().find(|(name, _)| attribute.path().is_ident(name)).map(|(_, keyword)| *keyword)
+        Self::VARIANTS.iter().copied().find(|keyword| attribute.path().is_ident(<&str>::from(*keyword)))
     }
 
     fn spec(self, attribute: &Attribute) -> syntax::Result<Spec> {

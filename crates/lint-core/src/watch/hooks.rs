@@ -31,8 +31,6 @@ macro_rules! hooks {
         }
 
         impl Kind {
-            pub const ALL: &'static [Kind] = &[Kind::Macro, Kind::Ident, $(Kind::$kind,)*];
-
             pub(crate) fn bit(self) -> u128 {
                 kind_bits!(@arms self; []; 0_u32; Macro Ident $($kind)*)
             }

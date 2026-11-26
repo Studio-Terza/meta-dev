@@ -5,13 +5,15 @@ use lint_layout::Name;
 use lint_transition_graph::Ask;
 
 use algebra::Semigroup;
+use strum::{IntoStaticStr, VariantArray};
 
 use crate::boundary::QueryFailure;
 use crate::query::top::Top;
 use crate::query::{Consumer, Query, Term};
 use crate::role::Role;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(IntoStaticStr, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "kebab-case", prefix = "--")]
 enum Item {
     Defined,
     Uses,
@@ -20,6 +22,17 @@ enum Item {
     Cluster,
     Exports,
     Cycles,
+}
+
+#[derive(IntoStaticStr, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "kebab-case", prefix = "--")]
+enum Switch {
+    In,
+    Role,
+    Top,
+    Path,
+    Crates,
+    ConsumedBy,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -52,24 +65,25 @@ impl Query {
 }
 
 impl Expecting {
-    const FLAGS: [(&'static str, Expecting); 13] = [
-        ("--in", Expecting::Root),
-        ("--role", Expecting::Role),
-        ("--top", Expecting::Top),
-        ("--defined", Expecting::Item(Item::Defined)),
-        ("--uses", Expecting::Item(Item::Uses)),
-        ("--users", Expecting::Item(Item::Users)),
-        ("--implementers", Expecting::Item(Item::Implementers)),
-        ("--cluster", Expecting::Item(Item::Cluster)),
-        ("--exports", Expecting::Item(Item::Exports)),
-        ("--path", Expecting::From),
-        ("--cycles", Expecting::Item(Item::Cycles)),
-        ("--crates", Expecting::Crates),
-        ("--consumed-by", Expecting::Consumer),
-    ];
-
     fn flag(word: &str) -> Option<Expecting> {
-        Self::FLAGS.into_iter().find(|(flag, _)| *flag == word).map(|(_, expecting)| expecting)
+        Switch::VARIANTS
+            .iter()
+            .find(|switch| <&str>::from(**switch) == word)
+            .map(|switch| switch.expecting())
+            .or_else(|| Item::VARIANTS.iter().copied().find(|item| <&str>::from(*item) == word).map(Expecting::Item))
+    }
+}
+
+impl Switch {
+    fn expecting(self) -> Expecting {
+        match self {
+            Switch::In => Expecting::Root,
+            Switch::Role => Expecting::Role,
+            Switch::Top => Expecting::Top,
+            Switch::Path => Expecting::From,
+            Switch::Crates => Expecting::Crates,
+            Switch::ConsumedBy => Expecting::Consumer,
+        }
     }
 }
 

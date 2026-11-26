@@ -194,10 +194,13 @@ impl fmt::Display for Invocation {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(strum::Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Looping {
+    #[strum(serialize = "for")]
     For,
+    #[strum(serialize = "while")]
     While,
+    #[strum(serialize = "loop")]
     Bare,
 }
 
@@ -263,16 +266,6 @@ impl AsRef<Name> for Reached {
     fn as_ref(&self) -> &Name {
         match self {
             Reached::Parameter { name, .. } | Reached::Field(name) => name,
-        }
-    }
-}
-
-impl fmt::Display for Looping {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Looping::For => formatter.write_str("for"),
-            Looping::While => formatter.write_str("while"),
-            Looping::Bare => formatter.write_str("loop"),
         }
     }
 }

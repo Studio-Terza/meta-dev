@@ -8,6 +8,7 @@ use syntax::{
 use algebra::{Monoid, Semigroup};
 use lint_core::SourceFile;
 use lint_sweep::{Contribute, Contributed, Contributing, Contribution, Descend, Facts, Kind, Ranked, Ranks, Scope};
+use strum::VariantArray;
 
 use super::FileFlow;
 use crate::finding::{Finding, Rule};
@@ -218,6 +219,6 @@ impl<'file> Ranks<'file> for Collector<'file> {
         let tested = file.test_modules().iter().map(|module| FileFlow::collected(module, Collector::collected(module)));
         let flows: Vec<FileFlow<'file>> =
             [FileFlow::collected(file, gathered.closed)].into_iter().chain(tested).collect();
-        Ranked::from(Rule::ALL.iter().map(|rule| FileFlow::violations(&flows, *rule)).collect::<Vec<_>>())
+        Ranked::from(Rule::VARIANTS.iter().map(|rule| FileFlow::violations(&flows, *rule)).collect::<Vec<_>>())
     }
 }
