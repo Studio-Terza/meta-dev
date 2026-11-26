@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use design_model::Project;
-use file_ports::{Bytes, FileFailure, Files, Offset};
+use file_ports::{Bytes, FileFailure, Files};
 use local_config::Kept;
 use port_core::{Port, Run};
 use store_ports::Store;
@@ -33,15 +33,6 @@ impl<'run, F: Files, S: Store> Ground<'run, F, S> {
 
     pub fn read(&self, path: &Path) -> Result<Bytes, FileFailure> {
         self.files.read(&self.located.within(path))
-    }
-
-    pub fn tail(&self, path: &Path, kept: u64) -> Result<Bytes, FileFailure> {
-        let size = self.files.size(path)?.into_inner();
-        let start = match i64::try_from(size.saturating_sub(kept)).map(Offset::try_new) {
-            Ok(Ok(offset)) => offset,
-            Ok(Err(_negative)) | Err(_huge) => Offset::default(),
-        };
-        self.files.read_from(path, start)
     }
 
     pub fn located(&self) -> &Located {

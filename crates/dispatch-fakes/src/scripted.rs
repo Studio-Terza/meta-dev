@@ -94,28 +94,31 @@ impl DispatchFiller for &Scripted {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Bells {
-    Ignored,
-    Heeded,
-}
-
 #[derive(Debug)]
 pub struct Stepped {
     now: Mutex<Wall>,
     sleep: Pause,
-    bells: Bells,
 }
+
+#[derive(Debug)]
+pub struct Heeding(Stepped);
 
 impl Stepped {
     #[must_use]
     pub fn starting(at: Wall, sleep: Pause) -> Stepped {
-        Stepped { now: Mutex::new(at), sleep, bells: Bells::Ignored }
+        Stepped { now: Mutex::new(at), sleep }
     }
 
-    #[must_use]
-    pub fn heeding(at: Wall, sleep: Pause) -> Stepped {
-        Stepped { bells: Bells::Heeded, ..Stepped::starting(at, sleep) }
+    fn stepped(&self, pause: Pause) -> Wall {
+        let mut now = self.now.lock().unpoisoned();
+        *now = now.after(pause).after(self.sleep);
+        *now
+    }
+}
+
+impl From<Stepped> for Heeding {
+    fn from(stepped: Stepped) -> Heeding {
+        Heeding(stepped)
     }
 }
 
@@ -124,10 +127,18 @@ impl ClockFiller for Stepped {
         *self.now.lock().unpoisoned()
     }
 
+    fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause, _bell: &Bell) -> Wall {
+        self.stepped(pause)
+    }
+}
+
+impl ClockFiller for Heeding {
+    fn now(&self, _pass: Pass<'_, clock_ops::Now>) -> Wall {
+        *self.0.now.lock().unpoisoned()
+    }
+
     fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause, bell: &Bell) -> Wall {
-        let _woke = (self.bells == Bells::Heeded).then(|| bell.waited(Duration::from(pause)));
-        let mut now = self.now.lock().unpoisoned();
-        *now = now.after(pause).after(self.sleep);
-        *now
+        let _woke = bell.waited(Duration::from(pause));
+        self.0.stepped(pause)
     }
 }
