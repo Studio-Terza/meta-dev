@@ -3,10 +3,11 @@ use std::fmt;
 use algebra::{Monoid, Semigroup};
 use invariants::{invariant, invariants};
 use lint_core::{SourceFile, SourceText, Tallied};
+use lint_layout::Name;
 use lint_sweep::{
     Around, Contribute, Contributed, Contributing, Contribution, Descend, Facts, Joined, Joint, Kind, Scope, Unjoined,
 };
-use syntax::{Block, ExprBinary, Macro};
+use syntax::{Block, ExprBinary, Ident, Macro};
 
 invariants! {
     enum Invariant {
@@ -108,7 +109,11 @@ impl Contribute for Positions {
     type Part = Vec<String>;
 
     fn kinds(&self) -> &'static [Kind] {
-        &[Kind::Block, Kind::ExprBinary, Kind::Macro]
+        &[Kind::Block, Kind::ExprBinary, Kind::Macro, Kind::Ident]
+    }
+
+    fn on_ident(&self, _: &Ident, name: &Name, around: &Around<'_, ()>) -> Contributed<(), Vec<String>> {
+        Contributed::parted(vec![format!("{name} at {:?}", around.position())])
     }
 
     fn on_block(&self, _: &Block, _: &Facts<'_, Block>, around: &Around<'_, ()>) -> Contributed<(), Vec<String>> {

@@ -41,7 +41,7 @@ pub struct Joined<Head, Tail> {
     tail: Tail,
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub struct Unjoined;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -49,6 +49,7 @@ pub struct Alive(u128);
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Entered {
+    alive: Alive,
     watched: Alive,
     descending: Alive,
     expanding: Alive,
@@ -94,8 +95,8 @@ pub trait Joint: Sized {
 
     fn swept(self, file: &SourceFile) -> Self::Tallied {
         let mut lanes = self.lanes();
-        let mask = lanes.mask();
-        let alive = lanes.present();
+        let mask = lanes.mask(Kinds::default());
+        let alive = lanes.present(Alive::default());
         let mut sweeping = Sweeping { lanes: &mut lanes, file: Some(file), mask };
         sweeping.siblings(Node::top_level(file.syntax()), Some(file.kind_index().top()), alive);
         lanes.tallied()
@@ -107,15 +108,15 @@ pub trait Lanes {
 
     type Tallied;
 
-    fn mask(&self) -> Kinds;
+    fn mask(&self, kinds: Kinds) -> Kinds;
 
-    fn present(&self) -> Alive;
+    fn present(&self, alive: Alive) -> Alive;
 
-    fn relevant(&self, indexed: Indexed<'_>, alive: Alive) -> Alive;
+    fn relevant(&self, indexed: Indexed<'_>, alive: Alive, kept: Alive) -> Alive;
 
     fn visited(&mut self, alive: Alive);
 
-    fn entered<Hooked: Hook>(&mut self, node: &Hooked, facts: &Hooked::Facts<'_>, alive: Alive) -> Entered;
+    fn entered<Hooked: Hook>(&mut self, node: &Hooked, facts: &Hooked::Facts<'_>, entered: Entered) -> Entered;
 
     fn exited<Hooked: Hook>(&mut self, node: &Hooked, facts: &Hooked::Facts<'_>, watched: Alive);
 
@@ -157,6 +158,7 @@ impl Alive {
 
     fn entering(self, descend: Descend) -> Entered {
         Entered {
+            alive: Alive::default(),
             watched: self,
             descending: descend.descending(self).unwrap_or_default(),
             expanding: descend.expanding(Some(self)).unwrap_or_default(),
@@ -164,9 +166,16 @@ impl Alive {
     }
 }
 
+impl From<Alive> for Entered {
+    fn from(alive: Alive) -> Entered {
+        Entered { alive, ..Entered::default() }
+    }
+}
+
 impl Semigroup for Entered {
     fn combine(self, other: Entered) -> Entered {
         Entered {
+            alive: self.alive.combine(other.alive),
             watched: self.watched.combine(other.watched),
             descending: self.descending.combine(other.descending),
             expanding: self.expanding.combine(other.expanding),
@@ -288,18 +297,18 @@ impl<Contributor: Contribute, Tail: Lanes> Lanes for Joined<Option<Lane<Contribu
 
     type Tallied = Joined<Option<Tallied<Contributor>>, Tail::Tallied>;
 
-    fn mask(&self) -> Kinds {
-        self.head.as_ref().map_or_default(|lane| lane.contributing.mask).combine(self.tail.mask())
+    fn mask(&self, kinds: Kinds) -> Kinds {
+        self.tail.mask(kinds.combine(self.head.as_ref().map_or_default(|lane| lane.contributing.mask)))
     }
 
-    fn present(&self) -> Alive {
-        self.head.as_ref().map_or_default(|_| Tail::NEXT).combine(self.tail.present())
+    fn present(&self, alive: Alive) -> Alive {
+        self.tail.present(alive.combine(self.head.as_ref().map_or_default(|_| Tail::NEXT)))
     }
 
-    fn relevant(&self, indexed: Indexed<'_>, alive: Alive) -> Alive {
+    fn relevant(&self, indexed: Indexed<'_>, alive: Alive, kept: Alive) -> Alive {
         let lane = alive.holds(Tail::NEXT).and(self.head.as_ref());
-        let kept = lane.and_then(|found| indexed.watches(found.contributing.mask)).map(|()| Tail::NEXT);
-        kept.unwrap_or_default().combine(self.tail.relevant(indexed, alive))
+        let mine = lane.and_then(|found| indexed.watches(found.contributing.mask)).map(|()| Tail::NEXT);
+        self.tail.relevant(indexed, alive, kept.combine(mine.unwrap_or_default()))
     }
 
     fn visited(&mut self, alive: Alive) {
@@ -307,10 +316,10 @@ impl<Contributor: Contribute, Tail: Lanes> Lanes for Joined<Option<Lane<Contribu
         self.tail.visited(alive);
     }
 
-    fn entered<Hooked: Hook>(&mut self, node: &Hooked, facts: &Hooked::Facts<'_>, alive: Alive) -> Entered {
-        let descend = self.lane(alive).and_then(|lane| lane.entered(node, facts));
+    fn entered<Hooked: Hook>(&mut self, node: &Hooked, facts: &Hooked::Facts<'_>, entered: Entered) -> Entered {
+        let descend = self.lane(entered.alive).and_then(|lane| lane.entered(node, facts));
         let mine = descend.map_or_default(|found| Tail::NEXT.entering(found));
-        mine.combine(self.tail.entered(node, facts, alive))
+        self.tail.entered(node, facts, entered.combine(mine))
     }
 
     fn exited<Hooked: Hook>(&mut self, node: &Hooked, facts: &Hooked::Facts<'_>, watched: Alive) {
@@ -328,22 +337,22 @@ impl Lanes for Unjoined {
 
     type Tallied = Unjoined;
 
-    fn mask(&self) -> Kinds {
-        Kinds::default()
+    fn mask(&self, kinds: Kinds) -> Kinds {
+        kinds
     }
 
-    fn present(&self) -> Alive {
-        Alive::default()
+    fn present(&self, alive: Alive) -> Alive {
+        alive
     }
 
-    fn relevant(&self, _: Indexed<'_>, _: Alive) -> Alive {
-        Alive::default()
+    fn relevant(&self, _: Indexed<'_>, _: Alive, kept: Alive) -> Alive {
+        kept
     }
 
     fn visited(&mut self, _: Alive) {}
 
-    fn entered<Hooked: Hook>(&mut self, _: &Hooked, _: &Hooked::Facts<'_>, _: Alive) -> Entered {
-        Entered::default()
+    fn entered<Hooked: Hook>(&mut self, _: &Hooked, _: &Hooked::Facts<'_>, entered: Entered) -> Entered {
+        entered
     }
 
     fn exited<Hooked: Hook>(&mut self, _: &Hooked, _: &Hooked::Facts<'_>, _: Alive) {}
@@ -377,7 +386,9 @@ impl<Lane: Lanes> Sweeping<'_, '_, Lane> {
     fn walked(&mut self, node: Node<'_>, indexed: Option<Indexed<'_>>, alive: Alive) {
         let mask = self.mask;
         let relevant = indexed
-            .map_or(Some(alive), |cursor| cursor.watches(mask).map(|()| self.lanes.relevant(cursor, alive)))
+            .map_or(Some(alive), |cursor| {
+                cursor.watches(mask).map(|()| self.lanes.relevant(cursor, alive, Alive::default()))
+            })
             .and_then(Alive::live);
         relevant.map_or_default(|live| {
             self.lanes.visited(live);
@@ -400,7 +411,7 @@ impl<Lane: Lanes> Sweeping<'_, '_, Lane> {
         let facts = hooked.facts();
         let kind = Kind::of(node);
         let watching = self.mask.overlap(Kinds::from(kind));
-        let entered = watching.map_or_default(|()| self.lanes.entered(hooked, &facts, alive));
+        let entered = watching.map_or_default(|()| self.lanes.entered(hooked, &facts, Entered::from(alive)));
         let descending = alive.outside(entered.watched).combine(entered.descending);
         descending.live().map_or_default(|live| self.children(node, indexed.map(Indexed::children), live));
         entered.expanding.live().map_or_default(|live| {
