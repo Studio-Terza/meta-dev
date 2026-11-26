@@ -1788,10 +1788,10 @@ struct Ruled {
 impl Ruled {
     fn recast(self) -> Result<Roles, Option<NodeEdge>> {
         let applying = Applying::ready().map_err(|_unready| None)?;
-        applying.outcome(&["role", "n1", self.parent.name()]).map_err(|_unrecast| None)?;
+        applying.outcome(&["role", "n1", self.parent.into()]).map_err(|_unrecast| None)?;
         applying.applied("propose(new, refines(n1), feature, \"metering\")").map_err(|_unproposed| None)?;
         let proposed = applying.role(NodeId::new(2)).ok_or(None)?;
-        applying.outcome(&["role", "n2", self.child.name()]).map_err(|failure| Ruled::inverted(&failure))?;
+        applying.outcome(&["role", "n2", self.child.into()]).map_err(|failure| Ruled::inverted(&failure))?;
         applying.role(NodeId::new(2)).map(|recast| Roles { proposed, recast }).ok_or(None)
     }
 
@@ -1976,29 +1976,27 @@ enum Parsed {
     Otherwise,
 }
 
-impl Spoken {
-    fn words(self) -> &'static [&'static str] {
-        match self {
-            Spoken::Ingest => &["ingest"],
-            Spoken::Show => &["show"],
-            Spoken::Search => &["search"],
-            Spoken::Init => &["init"],
-            Spoken::Apply => &["apply"],
-            Spoken::Refine => &["refine"],
-            Spoken::Specify => &["specify", "--artifact", "lint:x", "--condition", "it holds"],
-            Spoken::Reopen => &["reopen"],
-            Spoken::Drop => &["drop", "--reason", "folded"],
-            Spoken::Role => &["role", "n1"],
-        }
-    }
+#[derive(Clone, Copy, Debug)]
+struct Typed {
+    words: &'static [&'static str],
+    missing: &'static str,
+}
 
-    fn missing(self) -> &'static str {
+impl Spoken {
+    fn typed(self) -> Typed {
         match self {
-            Spoken::Ingest | Spoken::Init => "demo",
-            Spoken::Show | Spoken::Refine | Spoken::Specify | Spoken::Reopen | Spoken::Drop => "n1",
-            Spoken::Search => "thanks",
-            Spoken::Apply => "notes/directives",
-            Spoken::Role => "core",
+            Spoken::Ingest => Typed { words: &["ingest"], missing: "demo" },
+            Spoken::Show => Typed { words: &["show"], missing: "n1" },
+            Spoken::Search => Typed { words: &["search"], missing: "thanks" },
+            Spoken::Init => Typed { words: &["init"], missing: "demo" },
+            Spoken::Apply => Typed { words: &["apply"], missing: "notes/directives" },
+            Spoken::Refine => Typed { words: &["refine"], missing: "n1" },
+            Spoken::Specify => {
+                Typed { words: &["specify", "--artifact", "lint:x", "--condition", "it holds"], missing: "n1" }
+            }
+            Spoken::Reopen => Typed { words: &["reopen"], missing: "n1" },
+            Spoken::Drop => Typed { words: &["drop", "--reason", "folded"], missing: "n1" },
+            Spoken::Role => Typed { words: &["role", "n1"], missing: "core" },
         }
     }
 }
@@ -2006,7 +2004,8 @@ impl Spoken {
 impl Foreign {
     fn parsed(&self) -> Parsed {
         let Foreign(spoken, flag) = *self;
-        let arguments = [spoken.words(), &[flag, spoken.missing()]].concat();
+        let Typed { words, missing } = spoken.typed();
+        let arguments = [words, &[flag, missing]].concat();
         Some(Invocation::output(&Session::typical(), &arguments))
             .filter(|parsed| matches!(parsed, Err(Failure::Usage)))
             .map_or(Parsed::Otherwise, |_usage| Parsed::Usage)

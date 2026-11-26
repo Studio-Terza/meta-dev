@@ -5,10 +5,13 @@ use std::str::FromStr;
 
 use boundary::Scan;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(strum::Display, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Pinning {
+    #[strum(serialize = "assertion pins text with a line break")]
     LineBreak,
+    #[strum(serialize = "assertion pins Debug-formatted text")]
     Debug,
+    #[strum(serialize = "assertion pins Debug-formatted text")]
     Plain,
 }
 

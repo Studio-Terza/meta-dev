@@ -1,6 +1,7 @@
 use super::gathering::Gathering;
 use lint_core::SourceFile;
 use lint_core::{Parsed, Unwalked};
+use lint_derived_tables::DerivedTables;
 use lint_enum_predicates::EnumPredicates;
 use lint_file::{ContextLint, Gleaning, PrimedFacts};
 use lint_guard_must_use::GuardMustUse;
@@ -170,6 +171,7 @@ contexts! {
         no_forwarders: NoForwarders,
         unconsumed_traits: UnconsumedTraits,
         guard_must_use: GuardMustUse,
+        derived_tables: DerivedTables,
         enum_predicates: EnumPredicates,
         module_nesting: ModuleNesting,
         public_api_tests: PublicApiTests,

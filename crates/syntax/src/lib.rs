@@ -4,7 +4,7 @@ mod walk;
 
 pub use compiled::Compiled;
 pub use proc_macro2::{Delimiter, Group, Ident, LineColumn, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
-pub use quote::{ToTokens, format_ident, quote, quote_spanned};
+pub use quote::{ToTokens, format_ident, quote};
 pub use readers::applied::Applied;
 pub use readers::block_items::BlockItems;
 pub use readers::boundary::{LitText, MemberText, Past, PatEdge, PatReached, PatSpine, PatTree, Spine, TypeSpine};
@@ -18,7 +18,7 @@ pub use syn::ext::IdentExt;
 pub use syn::punctuated::Punctuated;
 pub use syn::spanned::Spanned;
 pub use syn::{
-    AngleBracketedGenericArguments, Arm, Attribute, BinOp, Block, Data, DataEnum, DataStruct, DeriveInput, Error, Expr,
+    AngleBracketedGenericArguments, Arm, Attribute, BinOp, Block, Data, DataStruct, DeriveInput, Error, Expr,
     ExprAssign, ExprBinary, ExprBreak, ExprCall, ExprCast, ExprClosure, ExprConst, ExprContinue, ExprField,
     ExprForLoop, ExprIf, ExprLet, ExprLit, ExprLoop, ExprMacro, ExprMatch, ExprMethodCall, ExprPath, ExprReference,
     ExprRepeat, ExprReturn, ExprStruct, ExprTry, ExprUnary, ExprWhile, Field, Fields, FieldsNamed, FieldsUnnamed, File,

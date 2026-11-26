@@ -1056,7 +1056,7 @@ const SEGMENTED: &str = concat!(
 
 const ENDS: usize = 5;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(strum::VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
 enum Closed {
     Refines,
     Supersedes,
@@ -1078,8 +1078,6 @@ struct Probe {
 }
 
 impl Closed {
-    const ALL: [Closed; 4] = [Closed::Refines, Closed::Supersedes, Closed::SegmentSupersedes, Closed::SegmentCorrects];
-
     fn ends(self) -> Ends {
         match self {
             Closed::Refines => Ends::Nodes(NodeRelation::Refines),
@@ -1128,8 +1126,11 @@ impl Ends {
 
 impl Probe {
     fn any() -> impl Strategy<Value = Probe> {
-        (select(Closed::ALL.to_vec()), Probe::edges(), 0..ENDS, 0..ENDS)
-            .prop_map(|(closed, edges, child, parent)| Probe { closed, edges, tried: Edge { child, parent } })
+        (select(Closed::VARIANTS), Probe::edges(), 0..ENDS, 0..ENDS).prop_map(|(closed, edges, child, parent)| Probe {
+            closed,
+            edges,
+            tried: Edge { child, parent },
+        })
     }
 
     fn edges() -> impl Strategy<Value = Vec<Edge>> {
@@ -1202,12 +1203,14 @@ laws::law!(an_edge_is_refused_exactly_where_the_closure_holds_its_reverse_path, 
 
 #[test]
 fn an_edge_reversing_a_written_path_is_refused_for_every_acyclic_relation() -> Result<(), laws::Unmet> {
-    let refused = Closed::ALL
-        .into_iter()
+    let refused = Closed::VARIANTS
+        .iter()
+        .copied()
         .map(|closed| Probe { closed, edges: Probe::chain(), tried: Probe::closing() }.refused())
         .collect::<Result<Vec<Option<Cycle>>, laws::Unmet>>()?;
-    let cycles = Closed::ALL
-        .into_iter()
+    let cycles = Closed::VARIANTS
+        .iter()
+        .copied()
         .map(|closed| Ok(Some(closed.ends().cycle(Probe::closing())?)))
         .collect::<Result<Vec<Option<Cycle>>, laws::Unmet>>()?;
     assert_eq!(refused, cycles);
@@ -1230,7 +1233,8 @@ struct Shown {
 
 impl Mixed {
     fn any() -> impl Strategy<Value = Mixed> {
-        let others: Vec<Closed> = Closed::ALL.into_iter().filter(|closed| *closed != Closed::Refines).collect();
+        let others: Vec<Closed> =
+            Closed::VARIANTS.iter().copied().filter(|closed| *closed != Closed::Refines).collect();
         (Dag::any(), select(others), Probe::edges()).prop_map(|(dag, closed, edges)| {
             let ends = dag.facets.len().min(ENDS);
             Mixed { dag, closed, edges: edges.into_iter().filter(|edge| edge.child < ends).collect() }
@@ -1294,7 +1298,7 @@ struct Mismatch {
     stored: Restaging,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(strum::VariantArray, Clone, Copy, Debug)]
 enum Step {
     Refine,
     Specify,
@@ -1305,8 +1309,6 @@ enum Step {
 struct Staging;
 
 impl Staging {
-    const STEPS: [Step; 4] = [Step::Refine, Step::Specify, Step::Reopen, Step::Drop];
-
     fn transition(step: Step) -> Result<Transition, laws::Unmet> {
         match step {
             Step::Refine => Ok(Transition::Refine),
@@ -1368,7 +1370,7 @@ impl Staging {
 
 laws::law!(
     a_restaged_node_reads_back_as_its_transition_applies_or_is_refused_unchanged_as_misstaged,
-    vec(select(Staging::STEPS.to_vec()), 0..8),
+    vec(select(Step::VARIANTS), 0..8),
     steps,
     {
         let mismatched = Staging::mismatched(&steps).map_err(|failure| TestCaseError::fail(format!("{failure:?}")))?;

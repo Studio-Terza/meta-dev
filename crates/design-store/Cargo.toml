@@ -31,6 +31,7 @@ design-jobs = { path = "../design-jobs" }
 design-runs = { path = "../design-runs" }
 sqlite-ports = { path = "../sqlite-ports" }
 laws = { path = "../laws" }
+strum.workspace = true
 
 [lints]
 workspace = true

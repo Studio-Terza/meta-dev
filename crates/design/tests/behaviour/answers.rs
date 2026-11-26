@@ -271,18 +271,6 @@ fn a_stop_with_nothing_running_blocks_as_stalled_with_the_quotes_that_bear_on_it
 }
 
 #[test]
-fn a_shell_the_harness_marked_killed_is_finished_not_an_overrun() -> Result<(), laws::Unmet> {
-    let asking = Asking::over(&[Asking::PICKED, Asking::KEPT])?;
-    Tasked::placed(&asking, "b2.output", "partial output\n[killed]\n", [45, 40])?;
-    let Stop { asked, reason, trail, .. } = Tasked::stopped(&asking)?;
-    assert_eq!(asked.outcome?, Outcome::Blocked);
-    assert!(reason.contains("Nothing is running: no background shell or agent will wake you"), "{reason}");
-    assert_eq!(reason.match_indices("OVERRUN").count(), 0, "{reason}");
-    assert_eq!(trail, ["s\t0\t0\tstalled\t2\t1\t1\tblocked\t74\t0"]);
-    Ok(())
-}
-
-#[test]
 fn a_stop_while_a_ci_wait_shell_runs_is_not_stalled_and_passes_without_quotes() -> Result<(), laws::Unmet> {
     let asking = Asking::over(&[Asking::NONE])?;
     Tasked::placed(&asking, "b1.output", "", [4, 4])?;

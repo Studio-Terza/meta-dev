@@ -3,26 +3,26 @@ use std::collections::BTreeSet;
 use algebra::Semigroup;
 use graph::{ItemPath, Reexport};
 use lint_layout::{Name, Whole, Word};
+use strum::{IntoStaticStr, VariantArray};
 
 use super::boundary::ScopeId;
 use super::entries::Visibility;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(IntoStaticStr, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
 pub(super) enum Anchor {
     Crate,
+    #[strum(serialize = "self")]
     Module,
     Super,
 }
 
 impl Anchor {
-    const WORDS: [Word<'static>; 3] = [Word::new("crate"), Word::new("self"), Word::new("super")];
-    const ANCHORS: [Anchor; 3] = [Anchor::Crate, Anchor::Module, Anchor::Super];
-
     pub(super) fn spelled(first: &Name) -> Option<Anchor> {
-        Self::WORDS
+        Self::VARIANTS
             .iter()
-            .zip(Self::ANCHORS)
-            .find_map(|(word, anchor)| first.matches::<Whole>(&[*word]).map(|_| anchor))
+            .copied()
+            .find(|anchor| first.matches::<Whole>(&[Word::new(<&str>::from(*anchor))]).is_some())
     }
 
     pub(super) fn reexported(self, written: &ItemPath, declared: &BTreeSet<&Name>) -> Reexport {

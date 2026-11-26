@@ -13,8 +13,8 @@ doctest = false
 invariants = { path = "../invariants" }
 grammar-lstart = { path = "../grammar-lstart" }
 grammar-reply = { path = "../grammar-reply" }
-named-derive = { path = "../named-derive" }
 newtype = { path = "../newtype" }
+strum.workspace = true
 port-core = { path = "../port-core" }
 serde.workspace = true
 serde_json.workspace = true
