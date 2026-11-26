@@ -15,7 +15,6 @@ newtype = { path = "../newtype" }
 thiserror.workspace = true
 
 [dev-dependencies]
-laws = { path = "../laws" }
 serde_json.workspace = true
 
 [lints]

@@ -1,13 +1,9 @@
-mod clause;
-
-pub use clause::Clause;
-
 use std::error::Error;
 use std::fmt::Display;
 use std::num::TryFromIntError;
 use std::str::FromStr;
 
-use newtype::{Enumerated, Guarded, Inner, Listed, Newtype, Optional, Spelled, Stored, Validated};
+use newtype::{Guarded, Inner, Listed, Newtype, Optional, Spelled, Stored, Validated};
 
 use crate::Cause;
 
@@ -31,8 +27,6 @@ pub trait Encoding<Value> {
     fn raw(value: &Value) -> Self::Raw;
 
     fn from_raw(raw: Self::Raw) -> Result<Value, ColumnFailure>;
-
-    fn check(column: &str) -> Option<Clause>;
 }
 
 pub trait Primitive: Sized {
@@ -41,10 +35,6 @@ pub trait Primitive: Sized {
     fn into_raw(self) -> Self::Raw;
 
     fn from_raw(raw: Self::Raw) -> Result<Self, ColumnFailure>;
-
-    fn check(_column: &str) -> Option<Clause> {
-        None
-    }
 }
 
 impl<Value: Newtype<Inner: Primitive> + Clone> Encoding<Value> for Inner {
@@ -56,10 +46,6 @@ impl<Value: Newtype<Inner: Primitive> + Clone> Encoding<Value> for Inner {
 
     fn from_raw(raw: Self::Raw) -> Result<Value, ColumnFailure> {
         Value::Inner::from_raw(raw).map(Value::new)
-    }
-
-    fn check(column: &str) -> Option<Clause> {
-        Value::Inner::check(column)
     }
 }
 
@@ -77,10 +63,6 @@ where
         Value::Inner::from_raw(raw)
             .and_then(|inner| Value::try_new(inner).map_err(|refused| ColumnFailure::Refused(Cause::told(&refused))))
     }
-
-    fn check(_column: &str) -> Option<Clause> {
-        None
-    }
 }
 
 impl<Value: Display + FromStr<Err: Error + Send + Sync + 'static>> Encoding<Value> for Spelled {
@@ -93,16 +75,9 @@ impl<Value: Display + FromStr<Err: Error + Send + Sync + 'static>> Encoding<Valu
     fn from_raw(raw: String) -> Result<Value, ColumnFailure> {
         raw.parse().map_err(|unknown| ColumnFailure::Misspelled(Cause::told(&unknown)))
     }
-
-    fn check(_column: &str) -> Option<Clause> {
-        None
-    }
 }
 
-impl<Value> Encoding<Value> for Listed
-where
-    Value: Enumerated + Display + FromStr<Err: Error + Send + Sync + 'static>,
-{
+impl<Value: Display + FromStr<Err: Error + Send + Sync + 'static>> Encoding<Value> for Listed {
     type Raw = String;
 
     fn raw(value: &Value) -> String {
@@ -111,10 +86,6 @@ where
 
     fn from_raw(raw: String) -> Result<Value, ColumnFailure> {
         <Spelled as Encoding<Value>>::from_raw(raw)
-    }
-
-    fn check(column: &str) -> Option<Clause> {
-        Some(Clause::within(column, Value::VARIANTS.iter().map(ToString::to_string)))
     }
 }
 
@@ -128,10 +99,6 @@ impl<Value: Column> Encoding<Option<Value>> for Optional {
     fn from_raw(raw: Option<Value::Raw>) -> Result<Option<Value>, ColumnFailure> {
         raw.map(Value::from_raw).transpose()
     }
-
-    fn check(column: &str) -> Option<Clause> {
-        Value::check(column).map(Clause::nullable)
-    }
 }
 
 impl Primitive for i64 {
@@ -142,18 +109,6 @@ impl Primitive for i64 {
     }
 
     fn from_raw(raw: i64) -> Result<i64, ColumnFailure> {
-        Ok(raw)
-    }
-}
-
-impl Primitive for f64 {
-    type Raw = f64;
-
-    fn into_raw(self) -> f64 {
-        self
-    }
-
-    fn from_raw(raw: f64) -> Result<f64, ColumnFailure> {
         Ok(raw)
     }
 }
@@ -170,18 +125,6 @@ impl Primitive for String {
     }
 }
 
-impl Primitive for Vec<u8> {
-    type Raw = Vec<u8>;
-
-    fn into_raw(self) -> Vec<u8> {
-        self
-    }
-
-    fn from_raw(raw: Vec<u8>) -> Result<Vec<u8>, ColumnFailure> {
-        Ok(raw)
-    }
-}
-
 impl Primitive for u32 {
     type Raw = i64;
 
@@ -192,10 +135,6 @@ impl Primitive for u32 {
     fn from_raw(raw: i64) -> Result<u32, ColumnFailure> {
         u32::try_from(raw).map_err(ColumnFailure::Unfit)
     }
-
-    fn check(column: &str) -> Option<Clause> {
-        Some(Clause::at_most(column, u32::MAX))
-    }
 }
 
 pub trait Column: Sized {
@@ -204,8 +143,6 @@ pub trait Column: Sized {
     fn raw(&self) -> Self::Raw;
 
     fn from_raw(raw: Self::Raw) -> Result<Self, ColumnFailure>;
-
-    fn check(column: &str) -> Option<Clause>;
 }
 
 impl<Value: Stored<Kind: Encoding<Value>>> Column for Value {
@@ -217,9 +154,5 @@ impl<Value: Stored<Kind: Encoding<Value>>> Column for Value {
 
     fn from_raw(raw: Self::Raw) -> Result<Value, ColumnFailure> {
         Value::Kind::from_raw(raw)
-    }
-
-    fn check(column: &str) -> Option<Clause> {
-        Value::Kind::check(column)
     }
 }

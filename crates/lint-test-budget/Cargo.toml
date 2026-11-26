@@ -11,9 +11,7 @@ doctest = false
 
 [dependencies]
 lint-sweep = { path = "../lint-sweep" }
-graph = { path = "../graph" }
 newtype = { path = "../newtype" }
-algebra = { path = "../algebra" }
 lint-core = { path = "../lint-core" }
 lint-placement = { path = "../lint-placement" }
 lint-layout = { path = "../lint-layout" }
@@ -21,11 +19,9 @@ lint-process-starters = { path = "../lint-process-starters" }
 syntax = { path = "../syntax" }
 
 [dev-dependencies]
-graph-reader = { path = "../graph-reader" }
 lint-core = { path = "../lint-core" }
 lint-fixtures = { path = "../lint-fixtures" }
 lint-placement = { path = "../lint-placement" }
-laws = { path = "../laws" }
 
 [lints]
 workspace = true

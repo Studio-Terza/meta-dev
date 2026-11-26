@@ -1,44 +1,26 @@
-mod boundary;
-
 use std::collections::BTreeMap;
 
-use strum::VariantArray;
 use toml::de::DeTable;
 
-use super::Manifest;
 use crate::line_number::LineNumber;
 use crate::name::Name;
 use crate::source_text::SourceText;
-pub use boundary::TableKey;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct KeyLines {
     features: BTreeMap<Name, LineNumber>,
-    keys: BTreeMap<TableKey, LineNumber>,
 }
 
 impl KeyLines {
     const FEATURES: &'static str = "features";
 
     pub(super) fn read(text: &SourceText, top: &DeTable<'_>) -> KeyLines {
-        KeyLines {
-            features: Self::features_in(text, top),
-            keys: TableKey::VARIANTS
-                .iter()
-                .copied()
-                .filter_map(|key| Some((key, Manifest::key_in(text, top, &key.table(), key.into())?)))
-                .collect(),
-        }
+        KeyLines { features: Self::features_in(text, top) }
     }
 
     #[must_use]
     pub fn features(&self) -> &BTreeMap<Name, LineNumber> {
         &self.features
-    }
-
-    #[must_use]
-    pub fn line(&self, key: TableKey) -> Option<LineNumber> {
-        self.keys.get(&key).copied()
     }
 
     fn features_in(text: &SourceText, top: &DeTable<'_>) -> BTreeMap<Name, LineNumber> {

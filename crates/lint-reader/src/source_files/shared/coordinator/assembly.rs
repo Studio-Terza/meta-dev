@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use algebra::{Monoid, Semigroup};
+use lint_core::Joins;
 use lint_layout::Failure;
 use lint_placement::CrateFile;
 use lint_roots::Survey;
@@ -28,15 +28,13 @@ pub(super) struct Assembled<'tree> {
     failures: Vec<Failure>,
 }
 
-impl Semigroup for Assembled<'_> {
+impl Joins for Assembled<'_> {
     fn combine(self, other: Self) -> Self {
         let mut mains = self.mains;
         other.mains.into_iter().for_each(|(hand, found)| mains.entry(hand).or_default().extend(found));
         Assembled { mains, failures: self.failures.combine(other.failures) }
     }
 }
-
-impl Monoid for Assembled<'_> {}
 
 impl<'tree> Assembled<'tree> {
     pub(super) fn concluded<Out>(
@@ -92,15 +90,13 @@ struct Plan<'tree> {
     seen: BTreeSet<PathBuf>,
 }
 
-impl Semigroup for Plan<'_> {
+impl Joins for Plan<'_> {
     fn combine(self, other: Self) -> Self {
         let mut seen = self.seen;
         seen.extend(other.seen);
         Plan { order: self.order.combine(other.order), seen }
     }
 }
-
-impl Monoid for Plan<'_> {}
 
 #[derive(Clone, Copy, Debug)]
 struct Marks<'up, 'tree> {
@@ -120,15 +116,13 @@ struct Tested<'tree> {
     consumed: BTreeSet<Located<'tree>>,
 }
 
-impl Semigroup for Tested<'_> {
+impl Joins for Tested<'_> {
     fn combine(self, other: Self) -> Self {
         let mut consumed = self.consumed;
         consumed.extend(other.consumed);
         Tested { found: self.found.combine(other.found), consumed }
     }
 }
-
-impl Monoid for Tested<'_> {}
 
 #[derive(Clone, Copy, Debug)]
 struct TestMarks<'up, 'tree> {

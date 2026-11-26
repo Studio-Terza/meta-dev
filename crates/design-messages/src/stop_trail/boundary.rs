@@ -1,14 +1,29 @@
 use std::fmt;
 use std::iter::Sum;
 
-use design_model::{Fate, Halt};
 use invariants::Ignoring;
-use newtype::{Arbitrary, Display, Newtype};
+use newtype::{Arbitrary, Display, Listed, Newtype};
 use store_ports::{Batch, Columns, Execute, Prepared, Query, StoreFailure};
+use strum::{IntoStaticStr, VariantArray};
 use transcript_ports::{Body, SessionId};
 
 use super::{Overran, Overruns, StopTrail, Stopped};
 use crate::boundary::ignored::Ignored;
+
+#[derive(strum::Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
+pub enum Halt {
+    Live,
+    Stalled,
+    Overrun,
+}
+
+#[derive(strum::Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
+pub enum Fate {
+    Blocked,
+    Passed,
+}
 
 #[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Tally(i64);

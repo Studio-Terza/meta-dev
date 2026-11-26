@@ -3,7 +3,6 @@ mod crate_name;
 mod crate_root;
 mod ignored;
 mod module_path;
-mod nest;
 mod package_root;
 mod packages;
 mod placement;
@@ -11,9 +10,6 @@ mod role;
 
 pub use crate_file::CrateFile;
 pub use crate_name::CrateName;
-pub use crate_root::CrateRoot;
-pub use module_path::ModulePath;
-pub use nest::{Krate, Level, Nest};
 pub use package_root::PackageRoot;
 pub use packages::Packages;
 pub use placement::Placement;

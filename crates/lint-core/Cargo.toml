@@ -11,7 +11,6 @@ doctest = false
 
 [dependencies]
 invariants = { path = "../invariants" }
-algebra = { path = "../algebra" }
 newtype = { path = "../newtype" }
 file-ports = { path = "../file-ports" }
 lint-placement = { path = "../lint-placement" }
@@ -21,7 +20,7 @@ syntax-lexer = { path = "../syntax-lexer" }
 lint-layout = { path = "../lint-layout" }
 
 [dev-dependencies]
-laws = { path = "../laws" }
+test-failure = { path = "../test-failure" }
 
 [lints]
 workspace = true

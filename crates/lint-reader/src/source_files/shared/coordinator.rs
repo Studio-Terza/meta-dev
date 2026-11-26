@@ -5,9 +5,9 @@ use std::iter;
 use std::path::Path;
 use std::sync::OnceLock;
 
-use algebra::{Monoid, Semigroup};
 use file_ports::Files;
-use lint_core::{FileHead, Readout, RepoFile, SourceFile};
+use lint_core::Joins;
+use lint_core::{FileHead, Readout, SourceFile};
 use lint_roots::Survey;
 
 use super::boundary::{Hands, Partition};
@@ -17,7 +17,6 @@ use crate::source_files::Stage;
 use crate::source_files::declared::{Declared, Kind};
 use crate::source_files::ignored::Ignored;
 use crate::source_files::located::{Located, Node};
-use crate::source_files::staged::Staged;
 use assembly::{Assembled, Outcomes, Planner};
 use invariants::Ignoring;
 
@@ -78,7 +77,7 @@ struct Gathered<'tree> {
     kept: BTreeMap<Located<'tree>, SourceFile>,
 }
 
-impl Semigroup for Gathered<'_> {
+impl Joins for Gathered<'_> {
     fn combine(self, other: Self) -> Self {
         let mut outcomes = self.outcomes;
         outcomes.extend(other.outcomes);
@@ -89,8 +88,6 @@ impl Semigroup for Gathered<'_> {
         Gathered { outcomes, hands, kept }
     }
 }
-
-impl Monoid for Gathered<'_> {}
 
 #[derive(Debug)]
 struct Explored<'tree> {
@@ -156,19 +153,18 @@ impl Reads for Coordinator<'_, '_> {
             let outcome = owned.remove(found.as_ref());
             Some(found.taken(outcome, &placed))
         });
-        let repo_files: Vec<RepoFile> = stage.staged.iter().flatten().flat_map(Staged::repo_files).cloned().collect();
-        <Assembled<'_> as Monoid>::concat(taken).concluded(|mains, failures| {
+        <Assembled<'_> as Joins>::concat(taken).concluded(|mains, failures| {
             let mut assigned = mains;
             let assembling: Vec<_> = self
                 .remotes
                 .iter()
                 .filter_map(|remote| {
                     let mine = assigned.remove(&remote.hand()).unwrap_or_default();
-                    remote.assigned(Assignment::new(mine, repo_files.clone(), Vec::new()))
+                    remote.assigned(Assignment::new(mine, Vec::new()))
                 })
                 .collect();
             let own = assigned.remove(&Partition::MAIN).unwrap_or_default();
-            let readout = Assignment::new(own, repo_files, failures).readout(kept);
+            let readout = Assignment::new(own, failures).readout(kept);
             let mut heads: Vec<FileHead> = readout.files().iter().map(|file| file.head().clone()).collect();
             heads.extend(assembling.into_iter().flat_map(Assembling::heads));
             heads.sort_by(|earlier, later| AsRef::<Path>::as_ref(earlier).cmp(AsRef::<Path>::as_ref(later)));
@@ -242,7 +238,7 @@ impl<'tree, Port: Files> Exploring<'_, '_, 'tree, Port> {
         let packages = &self.coordinator.shared.stage.packages;
         Parsed::read(self.files, packages, &local, |own, kept| {
             let report: Report<'tree> =
-                Monoid::concat(iter::once(own).chain(waiting.into_iter().map(Dispatched::sighted)));
+                Joins::concat(iter::once(own).chain(waiting.into_iter().map(Dispatched::sighted)));
             report.concluded(|sightings, survey| Sighted { sightings, survey, kept })
         })
     }

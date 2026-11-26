@@ -2,7 +2,7 @@
 
 use grammar::{Ignoring, Unlexed};
 use grammar_unit_label::{Fixed, Target, Unit};
-use laws::proptest::sample::select;
+use strum::VariantArray;
 
 #[derive(Debug, PartialEq, Eq)]
 enum Described {
@@ -21,55 +21,52 @@ impl Unit for Described {
 }
 
 impl Described {
-    fn read(text: &&str) -> Option<Described> {
-        Described::labelled(text)
-    }
-
     fn targeted(text: &str) -> Described {
         Described::Target(text.to_owned())
     }
 }
 
-laws::table!(
-    a_unit_label_reads_as_the_role_cargo_gave_the_unit,
-    Described::read,
-    [
-        "" => Some(Described::Fixed(Fixed::Built)),
-        " (check)" => Some(Described::Fixed(Fixed::Checked)),
-        " (check-test)" => Some(Described::Fixed(Fixed::CheckedTest)),
-        " build-script" => Some(Described::Fixed(Fixed::BuildScript)),
-        " build-script (run)" => Some(Described::Fixed(Fixed::BuildRun)),
-        " app \"bin\" (check)" => Some(Described::targeted(" app \"bin\" (check) Check")),
-        " behaviour \"test\" (check-test)" => Some(Described::targeted(" behaviour \"test\" (check-test) CheckTest")),
-        " b \"bench\" (check-test)" => Some(Described::targeted(" b \"bench\" (check-test) CheckTest")),
-        " ex \"example\" (check)" => Some(Described::targeted(" ex \"example\" (check) Check")),
-        " my-tool_2 \"bin\" (check-test)" => Some(Described::targeted(" my-tool_2 \"bin\" (check-test) CheckTest")),
-    ]
-);
+#[test]
+fn a_unit_label_reads_as_the_role_cargo_gave_the_unit() {
+    for (label, want) in [
+        ("", Described::Fixed(Fixed::Built)),
+        (" (check)", Described::Fixed(Fixed::Checked)),
+        (" (check-test)", Described::Fixed(Fixed::CheckedTest)),
+        (" build-script", Described::Fixed(Fixed::BuildScript)),
+        (" build-script (run)", Described::Fixed(Fixed::BuildRun)),
+        (" app \"bin\" (check)", Described::targeted(" app \"bin\" (check) Check")),
+        (" behaviour \"test\" (check-test)", Described::targeted(" behaviour \"test\" (check-test) CheckTest")),
+        (" b \"bench\" (check-test)", Described::targeted(" b \"bench\" (check-test) CheckTest")),
+        (" ex \"example\" (check)", Described::targeted(" ex \"example\" (check) Check")),
+        (" my-tool_2 \"bin\" (check-test)", Described::targeted(" my-tool_2 \"bin\" (check-test) CheckTest")),
+    ] {
+        assert_eq!(Described::labelled(label), Some(want), "{label}");
+    }
+}
 
-laws::table!(
-    a_label_cargo_does_not_write_for_a_clippy_unit_is_refused,
-    Described::read,
-    [
-        "(check)" => None,
-        " (check) " => None,
-        "  (check)" => None,
-        " (run)" => None,
-        " build-script (check)" => None,
-        " (check) build-script" => None,
-        " app bin (check)" => None,
-        " app \"bin\"" => None,
-        " app \"lib\" (check)" => None,
-        " app \"bin\" (run)" => None,
-        " app \"bin\" (doc)" => None,
-        "app \"bin\" (check)" => None,
-    ]
-);
+#[test]
+fn a_label_cargo_does_not_write_for_a_clippy_unit_is_refused() {
+    for label in [
+        "(check)",
+        " (check) ",
+        "  (check)",
+        " (run)",
+        " build-script (check)",
+        " (check) build-script",
+        " app bin (check)",
+        " app \"bin\"",
+        " app \"lib\" (check)",
+        " app \"bin\" (run)",
+        " app \"bin\" (doc)",
+        "app \"bin\" (check)",
+    ] {
+        assert_eq!(Described::labelled(label), None, "{label}");
+    }
+}
 
-laws::roundtrip!(
-    a_fixed_label_is_displayed_and_parsed_back,
-    select(vec![Fixed::Built, Fixed::Checked, Fixed::CheckedTest, Fixed::BuildScript, Fixed::BuildRun]),
-    |fixed: &Fixed| fixed.to_string(),
-    |text: &String| text.parse::<Fixed>().ignoring(Unlexed::NotThisGrammar),
-    Some
-);
+#[test]
+fn a_fixed_label_is_displayed_and_parsed_back() {
+    for fixed in Fixed::VARIANTS {
+        assert_eq!(fixed.to_string().parse::<Fixed>().ignoring(Unlexed::NotThisGrammar), Some(*fixed));
+    }
+}

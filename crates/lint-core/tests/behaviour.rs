@@ -1,8 +1,6 @@
-#[path = "generated/laws.rs"]
-mod generated_laws;
-
 use std::path::Path;
 use std::rc::Rc;
+use test_failure::Failed;
 
 use lint_core::{Macros, Parsed, SourceFile, SourceText};
 use syntax::{Expr, Item, Macro, Stmt};
@@ -43,7 +41,7 @@ impl Walked {
 }
 
 #[test]
-fn a_macro_body_walks_to_the_same_statements_each_time_from_any_copy_and_when_nested() -> Result<(), laws::Unmet> {
+fn a_macro_body_walks_to_the_same_statements_each_time_from_any_copy_and_when_nested() -> Result<(), Failed> {
     let file = SourceFile::parse("crates/x/src/lib.rs", SourceText::new(NESTED.to_owned()))?;
     let outer = file.syntax().items.iter().find_map(Invocations::in_item).ok_or("no macro in the file")?;
     Macros::pin(&file, outer);
@@ -62,7 +60,7 @@ fn a_macro_body_walks_to_the_same_statements_each_time_from_any_copy_and_when_ne
 }
 
 #[test]
-fn a_macro_outside_the_file_is_expanded_afresh_each_time() -> Result<(), laws::Unmet> {
+fn a_macro_outside_the_file_is_expanded_afresh_each_time() -> Result<(), Failed> {
     let file = SourceFile::parse("crates/x/src/lib.rs", SourceText::new(NESTED.to_owned()))?;
     let lengths = ["m!(a)", "m!(a; b)", "m!(a; b; c)"]
         .iter()
@@ -75,7 +73,7 @@ fn a_macro_outside_the_file_is_expanded_afresh_each_time() -> Result<(), laws::U
 }
 
 #[test]
-fn a_parsed_file_pairs_each_test_module_with_its_own_head() -> Result<(), laws::Unmet> {
+fn a_parsed_file_pairs_each_test_module_with_its_own_head() -> Result<(), Failed> {
     let module = SourceFile::parse("crates/x/src/tests.rs", SourceText::new("fn checked() {}\n".to_owned()))?;
     let file = SourceFile::parse("crates/x/src/lib.rs", SourceText::new("mod tests;\n".to_owned()))?
         .with_test_modules(vec![module]);
@@ -89,7 +87,7 @@ fn a_parsed_file_pairs_each_test_module_with_its_own_head() -> Result<(), laws::
 }
 
 #[test]
-fn a_pinned_macro_reads_its_nested_calls_once_and_a_copy_reads_them_afresh() -> Result<(), laws::Unmet> {
+fn a_pinned_macro_reads_its_nested_calls_once_and_a_copy_reads_them_afresh() -> Result<(), Failed> {
     let file = SourceFile::parse("crates/x/src/lib.rs", SourceText::new(NESTED.to_owned()))?;
     let outer = file.syntax().items.iter().find_map(Invocations::in_item).ok_or("no macro in the file")?;
     let copied = outer.clone();
@@ -103,12 +101,32 @@ fn a_pinned_macro_reads_its_nested_calls_once_and_a_copy_reads_them_afresh() -> 
     Ok(())
 }
 
+#[test]
+fn nested_calls_are_found_inside_groups_and_never_behind_a_metavariable() -> Result<(), Failed> {
+    let file = SourceFile::parse("crates/x/src/lib.rs", SourceText::new(NESTED.to_owned()))?;
+    let cases = [
+        ("m!(inner!(a))", vec!["inner"]),
+        ("m!((first!(a), [second!(b)]))", vec!["first", "second"]),
+        ("m!(a + b)", vec![]),
+        ("m!($inner!(a))", vec![]),
+    ];
+    for (text, expected) in cases {
+        let invocation = syntax::parse::parse_str::<Macro>(text)?;
+        let found: Vec<String> = Macros::nested(&file, &invocation)
+            .iter()
+            .map(|call| syntax::ToTokens::to_token_stream(&call.path).to_string())
+            .collect();
+        assert_eq!(found, expected, "{text}");
+    }
+    Ok(())
+}
+
 const RULES: &str = "macro_rules! made {\n    ($($name:ident),*) => {\n        $(impl $crate::Kind for $name {\n            fn f() -> ::a::B { c::d() }\n        })*\n        fn tail() -> e::F {}\n    };\n}";
 
 const NOT_RULES: &str = "other! {\n    fn f() -> a::B {}\n}";
 
 #[test]
-fn a_macro_rules_transcriber_mentions_its_paths_with_each_metavariable_as_its_name() -> Result<(), laws::Unmet> {
+fn a_macro_rules_transcriber_mentions_its_paths_with_each_metavariable_as_its_name() -> Result<(), Failed> {
     let rules: syntax::ItemMacro = syntax::parse::parse_str(RULES)?;
     let other: syntax::ItemMacro = syntax::parse::parse_str(NOT_RULES)?;
     let mentioned: Vec<String> = Macros::mentioned(&rules.mac)

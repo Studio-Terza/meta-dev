@@ -1,75 +1,51 @@
-mod boundary;
-
-use std::collections::BTreeMap;
-
-use design_model::Segment;
 use port_core::Op;
-use stream::Stream;
-use transcript_ports::{Cursor, SessionId};
+use store_ports::{Counts, Done, Execute, StoreFailure};
+use transcript_ports::{Authorship, Cursor, Kind, Line, SessionId};
 
-use crate::boundary::{CursorRow, EdgeRow, LinkRow, MessageRow, SegmentRow};
+use crate::boundary::{CursorRow, MessageRow};
 
 #[derive(Debug, Op)]
 pub struct SessionRecords {
     messages: Vec<MessageRow>,
-    segments: Vec<SegmentRow>,
-    links: Vec<LinkRow>,
-    refused: Vec<LinkRow>,
-    edges: Vec<EdgeRow>,
+    unrecognised: Vec<Kind>,
     cursor: CursorRow,
-}
-
-#[derive(Debug, Op)]
-pub struct Holding(SessionRecords);
-
-#[derive(Debug, Op)]
-pub struct Held(SessionRecords);
-
-struct Anchoring {
-    landing: BTreeMap<Segment, SegmentRow>,
-    deriving: BTreeMap<Segment, SegmentRow>,
 }
 
 impl SessionRecords {
     #[must_use]
-    pub fn read(session: &SessionId, cursor: Cursor, stream: &Stream) -> SessionRecords {
-        let messages = stream.as_ref();
-        SessionRecords {
-            messages: messages.iter().map(MessageRow::from).collect(),
-            segments: messages.iter().flat_map(SegmentRow::within).collect(),
-            links: stream.links().iter().map(LinkRow::from).collect(),
-            refused: Vec::new(),
-            edges: messages
-                .iter()
-                .map(|message| EdgeRow::said(session, message))
-                .chain(stream.skipped().iter().map(|skipped| EdgeRow::skipped(session, skipped)))
-                .collect(),
-            cursor: CursorRow::reached(session, cursor),
-        }
-    }
-}
-
-impl Anchoring {
-    fn keyed(rows: impl Iterator<Item = SegmentRow>) -> BTreeMap<Segment, SegmentRow> {
-        rows.map(|row| (row.segment(), row)).collect()
+    pub fn read(session: &SessionId, cursor: Cursor, lines: &[Line]) -> SessionRecords {
+        let messages = lines
+            .iter()
+            .filter_map(|line| match line {
+                Line::Said(record) => Some(MessageRow::from(record)),
+                Line::Unrecognised(_) | Line::Skipped(_) => None,
+            })
+            .collect();
+        let unrecognised = lines
+            .iter()
+            .filter_map(|line| match line {
+                Line::Unrecognised(unread) => Some(unread.kind().clone()),
+                Line::Said(_) | Line::Skipped(_) => None,
+            })
+            .collect();
+        SessionRecords { messages, unrecognised, cursor: CursorRow::reached(session, cursor) }
     }
 
-    fn unheld(&self, link: &LinkRow) -> Option<Segment> {
-        link.segments()
-            .into_iter()
-            .find(|segment| self.landing.get(segment).is_none_or(|row| self.deriving.get(segment) != Some(row)))
+    pub fn authors(&self) -> impl Iterator<Item = Authorship> + '_ {
+        self.messages.iter().map(|message| *AsRef::<Authorship>::as_ref(message))
     }
-}
 
-impl From<SessionRecords> for Holding {
-    fn from(records: SessionRecords) -> Holding {
-        Holding(records)
-    }
-}
-
-impl Held {
     #[must_use]
-    pub fn refused(&self) -> &[LinkRow] {
-        &self.0.refused
+    pub fn unrecognised(&self) -> &[Kind] {
+        &self.unrecognised
+    }
+}
+
+impl Counts for SessionRecords {
+    type Failure = StoreFailure;
+
+    fn counted<D: Done>(self, statements: &mut impl Execute) -> Result<D, StoreFailure> {
+        let messages = statements.counted_all(self.messages.iter().map(MessageRow::inserted))?;
+        Ok(D::total([messages, self.cursor.written(statements)?].into_iter()))
     }
 }

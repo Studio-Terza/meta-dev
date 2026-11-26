@@ -15,7 +15,7 @@ newtype = { path = "../newtype" }
 thiserror.workspace = true
 
 [dev-dependencies]
-laws = { path = "../laws" }
+test-failure = { path = "../test-failure" }
 tempfile.workspace = true
 
 [lints]

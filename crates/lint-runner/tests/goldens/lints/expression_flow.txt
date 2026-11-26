@@ -22,45 +22,4 @@ src/reassigned.rs:2: mutable local that is only reassigned; a mutable binding is
 src/reassigned.rs:3: assignment to a local; build the value in one expression or give its type an updater method
 src/reassigned.rs:7: mutable local that is only reassigned; a mutable binding is borrowed as &mut or has methods called on it
 src/reassigned.rs:8: compound assignment to a local; build the value in one expression or give its type an updater method
-function names say what the function does:
-src/dropped.rs:1: fn f names nothing; say what it does
-src/early.rs:1: fn f names nothing; say what it does
-src/lonely.rs:1: fn f names nothing; say what it does
-src/loops.rs:1: fn f names nothing; say what it does
-src/loops.rs:6: fn g names nothing; say what it does
-src/mutated.rs:1: fn f names nothing; say what it does
-src/reassigned.rs:1: fn f names nothing; say what it does
-src/reassigned.rs:6: fn g names nothing; say what it does
-src/tail.rs:1: fn f names nothing; say what it does
-a number has a name: outside tests and boundary modules, a literal other than 0 and 1 sits in a const item:
-src/early.rs:3: numeric literal outside a const item; name it as a const so it can be found and tuned
-src/early.rs:5: numeric literal outside a const item; name it as a const so it can be found and tuned
-src/loops.rs:2: numeric literal outside a const item; name it as a const so it can be found and tuned
-src/reassigned.rs:3: numeric literal outside a const item; name it as a const so it can be found and tuned
-src/reassigned.rs:8: numeric literal outside a const item; name it as a const so it can be found and tuned
-src/tail.rs:2: numeric literal outside a const item; name it as a const so it can be found and tuned
-primitives appear in signatures and fields only inside a boundary:
-src/dropped.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/early.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/early.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/lonely.rs:1: bare bool in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/mutated.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/reassigned.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/reassigned.rs:6: bare u8 in g; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/tail.rs:1: bare bool in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/tail.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-a body leaves through its tail value or ?, never through return, break or continue:
-src/early.rs:3: return; yield the value from an if or match expression, drive the iteration with find, take_while, try_fold or position, or split it into smaller functions
-src/loops.rs:9: break; yield the value from an if or match expression, drive the iteration with find, take_while, try_fold or position, or split it into smaller functions
-src/loops.rs:11: continue; yield the value from an if or match expression, drive the iteration with find, take_while, try_fold or position, or split it into smaller functions
-linear bodies: a body is let bindings and pipeline expressions, with no if, match or loop; the one non-linear form is a pure router, a body that is one match or if let:
-src/dropped.rs:2: match that is not the whole body; extract it into its own function whose whole body is the match, or use combinators on Option, Result and iterators
-src/early.rs:2: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
-src/lonely.rs:2: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
-src/loops.rs:2: for loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
-src/loops.rs:3: while loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
-src/loops.rs:4: loop; drive an iterator with combinators (successors, repeat_with, take_while, try_fold)
-src/loops.rs:7: for loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
-src/loops.rs:8: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
-src/tail.rs:2: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
 fails

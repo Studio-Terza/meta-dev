@@ -71,13 +71,6 @@ impl Placement {
     }
 
     #[must_use]
-    pub fn executable_root<'file>(&self, file: &'file Path) -> Option<&'file Path> {
-        Some(file).filter(|candidate| {
-            self.role.roots(self.crate_root().directory(), candidate).iter().any(|root| root == candidate)
-        })
-    }
-
-    #[must_use]
     pub fn crate_file(&self, file: &Path) -> CrateFile {
         let source = self.crate_root().directory().join(Self::SOURCE_DIRECTORY);
         let library =

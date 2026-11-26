@@ -1,2 +1,0 @@
-session	shells	agents	halt	read	quoted	kept	fate	tokens	millis
-s	0	0	stalled	2	1	1	blocked	74	0

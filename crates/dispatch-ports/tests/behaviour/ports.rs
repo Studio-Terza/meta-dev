@@ -2,6 +2,7 @@ use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::{Duration, Instant};
+use test_failure::Failed;
 
 use dispatch_ports::{
     Agent, AgentRun, Clock, Deadline, Dispatch, Ended, Finished, HeadlessClaude, Job, Model, Pause, Pid, Prompt, Reply,
@@ -13,7 +14,7 @@ use port_core::Run;
 use super::{FakeClock, Ignored, Sleep, Wait, Waits, Watching};
 
 #[test]
-fn a_live_process_group_has_a_start_time_until_it_is_killed() -> Result<(), laws::Unmet> {
+fn a_live_process_group_has_a_start_time_until_it_is_killed() -> Result<(), Failed> {
     let mut sleeper = Command::new("sleep").arg("30").process_group(0).spawn()?;
     let pid = Pid::new(sleeper.id());
     let run = Run::root();
@@ -28,7 +29,7 @@ fn a_live_process_group_has_a_start_time_until_it_is_killed() -> Result<(), laws
 }
 
 #[test]
-fn an_agent_that_prints_its_result_is_watched_to_that_reply_and_usage() -> Result<(), laws::Unmet> {
+fn an_agent_that_prints_its_result_is_watched_to_that_reply_and_usage() -> Result<(), Failed> {
     let printed = r#"{"subtype":"success","result":"conversational(a.0)","usage":{"input_tokens":4,"output_tokens":9,"cache_creation_input_tokens":2,"cache_read_input_tokens":7}}"#;
     let run = Run::root();
     let watched = {
@@ -114,17 +115,19 @@ impl Stalling {
     }
 }
 
-laws::table!(
-    an_agent_that_leaves_a_large_prompt_unread_is_killed_and_reaped_at_its_deadline,
-    Stalling::watched,
-    [
-        &["-c", "exec sleep 30"][..] => Some(Stalled { watched: Watched::Stalled(Stall::Overdue), left: None }),
-        &["-c", "exec 0<&-; exec sleep 30"][..] => Some(Stalled { watched: Watched::Stalled(Stall::Overdue), left: None }),
-    ]
-);
+#[test]
+fn an_agent_that_leaves_a_large_prompt_unread_is_killed_and_reaped_at_its_deadline() {
+    for arguments in [&["-c", "exec sleep 30"][..], &["-c", "exec 0<&-; exec sleep 30"][..]] {
+        assert_eq!(
+            Stalling::watched(&arguments),
+            Some(Stalled { watched: Watched::Stalled(Stall::Overdue), left: None }),
+            "{arguments:?}"
+        );
+    }
+}
 
 #[test]
-fn a_wait_nobody_rings_lasts_its_full_pause() -> Result<(), laws::Unmet> {
+fn a_wait_nobody_rings_lasts_its_full_pause() -> Result<(), Failed> {
     let pause = Pause::new(1);
     let waits = Waits::default();
     let run = Run::root();
@@ -148,7 +151,7 @@ fn a_wait_nobody_rings_lasts_its_full_pause() -> Result<(), laws::Unmet> {
 }
 
 #[test]
-fn quiet_bell_waits_out_its_pause() -> Result<(), laws::Unmet> {
+fn quiet_bell_waits_out_its_pause() -> Result<(), Failed> {
     let pause = Duration::from_millis(50);
     let run = Run::root();
     let quiet = {
@@ -163,7 +166,7 @@ fn quiet_bell_waits_out_its_pause() -> Result<(), laws::Unmet> {
 }
 
 #[test]
-fn a_ring_wakes_one_wait_and_is_then_spent() -> Result<(), laws::Unmet> {
+fn a_ring_wakes_one_wait_and_is_then_spent() -> Result<(), Failed> {
     let waits = Waits::default();
     let run = Run::root();
     let woke = {
@@ -189,7 +192,7 @@ fn a_ring_wakes_one_wait_and_is_then_spent() -> Result<(), laws::Unmet> {
 }
 
 #[test]
-fn a_dispatched_agent_rings_its_own_bell_when_it_finishes() -> Result<(), laws::Unmet> {
+fn a_dispatched_agent_rings_its_own_bell_when_it_finishes() -> Result<(), Failed> {
     let waits = Waits::default();
     let run = Run::root();
     let woke = {

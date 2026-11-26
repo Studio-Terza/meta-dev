@@ -1,3 +1,3 @@
 mod boundary;
 
-pub use boundary::{Lexed, Lexeme, Place, TokenTable};
+pub use boundary::{Lexed, TokenTable};

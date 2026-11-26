@@ -1,6 +1,3 @@
-#[path = "generated/laws.rs"]
-mod generated_laws;
-
 use std::ffi::{OsStr, OsString};
 
 use std::process::ExitCode;

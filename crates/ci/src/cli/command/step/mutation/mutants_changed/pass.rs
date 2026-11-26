@@ -12,11 +12,11 @@ mod boundary;
 
 use super::super::boundary::Exact;
 use super::super::kept::{Mutant, Outcomes};
+use super::outcome::Outcome;
 use super::verdict::Verdict;
 use crate::cli::command::failure::Failure;
 use crate::cli::command::step::journal::Journal;
 use crate::cli::command::step::mutation::cargo_mutants::CargoMutants;
-use crate::cli::command::step::mutation::shard_summary::outcome::Outcome;
 use crate::cli::ports::{Exit, Invocation, Ports, Text};
 use boundary::Narrowed;
 use strum::VariantArray;

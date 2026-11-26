@@ -1,9 +1,9 @@
 use lint_core::{SourceFile, Violation};
-use lint_sweep::{Found, Member, Ranked, Visited};
+use lint_sweep::{Found, Visited};
 
 #[derive(Debug)]
 pub struct Led<'file> {
-    lists: Vec<Vec<Violation<'file>>>,
+    violations: Vec<Violation<'file>>,
     visited: Option<Visited>,
 }
 
@@ -13,27 +13,21 @@ impl<'file> Led<'file> {
         self.visited
     }
 
-    pub fn member(&mut self, member: Member) -> Vec<Violation<'file>> {
-        self.lists.get_mut(member.index()).map_or_default(std::mem::take)
+    pub fn taken(&mut self) -> Vec<Violation<'file>> {
+        std::mem::take(&mut self.violations)
     }
 }
 
 impl<'file> From<Found<'file>> for Led<'file> {
     fn from(found: Found<'file>) -> Led<'file> {
         let visited = Some(found.visited());
-        Led { lists: vec![found.into_iter().collect()], visited }
+        Led { violations: found.into_iter().collect(), visited }
     }
 }
 
-impl<'file> From<Ranked<'file>> for Led<'file> {
-    fn from(ranked: Ranked<'file>) -> Led<'file> {
-        Led::from(Vec::from(ranked))
-    }
-}
-
-impl<'file> From<Vec<Vec<Violation<'file>>>> for Led<'file> {
-    fn from(lists: Vec<Vec<Violation<'file>>>) -> Led<'file> {
-        Led { lists, visited: None }
+impl<'file> From<Vec<Violation<'file>>> for Led<'file> {
+    fn from(violations: Vec<Violation<'file>>) -> Led<'file> {
+        Led { violations, visited: None }
     }
 }
 

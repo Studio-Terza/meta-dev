@@ -1,4 +1,3 @@
-use std::borrow::Borrow;
 use std::fmt;
 
 use syntax::Ident;
@@ -36,12 +35,6 @@ impl From<&str> for CrateName {
         let underscored: String =
             package.chars().map(|letter| Some(letter).filter(|candidate| *candidate != '-').unwrap_or('_')).collect();
         CrateName(Name::from(underscored.as_str()))
-    }
-}
-
-impl Borrow<Name> for CrateName {
-    fn borrow(&self) -> &Name {
-        &self.0
     }
 }
 

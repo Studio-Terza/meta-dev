@@ -19,7 +19,7 @@ newtype = { path = "../newtype" }
 thiserror.workspace = true
 
 [dev-dependencies]
-laws = { path = "../laws" }
+proptest.workspace = true
 
 [lints]
 workspace = true

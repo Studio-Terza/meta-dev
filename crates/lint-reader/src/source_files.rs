@@ -1,18 +1,13 @@
-mod crate_sources;
 mod declared;
-mod described;
 mod ignored;
 mod located;
 mod modules;
 mod shared;
 mod staged;
-mod unlocated;
 
 use std::iter;
 use std::path::{Path, PathBuf};
 
-pub use crate_sources::CrateSources;
-pub use described::Described;
 use file_ports::Files;
 use lint_core::Readout;
 use lint_layout::Failure;
@@ -20,20 +15,12 @@ use lint_placement::Packages;
 use lint_roots::{Regrouped, Target, Tree};
 pub use shared::{Crew, Partition, Reader, Reads, SharedRead};
 use staged::Staged;
-pub use unlocated::Unlocated;
 
 #[derive(Debug)]
 pub struct Stage<'given> {
     trees: Vec<Tree<'given>>,
     staged: Vec<Vec<Staged>>,
     packages: Packages,
-}
-
-impl Stage<'_> {
-    #[must_use]
-    pub fn package_directories(&self) -> Vec<&Path> {
-        self.staged.iter().flatten().flat_map(Staged::targets).map(Target::package).collect()
-    }
 }
 
 #[derive(Debug)]

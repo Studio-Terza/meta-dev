@@ -2,14 +2,14 @@ mod boundary;
 
 use std::cell::OnceCell;
 
-use syntax::{Attribute, ItemImpl, Macro};
+use syntax::{Attribute, ItemImpl};
 
-use lint_layout::{LineNumber, Name, TestMarks, Word};
+use lint_layout::{Name, TestMarks};
 
 use super::boundary::Address;
 use crate::syntax::Syntax;
 use crate::walk::Walk;
-use boundary::{Attributed, Identified, Numbered};
+use boundary::{Attributed, Identified};
 
 #[derive(Debug)]
 pub struct Facts<'node, Node> {
@@ -58,19 +58,5 @@ impl<'node> Facts<'node, ItemImpl> {
     #[must_use]
     pub fn inherent(&self) -> Option<&'node ItemImpl> {
         *self.marked.get_or_init(|| Syntax::inherent(self.node))
-    }
-}
-
-impl<'node> Facts<'node, Macro> {
-    #[must_use]
-    pub fn law(&self) -> Option<&'node Macro> {
-        *self.marked.get_or_init(|| TestMarks::law(self.node))
-    }
-}
-
-impl<Node: Numbered> Facts<'_, Node> {
-    pub fn unnamed(&self) -> Option<LineNumber> {
-        let digits = Word::new(self.node.digits());
-        Node::UNITS.iter().find(|unit| **unit == digits).map_or(Some(LineNumber::from(self.node.spot())), |_| None)
     }
 }

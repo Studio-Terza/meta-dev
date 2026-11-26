@@ -1,3 +1,0 @@
-a hand impl of a derivable trait is prone to subtle bugs; derive it:
-src/order.rs:2: hand impl of Ord for B; derive it; where derive can't apply (a trait object, a foreign wrapper), replace the impl with a named method; answer a special need with a type (a redacting wrapper, field order, a key type, a named constructor)
-fails

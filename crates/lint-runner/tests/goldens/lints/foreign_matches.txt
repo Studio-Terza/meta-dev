@@ -1,4 +1,0 @@
-state graph violated:
-src/area.rs:8: match on Shape outside its file; dispatch through a trait
-src/area.rs:9: match on Shape outside its file; dispatch through a trait
-fails

@@ -2,8 +2,7 @@ use std::ffi::OsStr;
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 
-use design_model::Halt;
-use design_store::Tally;
+use design_messages::{Halt, Tally};
 use file_ports::{Bytes, Epoch, Offset, Size, Stamp, Stamps, Tail};
 use grammar_lines::Lines;
 use invariants::Ignoring;

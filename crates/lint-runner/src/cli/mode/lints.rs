@@ -1,88 +1,34 @@
 use std::any::TypeId;
-use std::cmp::Reverse;
 use std::collections::BTreeMap;
 use std::io::Write;
 use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
 use std::thread::Scope;
 
-use cargo_ports::Cargo;
-use graph::Model;
-
-use lint_hand_impls::HandImpls;
-
 use file_ports::Files;
-use lint_core::{FileHead, Headline, Lint, Readout, Report, SourceFile, Violation};
-use lint_file::{
-    FileLint, Filed, Judged, Kin, KinLint, Leader, Led, Primed, PrimedLint, Reads, Ruled, RuledLint, Swept, SweptLint,
-    WatchingLint,
-};
-use lint_file::{ModelLint, WorkspaceLint};
-use lint_port_dependencies::RoleFacts;
-use lint_reader::{Described, Unlocated};
-use lint_sweep::{Found, Founds, Gathers, Joined, Joint, Member, Unjoined};
+use lint_core::{Headline, Readout, SourceFile, Violation};
+use lint_file::{FileLint, Filed, Judged, Leader, Led, Reads, Ruled, RuledLint, Swept, SweptLint, WatchingLint};
+use lint_sweep::{Found, Founds, Gathers, Joined, Joint, Unjoined};
 use timer_ports::Timer;
-use workspace_metadata::Metadata;
 
-use lint_arbitrary_newtypes::ArbitraryNewtypes;
 use lint_bool_methods::BoolMethods;
-use lint_const_shape::ConstShape;
-use lint_crate_graph::CrateGraph;
-use lint_derived_tables::DerivedTables;
-use lint_distinct_signatures::DistinctSignatures;
-use lint_effect_sites::EffectsInPorts;
-use lint_enum_predicates::EnumPredicates;
 use lint_expression_flow::ExpressionFlow;
-use lint_fakes_at_ports::FakesAtPorts;
-use lint_fn_shape::FnShape;
-use lint_guard_must_use::GuardMustUse;
-use lint_laws::HandWrittenLaws;
-use lint_linear_flow::{LinearBodies, PlainConditions, PureRouters};
-use lint_literal_names::LiteralNames;
-use lint_long_exact_strings::LongExactStrings;
-use lint_mandatory_laws::MandatoryLaws;
 use lint_manual_iteration::ManualIteration;
-use lint_module_nesting::ModuleNesting;
-use lint_named_invariants::UnnamedPanics;
 use lint_named_lifetimes::NamedLifetimes;
-use lint_named_numbers::NamedNumbers;
 use lint_no_comments::NoComments;
 use lint_no_dyn::NoDyn;
-use lint_no_early_exits::NoEarlyExits;
-use lint_no_forwarders::NoForwarders;
 use lint_no_free_fns::NoFreeFns;
-use lint_no_ignored_tests::NoIgnoredTests;
-use lint_no_numbers_in_binaries::NoNumbersInBinaries;
-use lint_no_parameter_bags::NoParameterBags;
-use lint_no_plaintext::NoPlaintext;
-use lint_no_test_io::NoTestIo;
 use lint_no_test_only_api::NoTestOnlyApi;
-use lint_node_recursion::NodeRecursion;
-use lint_port_batching::PortBatching;
-use lint_port_dependencies::{CountedCalls, EffectsInFillers, HiddenSqlx, KeyDependencyRoles, OwnedDependencies};
-use lint_primitive_boundary::PrimitiveBoundary;
-use lint_private_fns::PrivateFns;
 use lint_process_starters::ProcessStarters;
 use lint_public_api_tests::PublicApiTests;
 use lint_public_surface::PublicSurface;
-use lint_raw_resources::RawResources;
-use lint_repeated_methods::RepeatedMethods;
-use lint_repeated_reads::RepeatedReads;
-use lint_repeated_shapes::RepeatedShapes;
-use lint_rust_only::RustOnly;
-use lint_state_graph::{ForeignMatches, StateGraph};
-use lint_store_queries::StoreQueries;
-use lint_thin_main::ThinMain;
-use lint_transition_graph::{AcyclicQuotients, Clustered, Extraction, GraphLint, OneEdge, Transitions, TypeSystem};
 use lint_type_shape::TypeShape;
-use lint_unconsumed_traits::UnconsumedTraits;
 use lint_vec_out_params::VecOutParams;
-use lint_workflow_run::WorkflowRun;
 
-use crate::cli::boundary::{FileOrder, Helper, Helpers, Rendered, Slot, Worked, Workers};
+use crate::cli::boundary::{FileOrder, Helper, Helpers, Slot, Worked, Workers};
 use crate::cli::ignored::Ignored;
-use crate::cli::sources::{Claimed, Holding, Priming, Settled};
-use crate::cli::timings::{Measured, Named, Step, Stopwatch, Worker};
+use crate::cli::sources::{Claimed, Holding, Settled};
+use crate::cli::timings::{Measured, Step, Stopwatch, Worker};
 use crate::cli::{Outcome, Sources, Verdict};
 use invariants::Ignoring;
 
@@ -98,7 +44,7 @@ impl Crew<'_> {
     pub(crate) fn gated(
         self,
         readout: &Measured<Readout>,
-        sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>,
+        sources: &Sources<impl Files, impl Timer + Sync>,
         out: &mut impl Write,
         err: &mut impl Write,
     ) -> Verdict {
@@ -106,19 +52,10 @@ impl Crew<'_> {
         let worked: Worked = [mine].into_iter().chain(self.helpers.into_iter().map(Helper::joined)).collect();
         let first = sources.earlier().chain([readout.timing()]);
         let table = sources.wired().table(first.chain(worked.timings().iter().copied()), worked.visited().clone());
-        let outcome = Lints::gathered(readout.done(), sources.located().done(), worked);
+        let outcome = Lints::gathered(readout.done(), worked);
         outcome.surveyed(&[table], out, err)
     }
 }
-
-type Check = for<'file> fn(&'file Readout) -> Vec<Report<'file>>;
-
-type Query = for<'model> fn(&'model Model) -> Report<'model>;
-
-type Workspaced =
-    for<'file, 'head> fn(&'file [FileHead], &'file [Metadata], &'file RoleFacts<'head>, &'file Model) -> Report<'file>;
-
-type Extracting = for<'model> fn(&'model Model) -> Vec<Report<'model>>;
 
 macro_rules! registry {
     () => { Ended };
@@ -137,99 +74,40 @@ struct Listed<Head, Tail> {
 type Registry = registry![
     Filed<NoComments>,
     Swept<NoFreeFns>,
-    Filed<ThinMain>,
     Swept<VecOutParams>,
     Swept<NamedLifetimes>,
-    Judged<EnumPredicates>,
-    Swept<ConstShape>,
     Swept<TypeShape>,
     Swept<ExpressionFlow>,
-    Swept<FnShape>,
-    Swept<LiteralNames>,
     Swept<ManualIteration>,
-    Ruled<ModuleNesting>,
-    Judged<NamedNumbers>,
-    Judged<NoForwarders>,
-    Swept<NoNumbersInBinaries>,
-    Modelled<NoParameterBags>,
-    Modelled<PrimitiveBoundary>,
-    Swept<PrivateFns>,
-    Modelled<ProcessStarters>,
-    Modelled<RawResources>,
-    Modelled<UnnamedPanics>,
-    Modelled<HandWrittenLaws>,
+    Filed<ProcessStarters>,
     Ruled<PublicSurface>,
-    Modelled<RepeatedMethods>,
-    Primed<StateGraph>,
-    Ruled<GuardMustUse>,
-    Ruled<DerivedTables>,
     Judged<PublicApiTests>,
-    Grounded<NoTestOnlyApi>,
-    Swept<NoIgnoredTests>,
-    Modelled<NoTestIo>,
-    Modelled<FakesAtPorts>,
-    Modelled<PortBatching>,
-    OwnedDependencies,
-    KeyDependencyRoles,
-    Modelled<EffectsInFillers>,
-    Kin<CountedCalls>,
-    Kin<HiddenSqlx>,
-    Modelled<StoreQueries>,
-    Swept<LongExactStrings>,
-    Ruled<RepeatedShapes>,
-    Modelled<MandatoryLaws>,
-    Modelled<ForeignMatches>,
-    Swept<ArbitraryNewtypes>,
+    Judged<NoTestOnlyApi>,
     Swept<BoolMethods>,
-    Modelled<EffectsInPorts>,
-    Modelled<RepeatedReads>,
-    Modelled<NodeRecursion>,
-    Swept<NoEarlyExits>,
-    Kin<LinearBodies>,
-    Kin<PureRouters>,
-    Kin<PlainConditions>,
-    TypeSystem<'static, 'static>,
-    Clustered<AcyclicQuotients>,
-    Judged<UnconsumedTraits>,
-    RustOnly,
-    WorkflowRun,
-    Modelled<HandImpls>,
-    Modelled<CrateGraph>,
-    Modelled<NoPlaintext>,
     Filed<NoDyn>,
 ];
 
 impl Lints {
-    pub(crate) fn started<'scope, 'run: 'scope, F: Files + Sync, C: Cargo + Sync, T: Timer + Sync>(
+    pub(crate) fn started<'scope, 'run: 'scope, F: Files + Sync, T: Timer + Sync>(
         scope: &'scope Scope<'scope, '_>,
-        sources: &'scope Sources<F, C, T>,
+        sources: &'scope Sources<F, T>,
         readers: Vec<lint_reader::Reader<'run>>,
     ) -> Crew<'scope> {
         let helpers = Workers::available().helpers().zip(readers).filter_map(|(index, reader)| {
             Helper::spawned(scope, move || Self::helped(sources, Worker::from(index), reader))
                 .ignoring(Ignored::Unspawned)
         });
-        let locating = Helper::spawned(scope, move || Self::locating(sources)).ignoring(Ignored::Unspawned);
-        Crew { helpers: locating.into_iter().chain(helpers).collect() }
+        Crew { helpers: helpers.collect() }
     }
 
-    fn gathered<'run>(
-        readout: &'run Readout,
-        located: &'run Result<Described, Unlocated>,
-        worked: Worked,
-    ) -> Outcome<'run> {
-        let entries = Registry::entries(Vec::new());
-        let mut rendered = worked.into_rendered(|slot| slot.picked(&entries).and_then(Entry::headline));
-        rendered.sort_by_key(Rendered::slot);
-        Outcome::located(located, rendered, readout.failures())
-    }
-
-    fn locating(sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>) -> Worked {
-        Worked::timed(sources.located().timing())
+    fn gathered(readout: &Readout, worked: Worked) -> Outcome<'_> {
+        let headlines = Registry::headlines(Vec::new());
+        let rendered = worked.into_rendered(|slot| slot.picked(&headlines).copied());
+        Outcome::from_rendered(rendered, readout.failures())
     }
 
     fn helped(
-        sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>,
+        sources: &Sources<impl Files, impl Timer + Sync>,
         worker: Worker,
         reader: lint_reader::Reader<'_>,
     ) -> Worked {
@@ -237,22 +115,10 @@ impl Lints {
         [Self::worked(readout.done(), sources, worker), Worked::timed(readout.timing())].into_iter().collect()
     }
 
-    fn worked(
-        readout: &Readout,
-        sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>,
-        worker: Worker,
-    ) -> Worked {
+    fn worked(readout: &Readout, sources: &Sources<impl Files, impl Timer + Sync>, worker: Worker) -> Worked {
         let mut lowered = sources.gathered(readout, worker, Filer::started);
         let mut work: Vec<FileWork<'_>> = lowered.filed();
         let filed: Worked = work.iter_mut().map(FileWork::worked).collect();
-        let mut jobs: Vec<Job> = Registry::entries(Vec::new())
-            .into_iter()
-            .enumerate()
-            .filter_map(|(index, entry)| entry.queued(Slot::from(index)))
-            .collect();
-        jobs.sort_by_key(Job::rank);
-        let claimed = sources.queue().claimed(&jobs).map(|job| job.done(readout, sources));
-        let queued: Worked = claimed.collect();
         let waiting = Stopwatch::started(sources.wired().timer());
         let settled = Settled::from(sources.gathering());
         let waited = waiting.stopped(Step::Judged(worker).waited());
@@ -260,45 +126,7 @@ impl Lints {
         let judged: Worked = work.into_iter().map(|file| file.judged(settled)).collect();
         let judged_timing = judging.stopped(Step::Judged(worker));
         let timings = lowered.timings().iter().copied().chain([waited, judged_timing]);
-        timings.map(Worked::timed).chain([filed, queued, judged]).collect()
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-struct Entry {
-    name: Named,
-    work: Work,
-}
-
-#[derive(Clone, Copy, Debug)]
-enum Work {
-    Checked(Check),
-    Modelled(Query),
-    Extracted(Extracting),
-    Filed(Headline),
-    Described(Workspaced),
-    Composite(Headline, Workspaced),
-}
-
-impl Entry {
-    pub(crate) const fn spelled<Lint: ?Sized>(work: Work) -> Entry {
-        Entry { name: Named::spelled::<Lint>(), work }
-    }
-
-    fn queued(self, slot: Slot) -> Option<Job> {
-        match self.work {
-            Work::Filed(_) => None,
-            Work::Checked(_) | Work::Modelled(_) | Work::Extracted(_) | Work::Described(_) | Work::Composite(..) => {
-                Some(Job { slot, step: Step::Lint(self.name), work: self.work })
-            }
-        }
-    }
-
-    pub(crate) fn headline(&self) -> Option<Headline> {
-        match self.work {
-            Work::Filed(headline) | Work::Composite(headline, _) => Some(headline),
-            Work::Checked(_) | Work::Modelled(_) | Work::Extracted(_) | Work::Described(_) => None,
-        }
+        timings.map(Worked::timed).chain([filed, judged]).collect()
     }
 }
 
@@ -321,79 +149,8 @@ impl<'file> FileWork<'file> {
     }
 }
 
-impl Work {
-    fn awaited<'run>(self, sources: &'run Sources<impl Files, impl Cargo, impl Timer + Sync>) -> Ready<'run> {
-        match self {
-            Work::Modelled(_) | Work::Extracted(_) => Ready::Modelled(sources.gathering().model()),
-            Work::Described(_) | Work::Composite(..) => Ready::Grounded(Ground::awaited(sources)),
-            Work::Checked(_) | Work::Filed(_) => Ready::Bare,
-        }
-    }
-
-    fn reported<'run>(self, readout: &'run Readout, ready: Ready<'run>) -> Vec<Report<'run>> {
-        match self {
-            Work::Checked(check) => check(readout),
-            Work::Modelled(query) => ready.model().map(query).into_iter().collect(),
-            Work::Described(_) | Work::Composite(..) | Work::Extracted(_) | Work::Filed(_) => Vec::new(),
-        }
-    }
-
-    fn worked<'run>(self, slot: Slot, readout: &'run Readout, ready: Ready<'run>) -> Worked {
-        match self {
-            Work::Extracted(_) | Work::Described(_) | Work::Composite(..) => self.grounded(slot, ready),
-            Work::Checked(_) | Work::Modelled(_) | Work::Filed(_) => {
-                Worked::rendering(slot, self.reported(readout, ready))
-            }
-        }
-    }
-
-    fn grounded(self, slot: Slot, ready: Ready<'_>) -> Worked {
-        match self {
-            Work::Extracted(extracted) => Worked::rendering(slot, ready.model().map_or_default(extracted)),
-            Work::Described(described) => {
-                Worked::rendering(slot, ready.ground().map(|ground| ground.reported(described)).into_iter().collect())
-            }
-            Work::Composite(_, described) => ready.filed(slot, described),
-            Work::Checked(_) | Work::Modelled(_) | Work::Filed(_) => Worked::default(),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-enum Rank {
-    Early(Reverse<Slot>),
-    Whole(Slot),
-    Late(Slot),
-}
-
-#[derive(Clone, Copy, Debug)]
-struct Job {
-    slot: Slot,
-    step: Step,
-    work: Work,
-}
-
-impl Job {
-    fn rank(&self) -> Rank {
-        match self.work {
-            Work::Checked(_) | Work::Filed(_) => Rank::Early(Reverse(self.slot)),
-            Work::Extracted(_) => Rank::Whole(self.slot),
-            Work::Modelled(_) | Work::Described(_) | Work::Composite(..) => Rank::Late(self.slot),
-        }
-    }
-
-    fn done(self, readout: &Readout, sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>) -> Worked {
-        let waiting = Stopwatch::started(sources.wired().timer());
-        let ready = self.work.awaited(sources);
-        let waited = waiting.stopped(self.step.waited());
-        let stopwatch = Stopwatch::started(sources.wired().timer());
-        let worked = self.work.worked(self.slot, readout, ready);
-        [worked, Worked::timed(waited), Worked::timed(stopwatch.stopped(self.step))].into_iter().collect()
-    }
-}
-
 trait Registered {
-    const ENTRY: Entry;
+    const HEADLINE: Headline;
 
     fn filed(filing: Filing<'_>) -> Filing<'_> {
         filing
@@ -412,7 +169,7 @@ trait Registered {
 }
 
 trait Walk {
-    fn entries(entries: Vec<Entry>) -> Vec<Entry>;
+    fn headlines(headlines: Vec<Headline>) -> Vec<Headline>;
 
     fn watching(file: &SourceFile) -> impl Joint<Tallied: Founds<'_>> + '_;
 
@@ -422,8 +179,8 @@ trait Walk {
 }
 
 impl Walk for Ended {
-    fn entries(entries: Vec<Entry>) -> Vec<Entry> {
-        entries
+    fn headlines(headlines: Vec<Headline>) -> Vec<Headline> {
+        headlines
     }
 
     fn watching(_: &SourceFile) -> impl Joint<Tallied: Founds<'_>> + '_ {
@@ -440,8 +197,8 @@ impl Walk for Ended {
 }
 
 impl<Head: Registered, Tail: Walk> Walk for Listed<Head, Tail> {
-    fn entries(entries: Vec<Entry>) -> Vec<Entry> {
-        Tail::entries(entries.into_iter().chain([Head::ENTRY]).collect())
+    fn headlines(headlines: Vec<Headline>) -> Vec<Headline> {
+        Tail::headlines(headlines.into_iter().chain([Head::HEADLINE]).collect())
     }
 
     fn watching(file: &SourceFile) -> impl Joint<Tallied: Founds<'_>> + '_ {
@@ -481,7 +238,6 @@ impl<'file, 'settled, 'run> Judging<'file, 'settled, 'run> {
 struct Admitted {
     slot: Slot,
     key: TypeId,
-    member: Member,
 }
 
 #[derive(Debug)]
@@ -494,27 +250,19 @@ struct Filing<'file> {
 }
 
 impl<'file> Filing<'file> {
-    fn led<Leading: Leader>(self, reads: Reads, member: Member) -> Filing<'file> {
-        let Filing { file, slot, leds: started, mut admitted, swept } = self;
-        let found = reads.admits(file).map(|_| Admitted { slot, key: TypeId::of::<Leading>(), member });
-        let leds = found.iter().fold(started, |mut kept, admit| {
-            kept.entry(admit.key).or_insert_with(|| Leading::led(file));
-            kept
-        });
-        admitted.extend(found);
-        Filing { file, slot, leds, admitted, swept }
+    fn led<Leading: Leader>(self, reads: Reads) -> Filing<'file> {
+        let Filing { file, slot, leds: earlier, admitted, swept } = self;
+        let found = reads.admits(file).map(|_| Admitted { slot, key: TypeId::of::<Leading>() });
+        let leds = earlier.into_iter().chain(found.map(|admit| (admit.key, Leading::led(file)))).collect();
+        Filing { file, slot, leds, admitted: admitted.into_iter().chain(found).collect(), swept }
     }
 
-    fn swept<Sweeping: 'static>(self, member: Member) -> Filing<'file> {
-        let Filing { file, slot, leds: started, mut admitted, mut swept } = self;
-        let found =
-            swept.next().flatten().map(|sweep| (Admitted { slot, key: TypeId::of::<Sweeping>(), member }, sweep));
-        let leds = found.into_iter().fold(started, |mut kept, (admit, sweep)| {
-            admitted.push(admit);
-            kept.entry(admit.key).or_insert_with(|| Led::from(sweep));
-            kept
-        });
-        Filing { file, slot, leds, admitted, swept }
+    fn swept<Sweeping: 'static>(self) -> Filing<'file> {
+        let Filing { file, slot, leds: earlier, admitted, mut swept } = self;
+        let found = swept.next().flatten().map(|sweep| (Admitted { slot, key: TypeId::of::<Sweeping>() }, sweep));
+        let kept = found.as_ref().map(|(admit, _)| *admit);
+        let leds = earlier.into_iter().chain(found.map(|(admit, sweep)| (admit.key, Led::from(sweep)))).collect();
+        Filing { file, slot, leds, admitted: admitted.into_iter().chain(kept).collect(), swept }
     }
 
     fn advanced(self) -> Filing<'file> {
@@ -527,7 +275,7 @@ impl<'file> Filing<'file> {
         let filed: Vec<Worked> = admitted
             .into_iter()
             .map(|admit| {
-                let violations = leds.get_mut(&admit.key).map_or_default(|led| led.member(admit.member));
+                let violations = leds.get_mut(&admit.key).map_or_default(Led::taken);
                 Worked::filing(admit.slot, order, &violations)
             })
             .collect();
@@ -558,18 +306,18 @@ impl<'file> Gathers<FileWork<'file>> for Filer<'file> {
 }
 
 impl<Lint: FileLint + 'static> Registered for Filed<Lint> {
-    const ENTRY: Entry = Entry::spelled::<Lint>(Work::Filed(Lint::HEADLINE));
+    const HEADLINE: Headline = Lint::HEADLINE;
 
     fn filed(filing: Filing<'_>) -> Filing<'_> {
-        filing.led::<Filed<Lint>>(Lint::READS, Member::FIRST)
+        filing.led::<Filed<Lint>>(Lint::READS)
     }
 }
 
 impl<Lint: SweptLint + 'static> Registered for Swept<Lint> {
-    const ENTRY: Entry = Entry::spelled::<Lint>(Work::Filed(Lint::HEADLINE));
+    const HEADLINE: Headline = Lint::HEADLINE;
 
     fn filed(filing: Filing<'_>) -> Filing<'_> {
-        filing.swept::<Swept<Lint>>(Member::FIRST)
+        filing.swept::<Swept<Lint>>()
     }
 
     fn joined<'file>(
@@ -580,19 +328,11 @@ impl<Lint: SweptLint + 'static> Registered for Swept<Lint> {
     }
 }
 
-impl<Lint: KinLint + 'static> Registered for Kin<Lint> {
-    const ENTRY: Entry = Entry::spelled::<Lint>(Work::Filed(Lint::HEADLINE));
-
-    fn filed(filing: Filing<'_>) -> Filing<'_> {
-        filing.led::<Lint::Leader>(Lint::READS, Lint::MEMBER)
-    }
-}
-
 impl<Lint: WatchingLint> Registered for Judged<Lint>
 where
     for<'settled, 'run> Settled<'settled, 'run>: Holding<'run, Lint>,
 {
-    const ENTRY: Entry = Entry::spelled::<Lint>(Work::Filed(Lint::HEADLINE));
+    const HEADLINE: Headline = Lint::HEADLINE;
 
     fn judged<'file, 'settled, 'run: 'file>(judging: Judging<'file, 'settled, 'run>) -> Judging<'file, 'settled, 'run> {
         let settled = judging.settled;
@@ -605,138 +345,11 @@ impl<Lint: RuledLint> Registered for Ruled<Lint>
 where
     for<'settled, 'run> Settled<'settled, 'run>: Holding<'run, Lint>,
 {
-    const ENTRY: Entry = Entry::spelled::<Lint>(Work::Filed(Lint::HEADLINE));
+    const HEADLINE: Headline = Lint::HEADLINE;
 
     fn judged<'file, 'settled, 'run: 'file>(judging: Judging<'file, 'settled, 'run>) -> Judging<'file, 'settled, 'run> {
         let settled = judging.settled;
         let read = Lint::READS.admits(judging.file);
         judging.found(read.map(|file| Lint::ruled(file, settled.held())))
-    }
-}
-
-impl<Lint: PrimedLint> Registered for Primed<Lint>
-where
-    for<'settled, 'run> Settled<'settled, 'run>: Priming<'run, Lint>,
-{
-    const ENTRY: Entry = Entry::spelled::<Lint>(Work::Filed(Lint::HEADLINE));
-
-    fn judged<'file, 'settled, 'run: 'file>(judging: Judging<'file, 'settled, 'run>) -> Judging<'file, 'settled, 'run> {
-        let settled = judging.settled;
-        let read = Lint::READS.admits(judging.file);
-        judging.found(read.map(|file| Lint::judged(file, settled.primer(), settled.primed())))
-    }
-}
-
-#[derive(Debug)]
-struct Modelled<Lint>(PhantomData<Lint>);
-
-impl<Lint: ModelLint> Registered for Modelled<Lint> {
-    const ENTRY: Entry = Entry::spelled::<Lint>(Work::Modelled(<Lint as ModelLint>::report));
-}
-
-impl Registered for OwnedDependencies {
-    const ENTRY: Entry = Entry::spelled::<OwnedDependencies>(Work::Described(|heads, workspaces, _, model| {
-        <OwnedDependencies as WorkspaceLint>::report(heads, workspaces, &(), model)
-    }));
-}
-
-impl Registered for KeyDependencyRoles {
-    const ENTRY: Entry = Entry::spelled::<KeyDependencyRoles>(Work::Described(|heads, workspaces, facts, model| {
-        <KeyDependencyRoles as WorkspaceLint>::report(heads, workspaces, facts, model)
-    }));
-}
-
-impl Registered for TypeSystem<'static, 'static> {
-    const ENTRY: Entry = Entry::spelled::<TypeSystem>(Work::Extracted(|model| {
-        let extraction = Extraction::default();
-        let transitions = Transitions::from(model);
-        let system = TypeSystem::built_from(&extraction, &transitions);
-        [OneEdge::dirty(&system), DistinctSignatures::dirty(&system)].into_iter().flatten().collect()
-    }));
-}
-
-impl Registered for Clustered<AcyclicQuotients> {
-    const ENTRY: Entry = Entry::spelled::<Clustered<AcyclicQuotients>>(Work::Extracted(|model| {
-        Some(<Clustered<AcyclicQuotients> as ModelLint>::report(model))
-            .filter(|report| report.dirty().is_some())
-            .into_iter()
-            .collect()
-    }));
-}
-
-impl Registered for RustOnly {
-    const ENTRY: Entry =
-        Entry::spelled::<RustOnly>(Work::Checked(|readout| vec![RustOnly::report(readout.repo_files())]));
-}
-
-impl Registered for WorkflowRun {
-    const ENTRY: Entry =
-        Entry::spelled::<WorkflowRun>(Work::Checked(|readout| vec![WorkflowRun::report(readout.repo_files())]));
-}
-
-#[derive(Clone, Copy, Debug)]
-struct Ground<'run> {
-    heads: &'run [FileHead],
-    described: &'run Described,
-    roles: &'run RoleFacts<'run>,
-    model: &'run Model,
-}
-
-impl<'run> Ground<'run> {
-    fn awaited(sources: &'run Sources<impl Files, impl Cargo, impl Timer + Sync>) -> Option<Ground<'run>> {
-        let described = sources.located().done().as_ref().ignoring(Ignored::Unlocated)?;
-        let roles = Settled::from(sources.gathering()).roles();
-        let model = sources.gathering().model()?;
-        Some(Ground { heads: sources.gathering().heads(), described, roles, model })
-    }
-
-    fn reported(self, described: Workspaced) -> Report<'run> {
-        described(self.heads, Described::workspaces(self.described), self.roles, self.model)
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-enum Ready<'run> {
-    Bare,
-    Modelled(Option<&'run Model>),
-    Grounded(Option<Ground<'run>>),
-}
-
-impl<'run> Ready<'run> {
-    fn model(self) -> Option<&'run Model> {
-        match self {
-            Ready::Modelled(model) => model,
-            Ready::Grounded(ground) => ground.map(|found| found.model),
-            Ready::Bare => None,
-        }
-    }
-
-    fn filed(self, slot: Slot, described: Workspaced) -> Worked {
-        let report = self.ground().map(|ground| ground.reported(described));
-        report.map_or_default(|found| Worked::filing(slot, FileOrder::LAST, found.violations()))
-    }
-
-    fn ground(self) -> Option<Ground<'run>> {
-        match self {
-            Ready::Grounded(ground) => ground,
-            Ready::Modelled(_) | Ready::Bare => None,
-        }
-    }
-}
-
-#[derive(Debug)]
-struct Grounded<Lint>(PhantomData<Lint>);
-
-impl<Lint> Registered for Grounded<Lint>
-where
-    Lint: WatchingLint + for<'head> WorkspaceLint<Facts<'head> = ()> + 'static,
-    for<'settled, 'run> Settled<'settled, 'run>: Holding<'run, Lint>,
-{
-    const ENTRY: Entry = Entry::spelled::<Lint>(Work::Composite(Lint::HEADLINE, |heads, workspaces, _, model| {
-        Lint::report(heads, workspaces, &(), model)
-    }));
-
-    fn judged<'file, 'settled, 'run: 'file>(judging: Judging<'file, 'settled, 'run>) -> Judging<'file, 'settled, 'run> {
-        <Judged<Lint> as Registered>::judged(judging)
     }
 }

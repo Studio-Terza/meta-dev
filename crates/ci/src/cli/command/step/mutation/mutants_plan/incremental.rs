@@ -10,7 +10,6 @@ use text_lines::Lines;
 use super::super::super::journal::Journal;
 use super::super::kept::{Commits, Mutant, Outcomes};
 use super::boundary::Costs;
-use super::tested::Reach;
 use crate::cli::command::failure::Failure;
 use crate::cli::command::step::{Arguments, Location};
 use crate::cli::ignored::Ignored;
@@ -48,25 +47,19 @@ impl Prior {
         Prior { directory, metadata }
     }
 
-    pub(super) fn chosen(&self, ports: &impl Ports, reach: &Reach, diff: &Path) -> Result<Choice, Failure<'static>> {
+    pub(super) fn chosen(&self, ports: &impl Ports, diff: &Path) -> Result<Choice, Failure<'static>> {
         let marker = ports.files().read_text(&self.directory.join(Self::TESTED)).ignoring(Ignored::Unmarked);
         let commits = marker.as_ref().and_then(Commits::read);
-        commits.map_or(Ok(Choice::Full(Reason::NoPrior)), |found| self.compared(ports, reach, &found, diff))
+        commits.map_or(Ok(Choice::Full(Reason::NoPrior)), |found| self.compared(ports, &found, diff))
     }
 
-    fn compared(
-        &self,
-        ports: &impl Ports,
-        reach: &Reach,
-        commits: &Commits,
-        diff: &Path,
-    ) -> Result<Choice, Failure<'static>> {
+    fn compared(&self, ports: &impl Ports, commits: &Commits, diff: &Path) -> Result<Choice, Failure<'static>> {
         let heads = Invocation::new("git", Self::HEAD);
         let printed = ports.output(&heads).map_err(Failure::starting(&heads))?;
         let head = Text::new(printed.as_ref().parse::<Lines>().into_iter().flatten().next().unwrap_or_default());
         let edited = Edits::new(&self.metadata, commits).found(ports, &head)?;
         let missed = self.missed(ports)?;
-        let since = Since::new(&self.directory, reach, commits, diff);
+        let since = Since::new(&self.directory, commits, diff);
         edited.map_or_else(|| since.chosen(ports, &missed), |reason| Ok(Choice::Full(reason)))
     }
 

@@ -5,8 +5,8 @@ mod regrouped;
 mod target;
 
 use admission::Admission;
+pub use directory::Below;
 use directory::Directory;
-pub use directory::{Below, Listing, Surveyed};
 use packages::Packages;
 pub use regrouped::Regrouped;
 
@@ -24,8 +24,8 @@ use lint_layout::Manifest;
 pub struct Roots;
 
 impl Roots {
-    pub fn surveyed(files: &impl Files, trees: &[&Tree<'_>]) -> Surveyed {
-        Directory::shared(files, &Self::canonical(trees))
+    pub fn surveyed(files: &impl Files, trees: &[&Tree<'_>]) -> Below {
+        Directory::below(files, &Self::canonical(trees))
     }
 
     pub fn under(files: &impl Files, trees: &[&Tree<'_>], below: Below) -> Vec<Result<Vec<Target>, Failure>> {

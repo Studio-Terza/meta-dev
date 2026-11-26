@@ -1,7 +1,5 @@
 invariants::ignored! {
     pub(crate) enum Ignored {
-        Refused => "a query the arguments refuse is reported by the refusal, so the run has nothing to answer",
-        Unlocated => "a workspace that cannot be located is reported once, as Unlocated; elsewhere it has no workspaces",
         Unspawned => "a helper thread that cannot start leaves its work to the threads that did",
         Unwritable => "a refusal that cannot be written to standard error has nowhere left to go; the exit code still says Refused",
         Unknown => "an unknown parallelism reads as one worker",

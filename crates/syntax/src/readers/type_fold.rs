@@ -98,32 +98,3 @@ impl<'syn> IntoIterator for TypeTree<'syn> {
         self.postorder.into_iter()
     }
 }
-
-#[derive(Debug, Default)]
-pub struct ExprTree<'syn> {
-    postorder: Vec<&'syn Expr>,
-}
-
-impl<'syn> From<&'syn Expr> for ExprTree<'syn> {
-    fn from(expr: &'syn Expr) -> ExprTree<'syn> {
-        let mut tree = ExprTree::default();
-        tree.visit_expr(expr);
-        tree
-    }
-}
-
-impl<'syn> Visit<'syn> for ExprTree<'syn> {
-    fn visit_expr(&mut self, expr: &'syn Expr) {
-        visit::visit_expr(self, expr);
-        self.postorder.push(expr);
-    }
-}
-
-impl<'syn> IntoIterator for ExprTree<'syn> {
-    type Item = &'syn Expr;
-    type IntoIter = std::vec::IntoIter<&'syn Expr>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.postorder.into_iter()
-    }
-}

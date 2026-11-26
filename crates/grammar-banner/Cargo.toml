@@ -18,7 +18,7 @@ grammar-unspelled = { path = "../grammar-unspelled" }
 newtype = { path = "../newtype" }
 
 [dev-dependencies]
-laws = { path = "../laws" }
+proptest.workspace = true
 
 [lints]
 workspace = true

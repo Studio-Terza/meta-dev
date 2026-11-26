@@ -19,11 +19,6 @@ impl<'file> Report<'file> {
     pub fn violations(&self) -> &[Violation<'file>] {
         &self.violations
     }
-
-    #[must_use]
-    pub fn dirty(&self) -> Option<&Violation<'file>> {
-        self.violations.first()
-    }
 }
 
 impl fmt::Display for Report<'_> {

@@ -20,38 +20,6 @@ src/tuples.rs:2: tuple in a signature or field; values that travel together are 
 src/variants.rs:2: bool field; a stored flag is a stored mode, make it an enum or a type parameter
 src/variants.rs:3: tuple in a signature or field; values that travel together are a struct
 src/variants.rs:4: Result with a String error; errors are an enum with thiserror
-function names say what the function does:
-src/errors.rs:1: fn f names nothing; say what it does
-src/fine.rs:2: fn f names nothing; say what it does
-src/fine.rs:3: fn g names nothing; say what it does
-src/macros.rs:1: fn f names nothing; say what it does
-src/spellings.rs:1: fn f names nothing; say what it does
-src/tuples.rs:1: fn f names nothing; say what it does
-src/tuples.rs:2: fn g names nothing; say what it does
-a number has a name: outside tests and boundary modules, a literal other than 0 and 1 sits in a const item:
-src/macros.rs:1: numeric literal outside a const item; name it as a const so it can be found and tuned
-src/tuples.rs:2: numeric literal outside a const item; name it as a const so it can be found and tuned
-primitives appear in signatures and fields only inside a boundary:
-src/errors.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/errors.rs:1: bare String in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/fields.rs:4: bare bool in on; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/fine.rs:1: bare u8 in count; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/fine.rs:2: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/real.rs:3: bare bool in on; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/spellings.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/spellings.rs:1: bare String in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/tuples.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/tuples.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/tuples.rs:2: bare u8 in g; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/tuples.rs:2: bare u8 in g; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/variants.rs:2: bare bool in on; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/variants.rs:3: bare u8 in Pair; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/variants.rs:3: bare u8 in Pair; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/variants.rs:4: bare u8 in Bad; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/variants.rs:4: bare String in Bad; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-state graph violated:
-src/fields.rs:2: field on of A is pub; struct fields are private
-src/real.rs:3: field on of S is pub; struct fields are private
 tests go through public APIs:
 src/fine.rs:5: test code in src; move it to the package's tests directory and call the public API from there
 fails

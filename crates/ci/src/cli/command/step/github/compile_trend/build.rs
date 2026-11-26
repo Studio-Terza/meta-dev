@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use algebra::{Monoid, Semigroup};
 use file_ports::{FileFailure, Files};
 use text_lines::OneLine;
 
@@ -61,7 +60,7 @@ pub struct Build {
     crates: BTreeMap<OneLine, Seconds>,
 }
 
-impl Semigroup for Build {
+impl Build {
     fn combine(self, later: Build) -> Build {
         let crates = later.crates.into_iter().fold(self.crates, |mut all, (name, seconds)| {
             let total: &mut Seconds = all.entry(name).or_default();
@@ -71,8 +70,6 @@ impl Semigroup for Build {
         Build { total: [self.total, later.total].into_iter().sum(), crates }
     }
 }
-
-impl Monoid for Build {}
 
 impl From<Part> for Build {
     fn from(part: Part) -> Build {
@@ -133,6 +130,6 @@ impl Build {
             .zip(read)
             .map(|(source, text)| source.parsed(text))
             .collect::<Result<Vec<Part>, Failure<'static>>>()?;
-        Ok(Monoid::concat(parts.into_iter().map(Build::from)))
+        Ok(parts.into_iter().map(Build::from).fold(Build::default(), Build::combine))
     }
 }

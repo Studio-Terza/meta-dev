@@ -3,7 +3,6 @@ mod package;
 use std::path::{Path, PathBuf};
 
 use super::target::Target;
-use algebra::Semigroup;
 
 use crate::survey::{Fact, Failed, Survey};
 use crate::tree::Tree;

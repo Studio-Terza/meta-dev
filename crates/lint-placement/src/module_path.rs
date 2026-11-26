@@ -25,11 +25,6 @@ impl ModulePath {
                 .collect(),
         )
     }
-
-    #[must_use]
-    pub fn child(&self, name: Name) -> ModulePath {
-        ModulePath(self.0.iter().cloned().chain(Some(name)).collect())
-    }
 }
 
 impl AsRef<[Name]> for ModulePath {

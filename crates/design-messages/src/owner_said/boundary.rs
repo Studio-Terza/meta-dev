@@ -4,7 +4,7 @@ use store_ports::{Execute, Query, StoreFailure};
 use transcript_ports::{Authorship, Body, Instant, Uuid};
 
 use super::{LastSaid, OwnerHistory};
-use crate::boundary::MessageRow;
+use crate::boundary::SaidRow;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Said {
@@ -27,7 +27,7 @@ impl Query for OwnerHistory {
     type Rows = Vec<Said>;
 
     fn rows(self, statements: &mut impl Execute) -> Result<Vec<Said>, StoreFailure> {
-        MessageRow::owned(statements)
+        SaidRow::owned(statements)
     }
 }
 
@@ -41,7 +41,7 @@ impl Query for LastSaid {
     type Rows = Option<Body>;
 
     fn rows(self, statements: &mut impl Execute) -> Result<Option<Body>, StoreFailure> {
-        let rows = MessageRow::last_in(&self.0, Authorship::Lead, statements)?;
+        let rows = SaidRow::last_in(&self.0, Authorship::Lead, statements)?;
         Ok(rows.into_iter().next().map(|row| Said::from(row).body))
     }
 }

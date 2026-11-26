@@ -2,9 +2,9 @@ mod boundary;
 mod facts;
 mod hooks;
 
-use algebra::{Monoid, Semigroup};
 use newtype::Arbitrary;
 
+use crate::joins::Joins;
 use crate::walk::Walk;
 
 pub use boundary::Address;
@@ -36,13 +36,11 @@ impl Descend {
     }
 }
 
-impl Semigroup for Descend {
+impl Joins for Descend {
     fn combine(self, next: Descend) -> Descend {
         self.entered().map_or(self, |()| next)
     }
 }
-
-impl Monoid for Descend {}
 
 impl Descend {
     pub(crate) fn descending<Node>(self, node: Node) -> Option<Node> {

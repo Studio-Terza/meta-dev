@@ -1,6 +1,6 @@
 use std::fmt;
 
-use design_store::StopRow;
+use design_messages::StopRow;
 
 #[derive(Debug)]
 pub struct Trail(Vec<StopRow>);

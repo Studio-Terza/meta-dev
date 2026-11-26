@@ -13,15 +13,11 @@ doctest = false
 
 [dependencies]
 invariants = { path = "../invariants" }
-design-closure = { path = "../design-closure" }
-design-model = { path = "../design-model" }
 file-ports = { path = "../file-ports" }
-grammar-notes = { path = "../grammar-notes" }
-grammar-search = { path = "../grammar-search" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 store-ports = { path = "../store-ports" }
-stream = { path = "../stream" }
+strum.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 
 [build-dependencies]
@@ -31,5 +27,4 @@ console-ports = { path = "../console-ports" }
 workspace = true
 
 [dev-dependencies]
-laws = { path = "../laws" }
 sqlite-ports = { path = "../sqlite-ports" }

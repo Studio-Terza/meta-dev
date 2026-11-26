@@ -10,7 +10,6 @@ test = false
 doctest = false
 
 [dependencies]
-algebra = { path = "../algebra" }
 invariants = { path = "../invariants" }
 file-ports = { path = "../file-ports" }
 lint-layout = { path = "../lint-layout" }
@@ -19,8 +18,6 @@ syntax = { path = "../syntax" }
 
 [dev-dependencies]
 file-ports = { path = "../file-ports" }
-lint-mandatory-laws = { path = "../lint-mandatory-laws" }
-laws = { path = "../laws" }
 
 [lints]
 workspace = true

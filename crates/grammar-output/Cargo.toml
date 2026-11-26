@@ -14,14 +14,11 @@ doctest = false
 
 [dependencies]
 grammar = { path = "../grammar" }
-grammar-cited = { path = "../grammar-cited" }
-newtype = { path = "../newtype" }
 record-derive = { path = "../record-derive" }
 thiserror.workspace = true
 
 [dev-dependencies]
-grammar-search = { path = "../grammar-search" }
-laws = { path = "../laws" }
+proptest.workspace = true
 
 [lints]
 workspace = true

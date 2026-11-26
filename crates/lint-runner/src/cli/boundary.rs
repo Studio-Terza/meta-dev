@@ -1,15 +1,12 @@
 use std::fmt;
 use std::io;
-use std::iter;
 use std::num::NonZeroUsize;
 use std::ops::Range;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread::{self, Scope, ScopedJoinHandle};
 
 use std::collections::BTreeMap;
 
-use algebra::{Monoid, Semigroup};
-use lint_core::{Headline, Report, Violation};
+use lint_core::{Headline, Violation};
 use lint_sweep::Visited;
 
 use super::stack_size::StackSize;
@@ -40,18 +37,7 @@ impl From<usize> for Slot {
 
 #[derive(Debug)]
 pub(crate) struct Rendered {
-    slot: Slot,
     text: String,
-}
-
-impl Rendered {
-    pub(crate) fn dirty(slot: Slot, report: Report<'_>) -> Option<Rendered> {
-        Some(report).filter(|found| found.dirty().is_some()).map(|found| Rendered { slot, text: found.to_string() })
-    }
-
-    pub(crate) fn slot(&self) -> Slot {
-        self.slot
-    }
 }
 
 impl fmt::Display for Rendered {
@@ -69,10 +55,6 @@ impl From<usize> for FileOrder {
     }
 }
 
-impl FileOrder {
-    pub(crate) const LAST: FileOrder = FileOrder(usize::MAX);
-}
-
 #[derive(Debug)]
 struct FileLines {
     slot: Slot,
@@ -82,7 +64,6 @@ struct FileLines {
 
 #[derive(Debug, Default)]
 pub(crate) struct Worked {
-    rendered: Vec<Rendered>,
     filed: Vec<FileLines>,
     timings: Vec<Timing>,
     visited: Visiting,
@@ -90,11 +71,6 @@ pub(crate) struct Worked {
 
 impl Worked {
     const LINE_END: char = '\n';
-
-    pub(crate) fn rendering(slot: Slot, reports: Vec<Report<'_>>) -> Worked {
-        let rendered = reports.into_iter().filter_map(|report| Rendered::dirty(slot, report)).collect();
-        Worked { rendered, ..Worked::default() }
-    }
 
     pub(crate) fn filing(slot: Slot, order: FileOrder, violations: &[Violation<'_>]) -> Worked {
         let text = violations.iter().map(ToString::to_string).fold(String::new(), |mut text, line| {
@@ -129,40 +105,20 @@ impl Worked {
             slots.entry(part.slot).or_default().push_str(&part.text);
             slots
         });
-        let assembled = grouped.into_iter().filter_map(|(slot, lines)| {
-            headline(slot).map(|title| Rendered { slot, text: format!("{title}:\n{lines}") })
-        });
-        self.rendered.into_iter().chain(assembled).collect()
+        grouped
+            .into_iter()
+            .filter_map(|(slot, lines)| headline(slot).map(|title| Rendered { text: format!("{title}:\n{lines}") }))
+            .collect()
     }
 }
-
-impl Semigroup for Worked {
-    fn combine(self, other: Worked) -> Worked {
-        Worked {
-            rendered: self.rendered.combine(other.rendered),
-            filed: self.filed.combine(other.filed),
-            timings: self.timings.combine(other.timings),
-            visited: self.visited.combine(other.visited),
-        }
-    }
-}
-
-impl Monoid for Worked {}
 
 impl FromIterator<Worked> for Worked {
     fn from_iter<Parts: IntoIterator<Item = Worked>>(parts: Parts) -> Worked {
-        Monoid::concat(parts)
-    }
-}
-
-#[derive(Debug, Default)]
-pub(crate) struct Queue {
-    next: AtomicUsize,
-}
-
-impl Queue {
-    pub(crate) fn claimed<'items, T>(&'items self, items: &'items [T]) -> impl Iterator<Item = &'items T> {
-        iter::from_fn(move || items.get(self.next.fetch_add(1, Ordering::Relaxed)))
+        parts.into_iter().fold(Worked::default(), |mut all, part| {
+            all.filed.extend(part.filed);
+            all.timings.extend(part.timings);
+            Worked { visited: all.visited.combine(part.visited), ..all }
+        })
     }
 }
 
@@ -201,19 +157,5 @@ impl<'scope> Helper<'scope> {
 
     pub(crate) fn joined(self) -> Worked {
         self.0.join().rejoined()
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Dumped<'model>(&'model graph::Model);
-
-impl<'model> From<&'model graph::Model> for Dumped<'model> {
-    fn from(model: &'model graph::Model) -> Dumped<'model> {
-        Dumped(model)
-    }
-}
-impl fmt::Display for Dumped<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(&format!("{:#?}\n", self.0))
     }
 }

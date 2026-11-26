@@ -1,3 +1,0 @@
-a local trait with methods has a consumer in shipped code: a bound (generic, where clause, supertrait), impl Trait, dyn Trait, or a call to one of its provided methods:
-src/lib.rs:1: trait Shape has methods but nothing consumes it; delete the trait and keep its methods inherent, or give it a consumer: a bound, impl Trait, dyn Trait, or a provided method its callers use
-fails

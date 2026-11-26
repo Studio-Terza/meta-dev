@@ -21,7 +21,8 @@ serde_json.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-laws = { path = "../laws" }
+test-failure = { path = "../test-failure" }
+proptest.workspace = true
 
 [lints]
 workspace = true

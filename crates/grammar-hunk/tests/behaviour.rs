@@ -40,31 +40,20 @@ impl Old {
     }
 }
 
-laws::table!(
-    a_zero_context_patch_reads_as_each_file_s_paths_and_hunks_counting_content_lines_whatever_they_look_like,
-    Read::all,
-    [
-        TWO_FILES => Some(vec![
-            Read::file(Some("src/a.rs"), Some("src/a.rs")),
-            Read::file(None, None),
-        ]),
-        DELETED => Some(vec![Read::file(Some("tests/t.rs"), Some("tests/t.rs"))]),
-        "" => Some(Vec::new()),
-        SHORT => None,
-        STRAY => None,
-    ]
-);
+#[test]
+fn a_zero_context_patch_reads_as_each_file_s_paths_and_hunks_counting_content_lines_whatever_they_look_like() {
+    assert_eq!(
+        Read::all(&TWO_FILES),
+        Some(vec![Read::file(Some("src/a.rs"), Some("src/a.rs")), Read::file(None, None)])
+    );
+    assert_eq!(Read::all(&DELETED), Some(vec![Read::file(Some("tests/t.rs"), Some("tests/t.rs"))]));
+    assert_eq!(Read::all(&""), Some(Vec::new()));
+    assert_eq!(Read::all(&SHORT), None);
+    assert_eq!(Read::all(&STRAY), None);
+}
 
-laws::table!(
-    an_old_line_moves_by_the_hunks_before_it_and_a_removed_line_has_no_new_place,
-    Old::moved,
-    [
-        Old(1) => Some(1),
-        Old(3) => Some(3),
-        Old(4) => Some(6),
-        Old(9) => Some(11),
-        Old(10) => None,
-        Old(11) => None,
-        Old(12) => Some(13),
-    ]
-);
+#[test]
+fn an_old_line_moves_by_the_hunks_before_it_and_a_removed_line_has_no_new_place() {
+    let moved: Vec<Option<u32>> = [1, 3, 4, 9, 10, 11, 12].into_iter().map(|line| Old(line).moved()).collect();
+    assert_eq!(moved, [Some(1), Some(3), Some(6), Some(11), None, None, Some(13)]);
+}

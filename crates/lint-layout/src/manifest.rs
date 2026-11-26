@@ -1,4 +1,3 @@
-mod boundary;
 mod key_lines;
 mod members;
 
@@ -12,20 +11,12 @@ use serde_core::Deserialize;
 use toml::de::{DeTable, Deserializer};
 use toml::{Table, Value};
 
-use crate::crate_key::CrateKey;
-use crate::dependencies::Dependencies;
-use crate::dependency_sites::DependencySites;
 use crate::failure::Failure;
-use std::ops::Not;
-
-use crate::library_tests::LibraryTests;
 use crate::name::Name;
-use crate::package_name::PackageName;
 use crate::path_dependencies::PathDependencies;
 use crate::source_text::SourceText;
-use crate::untested::Untested;
 use crate::word::Word;
-pub use key_lines::{KeyLines, TableKey};
+pub use key_lines::KeyLines;
 use members::Members;
 
 #[derive(Debug)]
@@ -33,7 +24,6 @@ pub struct Manifest {
     directory: PathBuf,
     table: Table,
     lines: KeyLines,
-    sites: DependencySites,
 }
 
 impl Manifest {
@@ -42,16 +32,8 @@ impl Manifest {
     const WORKSPACE: &'static str = "workspace";
     const PATH: &'static str = "path";
     const LIBRARY: &'static str = "lib";
-    const TEST: &'static str = "test";
-    const NAME: &'static str = "name";
-    const SOURCE_EXTENSION: &'static str = "rs";
-    const MAIN_FILE: &'static str = "main.rs";
     const TARGET_LISTS: [&'static str; 4] = ["test", "bin", "example", "bench"];
-    const TESTED_LISTS: [&'static str; 3] = ["test", "bin", "bench"];
-    const TARGET_DIRECTORIES: [&'static str; 4] = ["tests", "src/bin", "examples", "benches"];
     const DEPENDENCIES: [&'static str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
-    const PLATFORMS: &'static str = "target";
-    const INHERITED: &'static str = "dependencies";
 
     pub fn read_many(files: &impl Files, directories: &[impl AsRef<Path>]) -> Vec<Result<Option<Manifest>, Failure>> {
         let paths: Vec<PathBuf> = directories.iter().map(|directory| directory.as_ref().join(Self::FILE)).collect();
@@ -76,9 +58,8 @@ impl Manifest {
     fn typed(directory: &Path, text: &SourceText) -> Result<Manifest, toml::de::Error> {
         let document = DeTable::parse(text.as_ref())?;
         let lines = KeyLines::read(text, document.get_ref());
-        let sites = DependencySites::listed(text, document.get_ref());
         let table = Table::deserialize(Deserializer::from(document))?;
-        Ok(Manifest { directory: directory.to_path_buf(), table, lines, sites })
+        Ok(Manifest { directory: directory.to_path_buf(), table, lines })
     }
 
     #[must_use]
@@ -97,29 +78,6 @@ impl Manifest {
     }
 
     #[must_use]
-    pub fn dependency_sites(&self) -> &DependencySites {
-        &self.sites
-    }
-
-    #[must_use]
-    pub fn dependencies(&self, workspace: Option<&Manifest>) -> Dependencies {
-        let inherited = workspace.and_then(|root| root.table.get(Self::WORKSPACE)?.get(Self::INHERITED)?.as_table());
-        let platforms = self.table.get(Self::PLATFORMS).and_then(Value::as_table).into_iter().flat_map(Table::values);
-        std::iter::once(&self.table)
-            .chain(platforms.filter_map(Value::as_table))
-            .flat_map(|section| Self::DEPENDENCIES.iter().filter_map(|kind| section.get(*kind)))
-            .filter_map(Value::as_table)
-            .flat_map(Table::iter)
-            .map(|(key, declared)| {
-                let source =
-                    declared.get(Self::WORKSPACE).and(inherited.and_then(|table| table.get(key))).unwrap_or(declared);
-                let package = source.get(Self::PACKAGE).and_then(Value::as_str).unwrap_or(key);
-                (CrateKey::new(Name::from(key.as_str()).words()), PackageName::from(&Name::from(package)))
-            })
-            .collect()
-    }
-
-    #[must_use]
     pub fn workspace(&self) -> Option<Members> {
         self.table.get(Self::WORKSPACE).map(|_| {
             Members::new(self.workspace_names(Word::new("members")), self.workspace_names(Word::new("exclude")))
@@ -129,12 +87,7 @@ impl Manifest {
     #[must_use]
     pub fn named_paths(&self) -> Vec<PathBuf> {
         let named = |path: &Path| Some(path.to_path_buf());
-        self.path_dependencies(named)
-            .into_inner()
-            .into_iter()
-            .chain(self.declared_roots(named))
-            .chain(self.untested_targets(named).into_inner())
-            .collect()
+        self.path_dependencies(named).into_inner().into_iter().chain(self.declared_roots(named)).collect()
     }
 
     #[must_use]
@@ -161,47 +114,6 @@ impl Manifest {
             .chain(listed.flatten())
             .filter_map(|target| target.get(Self::PATH)?.as_str())
             .filter_map(|path| canonical(&self.directory.join(path)))
-            .collect()
-    }
-
-    #[must_use]
-    pub fn library_tests(&self) -> LibraryTests {
-        self.table
-            .get(Self::LIBRARY)
-            .and_then(|library| library.get(Self::TEST))
-            .and_then(Value::as_bool)
-            .map(Not::not)
-            .filter(|switched_off| *switched_off)
-            .map_or(LibraryTests::Run, |_| LibraryTests::SwitchedOff)
-    }
-
-    #[must_use]
-    pub fn untested_targets(&self, canonical: impl Fn(&Path) -> Option<PathBuf>) -> Untested {
-        let library = self.table.get(Self::LIBRARY).into_iter();
-        let listed = Self::TESTED_LISTS.iter().filter_map(|key| self.table.get(*key)).filter_map(Value::as_array);
-        Untested::new(
-            library
-                .chain(listed.flatten())
-                .filter(|target| target.get(Self::TEST).and_then(Value::as_bool) == Some(false))
-                .flat_map(|target| {
-                    let explicit = target.get(Self::PATH).and_then(Value::as_str).map(|path| vec![PathBuf::from(path)]);
-                    explicit.unwrap_or_else(|| {
-                        Self::default_files(target.get(Self::NAME).and_then(Value::as_str).map(Name::from))
-                    })
-                })
-                .filter_map(|path| canonical(&self.directory.join(path)))
-                .collect(),
-        )
-    }
-
-    fn default_files(name: Option<Name>) -> Vec<PathBuf> {
-        name.into_iter()
-            .flat_map(|crate_name| {
-                Self::TARGET_DIRECTORIES
-                    .iter()
-                    .map(move |directory| PathBuf::from(directory).join(&crate_name))
-                    .flat_map(|target| [target.with_extension(Self::SOURCE_EXTENSION), target.join(Self::MAIN_FILE)])
-            })
             .collect()
     }
 

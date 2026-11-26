@@ -1,10 +1,7 @@
 use std::mem;
 use std::path::Path;
 use std::sync::{Mutex, OnceLock};
-use std::thread;
 
-use graph::Model;
-use graph_reader::{FileFacts, GroupLowering, ListedGroup, Listing};
 use lint_core::{FileHead, Parsed, Readout, SourceFile, Unwalked};
 use lint_sweep::Gathers;
 
@@ -12,28 +9,25 @@ use super::super::timings::{Measured, Timing};
 use super::Lowering;
 use super::contexts::{Contexts, Contributed};
 use crate::cli::ignored::Ignored;
-use invariants::{Ignoring, Rejoined, Unpoisoned};
+use invariants::{Ignoring, Unpoisoned};
 
 use super::super::boundary::FileOrder;
 
 #[derive(Debug)]
-struct Claim<'listing, 'read, 'run> {
+struct Claim<'read, 'run> {
     order: FileOrder,
-    group: &'listing ListedGroup<'read>,
     file: &'read SourceFile,
     head: &'run FileHead,
     unwalked: Unwalked,
 }
 
-impl<'read, 'run> Claim<'_, 'read, 'run> {
+impl<'read, 'run> Claim<'read, 'run> {
     fn gathered<Part, Filed: Gathers<Part>>(self, starting: &impl Fn(Claimed<'read>) -> Filed) -> Joined<'run, Part> {
         let parsed = Parsed::new(self.file, self.head);
-        let lowering: GroupLowering<'_> = self.group.lowering();
         let claimed = Claimed { order: self.order, file: self.file };
         let filing = starting(claimed);
         let contexts = Contributed::joined(parsed, self.unwalked);
-        let gathered = Gathered { head: self.head, facts: lowering.gathered(self.file), contexts };
-        Joined { gathered, filed: filing.gathered(self.file) }
+        Joined { gathered: Gathered { head: self.head, contexts }, filed: filing.gathered(self.file) }
     }
 }
 
@@ -46,7 +40,6 @@ struct Joined<'run, Part> {
 #[derive(Debug)]
 struct Gathered<'run> {
     head: &'run FileHead,
-    facts: Vec<FileFacts>,
     contexts: Contributed<'run>,
 }
 
@@ -79,12 +72,6 @@ impl<'run, Part> Share<'run, Part> {
     }
 }
 
-#[derive(Debug, Default)]
-struct Splitting<'run> {
-    facts: Vec<FileFacts>,
-    contexts: Vec<Contributed<'run>>,
-}
-
 #[derive(Debug)]
 pub(crate) struct Merging<'run>(Vec<Gathered<'run>>);
 
@@ -93,40 +80,30 @@ impl<'run> Merging<'run> {
         self,
         gathering: &Gathering<'run>,
         lowering: Lowering<Part>,
-        model: impl FnOnce(Vec<FileFacts>) -> Measured<Option<Model>>,
-        contexts: impl FnOnce(Vec<Contributed<'run>>) -> Measured<Contexts<'run>> + Send,
+        contexts: impl FnOnce(Vec<Contributed<'run>>) -> Measured<Contexts<'run>>,
     ) -> Lowering<Part> {
-        let split = self.split();
-        let parts = split.contexts;
-        thread::scope(|scope| {
-            let joined = scope.spawn(|| contexts(parts).kept(&gathering.contexts));
-            let modelled = model(split.facts).kept(&gathering.model);
-            lowering.timed(modelled).timed(joined.join().rejoined())
-        })
-    }
-
-    fn split(self) -> Splitting<'run> {
         let mut sorted = self.0;
         sorted.sort_by(|earlier, later| AsRef::<Path>::as_ref(earlier.head).cmp(AsRef::<Path>::as_ref(later.head)));
-        sorted.into_iter().fold(Splitting::default(), |mut split, part| {
-            split.facts.extend(part.facts);
-            split.contexts.push(part.contexts);
-            split
-        })
+        lowering.timed(contexts(sorted.into_iter().map(|part| part.contexts).collect()).kept(&gathering.contexts))
     }
+}
+
+#[derive(Debug, Default)]
+struct Deposited<'run> {
+    accounted: Vec<FileOrder>,
+    gathered: Vec<Gathered<'run>>,
 }
 
 #[derive(Debug)]
 pub(crate) struct Gathering<'run> {
     heads: &'run OnceLock<Vec<FileHead>>,
-    deposited: Mutex<Vec<Gathered<'run>>>,
-    model: OnceLock<Option<Model>>,
+    deposited: Mutex<Deposited<'run>>,
     contexts: OnceLock<Contexts<'run>>,
 }
 
 impl<'run> Gathering<'run> {
     pub(crate) fn new(heads: &'run OnceLock<Vec<FileHead>>) -> Gathering<'run> {
-        Gathering { heads, deposited: Mutex::default(), model: OnceLock::new(), contexts: OnceLock::new() }
+        Gathering { heads, deposited: Mutex::default(), contexts: OnceLock::new() }
     }
 
     pub(crate) fn gathered<'read, Part, Filed: Gathers<Part>>(
@@ -136,34 +113,32 @@ impl<'run> Gathering<'run> {
         starting: impl Fn(Claimed<'read>) -> Filed,
     ) -> Share<'run, Part> {
         let heads = self.heads.get_or_init(|| table.to_vec());
-        let listing = Listing::of_files(readout.files());
-        let claims: Vec<Claim<'_, 'read, 'run>> = listing
-            .groups()
+        let placed: Vec<(usize, &'read SourceFile, &'run FileHead)> = readout
+            .files()
             .iter()
-            .zip(readout.files())
-            .zip(readout.unwalked())
-            .filter_map(|((group, file), unwalked)| {
+            .filter_map(|file| {
                 let index = heads
                     .binary_search_by(|head| AsRef::<Path>::as_ref(head).cmp(AsRef::<Path>::as_ref(file.head())))
                     .ignoring(Ignored::Unclaimed)?;
-                Some(Claim { order: FileOrder::from(index), group, file, head: heads.get(index)?, unwalked })
+                Some((index, file, heads.get(index)?))
             })
             .collect();
-        let joined: Vec<Joined<'run, Part>> = claims.into_iter().map(|claim| claim.gathered(&starting)).collect();
+        let accounted: Vec<FileOrder> = placed.iter().map(|(index, _, _)| FileOrder::from(*index)).collect();
+        let claims = placed.into_iter().zip(readout.unwalked()).map(|((index, file, head), unwalked)| Claim {
+            order: FileOrder::from(index),
+            file,
+            head,
+            unwalked,
+        });
+        let joined: Vec<Joined<'run, Part>> = claims.map(|claim| claim.gathered(&starting)).collect();
         let (gathered, filed): (Vec<Gathered<'run>>, Vec<Part>) =
             joined.into_iter().map(|found| (found.gathered, found.filed)).unzip();
         let mut held = self.deposited.lock().unpoisoned();
-        held.extend(gathered);
-        let complete = Some(held.len()).filter(|count| *count == heads.len()).map(|_| mem::take(&mut *held));
+        held.accounted.extend(accounted);
+        held.gathered.extend(gathered);
+        let complete =
+            Some(held.accounted.len()).filter(|count| *count == heads.len()).map(|_| mem::take(&mut held.gathered));
         Share { merging: complete.map(Merging), filed }
-    }
-
-    pub(crate) fn model(&self) -> Option<&Model> {
-        self.model.wait().as_ref()
-    }
-
-    pub(crate) fn heads(&self) -> &'run [FileHead] {
-        self.heads.get().map_or(&[][..], Vec::as_slice)
     }
 
     pub(crate) fn contexts(&self) -> &Contexts<'run> {

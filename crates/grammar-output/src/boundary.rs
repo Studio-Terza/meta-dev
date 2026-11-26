@@ -6,7 +6,6 @@ use grammar::logos::{Lexer, Logos};
 use grammar::{Ignoring, Unlexed};
 
 use crate::record::{Parsed, Record};
-use newtype::{Guarded, Inner, Listed, Newtype, Stored, Validated};
 
 #[derive(Logos, Clone, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
@@ -14,8 +13,6 @@ use newtype::{Guarded, Inner, Listed, Newtype, Stored, Validated};
 enum Lexeme {
     #[regex(r"[A-Za-z0-9_][A-Za-z0-9_-]*")]
     Bare,
-    #[regex(r"[A-Za-z0-9_][A-Za-z0-9_-]*\.(0|[1-9][0-9]*)")]
-    Cited,
     #[regex(r#""([^"\\\r\n]|\\["\\nrt])*""#, Lexeme::unquoted)]
     Quoted(String),
     #[regex(r"\r?\n")]
@@ -73,7 +70,6 @@ enum Special {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Kind {
     Bare,
-    Cited,
     Quoted,
     End,
 }
@@ -115,30 +111,6 @@ pub trait Field {
     type Value;
 
     fn taken(token: Token) -> Result<Self::Value, Token>;
-}
-
-pub trait Unwrapping<T> {
-    fn unwrapped(text: String) -> Option<T>;
-}
-
-impl<T: Newtype<Inner = String>> Unwrapping<T> for Inner {
-    fn unwrapped(text: String) -> Option<T> {
-        Some(T::new(text))
-    }
-}
-
-impl<T: FromStr> Unwrapping<T> for Listed {
-    fn unwrapped(text: String) -> Option<T> {
-        text.parse().ignoring(Unlexed::NotThisGrammar)
-    }
-}
-
-impl<T: Guarded<Inner: FromStr>> Unwrapping<T> for Validated {
-    fn unwrapped(text: String) -> Option<T> {
-        text.parse()
-            .ignoring(Unlexed::NotThisGrammar)
-            .and_then(|inner| T::try_new(inner).ignoring(Unlexed::NotThisGrammar))
-    }
 }
 
 impl Fields {
@@ -234,18 +206,12 @@ impl Token {
         let kept = self.clone();
         self.expected(kind).and_then(|text| text.parse().map_err(|_unparsed| kept))
     }
-
-    pub(crate) fn wrapped<T: Stored<Kind: Unwrapping<T>>>(self, kind: Kind) -> Result<T, Token> {
-        let kept = self.clone();
-        self.expected(kind).and_then(|text| T::Kind::unwrapped(text).ok_or(kept))
-    }
 }
 
 impl From<(Lexeme, String)> for Token {
     fn from((lexeme, slice): (Lexeme, String)) -> Token {
         match lexeme {
             Lexeme::Bare => Token { kind: Kind::Bare, text: slice },
-            Lexeme::Cited => Token { kind: Kind::Cited, text: slice },
             Lexeme::Quoted(quoted) => Token { kind: Kind::Quoted, text: quoted },
             Lexeme::End => Token { kind: Kind::End, text: slice },
         }

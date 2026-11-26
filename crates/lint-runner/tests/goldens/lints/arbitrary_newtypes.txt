@@ -1,3 +1,0 @@
-a newtype that owns its value derives Arbitrary:
-src/ungenerated.rs:4: Rounds has no generator; add `Arbitrary` to its derives (`use newtype::Arbitrary`), with `#[newtype(strategy = ...)]` if its inner type has none
-fails

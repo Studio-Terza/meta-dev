@@ -1,3 +1,0 @@
-counted_call and counted_acquire are named only in port-core and port-derive, so every op is counted through a generated filler:
-src/lib.rs:1: names counted_call or counted_acquire outside port-core and port-derive; declare the trait with #[port] and implement its Filler, so the generated code counts each call and acquisition
-fails

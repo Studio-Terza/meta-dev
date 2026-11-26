@@ -1,19 +1,15 @@
-mod refusal;
-
 use std::borrow::Cow;
 use std::io;
 use std::path::Path;
 
 use file_ports::FileFailure;
 
-pub use refusal::Refusal;
-
 use crate::cli::ports::Invocation;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Failure<'path> {
     #[error(
-        "usage: ci timed <measured file> <stage> <program> [<argument>...] | ci clippy-targets <measured file> <stage> [<clippy argument>...] | ci logged <log file> <program> [<argument>...] | ci libtest-seconds <measured file> <stage> <test output> | ci reach <metadata file> <event> <base branch> <environment file> <summary file> | ci history <metadata file> <history file> <revision> | ci measured-history <measured file> <history file> <revision> | ci ratchet-lower <record file> <measured file> | ci tools <built directory> <tools directory> | ci tools-key <metadata file> <output file> | ci mutants-shard <shard> <output directory> | ci mutants-plan <diff file> <output file> changed|consumed-by <lint program> [--prior <directory> <metadata file>] [<scope>...] | ci mutants-prior <repository> <branch> <directory> | ci mutants-changed <diff file> <output directory> <shard> [--selected <names file>] [--kept <result file>] [<scope>...] | ci wall-times <repository> <run> <job> | ci compile-times <timings page> <report file> | ci graph-path <timings page> <measured file> <report file> | ci show <file>... | ci summarize <report file> <summary file> | ci stage-issues <limits file> <measured file> | ci compile-trend <cold build directory> <downloads directory> | ci labels <base branch> <pull request> <metadata file> | ci spec-line <pull request> | ci shard-summary <shards directory> <summary file> | ci matrix <shards directory> <sources directory> <output directory> <summary file> | ci cold-size <directory> <output file> | ci sqlite <library directory>"
+        "usage: ci timed <measured file> <stage> <program> [<argument>...] | ci clippy-targets <measured file> <stage> [<clippy argument>...] | ci logged <log file> <program> [<argument>...] | ci libtest-seconds <measured file> <stage> <test output> | ci measured-history <measured file> <history file> <revision> | ci ratchet-lower <record file> <measured file> | ci tools <built directory> <tools directory> | ci mutants-plan <diff file> <output file> [--prior <directory> <metadata file>] [<scope>...] | ci mutants-prior <repository> <branch> <directory> | ci mutants-changed <diff file> <output directory> <shard> [--selected <names file>] [--kept <result file>] [<scope>...] | ci wall-times <repository> <run> <job> | ci compile-times <timings page> <report file> | ci graph-path <timings page> <measured file> <report file> | ci show <file>... | ci summarize <report file> <summary file> | ci stage-issues <limits file> <measured file> | ci compile-trend <cold build directory> <downloads directory> | ci spec-line <pull request> | ci cold-size <directory> <output file> | ci sqlite <library directory>"
     )]
     Usage,
     #[error("cannot use {path}: {source}", path = path.display())]
@@ -30,8 +26,6 @@ pub enum Failure<'path> {
     Write(#[from] io::Error),
     #[error("the scoped rerun did not test these mutants its own crate missed; their names selected nothing:\n{0}")]
     Unselected(file_ports::Text),
-    #[error("reach failed: {0}")]
-    Reach(Refusal),
     #[error("the limits cannot be judged: {0}")]
     Limits(gate_limits::Failure<'path>),
     #[error("cannot read the list of issues: {0}")]
@@ -58,8 +52,6 @@ pub enum Failure<'path> {
     NothingToCheck,
     #[error("cannot read or write the mutants outcomes: {0}")]
     Outcomes(serde_json::Error),
-    #[error("the mutation matrix failed: {0}")]
-    Matrix(Refusal),
     #[error("cargo metadata lists no libsqlite3-sys package to build SQLite from")]
     NoSqlite,
 }

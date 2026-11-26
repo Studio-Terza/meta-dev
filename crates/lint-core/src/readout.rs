@@ -1,9 +1,7 @@
 use std::mem;
 use std::sync::Mutex;
 
-use algebra::{Monoid, Semigroup};
-
-use crate::repo_file::RepoFile;
+use crate::joins::Joins;
 use crate::source_file::SourceFile;
 use invariants::Unpoisoned;
 use lint_layout::Failure;
@@ -15,36 +13,26 @@ pub struct Unwalked(());
 pub struct Readout {
     files: Vec<SourceFile>,
     unwalked: Mutex<Vec<Unwalked>>,
-    repo_files: Vec<RepoFile>,
     failures: Vec<Failure>,
 }
 
-impl Semigroup for Readout {
+impl Joins for Readout {
     fn combine(self, other: Readout) -> Readout {
         Readout {
             files: self.files.combine(other.files),
             unwalked: Mutex::new(
                 self.unwalked.into_inner().unpoisoned().combine(other.unwalked.into_inner().unpoisoned()),
             ),
-            repo_files: self.repo_files.combine(other.repo_files),
             failures: self.failures.combine(other.failures),
         }
     }
 }
-
-impl Monoid for Readout {}
 
 impl FromIterator<SourceFile> for Readout {
     fn from_iter<Files: IntoIterator<Item = SourceFile>>(read: Files) -> Readout {
         let files: Vec<SourceFile> = read.into_iter().collect();
         let unwalked = files.iter().map(|_| Unwalked(())).collect();
         Readout { files, unwalked: Mutex::new(unwalked), ..Readout::default() }
-    }
-}
-
-impl FromIterator<RepoFile> for Readout {
-    fn from_iter<Found: IntoIterator<Item = RepoFile>>(found: Found) -> Readout {
-        Readout { repo_files: found.into_iter().collect(), ..Readout::default() }
     }
 }
 
@@ -58,11 +46,6 @@ impl Readout {
     #[must_use]
     pub fn files(&self) -> &[SourceFile] {
         &self.files
-    }
-
-    #[must_use]
-    pub fn repo_files(&self) -> &[RepoFile] {
-        &self.repo_files
     }
 
     #[must_use]

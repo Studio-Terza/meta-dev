@@ -1,5 +1,3 @@
-state graph violated:
-src/shapes.rs:4: field held of Shapes is pub; struct fields are private
 no dyn: every type is known at compile time, so code takes a generic, returns impl Trait or names an enum instead of a trait object:
 src/shapes.rs:4: dyn trait object; take a generic, return impl Trait, or list the known types in an enum
 fails

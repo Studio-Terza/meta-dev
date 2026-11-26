@@ -1,3 +1,3 @@
 mod boundary;
 
-pub(super) use boundary::{Reach, Reaching, Tested};
+pub(super) use boundary::Tested;

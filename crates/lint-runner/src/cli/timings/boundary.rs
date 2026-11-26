@@ -1,25 +1,8 @@
-use std::any;
 use std::collections::BTreeMap;
 use std::fmt;
 
-use algebra::{Monoid, Semigroup};
-use lint_core::Visits;
+use lint_core::{Joins, Visits};
 use lint_sweep::Visited;
-
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct Named(fn() -> &'static str);
-
-impl Named {
-    pub(crate) const fn spelled<Lint: ?Sized>() -> Named {
-        Named(any::type_name::<Lint>)
-    }
-}
-
-impl fmt::Display for Named {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str((self.0)())
-    }
-}
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Visiting(BTreeMap<String, Visits>);
@@ -30,13 +13,15 @@ impl From<Visited> for Visiting {
     }
 }
 
-impl Semigroup for Visiting {
-    fn combine(self, other: Visiting) -> Visiting {
-        Visiting(self.0.combine(other.0))
+impl Visiting {
+    pub(crate) fn combine(mut self, other: Visiting) -> Visiting {
+        other.0.into_iter().for_each(|(contributor, nodes)| {
+            let held = self.0.remove(&contributor).map_or(nodes, |earlier| earlier.combine(nodes));
+            self.0.insert(contributor, held);
+        });
+        self
     }
 }
-
-impl Monoid for Visiting {}
 
 impl fmt::Display for Visiting {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {

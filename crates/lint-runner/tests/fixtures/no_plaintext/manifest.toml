@@ -1,7 +1,0 @@
-[package]
-name = "corpus"
-
-[dependencies]
-chrono = "0.4"
-newtype = "1"
-serde = "1"

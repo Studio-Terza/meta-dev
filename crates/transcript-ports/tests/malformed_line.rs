@@ -41,12 +41,10 @@ impl Torn {
     }
 }
 
-laws::table!(
-    a_line_that_is_not_a_record_is_read_as_unreadable_and_the_rest_still_reads,
-    Torn::kinds,
-    [
-        Torn("{\"type\":\"user\",\"uuid\":\"2\",\"mess\n") => Some(vec![String::from("said"), String::from("unreadable"), String::from("said")]),
-        Torn("{\"foo\":1}\n") => Some(vec![String::from("said"), String::from("unreadable"), String::from("said")]),
-        Torn("\n") => Some(vec![String::from("said"), String::from("said")]),
-    ]
-);
+#[test]
+fn a_line_that_is_not_a_record_is_read_as_unreadable_and_the_rest_still_reads() {
+    let torn = ["said", "unreadable", "said"].map(String::from).to_vec();
+    assert_eq!(Torn("{\"type\":\"user\",\"uuid\":\"2\",\"mess\n").kinds(), Some(torn.clone()));
+    assert_eq!(Torn("{\"foo\":1}\n").kinds(), Some(torn));
+    assert_eq!(Torn("\n").kinds(), Some(["said", "said"].map(String::from).to_vec()));
+}

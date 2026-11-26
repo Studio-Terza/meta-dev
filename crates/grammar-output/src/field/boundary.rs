@@ -1,10 +1,7 @@
 use std::marker::PhantomData;
 use std::str::FromStr;
 
-use newtype::Stored;
-
-use crate::{Decimal, Field, Kind, Numbered, Token, Unwrapping};
-use grammar_cited::Cited;
+use crate::{Decimal, Field, Kind, Numbered, Token};
 
 #[derive(Debug)]
 pub struct Word<T>(PhantomData<T>);
@@ -17,12 +14,6 @@ pub struct Id<T>(PhantomData<T>);
 
 #[derive(Debug)]
 pub struct Checked<T>(PhantomData<T>);
-
-#[derive(Debug)]
-pub struct Bare<T>(PhantomData<T>);
-
-#[derive(Debug)]
-pub struct Quoted<T>(PhantomData<T>);
 
 #[derive(Debug)]
 pub struct Integer<T>(PhantomData<T>);
@@ -59,22 +50,6 @@ impl<T: FromStr> Field for Checked<T> {
     }
 }
 
-impl<T: Stored<Kind: Unwrapping<T>>> Field for Bare<T> {
-    type Value = T;
-
-    fn taken(token: Token) -> Result<T, Token> {
-        token.wrapped(Kind::Bare)
-    }
-}
-
-impl<T: Stored<Kind: Unwrapping<T>>> Field for Quoted<T> {
-    type Value = T;
-
-    fn taken(token: Token) -> Result<T, Token> {
-        token.wrapped(Kind::Quoted)
-    }
-}
-
 impl<T: TryFrom<u64>> Field for Integer<T> {
     type Value = T;
 
@@ -84,14 +59,5 @@ impl<T: TryFrom<u64>> Field for Integer<T> {
             .spelled::<Decimal>()
             .and_then(|digits| digits.parsed::<u64>(Kind::Bare))
             .and_then(|number| T::try_from(number).map_err(|_large| kept))
-    }
-}
-
-impl Field for Cited {
-    type Value = Cited;
-
-    fn taken(token: Token) -> Result<Cited, Token> {
-        let kept = token.clone();
-        token.expected(Kind::Cited).and_then(|text| text.parse::<Cited>().map_err(|_uncited| kept))
     }
 }

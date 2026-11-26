@@ -7,7 +7,6 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  SQLX_OFFLINE: "true"
   CARGO_INCREMENTAL: "0"
   CARGO_PROFILE_DEV_DEBUG: "0"
   CARGO_PROFILE_DEV_OPT_LEVEL: "1"
@@ -22,6 +21,7 @@ env:
   LIMITS: ${{ github.workspace }}/target/ci/limits.txt
   ELEGANCE: ${{ github.workspace }}/target/ci/elegance.txt
   HISTORY: ${{ github.workspace }}/target/ci/history.tsv
+  MUTANTS_SCOPE: --test-workspace=true
   TIMINGS: ${{ github.workspace }}/target/cargo-timings/cargo-timing.html
   COMPILE_TIMES: ${{ github.workspace }}/target/ci/compile-times.txt
   GRAPH_PATH: ${{ github.workspace }}/target/ci/graph-path.txt
@@ -59,18 +59,16 @@ jobs:
         run: cargo fmt --check
       - name: clippy
         id: clippy
-        if: env.BUILD_SCOPE != ''
-        run: '"$TOOLS/ci" clippy-targets "$MEASURED" clippy --timings $BUILD_SCOPE -- -D warnings'
+        run: '"$TOOLS/ci" clippy-targets "$MEASURED" clippy --timings --workspace -- -D warnings'
       - name: fuzz targets clippy
-        if: env.BUILD_SCOPE == '--workspace' || contains(format('{0} ', env.BUILD_SCOPE), '-p fuzz ')
         run: cargo clippy --locked --all-targets -p fuzz --features campaign -- -D warnings
       - name: graph path
         id: graph
-        if: env.BUILD_SCOPE != '' && steps.clippy.outcome == 'success' && always()
+        if: steps.clippy.outcome == 'success' && always()
         run: '"$TOOLS/ci" graph-path "$TIMINGS" "$MEASURED" "$GRAPH_PATH"'
       - name: graph path skipped
         id: graph_skipped
-        if: env.BUILD_SCOPE != '' && steps.clippy.outcome == 'failure' && always()
+        if: steps.clippy.outcome == 'failure' && always()
         run: '"$TOOLS/ci" graph-path "$TIMINGS" "$MEASURED" "$GRAPH_PATH"'
       - name: graph path report
         if: steps.graph.outcome == 'success' && always()
@@ -129,13 +127,10 @@ jobs:
       - uses: ./.github/actions/tools
       - uses: ./.github/actions/sqlite
       - name: test compile
-        if: env.BUILD_SCOPE != ''
-        run: '"$TOOLS/ci" timed "$MEASURED" test-compile cargo test --locked --no-run --timings $BUILD_SCOPE'
+        run: '"$TOOLS/ci" timed "$MEASURED" test-compile cargo test --locked --no-run --timings --workspace'
       - name: test run
-        if: env.BUILD_SCOPE != ''
-        run: '"$TOOLS/ci" logged "$TESTLOG" cargo test --locked $BUILD_SCOPE'
+        run: '"$TOOLS/ci" logged "$TESTLOG" cargo test --locked --workspace'
       - name: test run seconds
-        if: env.BUILD_SCOPE != ''
         run: '"$TOOLS/ci" libtest-seconds "$MEASURED" test-run "$TESTLOG"'
       - uses: ./.github/actions/judge
         with:
@@ -171,12 +166,6 @@ jobs:
         run: cargo fetch --locked
       - name: lint
         run: '"$TOOLS/ci" logged "$BUDGET" "$TOOLS/ci" timed "$MEASURED" lint "$TOOLS/lint" --timings .'
-      - name: generate laws from the graph
-        run: '"$TOOLS/lint" laws .'
-      - name: stage new law runners for the diff
-        run: git add --intent-to-add .
-      - name: generated laws match the committed runners
-        run: git diff --exit-code
       - name: budget
         if: (github.ref == 'refs/heads/main' || github.base_ref == 'main') && always()
         run: '"$TOOLS/ci" show "$BUDGET"'
@@ -192,28 +181,6 @@ jobs:
       - name: test budget and elegance reports on pull requests
         if: github.base_ref == 'main'
         run: '"$TOOLS/lint" --report .'
-      - name: history restore
-        if: github.ref == 'refs/heads/main'
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ github.workspace }}/target/ci/history.tsv
-          key: history-${{ github.sha }}
-          restore-keys: history-
-      - name: history
-        if: github.ref == 'refs/heads/main'
-        run: '"$TOOLS/ci" history "$METADATA" "$HISTORY" "$GITHUB_SHA"'
-      - name: history save
-        if: github.ref == 'refs/heads/main'
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ github.workspace }}/target/ci/history.tsv
-          key: history-${{ github.sha }}
-      - name: history file
-        if: github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: elegance-history
-          path: ${{ github.workspace }}/target/ci/history.tsv
 
   mutants-plan:
     if: github.event_name == 'pull_request'
@@ -229,21 +196,20 @@ jobs:
       - uses: ./.github/actions/toolchain
       - uses: ./.github/actions/tools
       - uses: taiki-e/install-action@v2
-        if: env.MUTANTS_SCOPE != ''
         with:
           tool: cargo-mutants@27.1.0
       - name: earlier result
-        if: env.MUTANTS_SCOPE != ''
         env:
           PRIOR: ${{ runner.temp }}/prior
         run: '"$TOOLS/ci" mutants-prior "$GITHUB_REPOSITORY" "$GITHUB_HEAD_REF" "$PRIOR"'
+      - name: workspace metadata
+        run: cargo metadata --locked --no-deps --format-version 1 > "$METADATA"
       - name: plan
         id: plan
         env:
           EARLIER: --prior ${{ runner.temp }}/prior ${{ env.METADATA }}
-        run: '"$TOOLS/ci" mutants-plan "$RUNNER_TEMP/changed.diff" "$GITHUB_OUTPUT" changed $EARLIER $MUTANTS_SCOPE'
+        run: '"$TOOLS/ci" mutants-plan "$RUNNER_TEMP/changed.diff" "$GITHUB_OUTPUT" $EARLIER $MUTANTS_SCOPE'
       - uses: actions/upload-artifact@v4
-        if: env.MUTANTS_SCOPE != ''
         with:
           name: changed-diff
           path: |
@@ -271,11 +237,9 @@ jobs:
       - uses: ./.github/actions/tools
       - uses: ./.github/actions/sqlite
       - uses: taiki-e/install-action@v2
-        if: env.MUTANTS_SCOPE != ''
         with:
           tool: cargo-mutants@27.1.0
       - uses: actions/download-artifact@v4
-        if: env.MUTANTS_SCOPE != ''
         with:
           name: changed-diff
           path: ${{ runner.temp }}

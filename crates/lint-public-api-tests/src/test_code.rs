@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 use super::PublicApiTests;
-use algebra::{Monoid, Semigroup};
+use lint_core::Joins;
 use lint_core::Macros;
 use lint_core::Walk;
 use lint_core::{Site, SourceFile, Violation};
@@ -24,13 +24,11 @@ pub struct InSource {
     invoked: Vec<Invoked>,
 }
 
-impl Semigroup for InSource {
+impl Joins for InSource {
     fn combine(self, other: InSource) -> InSource {
         InSource { lines: self.lines.combine(other.lines), invoked: self.invoked.combine(other.invoked) }
     }
 }
-
-impl Monoid for InSource {}
 
 impl InSource {
     fn lines(lines: impl IntoIterator<Item = LineNumber>) -> InSource {
@@ -133,17 +131,15 @@ impl Contribute for TestCode<'_> {
     fn on_macro(
         &self,
         invocation: &Macro,
-        facts: &Facts<'_, Macro>,
+        _: &Facts<'_, Macro>,
         _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), InSource> {
         let line = LineNumber::from(invocation.bang_token.span);
-        let law = facts.law().map(|_| line);
         let called =
             Some(invocation).filter(|candidate| candidate.path.get_ident().is_none_or(|name| name != Self::DEFINITION));
-        let marked = called.and_then(|call| {
+        let settled = called.and_then(|call| {
             Macros::attributes_in_file(self.file, call).iter().find_map(TestMarks::test).map(|_| line)
         });
-        let settled = law.or(marked);
         let named = invocation.path.get_ident().map(|name| Invoked { name: Name::from(name), line });
         let invoked = settled.map_or(named, |_| None).into_iter().collect();
         Contributed::new((), InSource { lines: settled.into_iter().collect(), invoked }, Descend::Over)

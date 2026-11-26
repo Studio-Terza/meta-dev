@@ -1,7 +1,6 @@
 use std::cmp::Ordering;
 use std::fmt;
 
-use algebra::Semigroup;
 use newtype::Wrapping;
 
 use super::super::Pace;
@@ -13,16 +12,14 @@ pub struct Range {
     most: Seconds,
 }
 
-impl Semigroup for Range {
-    fn combine(self, other: Range) -> Range {
+impl Range {
+    pub(super) fn combine(self, other: Range) -> Range {
         Range {
             least: Seconds::new(self.least.into_inner().min(other.least.into_inner())),
             most: Seconds::new(self.most.into_inner().max(other.most.into_inner())),
         }
     }
-}
 
-impl Range {
     pub(super) fn pace(self, total: Seconds) -> Pace {
         match total.partial_cmp(&self.most) {
             Some(Ordering::Greater) => Pace::Slower,

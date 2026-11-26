@@ -1,7 +1,0 @@
-primitives appear in signatures and fields only inside a boundary:
-src/lib.rs:14: bare str in spelling; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-an enum's variant list and spellings are derived, never kept by hand in a table or a match:
-src/lib.rs:10: a const lists every variant of Door by hand; derive it: strum's VariantArray lists the variants; Display, IntoStaticStr or EnumString with #[strum(serialize = ...)] spell them
-src/lib.rs:12: a const pairs variants of Door with their spellings; derive it: strum's VariantArray lists the variants; Display, IntoStaticStr or EnumString with #[strum(serialize = ...)] spell them
-src/lib.rs:14: a fn maps each variant of Door to a literal; derive it: strum's VariantArray lists the variants; Display, IntoStaticStr or EnumString with #[strum(serialize = ...)] spell them
-fails

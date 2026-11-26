@@ -58,12 +58,6 @@ impl IntoArgument for String {
     }
 }
 
-impl IntoArgument for Vec<u8> {
-    fn into_argument(self) -> Argument {
-        Argument::Blob(self)
-    }
-}
-
 impl<Inner: IntoArgument> IntoArgument for Option<Inner> {
     fn into_argument(self) -> Argument {
         self.map_or(Argument::Null, IntoArgument::into_argument)
@@ -80,41 +74,12 @@ impl FromValue for i64 {
     }
 }
 
-impl FromValue for f64 {
-    fn from_value(value: Value) -> Result<f64, ColumnFailure> {
-        match value {
-            Value::Real(real) => Ok(real),
-            Value::Null => Err(ColumnFailure::Absent),
-            Value::Integer(_) | Value::Text(_) | Value::Blob(_) => Err(ColumnFailure::Mistyped),
-        }
-    }
-}
-
 impl FromValue for String {
     fn from_value(value: Value) -> Result<String, ColumnFailure> {
         match value {
             Value::Text(text) => Ok(text),
             Value::Null => Err(ColumnFailure::Absent),
             Value::Integer(_) | Value::Real(_) | Value::Blob(_) => Err(ColumnFailure::Mistyped),
-        }
-    }
-}
-
-impl FromValue for Vec<u8> {
-    fn from_value(value: Value) -> Result<Vec<u8>, ColumnFailure> {
-        match value {
-            Value::Blob(blob) => Ok(blob),
-            Value::Null => Err(ColumnFailure::Absent),
-            Value::Integer(_) | Value::Real(_) | Value::Text(_) => Err(ColumnFailure::Mistyped),
-        }
-    }
-}
-
-impl<Inner: FromValue> FromValue for Option<Inner> {
-    fn from_value(value: Value) -> Result<Option<Inner>, ColumnFailure> {
-        match value {
-            Value::Null => Ok(None),
-            Value::Integer(_) | Value::Real(_) | Value::Text(_) | Value::Blob(_) => Inner::from_value(value).map(Some),
         }
     }
 }

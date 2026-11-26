@@ -5,8 +5,7 @@ use std::collections::BTreeMap;
 use syntax::{Ident, ItemUse, Macro, Path, UseLeaf, UseTree};
 
 use super::export::Export;
-use algebra::{Catenation, Monoid, Semigroup};
-use lint_core::{Macros, SourceFile};
+use lint_core::{Joins, Macros, SourceFile};
 use lint_layout::Name;
 use lint_placement::CrateName;
 use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind};
@@ -108,7 +107,7 @@ impl Gathers<ForeignReferences> for Reading {
     }
 }
 
-impl Semigroup for ForeignReferences {
+impl Joins for ForeignReferences {
     fn combine(mut self, other: ForeignReferences) -> ForeignReferences {
         other.crates.into_iter().for_each(|(crate_name, reach)| {
             self.crates.entry(crate_name).or_default().absorb(reach);
@@ -116,8 +115,6 @@ impl Semigroup for ForeignReferences {
         self
     }
 }
-
-impl Monoid for ForeignReferences {}
 
 impl ForeignReferences {
     const TESTS: &'static str = "tests";
@@ -133,7 +130,7 @@ impl ForeignReferences {
 }
 
 impl ReferenceScan {
-    fn used(&self, tree: &UseTree) -> Catenation<Sighting> {
+    fn used(&self, tree: &UseTree) -> Vec<Sighting> {
         let leaves = UseLeaf::of_tree(tree);
         let reached = leaves.iter().flat_map(|leaf| {
             let first = leaf.path().first().copied();
@@ -148,10 +145,10 @@ impl ReferenceScan {
         pair.and_then(|(first, second)| self.recorded(Some(&first.ident), Leaf::Named(&second.ident)))
     }
 
-    fn transcribed(&self, definition: &Macro) -> Catenation<Sighting> {
+    fn transcribed(&self, definition: &Macro) -> Vec<Sighting> {
         let mentioned = Macros::mentioned(definition);
-        let pathed: Catenation<Sighting> = mentioned.paths().iter().filter_map(|path| self.pathed(path)).collect();
-        pathed.combine(Monoid::concat(mentioned.uses().iter().map(|tree| self.used(tree))))
+        let pathed: Vec<Sighting> = mentioned.paths().iter().filter_map(|path| self.pathed(path)).collect();
+        pathed.combine(Joins::concat(mentioned.uses().iter().map(|tree| self.used(tree))))
     }
 
     fn recorded(&self, first: Option<&Ident>, leaf: Leaf<'_>) -> Option<Sighting> {
@@ -164,7 +161,7 @@ impl ReferenceScan {
 
 impl Contribute for ReferenceScan {
     type Open = ();
-    type Part = Catenation<Sighting>;
+    type Part = Vec<Sighting>;
 
     fn kinds(&self) -> &'static [Kind] {
         match self.reader {
@@ -178,7 +175,7 @@ impl Contribute for ReferenceScan {
         item: &ItemUse,
         _: &Facts<'_, ItemUse>,
         _around: &lint_sweep::Around<'_, Self::Open>,
-    ) -> Contributed<(), Catenation<Sighting>> {
+    ) -> Contributed<(), Vec<Sighting>> {
         Contributed::new((), self.used(&item.tree), Descend::Over)
     }
 
@@ -187,7 +184,7 @@ impl Contribute for ReferenceScan {
         invoked: &Macro,
         _: &Facts<'_, Macro>,
         _around: &lint_sweep::Around<'_, Self::Open>,
-    ) -> Contributed<(), Catenation<Sighting>> {
+    ) -> Contributed<(), Vec<Sighting>> {
         Contributed::new((), self.transcribed(invoked), Descend::Unfold)
     }
 
@@ -196,7 +193,7 @@ impl Contribute for ReferenceScan {
         path: &Path,
         _: &Facts<'_, Path>,
         _around: &lint_sweep::Around<'_, Self::Open>,
-    ) -> Contributed<(), Catenation<Sighting>> {
+    ) -> Contributed<(), Vec<Sighting>> {
         Contributed::parted(self.pathed(path).into_iter().collect())
     }
 }

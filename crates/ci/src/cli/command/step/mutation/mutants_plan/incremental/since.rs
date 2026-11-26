@@ -5,7 +5,7 @@ use file_ports::{Bytes, Files};
 use grammar_hunk::Patch;
 
 use super::super::super::kept::{Commits, Mutant, Places};
-use super::super::tested::{Reach, Tested};
+use super::super::tested::Tested;
 use super::boundary::Choice;
 use crate::cli::command::failure::Failure;
 use crate::cli::ignored::Ignored;
@@ -17,7 +17,6 @@ const ASKED: usize = 3;
 #[derive(Debug)]
 pub(super) struct Since<'run> {
     directory: &'run Path,
-    reach: &'run Reach,
     commits: &'run Commits,
     diff: &'run Path,
 }
@@ -27,13 +26,8 @@ impl<'run> Since<'run> {
     const SELECTED: &'static str = "selected.txt";
     const LISTED: [&'static str; 4] = ["mutants", "--list", "--json", "--in-diff"];
 
-    pub(super) fn new(
-        directory: &'run Path,
-        reach: &'run Reach,
-        commits: &'run Commits,
-        diff: &'run Path,
-    ) -> Since<'run> {
-        Since { directory, reach, commits, diff }
+    pub(super) fn new(directory: &'run Path, commits: &'run Commits, diff: &'run Path) -> Since<'run> {
+        Since { directory, commits, diff }
     }
 
     pub(super) fn chosen(&self, ports: &impl Ports, missed: &[Mutant]) -> Result<Choice, Failure<'static>> {
@@ -49,10 +43,9 @@ impl<'run> Since<'run> {
         let tree = self.commits.tree().as_ref();
         let since = self.directory.join(Self::SINCE);
         let parent = [tree, "^1"].concat();
-        let earlier = Tested::asked(ports, self.reach, OsStr::new(&parent), OsStr::new(tree))?;
-        let changed = Tested::asked(ports, self.reach, OsStr::new(tree), OsStr::new(Tested::HEAD))?
-            .without(&earlier)
-            .diff(ports)?;
+        let earlier = Tested::asked(ports, OsStr::new(&parent), OsStr::new(tree))?;
+        let changed =
+            Tested::asked(ports, OsStr::new(tree), OsStr::new(Tested::HEAD))?.without(&earlier).diff(ports)?;
         let files = ports.files();
         files
             .write(&since, Bytes::from(changed.as_ref()))

@@ -1,5 +1,5 @@
 use std::ffi::OsStr;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Role {
@@ -14,15 +14,6 @@ impl Role {
     const BINARIES: &'static str = "bin";
     const MAIN: &'static str = "main.rs";
     const LIBRARY: &'static str = "lib.rs";
-
-    #[must_use]
-    pub fn roots(self, target: &Path, file: &Path) -> Vec<PathBuf> {
-        match self {
-            Role::BinaryRoot | Role::BuildScript => vec![file.to_path_buf()],
-            Role::Target => vec![target.to_path_buf(), target.join(Self::MAIN)],
-            Role::LibraryRoot | Role::Other => Vec::new(),
-        }
-    }
 
     #[must_use]
     pub fn in_source(inside: &Path) -> Role {

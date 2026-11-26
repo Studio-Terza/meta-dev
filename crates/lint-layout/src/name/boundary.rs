@@ -16,8 +16,4 @@ impl Spelling {
             Arc::from(written.as_str())
         })
     }
-
-    pub(super) fn joined(parts: &[&str]) -> Arc<str> {
-        Spelling::written(|written| parts.iter().for_each(|part| written.push_str(part)))
-    }
 }

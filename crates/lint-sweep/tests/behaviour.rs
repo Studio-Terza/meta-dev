@@ -1,7 +1,7 @@
 use std::fmt;
 
-use algebra::{Monoid, Semigroup};
 use invariants::{invariant, invariants};
+use lint_core::Joins;
 use lint_core::{SourceFile, SourceText, Tallied};
 use lint_layout::Name;
 use lint_sweep::{
@@ -20,13 +20,11 @@ const NESTED: &str = "fn f() {\n    {\n        {\n        }\n    }\n}\nfn g() {\
 #[derive(Debug, Default)]
 struct Depth(Option<usize>);
 
-impl Semigroup for Depth {
+impl Joins for Depth {
     fn combine(self, other: Depth) -> Depth {
         Depth(self.0.or(other.0))
     }
 }
-
-impl Monoid for Depth {}
 
 #[derive(Debug)]
 struct Recorder {
@@ -120,29 +118,29 @@ impl Contribute for Positions {
         &Positions::SCOPES
     }
 
-    fn on_ident(&self, _: &Ident, name: &Name, around: &Around<'_, ()>) -> Contributed<(), Vec<String>> {
-        Contributed::parted(vec![format!("{name} at {:?}", around.position())])
+    fn on_ident(&self, _: &Ident, name: &Name, _: &Around<'_, ()>) -> Contributed<(), Vec<String>> {
+        Contributed::parted(vec![format!("entered {name}")])
     }
 
     fn off_ident(&self, found: &Ident, inner: Contribution<(), Vec<String>>) -> Vec<String> {
         inner.concluded(|(), heard| heard.into_iter().chain([format!("left {found}")]).collect())
     }
 
-    fn on_block(&self, _: &Block, _: &Facts<'_, Block>, around: &Around<'_, ()>) -> Contributed<(), Vec<String>> {
-        Contributed::parted(vec![format!("block at {:?}", around.position())])
+    fn on_block(&self, _: &Block, _: &Facts<'_, Block>, _: &Around<'_, ()>) -> Contributed<(), Vec<String>> {
+        Contributed::parted(vec!["block".to_owned()])
     }
 
     fn on_expr_binary(
         &self,
         _: &ExprBinary,
         _: &Facts<'_, ExprBinary>,
-        around: &Around<'_, ()>,
+        _: &Around<'_, ()>,
     ) -> Contributed<(), Vec<String>> {
-        Contributed::parted(vec![format!("sum at {:?}", around.position())])
+        Contributed::parted(vec!["sum".to_owned()])
     }
 
-    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>, around: &Around<'_, ()>) -> Contributed<(), Vec<String>> {
-        Contributed::new((), vec![format!("macro at {:?}", around.position())], Descend::Expand)
+    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>, _: &Around<'_, ()>) -> Contributed<(), Vec<String>> {
+        Contributed::new((), vec!["macro".to_owned()], Descend::Expand)
     }
 
     fn off_macro(&self, _: &Macro, _: &Facts<'_, Macro>, inner: Contribution<(), Vec<String>>) -> Vec<String> {

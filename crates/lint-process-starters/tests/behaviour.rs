@@ -1,14 +1,13 @@
 use std::path::PathBuf;
 
 use file_ports::{Bytes, Memory};
-use graph_reader::Reader;
 use invariants::{Ignoring, ignored};
-use lint_core::{SourceFile, SourceText};
-use lint_file::ModelLint;
+use lint_core::{Lint, SourceFile, SourceText};
+use lint_file::Filed;
 use lint_placement::Placement;
 use lint_process_starters::{CommandPaths, ProcessStarters, Scope};
 
-use lint_fixtures::{Case, Flagged, Lines, Located, Queried, Source, Sources, Text, Title};
+use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 
 ignored! {
     enum Ignored {
@@ -43,20 +42,14 @@ const OTHER_CONSTRUCTOR: &str = "fn f() {\n    process::Command::other(\"ls\").s
 const USE_AFTER: &str = "fn f() {\n    Command::new(\"ls\").status();\n}\nuse std::process::Command;\n";
 const SELF_RENAMED: &str = "use std::process::{self as p};\nfn f() {\n    p::Command::new(\"ls\").status();\n}\n";
 const FUNCTION_VALUE: &str = "fn f() {\n    let make = std::process::Command::new;\n    make(\"ls\").status();\n}\n";
-const TYPE_ALIAS: &str = "type C = std::process::Command;\nfn f() {\n    C::new(\"ls\").status();\n}\n";
-const ROOT_EXPORT: &str = "pub use std::process::Command;\nmod user;\n";
-const RE_EXPORTED: &str = "pub fn f() {\n    crate::Command::new(\"ls\").status();\n}\n";
-const QUALIFIED_SELF: &str = "fn f() {\n    <std::process::Command>::new(\"ls\").status();\n}\n";
 const MACRO_GUARD: &str =
     "fn f() {\n    matches!(std::process::Command::new(\"ls\").status(), Ok(s) if s.success());\n}\n";
 const MACRO_RULES: &str =
     "macro_rules! go {\n    () => {\n        std::process::Command::new(\"ls\").status()\n    };\n}\n";
 const REPEAT_MACRO: &str = "fn f() {\n    vec![std::process::Command::new(\"ls\").status().is_ok(); 2];\n}\n";
-const THROUGH_PORTS: &str =
-    "mod ports {\n    pub use std::process::Command;\n}\npub fn f() {\n    ports::Command::new(\"ls\").status();\n}\n";
 const SIBLING_IMPORT: &str = "mod a {\n    pub use std::process::Command;\n}\nmod b {\n    pub struct Command;\n    impl Command {\n        pub fn new(_x: u8) {}\n    }\n    pub fn f() {\n        Command::new(1);\n    }\n}\n";
 
-const CASES: [Case; 31] = [
+const CASES: [Case; 27] = [
     Case::new(
         Title::new("test module"),
         &[Source::new(Located::new("a.rs"), Text::new(TEST_MODULE))],
@@ -113,24 +106,6 @@ const CASES: [Case; 31] = [
         Flagged::new(&["a.rs:2"]),
     ),
     Case::new(
-        Title::new("type alias"),
-        &[Source::new(Located::new("a.rs"), Text::new(TYPE_ALIAS))],
-        Flagged::new(&["a.rs:3"]),
-    ),
-    Case::new(
-        Title::new("re-export in the crate root"),
-        &[
-            Source::new(Located::new("crates/x/src/lib.rs"), Text::new(ROOT_EXPORT)),
-            Source::new(Located::new("crates/x/src/user.rs"), Text::new(RE_EXPORTED)),
-        ],
-        Flagged::new(&["crates/x/src/user.rs:2"]),
-    ),
-    Case::new(
-        Title::new("qualified self"),
-        &[Source::new(Located::new("a.rs"), Text::new(QUALIFIED_SELF))],
-        Flagged::new(&["a.rs:2"]),
-    ),
-    Case::new(
         Title::new("macro guard"),
         &[Source::new(Located::new("a.rs"), Text::new(MACRO_GUARD))],
         Flagged::new(&["a.rs:2"]),
@@ -144,11 +119,6 @@ const CASES: [Case; 31] = [
         Title::new("repeat macro"),
         &[Source::new(Located::new("a.rs"), Text::new(REPEAT_MACRO))],
         Flagged::new(&["a.rs:2"]),
-    ),
-    Case::new(
-        Title::new("re-export through ports"),
-        &[Source::new(Located::new("a.rs"), Text::new(THROUGH_PORTS))],
-        Flagged::new(&["a.rs:5"]),
     ),
     Case::new(
         Title::new("import in a sibling module"),
@@ -231,7 +201,7 @@ const PACKAGES: [(&str, usize); 9] = [
 
 #[test]
 fn starting_a_process_is_flagged() {
-    assert_eq!(Sources::mismatches::<Queried<ProcessStarters>>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Filed<ProcessStarters>>(&CASES), Lines::default());
 }
 
 #[test]
@@ -245,10 +215,8 @@ fn every_start_is_counted_including_those_behind_ports() {
     let ported = Sources::file("crates/x/src/ports/run.rs", Text::new(IMPORTED));
     let inline = Sources::file("a.rs", Text::new(INLINE_PORTS));
     let other = Sources::file("b.rs", Text::new(OTHER_COMMAND));
-    let counts: Vec<usize> = [ported, inline, other]
-        .iter()
-        .map(|file| CommandPaths::queried(&Reader::read_files(std::slice::from_ref(file)), Scope::Everywhere).len())
-        .collect();
+    let counts: Vec<usize> =
+        [ported, inline, other].iter().map(|file| CommandPaths::found(file, Scope::Everywhere).len()).collect();
     assert_eq!(counts, vec![1, 1, 0]);
 }
 
@@ -263,6 +231,6 @@ impl Packages {
         let parsed = SourceFile::parse_at(path.clone(), path, placement, SourceText::new(IMPORTED.to_owned()));
         parsed
             .ignoring(Ignored::Unparsed)
-            .map_or(usize::MAX, |file| ProcessStarters::report(&Reader::read_files(&[file])).violations().len())
+            .map_or(usize::MAX, |file| Filed::<ProcessStarters>::report(&[file]).violations().len())
     }
 }

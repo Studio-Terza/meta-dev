@@ -1,5 +1,5 @@
-use algebra::{Monoid, Semigroup};
 use lint_core::Headline;
+use lint_core::Joins;
 use lint_file::{Reads, SweptLint};
 use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Contribution, Descend, Facts, Kind, Scope};
 use std::path::Path;
@@ -87,13 +87,11 @@ struct Iterated<'scan> {
     calls: Vec<Span>,
 }
 
-impl Semigroup for Iterated<'_> {
+impl Joins for Iterated<'_> {
     fn combine(self, other: Self) -> Self {
         Iterated { found: self.found.combine(other.found), calls: self.calls.combine(other.calls) }
     }
 }
-
-impl Monoid for Iterated<'_> {}
 
 impl Iterated<'_> {
     fn constructs(&self, init: &Expr) -> Option<()> {

@@ -15,7 +15,6 @@ use std::process::ExitCode;
 use std::sync::OnceLock;
 use std::thread;
 
-use cargo_ports::{Cargo, CargoFiller};
 use file_ports::{Cached, Files};
 use lint_layout::Failure;
 use lint_reader::{SharedRead, SourceFiles, Stage};
@@ -37,15 +36,14 @@ pub struct Cli {
 }
 
 #[derive(Debug)]
-pub struct Ports<'files, F, C, T> {
+pub struct Ports<'files, F, T> {
     files: &'files F,
-    cargo: C,
     timer: T,
 }
 
-impl<'files, F: Files + Sync, C: CargoFiller + Sync, T: TimerFiller + Sync> Ports<'files, F, C, T> {
-    pub fn new(files: &'files F, cargo: C, timer: T) -> Ports<'files, F, C, T> {
-        Ports { files, cargo, timer }
+impl<'files, F: Files + Sync, T: TimerFiller + Sync> Ports<'files, F, T> {
+    pub fn new(files: &'files F, timer: T) -> Ports<'files, F, T> {
+        Ports { files, timer }
     }
 }
 
@@ -55,14 +53,14 @@ impl Cli {
         let timings = Timings::of_arguments(&flagged);
         let given = Timings::unflagged(flagged);
         let mode = Mode::of_arguments(&given);
-        let named = mode.roots(&given);
+        let named = Mode::roots(&given);
         let roots = named.first().map(|_| ()).map_or_else(|| vec![PathBuf::from(".")], |()| named);
         Cli { roots, mode, timings }
     }
 
     pub fn report_to(
         &self,
-        ports: Ports<'_, impl Files + Sync, impl CargoFiller + Sync, impl TimerFiller + Sync>,
+        ports: Ports<'_, impl Files + Sync, impl TimerFiller + Sync>,
         out: &mut (impl Write + Send),
         err: &mut (impl Write + Send),
     ) -> ExitCode {
@@ -72,40 +70,33 @@ impl Cli {
     #[must_use]
     pub fn verdict(
         &self,
-        ports: Ports<'_, impl Files + Sync, impl CargoFiller + Sync, impl TimerFiller + Sync>,
+        ports: Ports<'_, impl Files + Sync, impl TimerFiller + Sync>,
         out: &mut (impl Write + Send),
         err: &mut (impl Write + Send),
     ) -> Verdict {
         let run = Run::root();
-        let cargo = run.port(ports.cargo);
         let timer = run.port(ports.timer);
         let files = Cached::new(ports.files);
-        self.metered(&Wired::new(&files, &cargo, &timer, self.timings), out, err)
+        self.metered(&Wired::new(&files, &timer, self.timings), out, err)
     }
 
     fn metered(
         &self,
-        wired: &Wired<'_, impl Files + Sync, impl Cargo + Sync, impl Timer + Sync>,
+        wired: &Wired<'_, impl Files + Sync, impl Timer + Sync>,
         out: &mut (impl Write + Send),
         err: &mut (impl Write + Send),
     ) -> Verdict {
-        match self.mode.refusal() {
-            Some(refused) => Verdict::refused(refused, err),
-            None => Verdict::ran(StackSize::LINT.ran(|| self.linted(self.staged(wired), wired, out, err)), err),
-        }
+        Verdict::ran(StackSize::LINT.ran(|| self.linted(self.staged(wired), wired, out, err)), err)
     }
 
-    fn staged(
-        &self,
-        wired: &Wired<'_, impl Files + Sync, impl Cargo, impl Timer>,
-    ) -> Result<Measured<Stage<'_>>, Failure> {
+    fn staged(&self, wired: &Wired<'_, impl Files + Sync, impl Timer>) -> Result<Measured<Stage<'_>>, Failure> {
         Stopwatch::measured(wired.timer(), Step::Stage, || SourceFiles::staged(wired.files(), &self.roots)).transposed()
     }
 
     fn linted(
         &self,
         staged: Result<Measured<Stage<'_>>, Failure>,
-        wired: &Wired<'_, impl Files + Sync, impl Cargo + Sync, impl Timer + Sync>,
+        wired: &Wired<'_, impl Files + Sync, impl Timer + Sync>,
         out: &mut impl Write,
         err: &mut impl Write,
     ) -> Verdict {
@@ -126,7 +117,7 @@ impl Cli {
 
     fn sourced(
         &self,
-        sources: &Sources<impl Files + Sync, impl Cargo + Sync, impl Timer + Sync>,
+        sources: &Sources<impl Files + Sync, impl Timer + Sync>,
         out: &mut impl Write,
         err: &mut impl Write,
     ) -> Verdict {

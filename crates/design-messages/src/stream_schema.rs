@@ -1,14 +1,6 @@
-mod anchored;
-mod boundary;
-mod resegmented;
-
 use std::sync::LazyLock;
 
-use store_ports::{Migrator, Schema, Version};
-
-use anchored::Anchored;
-pub use boundary::Rewrite;
-use resegmented::Resegmented;
+use store_ports::{Migrator, Schema};
 
 static MIGRATOR: LazyLock<Migrator> = LazyLock::new(|| store_ports::migrate!());
 
@@ -16,15 +8,7 @@ static MIGRATOR: LazyLock<Migrator> = LazyLock::new(|| store_ports::migrate!());
 pub struct StreamSchema;
 
 impl Schema for StreamSchema {
-    type Rewrite = Rewrite;
-
     fn migrator() -> &'static Migrator {
         &MIGRATOR
-    }
-
-    fn rewrite(pending: Version) -> Option<Rewrite> {
-        (pending == Resegmented::PENDING)
-            .then_some(Rewrite::Resegmented(Resegmented))
-            .or_else(|| (pending == Anchored::PENDING).then_some(Rewrite::Anchored(Anchored)))
     }
 }

@@ -17,15 +17,10 @@ file-ports = { path = "../file-ports" }
 sqlite-ports = { path = "../sqlite-ports" }
 
 [dev-dependencies]
-invariants = { path = "../invariants" }
-design-model = { path = "../design-model" }
-e2e = { path = "../../e2e" }
-laws = { path = "../laws" }
-newtype = { path = "../newtype" }
 grammar-slug = { path = "../grammar-slug" }
+test-failure = { path = "../test-failure" }
 serde_json.workspace = true
-structurer = { path = "../structurer" }
-text-lines = { path = "../text-lines" }
+tempfile.workspace = true
 
 [lints]
 workspace = true

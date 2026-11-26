@@ -19,7 +19,6 @@ thiserror.workspace = true
 
 [dev-dependencies]
 invariants = { path = "../invariants" }
-laws = { path = "../laws" }
 serde_json.workspace = true
 
 [lints]

@@ -1,5 +1,10 @@
-use graph::{Ground, Model, PathUse, Placed, Region};
-use lint_layout::{PathTail, Word, words};
+use std::path::Path;
+
+use lint_core::{
+    Address, Around, Contribute, Contributed, Contributing, Descend, Facts, Gate, Joins, Kind, Site, SourceFile,
+};
+use lint_layout::{LineNumber, Name, Word};
+use syntax::{Ident, ItemMod, ItemUse, Macro, Spanned, TokenStream, TokenTree, UseLeaf};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum Scope {
@@ -8,27 +13,287 @@ pub enum Scope {
     Everywhere,
 }
 
+#[derive(Debug)]
+pub struct CommandPaths;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Ported;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Module {
+    Root,
+    Inline(Address),
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Enclosing {
+    module: Module,
+    ported: Option<Ported>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Bound {
+    Command(Name),
+    Process(Name),
+}
+
+#[derive(Debug)]
+struct Import {
+    module: Module,
+    bound: Bound,
+}
+
+#[derive(Debug)]
+struct Spelled {
+    module: Module,
+    line: LineNumber,
+    segments: Vec<Name>,
+}
+
+#[derive(Debug, Default)]
+struct Spotted {
+    imports: Vec<Import>,
+    spelled: Vec<Spelled>,
+}
+
+#[derive(Debug)]
+struct Scan {
+    scope: Scope,
+}
+
+impl CommandPaths {
+    const PROCESS: Word<'static> = Word::new("process");
+    const COMMAND: Word<'static> = Word::new("Command");
+    const NEW: Word<'static> = Word::new("new");
+    const STD: Word<'static> = Word::new("std");
+    const OWN: Word<'static> = Word::new("self");
+
+    #[must_use]
+    pub fn found(file: &SourceFile, scope: Scope) -> Vec<Site<'_>> {
+        let path = AsRef::<Path>::as_ref(file.head());
+        let admitted = scope.inside(Gate::PORTS.admits(file.head(), Ported));
+        admitted.map_or_default(|_| {
+            Contributing::new(Scan { scope }).concluded(file, |_, _, spotted: Spotted| spotted.starts(path))
+        })
+    }
+}
+
 impl Scope {
-    fn admits(self, ground: Ground) -> Option<Ground> {
+    fn inside(self, ported: Option<Ported>) -> Option<Scope> {
         match self {
-            Scope::Everywhere => Some(ground),
-            Scope::OutsidePorts => Some(ground).filter(|candidate| *candidate != Ground::Ports),
+            Scope::Everywhere => Some(self),
+            Scope::OutsidePorts => ported.map_or(Some(self), |_| None),
         }
     }
 }
 
+impl Joins for Spotted {
+    fn combine(mut self, later: Spotted) -> Spotted {
+        self.imports.extend(later.imports);
+        self.spelled.extend(later.spelled);
+        self
+    }
+}
+
+impl Spotted {
+    fn starts(self, path: &Path) -> Vec<Site<'_>> {
+        let Spotted { imports, spelled } = self;
+        spelled.iter().filter_map(|spelling| spelling.started(&imports)).map(|line| Site::new(path, line)).collect()
+    }
+}
+
+impl Spelled {
+    fn started(&self, imports: &[Import]) -> Option<LineNumber> {
+        let (last, rest) = self.segments.split_last()?;
+        (*last == Name::from(CommandPaths::NEW)).then_some(())?;
+        let (owner, ahead) = rest.split_last()?;
+        let before = ahead.last();
+        let bound: Vec<&Bound> =
+            imports.iter().filter(|import| import.module == self.module).map(|import| &import.bound).collect();
+        let imported = bound.iter().find(|held| ***held == Bound::Command(owner.clone())).map(|_| ());
+        let qualified = before
+            .filter(|_| *owner == Name::from(CommandPaths::COMMAND))
+            .filter(|module| {
+                **module == Name::from(CommandPaths::PROCESS) || bound.contains(&&Bound::Process((*module).clone()))
+            })
+            .map(|_| ());
+        imported.or(qualified).map(|()| self.line)
+    }
+}
+
+impl Bound {
+    fn of_leaf(leaf: &UseLeaf<'_>) -> Option<Bound> {
+        let parent = Name::from(*leaf.path().last()?);
+        let end = leaf.end();
+        let named = end.named().map(|named| (&named.ident, &named.ident));
+        let spelled = named.or_else(|| end.renamed().map(|renamed| (&renamed.ident, &renamed.rename)));
+        spelled.map_or_else(
+            || (parent == Name::from(CommandPaths::PROCESS)).then(|| Bound::Command(Name::from(CommandPaths::COMMAND))),
+            |(original, bound)| Bound::named(&parent, original, bound),
+        )
+    }
+
+    fn named(parent: &Name, spelled: &Ident, as_bound: &Ident) -> Option<Bound> {
+        let original = Name::from(spelled);
+        let bound = Name::from(as_bound);
+        let process = Name::from(CommandPaths::PROCESS);
+        let in_process = (*parent == process).then_some(());
+        let command = in_process.filter(|()| original == Name::from(CommandPaths::COMMAND));
+        let itself = in_process.filter(|()| original == Name::from(CommandPaths::OWN));
+        let from_std = (*parent == Name::from(CommandPaths::STD)).then_some(()).filter(|()| original == process);
+        let module = itself.or(from_std).map(|()| Bound::Process(Bound::spelled(bound.clone(), &process)));
+        command.map(|()| Bound::Command(bound)).or(module)
+    }
+
+    fn spelled(bound: Name, process: &Name) -> Name {
+        Some(bound).filter(|name| *name != Name::from(CommandPaths::OWN)).unwrap_or_else(|| process.clone())
+    }
+}
+
+impl Scan {
+    fn enclosing<'up>(around: &Around<'up, Vec<Enclosing>>) -> impl Iterator<Item = &'up Enclosing> {
+        around.nearest().flat_map(|open| open.iter())
+    }
+
+    fn module(around: &Around<'_, Vec<Enclosing>>) -> Module {
+        Self::enclosing(around).next().map_or(Module::Root, |enclosing| enclosing.module)
+    }
+
+    fn ported(around: &Around<'_, Vec<Enclosing>>) -> Option<Ported> {
+        Self::enclosing(around).find_map(|enclosing| enclosing.ported)
+    }
+}
+
+impl Contribute for Scan {
+    type Open = Vec<Enclosing>;
+    type Part = Spotted;
+
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::ItemMod, Kind::ItemUse, Kind::Path, Kind::Macro]
+    }
+
+    fn scopes(&self) -> &'static [lint_core::Scope] {
+        const { &[lint_core::Scope::new(Kind::ItemMod)] }
+    }
+
+    fn on_item_mod(
+        &self,
+        module: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+        around: &Around<'_, Vec<Enclosing>>,
+    ) -> Contributed<Vec<Enclosing>, Spotted> {
+        let ported = Gate::PORTS.names(module, Ported).or_else(|| Scan::ported(around));
+        let opened = Enclosing { module: Module::Inline(facts.address()), ported };
+        Contributed::new(vec![opened], Spotted::default(), Descend::Into)
+    }
+
+    fn on_item_use(
+        &self,
+        item: &ItemUse,
+        _: &Facts<'_, ItemUse>,
+        around: &Around<'_, Vec<Enclosing>>,
+    ) -> Contributed<Vec<Enclosing>, Spotted> {
+        let module = Scan::module(around);
+        let imports = UseLeaf::of_tree(&item.tree)
+            .iter()
+            .filter_map(Bound::of_leaf)
+            .map(|bound| Import { module, bound })
+            .collect();
+        Contributed::new(Vec::new(), Spotted { imports, spelled: Vec::new() }, Descend::Over)
+    }
+
+    fn on_path(
+        &self,
+        path: &syntax::Path,
+        _: &Facts<'_, syntax::Path>,
+        around: &Around<'_, Vec<Enclosing>>,
+    ) -> Contributed<Vec<Enclosing>, Spotted> {
+        let spelled = self.scope.inside(Scan::ported(around)).map(|_| Spelled {
+            module: Scan::module(around),
+            line: LineNumber::from(path.span()),
+            segments: path.segments.iter().map(|segment| Name::from(&segment.ident)).collect(),
+        });
+        Contributed::parted(Spotted { imports: Vec::new(), spelled: spelled.into_iter().collect() })
+    }
+
+    fn on_macro(
+        &self,
+        invocation: &Macro,
+        _: &Facts<'_, Macro>,
+        around: &Around<'_, Vec<Enclosing>>,
+    ) -> Contributed<Vec<Enclosing>, Spotted> {
+        let module = Scan::module(around);
+        let spelled = self.scope.inside(Scan::ported(around)).map_or_default(|_| {
+            Spoken::scanned(invocation.tokens.clone())
+                .into_iter()
+                .map(|Spoken { line, segments }| Spelled { module, line, segments })
+                .collect()
+        });
+        Contributed::new(Vec::new(), Spotted { imports: Vec::new(), spelled }, Descend::Over)
+    }
+}
+
 #[derive(Debug)]
-pub struct CommandPaths;
+struct Spoken {
+    line: LineNumber,
+    segments: Vec<Name>,
+}
 
-impl CommandPaths {
-    const STARTER: [Word<'static>; 3] = words!["process", "Command", "new"];
+#[derive(Debug, Default)]
+struct Run {
+    segments: Vec<Name>,
+    line: Option<LineNumber>,
+    colons: usize,
+    found: Vec<Spoken>,
+}
 
-    #[must_use]
-    pub fn queried(model: &Model, scope: Scope) -> Vec<Placed<'_, &PathUse>> {
-        model
-            .uses()
-            .filter(|placed| placed.entity().spelling(PathTail::new(&Self::STARTER)).is_some())
-            .filter(|placed| scope.admits(AsRef::<Region>::as_ref(placed.entity()).ground()).is_some())
-            .collect()
+impl Spoken {
+    fn scanned(tokens: TokenStream) -> Vec<Spoken> {
+        tokens.into_iter().fold(Run::default(), Run::read).ended().found
+    }
+}
+
+impl Run {
+    const SEPARATOR: usize = 2;
+    const COLON: char = ':';
+
+    fn read(self, tree: TokenTree) -> Run {
+        match tree {
+            TokenTree::Group(group) => {
+                let Run { found, .. } = self.ended();
+                Run { found: found.into_iter().chain(Spoken::scanned(group.stream())).collect(), ..Run::default() }
+            }
+            TokenTree::Ident(ident) => self.named(&ident),
+            TokenTree::Punct(punct) => self.punctuated(punct.as_char()),
+            TokenTree::Literal(_) => self.ended(),
+        }
+    }
+
+    fn named(self, ident: &Ident) -> Run {
+        let joined = self.segments.first().map_or(Some(()), |_| (self.colons == Self::SEPARATOR).then_some(()));
+        let run = match joined {
+            Some(()) => self,
+            None => self.ended(),
+        };
+        Run {
+            line: run.line.or(Some(LineNumber::from(ident.span()))),
+            segments: run.segments.into_iter().chain([Name::from(ident)]).collect(),
+            colons: 0,
+            found: run.found,
+        }
+    }
+
+    fn punctuated(self, mark: char) -> Run {
+        match (mark == Self::COLON).then_some(()) {
+            Some(()) => Run { colons: self.colons + 1, ..self },
+            None => self.ended(),
+        }
+    }
+
+    fn ended(self) -> Run {
+        let Run { segments, line, colons, found } = self;
+        let whole = line.filter(|_| colons == 0).filter(|_| segments.len() >= Self::SEPARATOR);
+        let spoken = whole.map(|at| Spoken { line: at, segments });
+        Run { found: found.into_iter().chain(spoken).collect(), ..Run::default() }
     }
 }

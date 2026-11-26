@@ -13,7 +13,6 @@ doctest = false
 file-ports = { path = "../file-ports" }
 grammar-lines = { path = "../grammar-lines" }
 text-lines = { path = "../text-lines" }
-grammar-message = { path = "../grammar-message" }
 grammar-output = { path = "../grammar-output" }
 invariants = { path = "../invariants" }
 message-id = { path = "../message-id" }
@@ -25,7 +24,8 @@ strum.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-laws = { path = "../laws" }
+test-failure = { path = "../test-failure" }
+proptest.workspace = true
 
 [lints]
 workspace = true

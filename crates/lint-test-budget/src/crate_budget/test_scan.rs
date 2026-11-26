@@ -1,4 +1,4 @@
-use algebra::{Monoid, Semigroup};
+use lint_core::Joins;
 use syntax::Span;
 use syntax::Spanned;
 use syntax::{ItemFn, ItemMod, Macro, PathSegment};
@@ -38,16 +38,9 @@ impl<'file> TestScan<'file> {
     }
 
     fn tests_in(&self, invocation: &Macro) -> Count {
-        TestMarks::law(invocation)
-            .map(|_| Count::new(1))
-            .or_else(|| {
-                Self::property_block(invocation).map(|_| {
-                    Count::new(
-                        Macros::attributes_in_file(self.file, invocation).iter().filter_map(TestMarks::test).count(),
-                    )
-                })
-            })
-            .unwrap_or_default()
+        Self::property_block(invocation).map_or_default(|_| {
+            Count::new(Macros::attributes_in_file(self.file, invocation).iter().filter_map(TestMarks::test).count())
+        })
     }
 }
 
@@ -61,13 +54,11 @@ impl Tally {
     }
 }
 
-impl Semigroup for Tally {
+impl Joins for Tally {
     fn combine(self, other: Tally) -> Tally {
         Tally { tests: self.tests.plus(other.tests), test_lines: self.test_lines.plus(other.test_lines) }
     }
 }
-
-impl Monoid for Tally {}
 
 impl Contribute for TestScan<'_> {
     type Open = ();
