@@ -2,7 +2,7 @@ use design_model::{JobId, Ordinal, RunId, Segment};
 use dispatch_ports::{Deadline, Pid, Started, Tokens, Usage, Wall};
 use newtype::{Counter, Wrapping};
 use store_ports::Record as _;
-use store_ports::{Batch, Columns, Edge, Moved, Prepared, Query, Staged, Statements, StoreFailure, Written};
+use store_ports::{Batch, Columns, Edge, Execute, Moved, Prepared, Query, Staged, StoreFailure, Written};
 use transcript_ports::{Body, Instant, SessionId, Uuid};
 
 use design_jobs::{JobState, OpenJobs};
@@ -151,7 +151,7 @@ impl From<RanRow> for Ran {
 impl Batch for JobOpened {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let JobOpened { job, covering } = self;
         let open = JobState::Open;
         let opened = statements.written(store_ports::query!(
@@ -169,7 +169,7 @@ VALUES
             .map(|segment| {
                 let message = AsRef::<Uuid>::as_ref(segment).clone();
                 let ordinal = Ordinal::from(segment);
-                statements.written(store_ports::query!(
+                store_ports::query!(
                     r#"
 INSERT INTO
   successions (released, successor)
@@ -194,17 +194,17 @@ WHERE
                     job: JobId,
                     message: Uuid,
                     ordinal: Ordinal
-                ))
+                )
             })
-            .collect::<Result<Vec<Written>, StoreFailure>>()?;
-        Ok(Written::total([opened].into_iter().chain(succeeded)))
+            .collect::<Vec<Prepared<()>>>();
+        Ok(opened.plus(statements.written_all(succeeded)?))
     }
 }
 
 impl Batch for JobHalted {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let JobHalted { job, halted, account, held, retold } = self;
         let closed = JobState::from(halted).closing(job).written(statements)?;
         let unreported = Delivery::Unreported;
@@ -221,18 +221,15 @@ VALUES
             unreported: Delivery
         ))?;
         let holding = held.map(|flailing| flailing.written(statements)).transpose()?;
-        let retelling = retold
-            .into_iter()
-            .map(|again| again.written(statements))
-            .collect::<Result<Vec<Written>, StoreFailure>>()?;
-        Ok(Written::total([closed, recorded].into_iter().chain(holding).chain(retelling)))
+        let retelling = statements.written_all(retold)?;
+        Ok(Written::total([closed, recorded, retelling].into_iter().chain(holding)))
     }
 }
 
 impl Batch for Retold {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let Retold { job, account } = self;
         let recorded = statements.written(store_ports::query!(
             r#"
@@ -256,7 +253,7 @@ WHERE
 impl Query for UnreportedFailures {
     type Rows = Vec<Unreported>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Unreported>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Vec<Unreported>, StoreFailure> {
         let unreported = Delivery::Unreported;
         let rows = statements.rows(store_ports::query!(
             UnreportedRow,
@@ -280,33 +277,24 @@ ORDER BY
 impl Batch for FailuresReported {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let written = self
-            .0
-            .into_iter()
-            .map(|held| held.reported().written(statements))
-            .collect::<Result<Vec<Written>, StoreFailure>>()?;
-        Ok(Written::total(written.into_iter()))
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+        statements.written_all(self.0.into_iter().map(delivery::Unreported::reported))
     }
 }
 
 impl Batch for JobsInterrupted {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let moved = OpenJobs
-            .rows(statements)?
-            .into_iter()
-            .map(|open| open.interrupted().written(statements))
-            .collect::<Result<Vec<Written>, StoreFailure>>()?;
-        Ok(Written::total(moved.into_iter()))
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+        let open = OpenJobs.rows(statements)?;
+        statements.written_all(open.into_iter().map(design_jobs::job::Open::interrupted))
     }
 }
 
 impl Batch for RunSpawned {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let RunSpawned { run, job, spawned } = self;
         let pid = spawned.pid();
         let started = spawned.started().cloned();
@@ -332,7 +320,7 @@ VALUES
 impl Batch for RunEnded {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let RunEnded { run, state, usage, reply } = self;
         let Spent { input, output, cache_written, cache_read } = Spent::from(usage);
         let moved = Moved::<RunState>::new(run, Edge::new(RunState::Running, state)).written(statements)?;
@@ -361,14 +349,14 @@ WHERE
 }
 
 impl JobFlailed {
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let JobFlailed { run, segments } = self;
         let written = segments
             .iter()
             .map(|segment| {
                 let message = AsRef::<Uuid>::as_ref(segment).clone();
                 let ordinal = Ordinal::from(segment);
-                statements.written(store_ports::query!(
+                store_ports::query!(
                     r#"
 INSERT INTO
   flailed (message, ordinal, job, run)
@@ -398,17 +386,17 @@ WHERE
                     message: Uuid,
                     ordinal: Ordinal,
                     run: RunId
-                ))
+                )
             })
-            .collect::<Result<Vec<Written>, StoreFailure>>()?;
-        Ok(Written::total(written.into_iter()))
+            .collect::<Vec<Prepared<()>>>();
+        statements.written_all(written)
     }
 }
 
 impl Batch for JobRetried {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let job = self.0;
         let released = statements.one(Release::created(&ReleaseNew { job }))?;
         let unreported = Delivery::Unreported.held(*released.key(), statements)?;
@@ -421,7 +409,7 @@ impl Batch for JobRetried {
 impl Query for FlailedSegments {
     type Rows = Vec<Flailed>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Flailed>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Vec<Flailed>, StoreFailure> {
         let rows = statements.rows(store_ports::query!(
             FlailedRow,
             r#"
@@ -446,7 +434,7 @@ ORDER BY
 impl Query for HeldBy {
     type Rows = Option<Hold>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Option<Hold>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Option<Hold>, StoreFailure> {
         let job = self.0;
         let rows = statements.rows(store_ports::query!(
             FlailedRow,
@@ -476,7 +464,7 @@ ORDER BY
 impl Query for NextJob {
     type Rows = JobId;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<JobId, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<JobId, StoreFailure> {
         let row = statements.one(store_ports::query!(
             NextJobRow,
             r#"
@@ -493,7 +481,7 @@ FROM
 impl Query for NextRun {
     type Rows = RunId;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<RunId, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<RunId, StoreFailure> {
         let row = statements.one(store_ports::query!(
             NextRunRow,
             r#"
@@ -510,7 +498,7 @@ FROM
 impl Query for LiveRuns {
     type Rows = Vec<StoredRun>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<StoredRun>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Vec<StoredRun>, StoreFailure> {
         let running = RunState::Running;
         let rows = statements.rows(store_ports::query!(
             LiveRow,
@@ -536,7 +524,7 @@ ORDER BY
 impl Query for RunsOf {
     type Rows = Vec<Ran>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Ran>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Vec<Ran>, StoreFailure> {
         let job = self.0;
         let rows = statements.rows(store_ports::query!(
             RanRow,
@@ -565,7 +553,7 @@ ORDER BY
 impl Query for Unstructured {
     type Rows = Vec<Unplaced>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Unplaced>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Vec<Unplaced>, StoreFailure> {
         let unplaced = UnplacedSegments.rows(statements)?;
         Ok(unplaced.into_iter().filter(|segment| segment.flailed.is_none()).collect())
     }
@@ -574,7 +562,7 @@ impl Query for Unstructured {
 impl Query for UnplacedSegments {
     type Rows = Vec<Unplaced>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Unplaced>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Vec<Unplaced>, StoreFailure> {
         let rows = statements.rows(store_ports::query!(
             UnplacedRow,
             r#"
@@ -648,7 +636,7 @@ WHERE
 }
 
 impl Delivery {
-    fn held(self, job: JobId, statements: &mut Statements<'_>) -> Result<Option<JobId>, StoreFailure> {
+    fn held(self, job: JobId, statements: &mut impl Execute) -> Result<Option<JobId>, StoreFailure> {
         let from = self;
         let delivered = statements.rows(store_ports::query!(
             DeliveredRow,
@@ -671,7 +659,7 @@ WHERE
 impl Batch for RunReaped {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let RunReaped { held, ended } = self;
         held.moved(ended).written(statements)
     }

@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use design_model::Project;
@@ -83,7 +82,7 @@ laws::law!(a_repository_kept_for_one_project_refuses_another, (Configs::any(), C
 });
 
 #[test]
-fn a_kept_config_leaves_the_meta_directory_ignored_by_git() -> Result<(), Box<dyn Error>> {
+fn a_kept_config_leaves_the_meta_directory_ignored_by_git() -> Result<(), laws::Unmet> {
     let memory = Memory::default();
     LocalConfig::new("demo".parse()?, PathBuf::from("/ws")).kept(&memory, Path::new(REPO))?;
     let ignored = memory.read_text(&Path::new(REPO).join(".meta/.gitignore"))?;

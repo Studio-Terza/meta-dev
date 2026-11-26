@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use design_model::{NodeId, Ordinal, Prefix, Segment};
-use store_ports::{Columns, Query, Statements, StoreFailure};
+use store_ports::{Columns, Execute, Query, StoreFailure};
 use transcript_ports::{Authorship, Uuid};
 
 use super::{Cited, NextNode, Prefixed, Spoken, Started};
@@ -37,7 +37,7 @@ impl From<SpokenRow> for Spoken {
 impl Query for Prefixed {
     type Rows = Vec<Spoken>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Spoken>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Vec<Spoken>, StoreFailure> {
         let prefix = self.0;
         let rows = statements.rows(store_ports::query!(
             SpokenRow,
@@ -64,7 +64,7 @@ ORDER BY
 impl Query for Cited {
     type Rows = BTreeMap<Prefix, Vec<Spoken>>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<BTreeMap<Prefix, Vec<Spoken>>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<BTreeMap<Prefix, Vec<Spoken>>, StoreFailure> {
         let prefixes: Listed = self.0.iter().collect();
         let rows = statements.rows(store_ports::query!(
             CitedRow,
@@ -106,7 +106,7 @@ ORDER BY
 impl Query for Started {
     type Rows = Vec<Uuid>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Uuid>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Vec<Uuid>, StoreFailure> {
         let prefix = self.0;
         let rows = statements.rows(store_ports::query!(
             StartedRow,
@@ -129,7 +129,7 @@ ORDER BY
 impl Query for NextNode {
     type Rows = NodeId;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<NodeId, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<NodeId, StoreFailure> {
         NodeRow::next(statements)
     }
 }

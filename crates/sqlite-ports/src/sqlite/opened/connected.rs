@@ -5,7 +5,7 @@ use store_ports::{Argument, Bind, ColumnFailure, Execute, StoreFailure, Value, W
 use super::super::failed::Unexecuted;
 
 #[derive(Debug)]
-pub(super) struct Connected<'run> {
+pub(in super::super) struct Connected<'run> {
     connection: &'run Connection,
 }
 

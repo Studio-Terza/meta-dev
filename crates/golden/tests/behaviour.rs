@@ -14,14 +14,14 @@ use laws::{roundtrip, table};
 use proptest::prelude::any;
 
 #[test]
-fn checking_matching_output_passes() -> Result<(), Box<dyn std::error::Error>> {
+fn checking_matching_output_passes() -> Result<(), laws::Unmet> {
     let fixture = Fixture::with_recorded("same\n")?;
     Fixture::golden().verify(&Variables::default(), fixture.files(), Output::new("same\n"))?;
     Ok(())
 }
 
 #[test]
-fn a_check_fails_on_changed_output_and_leaves_the_golden_alone() -> Result<(), Box<dyn std::error::Error>> {
+fn a_check_fails_on_changed_output_and_leaves_the_golden_alone() -> Result<(), laws::Unmet> {
     let fixture = Fixture::with_recorded("old\n")?;
     assert!(matches!(
         Fixture::golden().verify(&Variables::default(), fixture.files(), Output::new("new\n")),
@@ -32,7 +32,7 @@ fn a_check_fails_on_changed_output_and_leaves_the_golden_alone() -> Result<(), B
 }
 
 #[test]
-fn a_check_never_creates_a_missing_golden() -> Result<(), Box<dyn std::error::Error>> {
+fn a_check_never_creates_a_missing_golden() -> Result<(), laws::Unmet> {
     let fixture = Fixture::new()?;
     assert!(matches!(
         Fixture::golden().verify(&Variables::default(), fixture.files(), Output::new("new\n")),
@@ -43,7 +43,7 @@ fn a_check_never_creates_a_missing_golden() -> Result<(), Box<dyn std::error::Er
 }
 
 #[test]
-fn a_golden_that_is_not_text_is_reported_as_unreadable() -> Result<(), Box<dyn std::error::Error>> {
+fn a_golden_that_is_not_text_is_reported_as_unreadable() -> Result<(), laws::Unmet> {
     let fixture = Fixture::with_recorded("")?;
     fixture.overwrite(&[0xff, 0xfe])?;
     assert!(matches!(
@@ -75,7 +75,7 @@ roundtrip!(
 );
 
 #[test]
-fn a_test_cannot_choose_to_record_a_package_golden() -> Result<(), Box<dyn std::error::Error>> {
+fn a_test_cannot_choose_to_record_a_package_golden() -> Result<(), laws::Unmet> {
     let fixture = Fixture::with_recorded("old")?;
     fixture.mark_package()?;
     let recorded =
@@ -86,7 +86,7 @@ fn a_test_cannot_choose_to_record_a_package_golden() -> Result<(), Box<dyn std::
 }
 
 #[test]
-fn recording_chosen_by_the_environment_rewrites_a_package_golden() -> Result<(), Box<dyn std::error::Error>> {
+fn recording_chosen_by_the_environment_rewrites_a_package_golden() -> Result<(), laws::Unmet> {
     let fixture = Fixture::with_recorded("old")?;
     fixture.mark_package()?;
     let chosen: Variables = [(OsString::from(Mode::VARIABLE), OsString::from(Mode::ON))].into_iter().collect();
@@ -96,7 +96,7 @@ fn recording_chosen_by_the_environment_rewrites_a_package_golden() -> Result<(),
 }
 
 #[test]
-fn a_golden_in_a_package_lives_under_its_goldens_directory() -> Result<(), Box<dyn std::error::Error>> {
+fn a_golden_in_a_package_lives_under_its_goldens_directory() -> Result<(), laws::Unmet> {
     let fixture = Fixture::new()?;
     Fixture::golden().verify_in(&Variables::default(), fixture.files(), Mode::Record, Output::new("placed\n"))?;
     assert!(Fixture::golden().verify(&Variables::default(), fixture.files(), Output::new("placed\n")).is_ok());
@@ -126,7 +126,7 @@ fn the_golden_macro_finds_a_golden_in_the_calling_package() {
 }
 
 #[test]
-fn the_fixtures_macro_reads_a_tree_of_the_calling_package() -> Result<(), Box<dyn std::error::Error>> {
+fn the_fixtures_macro_reads_a_tree_of_the_calling_package() -> Result<(), laws::Unmet> {
     let goldens = golden::fixtures!("tests/goldens")?;
     let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/goldens");
     assert_eq!(goldens.kind(&directory.join("macro.txt")), Kind::File);

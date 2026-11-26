@@ -24,11 +24,11 @@ impl Tally {
 }
 
 #[test]
-fn a_pull_request_into_a_project_branch_builds_the_reach_of_its_one_changed_crate() -> Result<(), Box<dyn Error>> {
+fn a_pull_request_into_a_project_branch_builds_the_reach_of_its_one_changed_crate() -> Result<(), laws::Unmet> {
     let world = World::of_this_repository()?;
     let metadata = world.metadata();
     let desk = Desk::default();
-    let tally = world.names().try_fold(Tally::default(), |tally, name| -> Result<Tally, Box<dyn Error>> {
+    let tally = world.names().try_fold(Tally::default(), |tally, name| -> Result<Tally, laws::Unmet> {
         let changed = [world.source_of(name)];
         let scope = desk.scope(&Fake::modifying(&metadata, &changed), "pull_request", "project/e2e")?;
         Ok(tally.counted(&scope.built(world.names().cloned()), &world.reached(&changed)))

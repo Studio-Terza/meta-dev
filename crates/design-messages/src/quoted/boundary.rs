@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use design_model::{Ordinal, Segment};
 use grammar_notes::{Date, Quote};
-use store_ports::{Columns, Query, Statements, StoreFailure};
+use store_ports::{Columns, Execute, Query, StoreFailure};
 use transcript_ports::{Authorship, Uuid};
 
 use super::{Quoted, QuotedSegments};
@@ -26,7 +26,7 @@ impl From<QuotedRow> for Quoted {
 impl Query for QuotedSegments {
     type Rows = BTreeMap<Quote, Vec<Quoted>>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<BTreeMap<Quote, Vec<Quoted>>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<BTreeMap<Quote, Vec<Quoted>>, StoreFailure> {
         let rows = QuotedRow::found(&self.0.iter().collect(), statements)?;
         let empty = self.0.into_iter().map(|quote| (quote, Vec::new())).collect();
         Ok(rows.into_iter().fold(empty, |mut found: BTreeMap<Quote, Vec<Quoted>>, row| {
@@ -37,7 +37,7 @@ impl Query for QuotedSegments {
 }
 
 impl QuotedRow {
-    fn found(quotes: &Listed, statements: &mut Statements<'_>) -> Result<Vec<QuotedRow>, StoreFailure> {
+    fn found(quotes: &Listed, statements: &mut impl Execute) -> Result<Vec<QuotedRow>, StoreFailure> {
         let owner = Authorship::Owner;
         statements.rows(store_ports::query!(
             QuotedRow,

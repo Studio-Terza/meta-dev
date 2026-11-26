@@ -3,7 +3,6 @@
 #[path = "generated/laws.rs"]
 mod generated_laws;
 
-use std::error::Error;
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -262,7 +261,7 @@ enum Move {
 struct Lifecycle;
 
 impl Lifecycle {
-    fn transition(step: Move) -> Result<Transition, Box<dyn Error>> {
+    fn transition(step: Move) -> Result<Transition, laws::Unmet> {
         match step {
             Move::Refine => Ok(Transition::Refine),
             Move::Specify => Ok(Transition::Specify {
@@ -274,7 +273,7 @@ impl Lifecycle {
         }
     }
 
-    fn fresh() -> Result<AnyNode, Box<dyn Error>> {
+    fn fresh() -> Result<AnyNode, laws::Unmet> {
         let entry = Entry::new("demo".parse()?, Facet::Feature, Provenance::from(Entered::Apply));
         let core = Inherited::from(Casting::new(Role::Core, entry.provenance()));
         Ok(Node::proposed(NodeId::new(7), entry, core, Title::new("lifecycle".to_owned())).any())
@@ -289,7 +288,7 @@ impl Lifecycle {
         }
     }
 
-    fn reached(stage: Stage) -> Result<AnyNode, Box<dyn Error>> {
+    fn reached(stage: Stage) -> Result<AnyNode, laws::Unmet> {
         Lifecycle::path(stage)
             .iter()
             .try_fold(Lifecycle::fresh()?, |node, step| Ok(Lifecycle::transition(*step)?.applied(node)?))
@@ -326,14 +325,14 @@ laws::table!(
 );
 
 #[test]
-fn a_refused_transition_names_the_node_it_was_asked_of() -> Result<(), Box<dyn Error>> {
+fn a_refused_transition_names_the_node_it_was_asked_of() -> Result<(), laws::Unmet> {
     let applied = Transition::Reopen.applied(Lifecycle::fresh()?);
     assert!(matches!(applied, Err(misstaged) if misstaged.node() == NodeId::new(7)));
     Ok(())
 }
 
 #[test]
-fn a_specified_node_holds_its_artifact_and_condition_and_a_dropped_one_its_reason() -> Result<(), Box<dyn Error>> {
+fn a_specified_node_holds_its_artifact_and_condition_and_a_dropped_one_its_reason() -> Result<(), laws::Unmet> {
     let artifact: Artifact = "lint:no-comments".parse()?;
     let condition: Condition = "every comment is refused".parse()?;
     let reason: Reason = "folded into its parent".parse()?;
@@ -349,10 +348,10 @@ laws::law!(
     vec(select(&[Move::Refine, Move::Specify, Move::Reopen, Move::Drop][..]), 0..8),
     steps,
     {
-        let fresh = Lifecycle::fresh().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+        let fresh = Lifecycle::fresh().map_err(|failure| TestCaseError::fail(format!("{failure:?}")))?;
         let walked = steps.iter().try_fold(fresh.clone(), |node, step| {
             let transition =
-                Lifecycle::transition(*step).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+                Lifecycle::transition(*step).map_err(|failure| TestCaseError::fail(format!("{failure:?}")))?;
             Ok::<AnyNode, TestCaseError>(transition.applied(node.clone()).ignoring(Ignored::Misstaged).unwrap_or(node))
         })?;
         prop_assert_eq!(walked.identity(), fresh.identity());

@@ -26,11 +26,11 @@ impl World {
     const ALL_BELOW: &'static str = "/*";
     const DEPENDENCY_TABLES: [&'static str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
 
-    pub fn of_this_repository() -> Result<World, Box<dyn Error>> {
+    pub fn of_this_repository() -> Result<World, laws::Unmet> {
         World::of(&System::manifests()?, System::root())
     }
 
-    fn of(files: &impl Files, root: PathBuf) -> Result<World, Box<dyn Error>> {
+    fn of(files: &impl Files, root: PathBuf) -> Result<World, laws::Unmet> {
         let manifest = Self::table(files, &root.join(Self::MANIFEST))?;
         let patterns: Vec<String> = manifest
             .get("workspace")
@@ -108,14 +108,14 @@ impl World {
         Some(grown).filter(|candidate| candidate.len() != reached.len()).map_or(reached, |larger| self.closure(larger))
     }
 
-    fn directories(files: &impl Files, root: &Path, pattern: &str) -> Result<Vec<PathBuf>, Box<dyn Error>> {
+    fn directories(files: &impl Files, root: &Path, pattern: &str) -> Result<Vec<PathBuf>, laws::Unmet> {
         match pattern.strip_suffix(Self::ALL_BELOW) {
             None => Ok(vec![PathBuf::from(pattern)]),
             Some(parent) => Self::listed(files, root, parent),
         }
     }
 
-    fn listed(files: &impl Files, root: &Path, parent: &str) -> Result<Vec<PathBuf>, Box<dyn Error>> {
+    fn listed(files: &impl Files, root: &Path, parent: &str) -> Result<Vec<PathBuf>, laws::Unmet> {
         Ok(files
             .entries(&root.join(parent))?
             .iter()
@@ -124,7 +124,7 @@ impl World {
             .collect())
     }
 
-    fn member(files: &impl Files, root: &Path, directory: PathBuf) -> Result<Member, Box<dyn Error>> {
+    fn member(files: &impl Files, root: &Path, directory: PathBuf) -> Result<Member, laws::Unmet> {
         let manifest = Self::table(files, &root.join(&directory).join(Self::MANIFEST))?;
         let package = manifest.get("package");
         let name = package.and_then(|table| table.get("name")).and_then(Value::as_str).unwrap_or_default().to_owned();
@@ -147,7 +147,7 @@ impl World {
         Ok(Member { name, directory, dependencies, reads })
     }
 
-    fn table(files: &impl Files, path: &Path) -> Result<Table, Box<dyn Error>> {
+    fn table(files: &impl Files, path: &Path) -> Result<Table, laws::Unmet> {
         Ok(files.read_text(path)?.as_ref().parse::<Table>()?)
     }
 }

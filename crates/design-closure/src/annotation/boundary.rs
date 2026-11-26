@@ -3,7 +3,7 @@ use design_model::{
     Specificity, Standing,
 };
 use message_id::Uuid;
-use store_ports::{Columns as Row, Statements, StoreFailure};
+use store_ports::{Columns as Row, Execute, StoreFailure};
 
 use super::{Annotation, Remark};
 
@@ -78,7 +78,7 @@ impl From<ConversationalRow> for Annotation {
 }
 
 impl PlacedRow {
-    fn stored_for(message: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<PlacedRow>, StoreFailure> {
+    fn stored_for(message: &Uuid, statements: &mut impl Execute) -> Result<Vec<PlacedRow>, StoreFailure> {
         statements.rows(store_ports::query!(
             PlacedRow,
             r#"
@@ -103,7 +103,7 @@ ORDER BY
 }
 
 impl SensedRow {
-    fn stored_for(message: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<SensedRow>, StoreFailure> {
+    fn stored_for(message: &Uuid, statements: &mut impl Execute) -> Result<Vec<SensedRow>, StoreFailure> {
         let current = Standing::Current;
         let superseded = Standing::Superseded;
         statements.rows(store_ports::query!(
@@ -144,7 +144,7 @@ ORDER BY
 }
 
 impl RelatedRow {
-    fn stored_for(message: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<RelatedRow>, StoreFailure> {
+    fn stored_for(message: &Uuid, statements: &mut impl Execute) -> Result<Vec<RelatedRow>, StoreFailure> {
         statements.rows(store_ports::query!(
             RelatedRow,
             r#"
@@ -171,7 +171,7 @@ ORDER BY
 }
 
 impl ConversationalRow {
-    fn stored_for(message: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<ConversationalRow>, StoreFailure> {
+    fn stored_for(message: &Uuid, statements: &mut impl Execute) -> Result<Vec<ConversationalRow>, StoreFailure> {
         statements.rows(store_ports::query!(
             ConversationalRow,
             r#"
@@ -192,7 +192,7 @@ ORDER BY
 }
 
 impl Annotation {
-    pub fn stored_for(message: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<Annotation>, StoreFailure> {
+    pub fn stored_for(message: &Uuid, statements: &mut impl Execute) -> Result<Vec<Annotation>, StoreFailure> {
         let placed = PlacedRow::stored_for(message, statements)?;
         let sensed = SensedRow::stored_for(message, statements)?;
         let related = RelatedRow::stored_for(message, statements)?;

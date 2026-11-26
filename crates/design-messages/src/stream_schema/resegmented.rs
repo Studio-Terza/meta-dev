@@ -6,7 +6,7 @@ use std::fmt;
 
 use design_model::{Ordinal, Segment};
 use port_core::Op;
-use store_ports::{Released, StoreFailure, Version};
+use store_ports::{Cause, Released, StoreFailure, Version};
 use transcript_ports::Uuid;
 
 use crate::boundary::SegmentRow;
@@ -32,7 +32,7 @@ impl Referenced {
     fn kept(segments: Vec<Segment>, derived: Vec<SegmentRow>) -> Result<Vec<SegmentRow>, StoreFailure> {
         match segments.first() {
             None => Ok(derived),
-            Some(_) => Err(StoreFailure::Refused(Box::new(Referenced { segments }))),
+            Some(_) => Err(StoreFailure::Refused(Cause::told(&Referenced { segments }))),
         }
     }
 

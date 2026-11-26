@@ -41,7 +41,7 @@ impl Runs<'_> {
     const PROJECT: &'static str = "project/e2e";
     const NO_BASE: &'static str = "";
 
-    fn spent(&self, spend: &mut Spend, changed: &[PathBuf], event: &str, base: &str) -> Result<(), Box<dyn Error>> {
+    fn spent(&self, spend: &mut Spend, changed: &[PathBuf], event: &str, base: &str) -> Result<(), laws::Unmet> {
         let scope = self.desk.scope(&Fake::modifying(&self.metadata, changed), event, base)?;
         spend.counted(&scope, self.world);
         Ok(())
@@ -49,15 +49,15 @@ impl Runs<'_> {
 }
 
 #[test]
-fn a_project_landed_through_its_branch_against_its_changes_sent_to_main_one_by_one() -> Result<(), Box<dyn Error>> {
+fn a_project_landed_through_its_branch_against_its_changes_sent_to_main_one_by_one() -> Result<(), laws::Unmet> {
     const PROJECT_SIZE: usize = 4;
     let world = World::of_this_repository()?;
     let runs = Runs { world: &world, metadata: world.metadata(), desk: Desk::default() };
     let names: Vec<&String> = world.names().collect();
     let (mut project, mut direct) = (Spend::default(), Spend::default());
-    names.chunks(PROJECT_SIZE).try_for_each(|members| -> Result<(), Box<dyn Error>> {
+    names.chunks(PROJECT_SIZE).try_for_each(|members| -> Result<(), laws::Unmet> {
         let changed: Vec<PathBuf> = members.iter().map(|name| world.source_of(name)).collect();
-        changed.chunks(1).try_for_each(|one| -> Result<(), Box<dyn Error>> {
+        changed.chunks(1).try_for_each(|one| -> Result<(), laws::Unmet> {
             runs.spent(&mut project, one, Runs::PULL_REQUEST, Runs::PROJECT)?;
             runs.spent(&mut direct, one, Runs::PULL_REQUEST, Runs::MAIN)?;
             runs.spent(&mut direct, one, Runs::PUSH, Runs::NO_BASE)

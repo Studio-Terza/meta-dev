@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::ffi::OsString;
 use std::io;
 use std::ops::Range;
@@ -195,7 +194,7 @@ fn a_reply_structuring_outside_its_job_or_repeating_a_job_is_retried_but_one_lin
 
 #[test]
 fn a_job_is_shown_the_questions_still_open_earlier_in_its_session_and_may_link_an_answer_to_one_but_not_place_one()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let asked = format!("{}.0", Session::ASKED);
     let [decided, other] = [Applying::answer(0), Applying::answer(1)];
     let later = "aaaaaaaa-0000-4000-8000-000000000005.0";
@@ -222,7 +221,7 @@ fn a_job_is_shown_the_questions_still_open_earlier_in_its_session_and_may_link_a
 
 #[test]
 fn a_brief_with_asked_lines_states_that_they_are_link_targets_only_and_a_reply_linking_an_answer_to_one_applies()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let asked = format!("{}.0", Session::ASKED);
     let [decided, other] = [Applying::answer(0), Applying::answer(1)];
     let later = "aaaaaaaa-0000-4000-8000-000000000005.0";
@@ -242,7 +241,7 @@ fn a_brief_with_asked_lines_states_that_they_are_link_targets_only_and_a_reply_l
 
 #[test]
 fn a_reply_linking_to_a_job_segment_without_a_directive_for_it_is_refused_as_unpaid_but_one_linking_to_an_asked_line_is_accepted()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let asked = format!("{}.0", Session::ASKED);
     let [decided, other] = [Applying::answer(0), Applying::answer(1)];
     let later = "aaaaaaaa-0000-4000-8000-000000000005.0";
@@ -264,7 +263,7 @@ fn a_reply_linking_to_a_job_segment_without_a_directive_for_it_is_refused_as_unp
 
 #[test]
 fn a_job_starting_partway_through_a_message_is_shown_the_question_open_earlier_in_that_message()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let message = "aaaaaaaa-0000-4000-8000-000000000021";
     let session = Session::working(Session::line(Speaker::Owner, message, "null", "1. which crate\\n2. the first"));
     let applying = Applying::over(&session)?;
@@ -282,7 +281,7 @@ fn a_job_starting_partway_through_a_message_is_shown_the_question_open_earlier_i
 }
 
 #[test]
-fn same_timestamp_messages_are_ordered_by_transcript_order_not_uuid() -> Result<(), Box<dyn Error>> {
+fn same_timestamp_messages_are_ordered_by_transcript_order_not_uuid() -> Result<(), laws::Unmet> {
     let [before, middle, after] = [
         "aaaaaaaa-0000-4000-8000-000000000043",
         "aaaaaaaa-0000-4000-8000-000000000042",
@@ -312,7 +311,7 @@ fn same_timestamp_messages_are_ordered_by_transcript_order_not_uuid() -> Result<
 }
 
 #[test]
-fn a_job_spanning_two_sessions_is_shown_each_session_s_earlier_open_questions() -> Result<(), Box<dyn Error>> {
+fn a_job_spanning_two_sessions_is_shown_each_session_s_earlier_open_questions() -> Result<(), laws::Unmet> {
     let [first, second] = ["aaaaaaaa-0000-4000-8000-000000000011", "aaaaaaaa-0000-4000-8000-000000000012"];
     let [first_answer, second_answer] =
         ["aaaaaaaa-0000-4000-8000-000000000013", "aaaaaaaa-0000-4000-8000-000000000014"];
@@ -342,7 +341,7 @@ fn a_job_spanning_two_sessions_is_shown_each_session_s_earlier_open_questions() 
 
 #[test]
 fn a_flailed_job_holds_its_segments_and_the_run_goes_on_and_the_next_run_does_not_redispatch_them()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let u = Some(Script::UNCOVERING);
     let last = format!("conversational({}.8)", Script::LISTED);
     let structuring = Structuring {
@@ -405,7 +404,7 @@ fn a_deadline_passed_during_a_sleep_stalls_the_run_loudly_before_its_next_job_an
 
 #[test]
 fn a_flail_then_a_stall_halts_the_stop_before_its_third_job_and_the_stop_tells_the_flail_and_the_stall_it_halted_on()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let u = Some(Script::UNCOVERING);
     let structuring = Structuring {
         applying: Applying::over(&Session::working(Session::line(
@@ -447,7 +446,7 @@ fn a_flail_then_a_stall_halts_the_stop_before_its_third_job_and_the_stop_tells_t
 
 #[test]
 fn a_retried_flail_owes_its_segments_again_and_the_next_run_sends_and_applies_them_while_a_job_that_did_not_flail_or_never_ran_is_refused()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let u = Some(Script::UNCOVERING);
     let structuring = Structuring::over(Script::replying(&[u, u, Some(Script::COVERING)]), Pause::new(0))?;
     let flailed = structuring.structured(&["structure"]);
@@ -533,7 +532,7 @@ fn a_reused_pid_with_another_start_time_is_not_killed() -> Result<(), Failure> {
 
 #[test]
 fn a_reply_leaving_job_segments_uncovered_writes_nothing_and_is_retried_with_them_in_the_prompt()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let structuring =
         Structuring::over(Script::replying(&[Some(Script::UNCOVERING), Some(Script::COVERING)]), Pause::new(0))?;
     let run = Run::root();
@@ -559,7 +558,7 @@ fn a_reply_leaving_job_segments_uncovered_writes_nothing_and_is_retried_with_the
 
 #[test]
 fn an_agent_that_errs_writes_no_result_cannot_start_or_cannot_be_read_stalls_the_run_and_leaves_its_segments_owed()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let structuring = Structuring::over(Scripted::default(), Pause::new(0))?;
     let scratch = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let errs = Agent::new(
@@ -599,7 +598,7 @@ fn an_agent_that_errs_writes_no_result_cannot_start_or_cannot_be_read_stalls_the
 }
 
 #[test]
-fn a_stop_whose_agent_cannot_be_started_blocks_loudly_and_closes_its_job_stalled() -> Result<(), Box<dyn Error>> {
+fn a_stop_whose_agent_cannot_be_started_blocks_loudly_and_closes_its_job_stalled() -> Result<(), laws::Unmet> {
     let structuring = Structuring::over(Scripted::default(), Pause::new(0))?;
     let scratch = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let stopped = [(); 2].map(|()| {
@@ -626,7 +625,7 @@ fn a_stop_whose_agent_cannot_be_started_blocks_loudly_and_closes_its_job_stalled
 
 #[test]
 fn a_stop_ingests_what_was_said_since_and_structures_it_and_a_stop_after_it_reads_and_dispatches_nothing()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let later = "aaaaaaaa-0000-4000-8000-000000000006";
     let covering = format!("{}\nconversational({later}.0)", Script::COVERING);
     let structuring = Structuring::over(Script::replying(&[Some(&covering)]), Pause::new(0))?;
@@ -648,7 +647,7 @@ fn a_stop_ingests_what_was_said_since_and_structures_it_and_a_stop_after_it_read
 }
 
 #[test]
-fn a_prompt_ingests_silently_and_leaves_what_it_ingested_to_the_stop() -> Result<(), Box<dyn Error>> {
+fn a_prompt_ingests_silently_and_leaves_what_it_ingested_to_the_stop() -> Result<(), laws::Unmet> {
     let structuring = Structuring::over(Scripted::default(), Pause::new(0))?;
     let before = structuring.unstructured()?;
     let linked = Session::linked();
@@ -662,8 +661,7 @@ fn a_prompt_ingests_silently_and_leaves_what_it_ingested_to_the_stop() -> Result
 }
 
 #[test]
-fn a_stop_that_flails_blocks_loudly_and_the_stop_after_it_passes_with_the_segments_held() -> Result<(), Box<dyn Error>>
-{
+fn a_stop_that_flails_blocks_loudly_and_the_stop_after_it_passes_with_the_segments_held() -> Result<(), laws::Unmet> {
     let u = Some(Script::UNCOVERING);
     let structuring = Structuring::over(Script::replying(&[u, u]), Pause::new(0))?;
     let flailed = structuring.structured(&["hook", "stop"]);
@@ -683,8 +681,7 @@ fn a_stop_that_flails_blocks_loudly_and_the_stop_after_it_passes_with_the_segmen
 }
 
 #[test]
-fn a_stop_whose_agent_stalls_blocks_loudly_and_the_stop_after_it_sends_the_segments_again() -> Result<(), Box<dyn Error>>
-{
+fn a_stop_whose_agent_stalls_blocks_loudly_and_the_stop_after_it_sends_the_segments_again() -> Result<(), laws::Unmet> {
     let structuring = Structuring::over(Script::replying(&[None, Some(Script::COVERING)]), Pause::new(3600))?;
     let stalled = structuring.structured(&["hook", "stop"]);
     let owed = structuring.unstructured()?;
@@ -698,7 +695,7 @@ fn a_stop_whose_agent_stalls_blocks_loudly_and_the_stop_after_it_sends_the_segme
 }
 
 #[test]
-fn probe_a_retried_and_applied_flail_is_not_told_as_held() -> Result<(), Box<dyn Error>> {
+fn probe_a_retried_and_applied_flail_is_not_told_as_held() -> Result<(), laws::Unmet> {
     let u = Some(Script::UNCOVERING);
     let structuring = Structuring::over(Script::replying(&[u, u, Some(Script::COVERING)]), Pause::new(0))?;
     let flailed = structuring.structured(&["structure"]);
@@ -713,7 +710,7 @@ fn probe_a_retried_and_applied_flail_is_not_told_as_held() -> Result<(), Box<dyn
 }
 
 #[test]
-fn probe_review_a_retried_flail_is_not_told_as_held_before_its_retry_runs() -> Result<(), Box<dyn Error>> {
+fn probe_review_a_retried_flail_is_not_told_as_held_before_its_retry_runs() -> Result<(), laws::Unmet> {
     let u = Some(Script::UNCOVERING);
     let structuring = Structuring::over(Script::replying(&[u, u]), Pause::new(0))?;
     let flailed = structuring.structured(&["structure"]);
@@ -727,7 +724,7 @@ fn probe_review_a_retried_flail_is_not_told_as_held_before_its_retry_runs() -> R
 }
 
 #[test]
-fn probe_review_b_a_retried_flail_that_flails_again_is_told_once_under_its_new_job() -> Result<(), Box<dyn Error>> {
+fn probe_review_b_a_retried_flail_that_flails_again_is_told_once_under_its_new_job() -> Result<(), laws::Unmet> {
     let u = Some(Script::UNCOVERING);
     let structuring = Structuring::over(Script::replying(&[u, u, u, u]), Pause::new(0))?;
     let flailed = structuring.structured(&["structure"]);

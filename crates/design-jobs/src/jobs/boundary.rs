@@ -1,6 +1,6 @@
 use design_model::JobId;
 use port_core::Op;
-use store_ports::{Columns, Prepared, Query, Staged, Statements, StoreFailure};
+use store_ports::{Columns, Execute, Prepared, Query, Staged, StoreFailure};
 
 use super::JobState;
 use super::state::job;
@@ -39,7 +39,7 @@ WHERE
 impl Query for OpenJobs {
     type Rows = Vec<job::Open>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<job::Open>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Vec<job::Open>, StoreFailure> {
         let open = JobState::Open;
         let rows = statements.rows(store_ports::query!(
             OpenJobRow,

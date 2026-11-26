@@ -2,7 +2,6 @@
 
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet};
-use std::error::Error;
 use std::iter;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
@@ -36,7 +35,7 @@ use newtype::{Checked, Counter, Display, Newtype, Wrapping};
 use port_core::{Op, Port, Run};
 use sqlite_ports::SqliteOpener;
 use store_ports::Record as _;
-use store_ports::{Batch, Columns, Migrator, Query, Schema, Statements, Store, StoreFailure, Version, Written};
+use store_ports::{Batch, Columns, Execute, Migrator, Query, Schema, Store, StoreFailure, Version, Written};
 use stream::{Message, Relation, Shape, Stream};
 use transcript_ports::{
     Authorship, Body, ClaudeCodeDir, Cursor, Instant, Malformed, SessionId, Skipped, Transcripts, Uuid,
@@ -63,11 +62,11 @@ struct Recorded {
 }
 
 impl Recorded {
-    fn session() -> Result<Recorded, Box<dyn Error>> {
+    fn session() -> Result<Recorded, laws::Unmet> {
         Recorded::of(SESSION)
     }
 
-    fn of(lines: &str) -> Result<Recorded, Box<dyn Error>> {
+    fn of(lines: &str) -> Result<Recorded, laws::Unmet> {
         let memory = Memory::default();
         memory.create_directories(Path::new(DIRECTORY))?;
         memory.write(&Path::new(DIRECTORY).join("s.jsonl"), Bytes::from(lines))?;
@@ -83,7 +82,7 @@ impl Recorded {
 }
 
 #[test]
-fn a_written_session_reads_back_with_its_segments_links_and_cursor() -> Result<(), Box<dyn Error>> {
+fn a_written_session_reads_back_with_its_segments_links_and_cursor() -> Result<(), laws::Unmet> {
     let Recorded { records, cursor } = Recorded::session()?;
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
@@ -122,7 +121,7 @@ fn a_written_session_reads_back_with_its_segments_links_and_cursor() -> Result<(
 }
 
 #[test]
-fn writing_the_same_session_again_writes_no_row() -> Result<(), Box<dyn Error>> {
+fn writing_the_same_session_again_writes_no_row() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     let first = store.write(store.read(Holding::from(Recorded::session()?.records))?)?;
@@ -133,7 +132,7 @@ fn writing_the_same_session_again_writes_no_row() -> Result<(), Box<dyn Error>> 
 }
 
 #[test]
-fn an_unknown_message_is_not_shown() -> Result<(), Box<dyn Error>> {
+fn an_unknown_message_is_not_shown() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(store.read(Holding::from(Recorded::session()?.records))?)?;
@@ -156,11 +155,11 @@ impl Said {
         )
     }
 
-    fn found(lines: &[String], words: &[&str]) -> Result<Vec<String>, Box<dyn Error>> {
+    fn found(lines: &[String], words: &[&str]) -> Result<Vec<String>, laws::Unmet> {
         Said::scoped(lines, words, Scope::Owner)
     }
 
-    fn scoped(lines: &[String], words: &[&str], scope: Scope) -> Result<Vec<String>, Box<dyn Error>> {
+    fn scoped(lines: &[String], words: &[&str], scope: Scope) -> Result<Vec<String>, laws::Unmet> {
         let run = Run::root();
         let store = run.port(Sqlite::in_memory::<StreamSchema>());
         store.write(store.read(Holding::from(Recorded::of(&lines.concat())?.records))?)?;
@@ -180,14 +179,14 @@ impl Said {
 }
 
 #[test]
-fn a_search_returns_each_segment_holding_the_word_with_its_message() -> Result<(), Box<dyn Error>> {
+fn a_search_returns_each_segment_holding_the_word_with_its_message() -> Result<(), laws::Unmet> {
     let lines = [Said::owner("o1", 1, "alpha here"), Said::owner("o2", 2, "beta there")];
     assert_eq!(Said::found(&lines, &["beta"])?, ["o2 owner 2026-01-01T00:00:02Z beta there"]);
     Ok(())
 }
 
 #[test]
-fn several_terms_rank_a_segment_dense_in_the_rarer_term_first() -> Result<(), Box<dyn Error>> {
+fn several_terms_rank_a_segment_dense_in_the_rarer_term_first() -> Result<(), laws::Unmet> {
     let lines = [
         Said::owner("o1", 1, "alpha alpha alpha alpha beta"),
         Said::owner("o2", 2, "alpha beta beta beta beta"),
@@ -210,7 +209,7 @@ fn several_terms_rank_a_segment_dense_in_the_rarer_term_first() -> Result<(), Bo
 }
 
 #[test]
-fn several_terms_rank_a_segment_dense_in_both_before_one_diluted() -> Result<(), Box<dyn Error>> {
+fn several_terms_rank_a_segment_dense_in_both_before_one_diluted() -> Result<(), laws::Unmet> {
     let lines = [
         Said::owner("o1", 1, "delta epsilon zeta zeta zeta zeta zeta zeta zeta zeta"),
         Said::owner("o2", 2, "delta epsilon"),
@@ -227,7 +226,7 @@ fn several_terms_rank_a_segment_dense_in_both_before_one_diluted() -> Result<(),
 }
 
 #[test]
-fn the_lead_is_found_only_in_the_everyone_scope() -> Result<(), Box<dyn Error>> {
+fn the_lead_is_found_only_in_the_everyone_scope() -> Result<(), laws::Unmet> {
     let lines = [Said::owner("o1", 1, "omega"), Said::lead("l1", "omega")];
     assert_eq!(Said::scoped(&lines, &["omega"], Scope::Owner)?, ["o1 owner 2026-01-01T00:00:01Z omega"]);
     assert_eq!(Said::scoped(&lines, &["omega"], Scope::Everyone)?.len(), 2);
@@ -235,7 +234,7 @@ fn the_lead_is_found_only_in_the_everyone_scope() -> Result<(), Box<dyn Error>> 
 }
 
 #[test]
-fn a_stem_finds_its_inflected_forms() -> Result<(), Box<dyn Error>> {
+fn a_stem_finds_its_inflected_forms() -> Result<(), laws::Unmet> {
     let lines = [Said::owner("o1", 1, "banning dyn seems desirable"), Said::owner("o2", 2, "we decided")];
     assert_eq!(Said::found(&lines, &["ban", "dyn"])?, ["o1 owner 2026-01-01T00:00:01Z banning dyn seems desirable"]);
     assert_eq!(Said::found(&lines, &["decide"])?, ["o2 owner 2026-01-01T00:00:02Z we decided"]);
@@ -243,7 +242,7 @@ fn a_stem_finds_its_inflected_forms() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn an_unrelated_word_finds_nothing() -> Result<(), Box<dyn Error>> {
+fn an_unrelated_word_finds_nothing() -> Result<(), laws::Unmet> {
     let lines = [Said::owner("o1", 1, "banning dyn seems desirable"), Said::owner("o2", 2, "we decided")];
     assert_eq!(Said::found(&lines, &["kettle"])?, Vec::<String>::new());
     Ok(())
@@ -284,7 +283,7 @@ impl Schema for Seeded {
 impl Batch for Seeding {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         match self {
             Seeding::Untrimmed => Around::untrimmed(statements),
             Seeding::Streamed(streamed) => streamed.written(statements),
@@ -295,7 +294,7 @@ impl Batch for Seeding {
 static OLD_STORE: LazyLock<Sqlite> = LazyLock::new(Sqlite::in_memory::<Seeded>);
 
 #[test]
-fn a_segment_stored_before_stemming_is_found_by_its_stem() -> Result<(), Box<dyn Error>> {
+fn a_segment_stored_before_stemming_is_found_by_its_stem() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(OLD_STORE.clone());
     let terms = Terms::lexed(["ban", "dyn"]).ok_or("no terms")?;
@@ -313,7 +312,7 @@ const KEPT: [char; 7] = ['a', 'é', 'か', '.', '—', '\u{200b}', '😀'];
 struct Around(char);
 
 impl Around {
-    fn untrimmed(statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn untrimmed(statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let written = SHED
             .iter()
             .map(|blank| Around(*blank).stored(statements))
@@ -321,9 +320,9 @@ impl Around {
         Ok(Written::total(written.into_iter()))
     }
 
-    fn stored(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let uuid = self.uuid().map_err(|failed| StoreFailure::Refused(Box::new(failed)))?;
-        let body = self.kept().map_err(|failed| StoreFailure::Refused(Box::new(failed)))?;
+    fn stored(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+        let uuid = self.uuid().map_err(|failed| StoreFailure::Refused(store_ports::Cause::told(&failed)))?;
+        let body = self.kept().map_err(|failed| StoreFailure::Refused(store_ports::Cause::told(&failed)))?;
         let message = statements.written(store_ports::query!(
             r#"
 INSERT INTO
@@ -362,7 +361,7 @@ VALUES
         self.0.encode_utf16(&mut [0; 2]).iter().map(|unit| format!("\\u{unit:04x}")).collect::<Vec<String>>().concat()
     }
 
-    fn session(self) -> Result<String, Box<dyn Error>> {
+    fn session(self) -> Result<String, laws::Unmet> {
         Ok(format!(
             "{{\"type\":\"user\",\"uuid\":\"{}\",\"parentUuid\":null,\"sessionId\":\"s\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"origin\":{{\"kind\":\"human\"}},\"message\":{{\"content\":\"{}w{}\"}}}}\n",
             self.uuid()?,
@@ -371,18 +370,18 @@ VALUES
         ))
     }
 
-    fn migrated(self) -> Result<Vec<String>, Box<dyn Error>> {
+    fn migrated(self) -> Result<Vec<String>, laws::Unmet> {
         Listed(self.uuid()?).shown(&Run::root().port(OLD_STORE.clone()))
     }
 
-    fn fresh(self) -> Result<Vec<String>, Box<dyn Error>> {
+    fn fresh(self) -> Result<Vec<String>, laws::Unmet> {
         let run = Run::root();
         let fresh = run.port(Sqlite::in_memory::<StreamSchema>());
         fresh.write(fresh.read(Holding::from(Recorded::of(&self.session()?)?.records))?)?;
         Listed(self.uuid()?).shown(&fresh)
     }
 
-    fn rederived(self) -> Result<Vec<Body>, Box<dyn Error + Send + Sync>> {
+    fn rederived(self) -> Result<Vec<Body>, laws::Unmet> {
         let message = Message::from(Skipped::new(self.uuid()?, None).said(
             SessionId::try_new("s".to_owned())?,
             Instant::try_new("2026-01-01T00:00:00Z".to_owned())?,
@@ -400,7 +399,7 @@ VALUES
 struct Listed(Uuid);
 
 impl Listed {
-    fn shown(&self, store: &Port<'_, Sqlite>) -> Result<Vec<String>, Box<dyn Error>> {
+    fn shown(&self, store: &Port<'_, Sqlite>) -> Result<Vec<String>, laws::Unmet> {
         let shown = store.read(ShownMessage::named(self.0.clone()))?.ok_or("the message is not stored")?;
         Ok(shown
             .segments()
@@ -411,7 +410,7 @@ impl Listed {
             .collect())
     }
 
-    fn found(words: &[&str]) -> Result<Vec<String>, Box<dyn Error>> {
+    fn found(words: &[&str]) -> Result<Vec<String>, laws::Unmet> {
         let run = Run::root();
         let store = run.port(OLD_STORE.clone());
         let terms = Terms::lexed(words.iter().copied()).ok_or("no terms")?;
@@ -488,7 +487,7 @@ impl SegmentKey {
 impl Query for SegmentKeys {
     type Rows = Vec<SegmentKey>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<SegmentKey>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Vec<SegmentKey>, StoreFailure> {
         statements.rows(store_ports::query!(
             SegmentKey,
             r#"
@@ -512,8 +511,7 @@ ORDER BY
 }
 
 #[test]
-fn an_in_memory_store_opened_after_two_of_its_schema_is_copied_from_the_migrated_template() -> Result<(), Box<dyn Error>>
-{
+fn an_in_memory_store_opened_after_two_of_its_schema_is_copied_from_the_migrated_template() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let opened: Vec<Option<store_ports::Provenance>> = iter::repeat_with(Sqlite::in_memory::<StreamSchema>)
         .take(3)
@@ -524,7 +522,7 @@ fn an_in_memory_store_opened_after_two_of_its_schema_is_copied_from_the_migrated
 }
 
 #[test]
-fn every_foreign_key_into_segments_is_immediate_and_neither_cascades_nor_sets() -> Result<(), Box<dyn Error>> {
+fn every_foreign_key_into_segments_is_immediate_and_neither_cascades_nor_sets() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let keys = run.port(Sqlite::in_memory::<StreamSchema>()).read(SegmentKeys)?;
     let children: BTreeSet<String> = keys.iter().map(|key| key.child.clone().into_inner()).collect();
@@ -546,7 +544,7 @@ const RESEGMENTED: &str = concat!(
 
 #[test]
 fn a_message_stored_with_segments_or_shapes_it_no_longer_derives_holds_what_a_fresh_ingest_stores()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let run = Run::root();
     let fresh = run.port(Sqlite::in_memory::<StreamSchema>());
     fresh.write(fresh.read(Holding::from(Recorded::of(RESEGMENTED)?.records))?)?;
@@ -567,7 +565,7 @@ fn a_message_stored_with_segments_or_shapes_it_no_longer_derives_holds_what_a_fr
 
 #[test]
 fn a_blank_the_segmenter_sheds_around_a_segment_stored_before_trimming_is_shed_as_a_fresh_ingest_sheds_it()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let blanks: Vec<Around> = SHED.iter().copied().map(Around).collect();
     let migrated = blanks.iter().map(|blank| blank.migrated()).collect::<Result<Vec<_>, _>>()?;
     let fresh = blanks.iter().map(|blank| blank.fresh()).collect::<Result<Vec<_>, _>>()?;
@@ -576,8 +574,8 @@ fn a_blank_the_segmenter_sheds_around_a_segment_stored_before_trimming_is_shed_a
 }
 
 #[test]
-fn a_point_the_segmenter_inks_around_a_segment_stored_before_trimming_is_kept_on_both_sides()
--> Result<(), Box<dyn Error + Send + Sync>> {
+fn a_point_the_segmenter_inks_around_a_segment_stored_before_trimming_is_kept_on_both_sides() -> Result<(), laws::Unmet>
+{
     let inked: Vec<Around> = KEPT.iter().copied().map(Around).collect();
     let rederived = inked.iter().map(|point| point.rederived()).collect::<Result<Vec<Vec<Body>>, _>>()?;
     let both_sides =
@@ -588,7 +586,7 @@ fn a_point_the_segmenter_inks_around_a_segment_stored_before_trimming_is_kept_on
 
 #[test]
 fn a_segment_stored_with_a_body_its_message_no_longer_derives_is_rederived_and_found_by_its_words()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(OLD_STORE.clone());
     let shown = store.read(ShownMessage::named(Uuid::try_new("o2".to_owned())?))?.ok_or("o2 was not stored")?;
@@ -635,15 +633,15 @@ impl Dag {
         NodeId::new(i64::try_from(node).ignoring(Ignored::BeyondRange).unwrap_or(i64::MAX).saturating_add(1))
     }
 
-    fn node(store: &Port<'_, Sqlite>, facet: Facet) -> Result<Planting, Box<dyn Error>> {
+    fn node(store: &Port<'_, Sqlite>, facet: Facet) -> Result<Planting, laws::Unmet> {
         Dag::planting(store, Entry::new("p".parse()?, facet, Provenance::from(Entered::Init)))
     }
 
-    fn planting(store: &Port<'_, Sqlite>, entry: Entry) -> Result<Planting, Box<dyn Error>> {
+    fn planting(store: &Port<'_, Sqlite>, entry: Entry) -> Result<Planting, laws::Unmet> {
         Ok(Planting::sown(Node::new(store.read(NextNode)?, entry)))
     }
 
-    fn resolved(store: &Port<'_, Sqlite>, id: NodeId) -> Result<Resolved, Box<dyn Error>> {
+    fn resolved(store: &Port<'_, Sqlite>, id: NodeId) -> Result<Resolved, laws::Unmet> {
         Ok(store.read(Resolving::from(id))?.ok_or("the node is not stored")?)
     }
 
@@ -651,27 +649,27 @@ impl Dag {
         store: &Port<'_, Sqlite>,
         [source, target]: [NodeId; 2],
         relation: NodeRelation,
-    ) -> Result<Result<Written, Refusal>, Box<dyn Error>> {
+    ) -> Result<Result<Written, Refusal>, laws::Unmet> {
         let (from, to) = (Dag::resolved(store, source)?, Dag::resolved(store, target)?);
         Ok(store.write(Linked::new(from, relation, to, Entered::Init.into())))
     }
 
-    fn cast(store: &Port<'_, Sqlite>, node: NodeId, role: Role) -> Result<Result<Written, Refusal>, Box<dyn Error>> {
+    fn cast(store: &Port<'_, Sqlite>, node: NodeId, role: Role) -> Result<Result<Written, Refusal>, laws::Unmet> {
         let resolved = Dag::resolved(store, node)?;
         Ok(store.write(Cast::new(resolved, Casting::new(role, Entered::Role.into()))))
     }
 
-    fn planted(&self, store: &Port<'_, Sqlite>) -> Result<Written, Box<dyn Error>> {
+    fn planted(&self, store: &Port<'_, Sqlite>) -> Result<Written, laws::Unmet> {
         let nodes = self
             .facets
             .iter()
             .map(|facet| Ok(store.write(Dag::node(store, *facet)?)?))
-            .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
+            .collect::<Result<Vec<Written>, laws::Unmet>>()?;
         let links = self
             .edges
             .iter()
             .map(|edge| Ok(Dag::linked(store, [Dag::id(edge.child), Dag::id(edge.parent)], NodeRelation::Refines)??))
-            .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
+            .collect::<Result<Vec<Written>, laws::Unmet>>()?;
         Ok(Written::total(nodes.into_iter().chain(links)))
     }
 
@@ -730,14 +728,14 @@ impl Ids {
 }
 
 laws::law!(a_node_s_kin_are_exactly_its_transitive_refinements_whatever_else_is_closed, Mixed::any(), mixed, {
-    let shown = mixed.shown().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    let shown = mixed.shown().map_err(|failure| TestCaseError::fail(format!("{failure:?}")))?;
     prop_assert_eq!(shown, mixed.wanted());
 });
 
 struct Projects;
 
 impl Projects {
-    fn rooted(store: &Port<'_, Sqlite>, name: &str) -> Result<NodeId, Box<dyn Error>> {
+    fn rooted(store: &Port<'_, Sqlite>, name: &str) -> Result<NodeId, laws::Unmet> {
         let project: Project = name.parse()?;
         store.write(Dag::planting(store, Entry::new(project.clone(), Facet::Project, Entered::Init.into()))?)?;
         Ok(store.read(ProjectRoot::from(project))?.ok_or("no root")?.identity())
@@ -754,7 +752,7 @@ laws::table!(
 );
 
 impl Projects {
-    fn alone(facet: Facet) -> Result<[Option<NodeId>; 2], Box<dyn Error>> {
+    fn alone(facet: Facet) -> Result<[Option<NodeId>; 2], laws::Unmet> {
         let run = Run::root();
         let store = run.port(Sqlite::in_memory::<StreamSchema>());
         Projects::rooted(&store, "q")?;
@@ -768,7 +766,7 @@ impl Projects {
 }
 
 #[test]
-fn a_consumes_link_is_listed_from_its_source_and_adds_no_ancestor() -> Result<(), Box<dyn Error>> {
+fn a_consumes_link_is_listed_from_its_source_and_adds_no_ancestor() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     let eater = Projects::rooted(&store, "p")?;
@@ -783,7 +781,7 @@ fn a_consumes_link_is_listed_from_its_source_and_adds_no_ancestor() -> Result<()
 }
 
 #[test]
-fn linking_the_same_nodes_again_writes_no_row() -> Result<(), Box<dyn Error>> {
+fn linking_the_same_nodes_again_writes_no_row() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     let parent = Projects::rooted(&store, "p")?;
@@ -797,7 +795,7 @@ fn linking_the_same_nodes_again_writes_no_row() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_shortcut_refinement_is_listed_as_a_child() -> Result<(), Box<dyn Error>> {
+fn a_shortcut_refinement_is_listed_as_a_child() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     let edges = [(1, 0), (2, 1), (2, 0)].map(|(child, parent)| Edge { child, parent });
@@ -808,7 +806,7 @@ fn a_shortcut_refinement_is_listed_as_a_child() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn an_unknown_node_is_not_shown() -> Result<(), Box<dyn Error>> {
+fn an_unknown_node_is_not_shown() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     Projects::rooted(&store, "p")?;
@@ -819,30 +817,30 @@ fn an_unknown_node_is_not_shown() -> Result<(), Box<dyn Error>> {
 struct Proposals;
 
 impl Proposals {
-    fn node(id: i64) -> Result<Node<Vague>, Box<dyn Error>> {
+    fn node(id: i64) -> Result<Node<Vague>, laws::Unmet> {
         let entry = Entry::new("p".parse()?, Facet::Feature, Entered::Apply.into());
         let core = Inherited::from(Casting::new(Role::Core, entry.provenance()));
         Ok(Node::proposed(NodeId::new(id), entry, core, Title::new(format!("child {id}"))))
     }
 
-    fn child(parent: NodeId, id: i64) -> Result<Directed, Box<dyn Error>> {
+    fn child(parent: NodeId, id: i64) -> Result<Directed, laws::Unmet> {
         Ok(Directed::Proposed { node: Proposals::node(id)?, parent })
     }
 
-    fn superseded(old: i64, by: i64) -> Result<Directed, Box<dyn Error>> {
+    fn superseded(old: i64, by: i64) -> Result<Directed, laws::Unmet> {
         Ok(Directed::Superseded(Supersession::within(&Proposals::node(old)?, &Proposals::node(by)?)?))
     }
 
-    fn written(store: &Port<'_, Sqlite>, directed: Vec<Directed>) -> Result<Written, Box<dyn Error>> {
+    fn written(store: &Port<'_, Sqlite>, directed: Vec<Directed>) -> Result<Written, laws::Unmet> {
         let file = Proposals::unseen(store, &format!("{directed:?}"))?;
         Ok(store.write(Directions::new(Provenance::from(Entered::Apply), file, directed, Remit::Unbounded))?)
     }
 
-    fn open(store: &Port<'_, Sqlite>) -> Result<Vec<JobId>, Box<dyn Error>> {
+    fn open(store: &Port<'_, Sqlite>) -> Result<Vec<JobId>, laws::Unmet> {
         Ok(store.read(OpenJobs)?.iter().map(job::Open::key).copied().collect())
     }
 
-    fn unseen(store: &Port<'_, Sqlite>, contents: &str) -> Result<Unseen, Box<dyn Error>> {
+    fn unseen(store: &Port<'_, Sqlite>, contents: &str) -> Result<Unseen, laws::Unmet> {
         match store.read(AppliedFile::from(Bytes::from(contents)))? {
             Seen::Unseen(unseen) => Ok(unseen),
             Seen::Before(earlier) => {
@@ -851,13 +849,13 @@ impl Proposals {
         }
     }
 
-    fn segment(message: &str, ordinal: u32) -> Result<Segment, Box<dyn Error>> {
+    fn segment(message: &str, ordinal: u32) -> Result<Segment, laws::Unmet> {
         Ok(Segment::new(Uuid::try_new(message.to_owned())?, Ordinal::new(ordinal)))
     }
 }
 
 #[test]
-fn a_proposal_plants_a_titled_vague_child_under_its_parent() -> Result<(), Box<dyn Error>> {
+fn a_proposal_plants_a_titled_vague_child_under_its_parent() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     let root = Projects::rooted(&store, "p")?;
@@ -872,7 +870,7 @@ fn a_proposal_plants_a_titled_vague_child_under_its_parent() -> Result<(), Box<d
 }
 
 #[test]
-fn the_next_node_follows_the_highest_node() -> Result<(), Box<dyn Error>> {
+fn the_next_node_follows_the_highest_node() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     assert_eq!(store.read(NextNode)?, NodeId::new(1));
@@ -883,7 +881,7 @@ fn the_next_node_follows_the_highest_node() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn directions_are_written_whole_or_not_at_all() -> Result<(), Box<dyn Error>> {
+fn directions_are_written_whole_or_not_at_all() -> Result<(), laws::Unmet> {
     let Recorded { records, .. } = Recorded::session()?;
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
@@ -896,7 +894,7 @@ fn directions_are_written_whole_or_not_at_all() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_file_is_seen_once_its_directions_are_written_and_not_when_they_are_refused() -> Result<(), Box<dyn Error>> {
+fn a_file_is_seen_once_its_directions_are_written_and_not_when_they_are_refused() -> Result<(), laws::Unmet> {
     let Recorded { records, .. } = Recorded::session()?;
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
@@ -945,7 +943,7 @@ fn a_file_is_seen_once_its_directions_are_written_and_not_when_they_are_refused(
 }
 
 #[test]
-fn a_superseded_node_stays_shown_and_its_successor_links_to_it() -> Result<(), Box<dyn Error>> {
+fn a_superseded_node_stays_shown_and_its_successor_links_to_it() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     let root = Projects::rooted(&store, "p")?;
@@ -968,12 +966,12 @@ fn a_superseded_node_stays_shown_and_its_successor_links_to_it() -> Result<(), B
 }
 
 #[test]
-fn a_prefix_finds_every_segment_of_the_messages_it_starts() -> Result<(), Box<dyn Error>> {
+fn a_prefix_finds_every_segment_of_the_messages_it_starts() -> Result<(), laws::Unmet> {
     let Recorded { records, .. } = Recorded::session()?;
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(store.read(Holding::from(records))?)?;
-    let heard = |prefix: &str| -> Result<Vec<(Segment, Authorship)>, Box<dyn Error>> {
+    let heard = |prefix: &str| -> Result<Vec<(Segment, Authorship)>, laws::Unmet> {
         let spoken = store.read(Prefixed::from(Prefix::new(prefix.to_owned())))?;
         Ok(spoken.iter().map(|said| (said.segment().clone(), said.author())).collect())
     };
@@ -1002,13 +1000,13 @@ impl Shortened {
             .concat()
     }
 
-    fn strays(uuids: &BTreeSet<String>) -> Result<Vec<String>, Box<dyn Error>> {
+    fn strays(uuids: &BTreeSet<String>) -> Result<Vec<String>, laws::Unmet> {
         let Recorded { records, .. } = Recorded::of(&Shortened::session(uuids))?;
         let run = Run::root();
         let store = run.port(Sqlite::in_memory::<StreamSchema>());
         store.write(store.read(Holding::from(records))?)?;
         let messages =
-            uuids.iter().map(|uuid| Ok(Uuid::try_new(uuid.clone())?)).collect::<Result<Vec<Uuid>, Box<dyn Error>>>()?;
+            uuids.iter().map(|uuid| Ok(Uuid::try_new(uuid.clone())?)).collect::<Result<Vec<Uuid>, laws::Unmet>>()?;
         let shortest = store.read(messages.iter().cloned().collect::<Prefixes>())?;
         messages.iter().try_fold(Vec::new(), |mut strays, message| {
             let prefix = shortest.prefix(message);
@@ -1022,23 +1020,23 @@ impl Shortened {
 }
 
 laws::law!(a_shortest_prefix_hears_only_its_own_message, btree_set("[ab]{12}", 1..8), uuids, {
-    let strays = Shortened::strays(&uuids).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    let strays = Shortened::strays(&uuids).map_err(|failure| TestCaseError::fail(format!("{failure:?}")))?;
     prop_assert_eq!(strays, Vec::<String>::new());
 });
 
 #[test]
-fn a_segment_is_covered_by_its_own_directive_not_by_a_link_to_it() -> Result<(), Box<dyn Error>> {
+fn a_segment_is_covered_by_its_own_directive_not_by_a_link_to_it() -> Result<(), laws::Unmet> {
     let Recorded { records, .. } = Recorded::session()?;
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(store.read(Holding::from(records))?)?;
     let [asked, answered, said] =
         [Proposals::segment("o1", 0)?, Proposals::segment("o1", 1)?, Proposals::segment("l1", 0)?];
-    let covered = |messages: &[&str]| -> Result<Vec<Segment>, Box<dyn Error>> {
+    let covered = |messages: &[&str]| -> Result<Vec<Segment>, laws::Unmet> {
         let uuids = messages
             .iter()
             .map(|message| Ok(Uuid::try_new((*message).to_owned())?))
-            .collect::<Result<Vec<Uuid>, Box<dyn Error>>>()?;
+            .collect::<Result<Vec<Uuid>, laws::Unmet>>()?;
         Ok(store.read(uuids.into_iter().collect::<Covered>())?.into_iter().collect())
     };
     assert_eq!(covered(&["o1", "l1"])?, []);
@@ -1098,7 +1096,7 @@ impl Ends {
         store: &Port<'_, Sqlite>,
         edge: Edge,
         file: Unseen,
-    ) -> Result<Result<Written, Refusal>, Box<dyn Error>> {
+    ) -> Result<Result<Written, Refusal>, laws::Unmet> {
         match self {
             Ends::Nodes(relation) => Dag::linked(store, [Dag::id(edge.child), Dag::id(edge.parent)], relation),
             Ends::Segments(relation) => Ok(store.write(Directions::new(
@@ -1114,7 +1112,7 @@ impl Ends {
         }
     }
 
-    fn cycle(self, edge: Edge) -> Result<Cycle, Box<dyn Error>> {
+    fn cycle(self, edge: Edge) -> Result<Cycle, laws::Unmet> {
         match self {
             Ends::Nodes(relation) => {
                 Ok(Cycle::Nodes { source: Dag::id(edge.child), relation, target: Dag::id(edge.parent) })
@@ -1144,29 +1142,29 @@ impl Probe {
         })
     }
 
-    fn refused(&self) -> Result<Option<Cycle>, Box<dyn Error>> {
+    fn refused(&self) -> Result<Option<Cycle>, laws::Unmet> {
         let Recorded { records, .. } = Recorded::of(SEGMENTED)?;
         let run = Run::root();
         let store = run.port(Sqlite::in_memory::<StreamSchema>());
         store.write(store.read(Holding::from(records))?)?;
         iter::repeat_with(|| Ok(store.write(Dag::node(&store, Facet::Feature)?)?))
             .take(ENDS)
-            .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
+            .collect::<Result<Vec<Written>, laws::Unmet>>()?;
         let ends = self.closed.ends();
         let mut files = (0..=self.edges.len())
             .map(|nth| Proposals::unseen(&store, &nth.to_string()))
-            .collect::<Result<Vec<Unseen>, Box<dyn Error>>>()?
+            .collect::<Result<Vec<Unseen>, laws::Unmet>>()?
             .into_iter();
         let tried = files.next().ok_or("no file for the tried edge")?;
         self.edges
             .iter()
             .zip(files)
             .map(|(edge, file)| Ok(ends.linked(&store, *edge, file)??))
-            .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
+            .collect::<Result<Vec<Written>, laws::Unmet>>()?;
         Probe::cyclic(ends.linked(&store, self.tried, tried)?)
     }
 
-    fn cyclic(written: Result<Written, Refusal>) -> Result<Option<Cycle>, Box<dyn Error>> {
+    fn cyclic(written: Result<Written, Refusal>) -> Result<Option<Cycle>, laws::Unmet> {
         match written {
             Ok(_written) => Ok(None),
             Err(Refusal::Cyclic(cycle)) => Ok(Some(cycle)),
@@ -1192,26 +1190,26 @@ impl Probe {
         Edge { child: 0, parent: 2 }
     }
 
-    fn wanted(&self) -> Result<Option<Cycle>, Box<dyn Error>> {
+    fn wanted(&self) -> Result<Option<Cycle>, laws::Unmet> {
         self.reached().get(&self.tried.child).map(|_reached| self.closed.ends().cycle(self.tried)).transpose()
     }
 }
 
 laws::law!(an_edge_is_refused_exactly_where_the_closure_holds_its_reverse_path, Probe::any(), probe, {
-    let refused = probe.refused().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-    prop_assert_eq!(refused, probe.wanted().map_err(|failure| TestCaseError::fail(failure.to_string()))?);
+    let refused = probe.refused().map_err(|failure| TestCaseError::fail(format!("{failure:?}")))?;
+    prop_assert_eq!(refused, probe.wanted().map_err(|failure| TestCaseError::fail(format!("{failure:?}")))?);
 });
 
 #[test]
-fn an_edge_reversing_a_written_path_is_refused_for_every_acyclic_relation() -> Result<(), Box<dyn Error>> {
+fn an_edge_reversing_a_written_path_is_refused_for_every_acyclic_relation() -> Result<(), laws::Unmet> {
     let refused = Closed::ALL
         .into_iter()
         .map(|closed| Probe { closed, edges: Probe::chain(), tried: Probe::closing() }.refused())
-        .collect::<Result<Vec<Option<Cycle>>, Box<dyn Error>>>()?;
+        .collect::<Result<Vec<Option<Cycle>>, laws::Unmet>>()?;
     let cycles = Closed::ALL
         .into_iter()
         .map(|closed| Ok(Some(closed.ends().cycle(Probe::closing())?)))
-        .collect::<Result<Vec<Option<Cycle>>, Box<dyn Error>>>()?;
+        .collect::<Result<Vec<Option<Cycle>>, laws::Unmet>>()?;
     assert_eq!(refused, cycles);
     Ok(())
 }
@@ -1239,7 +1237,7 @@ impl Mixed {
         })
     }
 
-    fn shown(&self) -> Result<Vec<Shown>, Box<dyn Error>> {
+    fn shown(&self) -> Result<Vec<Shown>, laws::Unmet> {
         let Recorded { records, .. } = Recorded::of(SEGMENTED)?;
         let run = Run::root();
         let store = run.port(Sqlite::in_memory::<StreamSchema>());
@@ -1248,7 +1246,7 @@ impl Mixed {
         let ends = self.closed.ends();
         let files = (0..self.edges.len())
             .map(|nth| Proposals::unseen(&store, &nth.to_string()))
-            .collect::<Result<Vec<Unseen>, Box<dyn Error>>>()?;
+            .collect::<Result<Vec<Unseen>, laws::Unmet>>()?;
         self.edges
             .iter()
             .zip(files)
@@ -1257,7 +1255,7 @@ impl Mixed {
                     matches!(refusal, Refusal::Ancestral { .. }).then_some(Written::zero()).ok_or(refusal)
                 })?)
             })
-            .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
+            .collect::<Result<Vec<Written>, laws::Unmet>>()?;
         (0..self.dag.facets.len())
             .map(|node| {
                 let placed = store.read(ShownNode::from(Dag::id(node)))?.ok_or("a planted node is not shown")?;
@@ -1309,7 +1307,7 @@ struct Staging;
 impl Staging {
     const STEPS: [Step; 4] = [Step::Refine, Step::Specify, Step::Reopen, Step::Drop];
 
-    fn transition(step: Step) -> Result<Transition, Box<dyn Error>> {
+    fn transition(step: Step) -> Result<Transition, laws::Unmet> {
         match step {
             Step::Refine => Ok(Transition::Refine),
             Step::Specify => {
@@ -1320,11 +1318,11 @@ impl Staging {
         }
     }
 
-    fn stored(store: &Port<'_, Sqlite>, id: NodeId) -> Result<AnyNode, Box<dyn Error>> {
+    fn stored(store: &Port<'_, Sqlite>, id: NodeId) -> Result<AnyNode, laws::Unmet> {
         Ok(store.read(ShownNode::from(id))?.ok_or("the node is not shown")?.node().clone())
     }
 
-    fn mismatched(steps: &[Step]) -> Result<Vec<Mismatch>, Box<dyn Error>> {
+    fn mismatched(steps: &[Step]) -> Result<Vec<Mismatch>, laws::Unmet> {
         let run = Run::root();
         let store = run.port(Sqlite::in_memory::<StreamSchema>());
         let root = Projects::rooted(&store, "p")?;
@@ -1338,11 +1336,11 @@ impl Staging {
                 let refused = Staging::refused(store.write(Restaged::new(resolved, transition)))?;
                 Ok(Mismatch { wanted, stored: Restaging { refused, node: Staging::stored(&store, root)? } })
             })
-            .collect::<Result<Vec<Mismatch>, Box<dyn Error>>>()?;
+            .collect::<Result<Vec<Mismatch>, laws::Unmet>>()?;
         Ok(moved.into_iter().filter(|mismatch| mismatch.wanted != mismatch.stored).collect())
     }
 
-    fn refused<Written>(written: Result<Written, Refusal>) -> Result<Option<Misstaged>, Box<dyn Error>> {
+    fn refused<Written>(written: Result<Written, Refusal>) -> Result<Option<Misstaged>, laws::Unmet> {
         match written {
             Ok(_written) => Ok(None),
             Err(refusal) => Self::misstaged(refusal).map(Some),
@@ -1356,7 +1354,7 @@ impl Staging {
         }
     }
 
-    fn misstaged(refusal: Refusal) -> Result<Misstaged, Box<dyn Error>> {
+    fn misstaged(refusal: Refusal) -> Result<Misstaged, laws::Unmet> {
         match refusal {
             Refusal::Misstaged(misstaged) => Ok(misstaged),
             other @ (Refusal::Cyclic(_)
@@ -1373,13 +1371,13 @@ laws::law!(
     vec(select(Staging::STEPS.to_vec()), 0..8),
     steps,
     {
-        let mismatched = Staging::mismatched(&steps).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+        let mismatched = Staging::mismatched(&steps).map_err(|failure| TestCaseError::fail(format!("{failure:?}")))?;
         prop_assert_eq!(mismatched, Vec::<Mismatch>::new());
     }
 );
 
 #[test]
-fn a_dropped_node_stays_shown_under_its_parent() -> Result<(), Box<dyn Error>> {
+fn a_dropped_node_stays_shown_under_its_parent() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     let root = Projects::rooted(&store, "p")?;
@@ -1391,7 +1389,7 @@ fn a_dropped_node_stays_shown_under_its_parent() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_vague_node_is_refused_a_specification_and_keeps_its_stage() -> Result<(), Box<dyn Error>> {
+fn a_vague_node_is_refused_a_specification_and_keeps_its_stage() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     let root = Projects::rooted(&store, "p")?;
@@ -1403,7 +1401,7 @@ fn a_vague_node_is_refused_a_specification_and_keeps_its_stage() -> Result<(), B
 }
 
 #[test]
-fn a_missing_node_resolves_to_nothing_and_once_planted_refines_without_a_cycle() -> Result<(), Box<dyn Error>> {
+fn a_missing_node_resolves_to_nothing_and_once_planted_refines_without_a_cycle() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     let root = Projects::rooted(&store, "p")?;
@@ -1415,7 +1413,7 @@ fn a_missing_node_resolves_to_nothing_and_once_planted_refines_without_a_cycle()
 }
 
 #[test]
-fn a_proposal_under_a_missing_parent_is_refused_and_closes_nothing() -> Result<(), Box<dyn Error>> {
+fn a_proposal_under_a_missing_parent_is_refused_and_closes_nothing() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     let root = Projects::rooted(&store, "p")?;
@@ -1457,24 +1455,24 @@ impl Changes {
         vec(prop_oneof![cast, refined], 0..14).prop_map(Changes)
     }
 
-    fn written(&self) -> Result<Settled, Box<dyn Error>> {
+    fn written(&self) -> Result<Settled, laws::Unmet> {
         let run = Run::root();
         let store = run.port(Sqlite::in_memory::<StreamSchema>());
         iter::repeat_with(|| Ok(store.write(Dag::node(&store, Facet::Feature)?)?))
             .take(ENDS)
-            .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
+            .collect::<Result<Vec<Written>, laws::Unmet>>()?;
         let refused = self
             .0
             .iter()
             .map(|change| change.written(&store).and_then(Changes::inverted))
-            .collect::<Result<Vec<Option<NodeEdge>>, Box<dyn Error>>>()?;
+            .collect::<Result<Vec<Option<NodeEdge>>, laws::Unmet>>()?;
         let roles = (0..ENDS)
             .map(|node| Ok(Staging::stored(&store, Dag::id(node))?.casting().role()))
-            .collect::<Result<Vec<Role>, Box<dyn Error>>>()?;
+            .collect::<Result<Vec<Role>, laws::Unmet>>()?;
         Ok(Settled { refused, roles })
     }
 
-    fn inverted(written: Result<Written, Refusal>) -> Result<Option<NodeEdge>, Box<dyn Error>> {
+    fn inverted(written: Result<Written, Refusal>) -> Result<Option<NodeEdge>, laws::Unmet> {
         match written {
             Ok(_written) => Ok(None),
             Err(Refusal::Inverted(inversion)) => Ok(Some(inversion.edge())),
@@ -1490,7 +1488,7 @@ impl Changes {
 }
 
 impl Change {
-    fn written(self, store: &Port<'_, Sqlite>) -> Result<Result<Written, Refusal>, Box<dyn Error>> {
+    fn written(self, store: &Port<'_, Sqlite>) -> Result<Result<Written, Refusal>, laws::Unmet> {
         match self {
             Change::Cast(node, role) => Dag::cast(store, Dag::id(node), role),
             Change::Refined(edge) => {
@@ -1552,12 +1550,12 @@ impl Held {
 }
 
 laws::law!(a_write_is_refused_exactly_where_a_core_node_would_depend_on_a_secondary_one, Changes::any(), leanings, {
-    let written = leanings.written().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    let written = leanings.written().map_err(|failure| TestCaseError::fail(format!("{failure:?}")))?;
     prop_assert_eq!(written, leanings.wanted());
 });
 
 #[test]
-fn a_core_project_cannot_consume_a_secondary_one() -> Result<(), Box<dyn Error>> {
+fn a_core_project_cannot_consume_a_secondary_one() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     let eating = Projects::rooted(&store, "p")?;
@@ -1576,13 +1574,13 @@ fn a_core_project_cannot_consume_a_secondary_one() -> Result<(), Box<dyn Error>>
 struct Unstructuring;
 
 impl Unstructuring {
-    fn listed(store: &Port<'_, Sqlite>) -> Result<Vec<Segment>, Box<dyn Error>> {
+    fn listed(store: &Port<'_, Sqlite>) -> Result<Vec<Segment>, laws::Unmet> {
         Ok(store.read(Unstructured)?.iter().map(|unplaced| AsRef::<Segment>::as_ref(unplaced).clone()).collect())
     }
 }
 
 #[test]
-fn the_unstructured_owner_segments_shrink_as_directives_cover_them() -> Result<(), Box<dyn Error>> {
+fn the_unstructured_owner_segments_shrink_as_directives_cover_them() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(store.read(Holding::from(Recorded::session()?.records))?)?;
@@ -1597,19 +1595,19 @@ fn the_unstructured_owner_segments_shrink_as_directives_cover_them() -> Result<(
 }
 
 #[test]
-fn the_structurer_s_context_outlines_every_live_node_past_200_with_its_parent() -> Result<(), Box<dyn Error>> {
+fn the_structurer_s_context_outlines_every_live_node_past_200_with_its_parent() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(Dag::planting(&store, Entry::new("q".parse()?, Facet::Project, Provenance::from(Entered::Init)))?)?;
     store.write(Dag::node(&store, Facet::Project)?)?;
     iter::repeat_with(|| Ok(store.write(Dag::node(&store, Facet::Feature)?)?))
         .take(201)
-        .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
+        .collect::<Result<Vec<Written>, laws::Unmet>>()?;
     let [specified, dropped] = [NodeId::new(203), NodeId::new(202)];
     [Step::Refine, Step::Specify]
         .into_iter()
         .map(|step| Ok(store.write(Restaged::new(Dag::resolved(&store, specified)?, Staging::transition(step)?))?))
-        .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
+        .collect::<Result<Vec<Written>, laws::Unmet>>()?;
     store.write(Restaged::new(Dag::resolved(&store, dropped)?, Staging::transition(Step::Drop)?))?;
     let child = Dag::node(&store, Facet::Feature)?;
     store.write(child)?;
@@ -1624,7 +1622,7 @@ fn the_structurer_s_context_outlines_every_live_node_past_200_with_its_parent() 
 
 #[test]
 fn a_flailed_mark_lands_only_on_unstructured_segments_is_listed_with_its_job_and_run_stays_unplaced_and_lifts_once_structured()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(store.read(Holding::from(Recorded::session()?.records))?)?;
@@ -1653,7 +1651,7 @@ fn a_flailed_mark_lands_only_on_unstructured_segments_is_listed_with_its_job_and
 }
 
 #[test]
-fn a_retried_hold_withdraws_its_account_and_queues_its_segments_again() -> Result<(), Box<dyn Error>> {
+fn a_retried_hold_withdraws_its_account_and_queues_its_segments_again() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(store.read(Holding::from(Recorded::session()?.records))?)?;
@@ -1681,7 +1679,7 @@ fn a_retried_hold_withdraws_its_account_and_queues_its_segments_again() -> Resul
 }
 
 #[test]
-fn a_retold_account_of_an_already_reported_failure_is_reported_again() -> Result<(), Box<dyn Error>> {
+fn a_retold_account_of_an_already_reported_failure_is_reported_again() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     let [first, second] = [JobId::new(1), JobId::new(2)];
@@ -1698,7 +1696,7 @@ fn a_retold_account_of_an_already_reported_failure_is_reported_again() -> Result
 }
 
 #[test]
-fn a_held_segment_is_held_under_the_job_its_run_belongs_to() -> Result<(), Box<dyn Error>> {
+fn a_held_segment_is_held_under_the_job_its_run_belongs_to() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(store.read(Holding::from(Recorded::session()?.records))?)?;
@@ -1723,16 +1721,15 @@ fn a_held_segment_is_held_under_the_job_its_run_belongs_to() -> Result<(), Box<d
 type Sqlite = <SqliteOpener as store_ports::Opens>::Store;
 
 #[test]
-fn every_store_opened_in_memory_after_others_are_dropped_starts_empty_and_indexes_afresh() -> Result<(), Box<dyn Error>>
-{
+fn every_store_opened_in_memory_after_others_are_dropped_starts_empty_and_indexes_afresh() -> Result<(), laws::Unmet> {
     let run = Run::root();
-    let searched = |store: &Port<'_, Sqlite>| -> Result<usize, Box<dyn Error>> {
+    let searched = |store: &Port<'_, Sqlite>| -> Result<usize, laws::Unmet> {
         let terms = Terms::lexed(["done"]).ok_or("no terms")?;
         Ok(store.read(SearchSegments::matching(terms, Scope::Everyone))?.len())
     };
     let opened: Vec<Port<'_, Sqlite>> =
         iter::repeat_with(|| run.port(Sqlite::in_memory::<StreamSchema>())).take(4).collect();
-    opened.iter().try_for_each(|earlier| -> Result<(), Box<dyn Error>> {
+    opened.iter().try_for_each(|earlier| -> Result<(), laws::Unmet> {
         earlier.write(earlier.read(Holding::from(Recorded::session()?.records))?)?;
         assert_eq!(searched(earlier)?, 1);
         Ok(())

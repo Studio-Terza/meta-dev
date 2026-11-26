@@ -1,7 +1,6 @@
 #[path = "generated/laws.rs"]
 mod generated_laws;
 
-use std::error::Error;
 use std::iter;
 
 use design_model::RunId;
@@ -68,7 +67,7 @@ impl Spawning {
             })
     }
 
-    fn stored(&self) -> Result<Lived, Box<dyn Error>> {
+    fn stored(&self) -> Result<Lived, laws::Unmet> {
         let run = Run::root();
         let store = run.port(Sqlite::in_memory::<StreamSchema>());
         let job = store.read(NextJob)?;
@@ -96,7 +95,7 @@ laws::law!(
     Spawning::any(),
     spawning,
     {
-        let lived = spawning.stored().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+        let lived = spawning.stored().map_err(|failure| TestCaseError::fail(format!("{failure:?}")))?;
         let spawned: Vec<Spawned> = lived.live.iter().map(|stored| stored.spawned().clone()).collect();
         let wanted = Spawned::new(spawning.pid, spawning.started.clone(), Deadline::new(spawning.deadline));
         prop_assert_eq!(spawned, vec![wanted]);
@@ -135,7 +134,7 @@ impl Spawning {
         }
     }
 
-    fn kept(self) -> Result<String, Box<dyn Error>> {
+    fn kept(self) -> Result<String, laws::Unmet> {
         let lived = self.stored()?;
         let reply = lived.ran.first().and_then(Ran::reply).cloned().ok_or("no reply kept")?;
         Ok(Excerpt::into_inner(reply))
@@ -143,14 +142,14 @@ impl Spawning {
 }
 
 #[test]
-fn an_ascii_reply_of_twenty_thousand_bytes_is_stored_as_exactly_sixteen_kibibytes() -> Result<(), Box<dyn Error>> {
+fn an_ascii_reply_of_twenty_thousand_bytes_is_stored_as_exactly_sixteen_kibibytes() -> Result<(), laws::Unmet> {
     let kept = Spawning::replying("a".repeat(20_000)).kept()?;
     assert_eq!(kept.len(), 16 * 1024);
     Ok(())
 }
 
 #[test]
-fn an_ascii_reply_of_exactly_sixteen_kibibytes_is_stored_unchanged() -> Result<(), Box<dyn Error>> {
+fn an_ascii_reply_of_exactly_sixteen_kibibytes_is_stored_unchanged() -> Result<(), laws::Unmet> {
     let told = "a".repeat(16 * 1024);
     let kept = Spawning::replying(told.clone()).kept()?;
     assert_eq!(kept, told);

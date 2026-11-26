@@ -10,7 +10,7 @@ const ACROSS_CHILD: &str = "use super::*;\nfn f() -> Result<()> { Ok(()) }\n";
 const INNER_MAIN: &str = "mod inner {\n    fn main() -> Result<(), u8> { Ok(()) }\n}\nfn main() {}\n";
 
 const TRAIT_IMPLS: &str = "use std::fmt;\nstruct A;\nimpl PartialEq for A {\n    fn eq(&self, _: &A) -> bool { true }\n}\nimpl fmt::Display for A {\n    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result { Ok(()) }\n}\n";
-const TESTS: &str = "#[test]\nfn t() -> Result<(), Box<dyn std::error::Error>> { Ok(()) }\n#[tokio::test]\nasync fn u() -> Result<(), u8> { Ok(()) }\n";
+const TESTS: &str = "#[test]\nfn t() -> Result<(), laws::Unmet> { Ok(()) }\n#[tokio::test]\nasync fn u() -> Result<(), u8> { Ok(()) }\n";
 const ROOT_MAIN: &str = "fn main() -> Result<(), u8> { Ok(()) }\n";
 const OTHER_SHAPES: &str = "struct E;\nfn a() -> Result<u8, E> { Ok(0) }\nfn b() -> Option<u8> { None }\nfn c<T>() -> Option<T> { None }\nfn d() -> impl std::future::Future<Output = Result<(), E>> { async { Ok(()) } }\nfn e() -> () {}\n";
 const SHADOWED_RESULT: &str =

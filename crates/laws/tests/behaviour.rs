@@ -152,7 +152,7 @@ table!(a_row_may_fail_with_an_error, ["a", "b"], text, {
 });
 
 table!(
-    #[should_panic(expected = "the table row is broken: invalid utf-8")]
+    #[should_panic(expected = "the table row is broken: Unmet(Told(\"invalid utf-8")]
     a_row_failing_with_an_error_fails,
     [vec![0xff_u8]],
     bytes,

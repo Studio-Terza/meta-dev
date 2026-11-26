@@ -1,7 +1,7 @@
 use design_model::{
     Confidence, Explicitness, NodeId, Ordinal, Provenance, Sense, SenseKind, SpanRelation, Specificity,
 };
-use store_ports::{Columns, Query, Statements, StoreFailure};
+use store_ports::{Columns, Execute, Query, StoreFailure};
 use transcript_ports::{Authorship, Body, Uuid};
 
 use super::{CurrentSpans, Placement};
@@ -40,7 +40,7 @@ impl From<PlacementRow> for Placement {
 }
 
 impl Placement {
-    pub(crate) fn placed_on(node: NodeId, statements: &mut Statements<'_>) -> Result<Vec<Placement>, StoreFailure> {
+    pub(crate) fn placed_on(node: NodeId, statements: &mut impl Execute) -> Result<Vec<Placement>, StoreFailure> {
         let rows = statements.rows(store_ports::query!(
             PlacementRow,
             r#"
@@ -85,7 +85,7 @@ ORDER BY
 impl Query for CurrentSpans {
     type Rows = Vec<Placement>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Placement>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Vec<Placement>, StoreFailure> {
         let relation = self.0;
         let rows = statements.rows(store_ports::query!(
             PlacementRow,

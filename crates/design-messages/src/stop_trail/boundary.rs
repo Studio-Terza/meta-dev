@@ -3,7 +3,7 @@ use std::fmt;
 use design_model::{Awaited, Fate, Gist, Halt};
 use invariants::Ignoring;
 use newtype::{Arbitrary, Display, Newtype};
-use store_ports::{Batch, Columns, Query, Statements, StoreFailure, Written};
+use store_ports::{Batch, Columns, Execute, Query, StoreFailure, Written};
 use transcript_ports::SessionId;
 
 use super::{StopTrail, Stopped};
@@ -57,7 +57,7 @@ impl fmt::Display for StopRow {
 impl Batch for Stopped {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let Stopped(StopRow { session, gist, read, quoted, kept, awaited, halt, fate }) = self;
         statements.written(store_ports::query!(
             r#"
@@ -90,7 +90,7 @@ VALUES
 impl Query for StopTrail {
     type Rows = Vec<StopRow>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<StopRow>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Vec<StopRow>, StoreFailure> {
         statements.rows(store_ports::query!(
             StopRow,
             r#"

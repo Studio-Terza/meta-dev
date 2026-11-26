@@ -83,7 +83,7 @@ impl Run {
     fn dropped<R: Release>(&self, resource: &mut R) {
         match self.released(resource) {
             Ok(_receipt) => (),
-            Err(failure) => self.fail(R::NAME, Box::new(failure)),
+            Err(failure) => self.fail(R::NAME, &failure),
         }
     }
 }

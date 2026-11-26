@@ -1,6 +1,6 @@
 use std::fmt;
 
-use store_ports::{Query, Statements, StoreFailure};
+use store_ports::{Execute, Query, StoreFailure};
 use transcript_ports::{Authorship, Body, Instant, Uuid};
 
 use super::{LastSaid, OwnerHistory};
@@ -26,7 +26,7 @@ pub struct Unabridged<'said>(&'said Said);
 impl Query for OwnerHistory {
     type Rows = Vec<Said>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Said>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Vec<Said>, StoreFailure> {
         MessageRow::owned(statements)
     }
 }
@@ -40,7 +40,7 @@ impl<'said> From<&'said Said> for Unabridged<'said> {
 impl Query for LastSaid {
     type Rows = Option<Body>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Option<Body>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Option<Body>, StoreFailure> {
         let rows = MessageRow::last_in(&self.0, Authorship::Lead, statements)?;
         Ok(rows.into_iter().next().map(|row| Said::from(row).body))
     }

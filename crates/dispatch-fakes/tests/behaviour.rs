@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::time::Duration;
 
 use dispatch_fakes::{Heeding, Stepped};
@@ -21,7 +20,7 @@ impl Rung {
 }
 
 #[test]
-fn a_heeding_clock_spends_a_rung_bell_while_a_stepped_clock_leaves_it_rung() -> Result<(), Box<dyn Error>> {
+fn a_heeding_clock_spends_a_rung_bell_while_a_stepped_clock_leaves_it_rung() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let rung = [
         Rung::waited(&run, Heeding::from(Stepped::starting(Wall::new(0), Pause::new(0)))),

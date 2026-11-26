@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use design_model::{NodeId, NodeRelation, Ordinal, Segment, SegmentRelation};
 use newtype::{Arbitrary, Counter, Newtype, Wrapping};
-use store_ports::{Columns, Statements, StoreFailure, Written};
+use store_ports::{Columns, Execute, StoreFailure, Written};
 
 use super::{Acyclic, Closed, Cycle, Refines, Refuses, SegmentCorrects, SegmentSupersedes, Supersedes};
 use message_id::Uuid;
@@ -42,7 +42,7 @@ impl Keyed {
         Keyed(id.into_inner())
     }
 
-    pub fn segment(segment: &Segment, statements: &mut Statements<'_>) -> Result<Keyed, StoreFailure> {
+    pub fn segment(segment: &Segment, statements: &mut impl Execute) -> Result<Keyed, StoreFailure> {
         let message = AsRef::<Uuid>::as_ref(segment).clone();
         let ordinal = Ordinal::from(segment);
         let row = statements.one(store_ports::query!(
@@ -68,10 +68,10 @@ impl<R: Acyclic> Closing<R> {
         Closing { source, target, relation: PhantomData }
     }
 
-    pub fn written<Failure, Refused>(
+    pub fn written<E: Execute, Failure, Refused>(
         self,
-        statements: &mut Statements<'_>,
-        edge: impl FnOnce(&mut Statements<'_>) -> Result<Written, Failure>,
+        statements: &mut E,
+        edge: impl FnOnce(&mut E) -> Result<Written, Failure>,
     ) -> Result<Written, Refused>
     where
         Refused: Refuses + From<Failure>,
@@ -82,7 +82,7 @@ impl<R: Acyclic> Closing<R> {
         Ok(edged.plus(closed))
     }
 
-    fn opened<Refused: Refuses>(self, statements: &mut Statements<'_>) -> Result<Open, Refused> {
+    fn opened<Refused: Refuses>(self, statements: &mut impl Execute) -> Result<Open, Refused> {
         let open =
             Open { ancestor: R::keyed(&self.target, statements)?, descendant: R::keyed(&self.source, statements)? };
         let relation = R::CLOSED;
@@ -117,7 +117,7 @@ WHERE
 }
 
 impl Open {
-    fn closed(self, relation: Closed, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn closed(self, relation: Closed, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let Open { ancestor, descendant } = self;
         statements.written(store_ports::query!(
             r#"
@@ -178,7 +178,7 @@ impl Acyclic for Refines {
 
     const CLOSED: Closed = Closed::Refines;
 
-    fn keyed(end: &NodeId, _statements: &mut Statements<'_>) -> Result<Keyed, StoreFailure> {
+    fn keyed(end: &NodeId, _statements: &mut impl Execute) -> Result<Keyed, StoreFailure> {
         Ok(Keyed::node(*end))
     }
 
@@ -192,7 +192,7 @@ impl Acyclic for Supersedes {
 
     const CLOSED: Closed = Closed::Supersedes;
 
-    fn keyed(end: &NodeId, _statements: &mut Statements<'_>) -> Result<Keyed, StoreFailure> {
+    fn keyed(end: &NodeId, _statements: &mut impl Execute) -> Result<Keyed, StoreFailure> {
         Ok(Keyed::node(*end))
     }
 
@@ -206,7 +206,7 @@ impl Acyclic for SegmentSupersedes {
 
     const CLOSED: Closed = Closed::SegmentSupersedes;
 
-    fn keyed(end: &Segment, statements: &mut Statements<'_>) -> Result<Keyed, StoreFailure> {
+    fn keyed(end: &Segment, statements: &mut impl Execute) -> Result<Keyed, StoreFailure> {
         Keyed::segment(end, statements)
     }
 
@@ -220,7 +220,7 @@ impl Acyclic for SegmentCorrects {
 
     const CLOSED: Closed = Closed::SegmentCorrects;
 
-    fn keyed(end: &Segment, statements: &mut Statements<'_>) -> Result<Keyed, StoreFailure> {
+    fn keyed(end: &Segment, statements: &mut impl Execute) -> Result<Keyed, StoreFailure> {
         Keyed::segment(end, statements)
     }
 

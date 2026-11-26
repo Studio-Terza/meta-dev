@@ -2,7 +2,7 @@ mod boundary;
 
 use design_model::{Node, NodeId, Provenance, Segment, SegmentRelation, Sense, SpanRelation, Supersession, Vague};
 use port_core::Op;
-use store_ports::Written;
+use store_ports::{Execute, Written};
 use transcript_ports::Uuid;
 
 use crate::{Refusal, Remit, Unseen};
@@ -49,7 +49,7 @@ impl Directed {
         }
     }
 
-    pub(crate) fn written(&self, annotating: &mut Annotating<'_, '_>) -> Result<Written, Refusal> {
+    pub(crate) fn written(&self, annotating: &mut Annotating<'_, impl Execute>) -> Result<Written, Refusal> {
         match self {
             Directed::Placed { segment, node, relation } => annotating.placed(segment, *node, *relation),
             Directed::Sensed { segment, sense } => annotating.sensed(segment, *sense),

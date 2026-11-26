@@ -1,5 +1,5 @@
 use rusqlite::ffi;
-use store_ports::StoreFailure;
+use store_ports::{Cause, StoreFailure};
 
 #[derive(Debug)]
 pub(in super::super) struct Unopened(rusqlite::Error);
@@ -20,10 +20,10 @@ pub(in super::super) enum Unmigrated {
 }
 
 impl Unexecuted {
-    fn kinded(extended: Option<i32>, failed: rusqlite::Error) -> StoreFailure {
+    fn kinded(extended: Option<i32>, failed: &rusqlite::Error) -> StoreFailure {
         match extended {
-            Some(ffi::SQLITE_CONSTRAINT_FOREIGNKEY) => StoreFailure::Referenced(Box::new(failed)),
-            Some(_) | None => StoreFailure::Statement(Box::new(failed)),
+            Some(ffi::SQLITE_CONSTRAINT_FOREIGNKEY) => StoreFailure::Referenced(Cause::told(failed)),
+            Some(_) | None => StoreFailure::Statement(Cause::told(failed)),
         }
     }
 }
@@ -48,19 +48,19 @@ impl From<rusqlite::Error> for Unmigrated {
 
 impl From<Unopened> for StoreFailure {
     fn from(failed: Unopened) -> StoreFailure {
-        StoreFailure::Open(Box::new(failed.0))
+        StoreFailure::Open(Cause::told(&failed.0))
     }
 }
 
 impl From<Unexecuted> for StoreFailure {
     fn from(failed: Unexecuted) -> StoreFailure {
         let extended = failed.0.sqlite_error().map(|error| error.extended_code);
-        Unexecuted::kinded(extended, failed.0)
+        Unexecuted::kinded(extended, &failed.0)
     }
 }
 
 impl From<Unmigrated> for StoreFailure {
     fn from(failed: Unmigrated) -> StoreFailure {
-        StoreFailure::Migrate(Box::new(failed))
+        StoreFailure::Migrate(Cause::told(&failed))
     }
 }

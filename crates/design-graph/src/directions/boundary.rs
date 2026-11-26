@@ -3,7 +3,7 @@ use design_model::{
     SenseKind, SpanRelation, Specificity, Supersession, Vague,
 };
 use newtype::Counter;
-use store_ports::{Batch, Columns as Row, Statements, StoreFailure, Written};
+use store_ports::{Batch, Columns as Row, Execute, StoreFailure, Written};
 use transcript_ports::Uuid;
 
 use super::Directions;
@@ -15,9 +15,9 @@ use design_jobs::JobState;
 use crate::Linked;
 
 #[derive(Debug)]
-pub(crate) struct Annotating<'held, 'run> {
+pub(crate) struct Annotating<'held, E: Execute> {
     provenance: Provenance,
-    statements: &'held mut Statements<'run>,
+    statements: &'held mut E,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -51,7 +51,7 @@ impl From<&Segment> for Columns {
 impl Batch for Directions {
     type Failure = Refusal;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, Refusal> {
         let mut annotating = Annotating { provenance: self.provenance, statements };
         let written = self
             .directed
@@ -65,12 +65,12 @@ impl Batch for Directions {
     }
 }
 
-impl<'held, 'run> Annotating<'held, 'run> {
-    pub(crate) fn new(provenance: Provenance, statements: &'held mut Statements<'run>) -> Annotating<'held, 'run> {
+impl<'held, E: Execute> Annotating<'held, E> {
+    pub(crate) fn new(provenance: Provenance, statements: &'held mut E) -> Annotating<'held, E> {
         Annotating { provenance, statements }
     }
 
-    pub(crate) fn unflailed(statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    pub(crate) fn unflailed(statements: &mut E) -> Result<Written, StoreFailure> {
         statements.written(store_ports::query!(
             r#"
 DELETE FROM
@@ -228,7 +228,7 @@ VALUES
 }
 
 impl Linking<'_> {
-    fn closed(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
+    fn closed(self, statements: &mut impl Execute) -> Result<Written, Refusal> {
         match self.relation {
             SegmentRelation::Supersedes => Closing::<SegmentSupersedes>::new(self.source.clone(), self.target.clone())
                 .written(statements, |linked| LinkColumns::from(self).written(linked)),
@@ -251,7 +251,7 @@ impl From<Linking<'_>> for LinkColumns {
 }
 
 impl LinkColumns {
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let LinkColumns { source, relation, target, provenance } = self;
         let Columns { message: source_message, ordinal: source_ordinal } = source;
         let Columns { message: target_message, ordinal: target_ordinal } = target;

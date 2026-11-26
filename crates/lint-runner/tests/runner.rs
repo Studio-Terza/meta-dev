@@ -1,5 +1,3 @@
-use std::error::Error;
-
 use lint_crate_graph::CrateGraph;
 use lint_fixtures::{Checks, Lines, Queried};
 use lint_reader::SourceFiles;
@@ -44,7 +42,7 @@ const MOST_READERS: usize = 4;
 const NO_DEPENDENCIES: &str = "{\"workspace_root\": \"/\", \"packages\": []}";
 
 #[test]
-fn every_lint_reports_over_the_same_files() -> Result<(), Box<dyn Error>> {
+fn every_lint_reports_over_the_same_files() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", DIRTY)?;
     let run = root.reported();
@@ -56,7 +54,7 @@ fn every_lint_reports_over_the_same_files() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
+fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), laws::Unmet> {
     let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let workspace = golden::fixtures!("..")?;
     let implemented = workspace.entries(&crates)?.iter().try_fold(0, |found, entry| {
@@ -105,7 +103,7 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_tree_with_violations_is_not_clean() -> Result<(), Box<dyn Error>> {
+fn a_tree_with_violations_is_not_clean() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", DIRTY)?;
     root.write("src/clean.rs", CLEAN)?;
@@ -116,7 +114,7 @@ fn a_tree_with_violations_is_not_clean() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_clean_tree_is_clean_and_build_directories_are_not_read() -> Result<(), Box<dyn Error>> {
+fn a_clean_tree_is_clean_and_build_directories_are_not_read() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", CLEAN)?;
     root.write("target/out.rs", DIRTY)?;
@@ -125,7 +123,7 @@ fn a_clean_tree_is_clean_and_build_directories_are_not_read() -> Result<(), Box<
 }
 
 #[test]
-fn the_report_flag_lists_report_only_findings_and_blocks_nothing() -> Result<(), Box<dyn Error>> {
+fn the_report_flag_lists_report_only_findings_and_blocks_nothing() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/paired.rs", PAIRED)?;
     root.write("src/lib.rs", "pub struct A;\nmod paired;\nmod cloned;\n")?;
@@ -142,7 +140,7 @@ fn the_report_flag_lists_report_only_findings_and_blocks_nothing() -> Result<(),
 }
 
 #[test]
-fn the_report_flag_prints_elegance_reports_and_blocks_nothing() -> Result<(), Box<dyn Error>> {
+fn the_report_flag_prints_elegance_reports_and_blocks_nothing() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", DIRTY)?;
     let run = root.flagged(&["--report"]);
@@ -153,7 +151,7 @@ fn the_report_flag_prints_elegance_reports_and_blocks_nothing() -> Result<(), Bo
 }
 
 #[test]
-fn the_report_flag_lists_narrowed_returns_and_blocks_nothing() -> Result<(), Box<dyn Error>> {
+fn the_report_flag_lists_narrowed_returns_and_blocks_nothing() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", NARROWED)?;
     let reported = root.flagged(&["--report"]);
@@ -171,7 +169,7 @@ fn the_report_flag_lists_narrowed_returns_and_blocks_nothing() -> Result<(), Box
 }
 
 #[test]
-fn without_the_report_flag_elegance_reports_stay_off() -> Result<(), Box<dyn Error>> {
+fn without_the_report_flag_elegance_reports_stay_off() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", DIRTY)?;
     let run = root.flagged(&[]);
@@ -180,7 +178,7 @@ fn without_the_report_flag_elegance_reports_stay_off() -> Result<(), Box<dyn Err
 }
 
 #[test]
-fn a_repeated_shape_fails_the_run() -> Result<(), Box<dyn Error>> {
+fn a_repeated_shape_fails_the_run() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", MODULES)?;
     root.write("src/one.rs", REPEATED)?;
@@ -201,7 +199,7 @@ fn the_report_flag_fails_on_an_unreadable_root() {
 }
 
 #[test]
-fn the_query_command_lists_matching_abstractions_and_blocks_nothing() -> Result<(), Box<dyn Error>> {
+fn the_query_command_lists_matching_abstractions_and_blocks_nothing() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", &format!("{DIRTY}{INDEX}"))?;
     let run = root.flagged(&["query", "index", "--role", "fn f(&self, q: &Q) -> Vec<Hit>", "--in"]);
@@ -225,7 +223,7 @@ fn the_query_command_refuses_a_malformed_role() {
 }
 
 #[test]
-fn the_gate_refuses_a_workspace_cargo_cannot_describe() -> Result<(), Box<dyn Error>> {
+fn the_gate_refuses_a_workspace_cargo_cannot_describe() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", CLEAN)?;
     let (mut out, mut err) = (Vec::new(), Vec::new());
@@ -256,7 +254,7 @@ fn the_gate_refuses_a_workspace_cargo_cannot_describe() -> Result<(), Box<dyn Er
 }
 
 #[test]
-fn the_verdict_names_what_the_run_decided() -> Result<(), Box<dyn Error>> {
+fn the_verdict_names_what_the_run_decided() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", "pub struct A;\n")?;
     let clean = root.verdict(&[]);
@@ -286,7 +284,7 @@ fn the_verdict_names_what_the_run_decided() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_cargo_metadata_failure_refuses_the_run_once_rather_than_flagging_each_derive() -> Result<(), Box<dyn Error>> {
+fn a_cargo_metadata_failure_refuses_the_run_once_rather_than_flagging_each_derive() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", "#[derive(serde::Deserialize)]\npub struct A {\n    a: Title,\n}\n")?;
     let mut err = Vec::new();
@@ -304,8 +302,8 @@ fn a_cargo_metadata_failure_refuses_the_run_once_rather_than_flagging_each_deriv
 }
 
 #[test]
-fn a_workspace_located_through_cargo_resolves_a_derive_through_its_dependencies_crate_roots()
--> Result<(), Box<dyn Error>> {
+fn a_workspace_located_through_cargo_resolves_a_derive_through_its_dependencies_crate_roots() -> Result<(), laws::Unmet>
+{
     let workspace = golden::fixtures!("tests/.workspace")?;
     let (mut out, mut err) = (Vec::new(), Vec::new());
     let arguments = [Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/.workspace").into_os_string()].into_iter();
@@ -320,7 +318,7 @@ fn a_workspace_located_through_cargo_resolves_a_derive_through_its_dependencies_
 }
 
 #[test]
-fn a_violation_fails_the_run() -> Result<(), Box<dyn Error>> {
+fn a_violation_fails_the_run() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", DIRTY)?;
     assert_eq!(root.reported().exit, ExitCode::FAILURE);
@@ -328,7 +326,7 @@ fn a_violation_fails_the_run() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn the_gate_lists_the_tree_once_and_reads_each_source_once() -> Result<(), Box<dyn Error>> {
+fn the_gate_lists_the_tree_once_and_reads_each_source_once() -> Result<(), laws::Unmet> {
     let scratch = Scratch::package()?;
     scratch.write("src/lib.rs", CLEAN)?;
     let reading = FakeCounted::new(&scratch.files, scratch.root.clone());
@@ -342,7 +340,7 @@ fn the_gate_lists_the_tree_once_and_reads_each_source_once() -> Result<(), Box<d
 }
 
 #[test]
-fn the_timings_flag_lists_every_lint_and_phase_once() -> Result<(), Box<dyn Error>> {
+fn the_timings_flag_lists_every_lint_and_phase_once() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", CLEAN)?;
     let timed = Trees::timed(&root.files, &root.root, &["--timings"])?;
@@ -374,7 +372,7 @@ fn the_timings_flag_lists_every_lint_and_phase_once() -> Result<(), Box<dyn Erro
 }
 
 #[test]
-fn the_timings_flag_counts_only_the_subtrees_that_hold_the_kinds_a_contributor_watches() -> Result<(), Box<dyn Error>> {
+fn the_timings_flag_counts_only_the_subtrees_that_hold_the_kinds_a_contributor_watches() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", "struct A {\n    b: u8,\n}\nimpl A {}\n")?;
     let timed = root.flagged(&["--timings"]).out;
@@ -421,7 +419,7 @@ impl Trees {
         }
     }
 
-    fn timed(files: &(impl Files + Sync), root: &Path, flags: &[&str]) -> Result<String, Box<dyn Error>> {
+    fn timed(files: &(impl Files + Sync), root: &Path, flags: &[&str]) -> Result<String, laws::Unmet> {
         let mut out = Vec::new();
         let arguments = flags.iter().map(OsString::from).chain([OsString::from(root)]);
         let exit = Cli::from_args(arguments).report_to(
@@ -540,12 +538,12 @@ impl Scratch {
         Trees::verdict(&self.files, &self.root, flags)
     }
 
-    fn crate_graph_lines(&self) -> Result<Lines, Box<dyn Error>> {
+    fn crate_graph_lines(&self) -> Result<Lines, laws::Unmet> {
         let readout = SourceFiles::read(&self.files, &self.root)?;
         Ok(Queried::<CrateGraph>::flagged(readout.files()))
     }
 
-    fn read_files(&self) -> Result<Vec<String>, Box<dyn Error>> {
+    fn read_files(&self) -> Result<Vec<String>, laws::Unmet> {
         let readout = SourceFiles::read(&self.files, &self.root)?;
         let shown = |file: &lint_core::SourceFile| {
             let path: &Path = file.head().as_ref();
@@ -563,7 +561,7 @@ impl Scratch {
 }
 
 #[test]
-fn a_module_file_two_packages_both_reach_is_read_once() -> Result<(), Box<dyn Error>> {
+fn a_module_file_two_packages_both_reach_is_read_once() -> Result<(), laws::Unmet> {
     let root = Scratch::temporary()?;
     root.write("Cargo.toml", "[workspace]\nmembers = [\"crates/*\"]\n")?;
     root.write("crates/a/Cargo.toml", "[package]\nname = \"a\"\n")?;
@@ -576,7 +574,7 @@ fn a_module_file_two_packages_both_reach_is_read_once() -> Result<(), Box<dyn Er
 }
 
 #[test]
-fn a_file_two_test_modules_name_is_read_once() -> Result<(), Box<dyn Error>> {
+fn a_file_two_test_modules_name_is_read_once() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", "#[cfg(test)]\nmod t;\n#[cfg(test)]\n#[path = \"t.rs\"]\nmod again;\n")?;
     root.write("src/t.rs", CLEAN)?;
@@ -585,18 +583,18 @@ fn a_file_two_test_modules_name_is_read_once() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn reading_a_module_path_cycle_finishes() -> Result<(), Box<dyn Error>> {
+fn reading_a_module_path_cycle_finishes() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     PATH_CYCLE.iter().try_for_each(|[path, text]| root.write(path, text).map(|_| ()))?;
     let (sending, receiving) = mpsc::channel();
-    thread::spawn(move || sending.send(root.read_files().map_err(|failure| failure.to_string())));
+    thread::spawn(move || sending.send(root.read_files().map_err(|failure| format!("{failure:?}"))));
     let read = receiving.recv_timeout(Duration::from_secs(10))?;
     assert_eq!(read?, ["src/a.rs", "src/b.rs", "src/lib.rs"]);
     Ok(())
 }
 
 #[test]
-fn a_panic_while_reading_reaches_the_caller_rather_than_stranding_the_helpers() -> Result<(), Box<dyn Error>> {
+fn a_panic_while_reading_reaches_the_caller_rather_than_stranding_the_helpers() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", "mod a;\n")?;
     root.write("src/a.rs", CLEAN)?;
@@ -660,7 +658,7 @@ impl Reported {
 }
 
 #[test]
-fn a_file_that_does_not_parse_is_reported_without_hiding_other_lints() -> Result<(), Box<dyn Error>> {
+fn a_file_that_does_not_parse_is_reported_without_hiding_other_lints() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", "// note\nmod broken;\n")?;
     root.write("src/broken.rs", "\n\nfn (")?;
@@ -672,7 +670,7 @@ fn a_file_that_does_not_parse_is_reported_without_hiding_other_lints() -> Result
 }
 
 #[test]
-fn a_parse_failure_names_its_line() -> Result<(), Box<dyn Error>> {
+fn a_parse_failure_names_its_line() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", "mod broken;\n")?;
     root.write("src/broken.rs", "struct A;\nstruct B;\nfn f() { let x = (1; }\n")?;
@@ -681,7 +679,7 @@ fn a_parse_failure_names_its_line() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn files_outside_crate_targets_and_fixture_trees_are_not_read() -> Result<(), Box<dyn Error>> {
+fn files_outside_crate_targets_and_fixture_trees_are_not_read() -> Result<(), laws::Unmet> {
     let outside = Scratch::package()?;
     outside.write("src/lib.rs", CLEAN)?;
     outside.write("tests/ui/bad.rs", "fn (")?;
@@ -696,7 +694,7 @@ fn files_outside_crate_targets_and_fixture_trees_are_not_read() -> Result<(), Bo
 }
 
 #[test]
-fn test_modules_in_their_own_files_are_not_read() -> Result<(), Box<dyn Error>> {
+fn test_modules_in_their_own_files_are_not_read() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", "#[cfg(test)]\nmod tests;\n")?;
     root.write("src/tests.rs", "struct S { on: bool }\n")?;
@@ -707,7 +705,7 @@ fn test_modules_in_their_own_files_are_not_read() -> Result<(), Box<dyn Error>> 
 }
 
 #[test]
-fn a_declared_module_with_no_file_is_a_failure() -> Result<(), Box<dyn Error>> {
+fn a_declared_module_with_no_file_is_a_failure() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", "mod absent;\n")?;
     let run = root.reported();
@@ -718,7 +716,7 @@ fn a_declared_module_with_no_file_is_a_failure() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_tree_with_no_rust_sources_fails_closed() -> Result<(), Box<dyn Error>> {
+fn a_tree_with_no_rust_sources_fails_closed() -> Result<(), laws::Unmet> {
     let empty = Scratch::temporary()?;
     assert!(empty.reported().err.contains("no Rust sources found"));
     let other = Scratch::temporary()?;
@@ -728,7 +726,7 @@ fn a_tree_with_no_rust_sources_fails_closed() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn every_path_given_is_checked() -> Result<(), Box<dyn Error>> {
+fn every_path_given_is_checked() -> Result<(), laws::Unmet> {
     let scratch = Scratch::temporary()?;
     let roots: Vec<PathBuf> = [("clean", CLEAN), ("dirty", DIRTY)]
         .iter()
@@ -743,7 +741,7 @@ fn every_path_given_is_checked() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn the_binary_root_is_found_whichever_path_is_given() -> Result<(), Box<dyn Error>> {
+fn the_binary_root_is_found_whichever_path_is_given() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/main.rs", "struct Extra;\nfn main() {}\n")?;
     assert_eq!(root.reported().violations(), 1);
@@ -752,7 +750,7 @@ fn the_binary_root_is_found_whichever_path_is_given() -> Result<(), Box<dyn Erro
 }
 
 #[test]
-fn bin_roots_and_modules_named_like_build_directories_are_read() -> Result<(), Box<dyn Error>> {
+fn bin_roots_and_modules_named_like_build_directories_are_read() -> Result<(), laws::Unmet> {
     let bins = Scratch::package()?;
     bins.write("src/bin/tool.rs", "struct Extra;\nfn main() {}\n")?;
     bins.write("src/bin/other/main.rs", "mod m {}\nfn main() {}\n")?;
@@ -765,7 +763,7 @@ fn bin_roots_and_modules_named_like_build_directories_are_read() -> Result<(), B
 }
 
 #[test]
-fn symlink_loops_do_not_repeat_findings() -> Result<(), Box<dyn Error>> {
+fn symlink_loops_do_not_repeat_findings() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", DIRTY)?;
     let linked = FakeLinked::new(&root.files, root.at("src/loop"), root.root.clone());
@@ -774,7 +772,7 @@ fn symlink_loops_do_not_repeat_findings() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_shebang_is_not_a_comment() -> Result<(), Box<dyn Error>> {
+fn a_shebang_is_not_a_comment() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", "#!//usr/bin/env foo\nstruct A;\n")?;
     assert_eq!(root.reported(), Reported::clean());
@@ -782,7 +780,7 @@ fn a_shebang_is_not_a_comment() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_directory_named_tests_inside_src_is_not_a_package() -> Result<(), Box<dyn Error>> {
+fn a_directory_named_tests_inside_src_is_not_a_package() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", "pub mod request;\n")?;
     root.write("src/request.rs", "#[cfg(test)]\nmod tests;\n")?;
@@ -794,7 +792,7 @@ fn a_directory_named_tests_inside_src_is_not_a_package() -> Result<(), Box<dyn E
 }
 
 #[test]
-fn hidden_directories_and_unlisted_crates_are_not_read() -> Result<(), Box<dyn Error>> {
+fn hidden_directories_and_unlisted_crates_are_not_read() -> Result<(), laws::Unmet> {
     let root = Scratch::temporary()?;
     root.write("Cargo.toml", "[workspace]\nmembers = [\"crates/*\"]\nexclude = [\"crates/skipped\"]\n")?;
     root.write("crates/one/Cargo.toml", MANIFEST)?;
@@ -813,7 +811,7 @@ fn hidden_directories_and_unlisted_crates_are_not_read() -> Result<(), Box<dyn E
 }
 
 #[test]
-fn a_path_dependency_inside_the_workspace_is_read() -> Result<(), Box<dyn Error>> {
+fn a_path_dependency_inside_the_workspace_is_read() -> Result<(), laws::Unmet> {
     let root = Scratch::temporary()?;
     root.write("Cargo.toml", "[workspace]\nmembers = [\"app\"]\n")?;
     root.write("app/Cargo.toml", "[package]\nname = \"app\"\n[dependencies]\nhelp = { path = \"../help\" }\n")?;
@@ -825,7 +823,7 @@ fn a_path_dependency_inside_the_workspace_is_read() -> Result<(), Box<dyn Error>
 }
 
 #[test]
-fn the_verdict_does_not_depend_on_where_the_checkout_lives() -> Result<(), Box<dyn Error>> {
+fn the_verdict_does_not_depend_on_where_the_checkout_lives() -> Result<(), laws::Unmet> {
     let root = Scratch::temporary()?;
     let flow = "#[test]\nfn t() { for i in [2, 3] { if i > 9 { return; } } }\n";
     let build = "fn main() { println!(\"{}\", 2 + 3); }\n";
@@ -854,7 +852,7 @@ fn the_verdict_does_not_depend_on_where_the_checkout_lives() -> Result<(), Box<d
 }
 
 #[test]
-fn a_module_used_by_a_sibling_and_its_test_file_stays_put() -> Result<(), Box<dyn Error>> {
+fn a_module_used_by_a_sibling_and_its_test_file_stays_put() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", "pub mod a;\n")?;
     root.write("src/a.rs", "mod helper;\npub mod user;\n#[cfg(test)]\nmod tests;\n")?;
@@ -906,7 +904,7 @@ laws::table!(
 );
 
 #[test]
-fn a_crate_is_named_by_its_manifest_not_its_directory() -> Result<(), Box<dyn Error>> {
+fn a_crate_is_named_by_its_manifest_not_its_directory() -> Result<(), laws::Unmet> {
     let root = Scratch::temporary()?;
     root.write("Cargo.toml", "[workspace]\nmembers = [\"crates/*\"]\n")?;
     root.write("crates/engine-impl/Cargo.toml", "[package]\nname = \"engine\"\n")?;
@@ -922,7 +920,7 @@ fn a_crate_is_named_by_its_manifest_not_its_directory() -> Result<(), Box<dyn Er
 }
 
 #[test]
-fn a_library_and_its_binary_are_judged_apart() -> Result<(), Box<dyn Error>> {
+fn a_library_and_its_binary_are_judged_apart() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", CHAIN_A)?;
     let main = format!("use r::A0;\n{SHORT_CHAIN_B}fn main() {{\n    let _ = (B0, A0);\n}}\n");
@@ -932,7 +930,7 @@ fn a_library_and_its_binary_are_judged_apart() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_library_outside_src_is_judged_and_named_by_its_root_file() -> Result<(), Box<dyn Error>> {
+fn a_library_outside_src_is_judged_and_named_by_its_root_file() -> Result<(), laws::Unmet> {
     let root = Scratch::temporary()?;
     root.write("Cargo.toml", &format!("{MANIFEST}[lib]\npath = \"code/lib.rs\"\n"))?;
     let links: Vec<String> = (0..RING)
@@ -948,7 +946,7 @@ fn a_library_outside_src_is_judged_and_named_by_its_root_file() -> Result<(), Bo
 }
 
 #[test]
-fn a_binary_and_its_module_files_are_judged_as_one_crate() -> Result<(), Box<dyn Error>> {
+fn a_binary_and_its_module_files_are_judged_as_one_crate() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     let links: Vec<String> = (0..RING)
         .zip((0..RING).cycle().skip(1))
@@ -963,7 +961,7 @@ fn a_binary_and_its_module_files_are_judged_as_one_crate() -> Result<(), Box<dyn
 }
 
 #[test]
-fn inline_modules_and_path_attributes_lead_to_the_file_read() -> Result<(), Box<dyn Error>> {
+fn inline_modules_and_path_attributes_lead_to_the_file_read() -> Result<(), laws::Unmet> {
     let layouts = [
         ("mod outer {\n    mod inner;\n}\n", "src/outer/inner.rs"),
         ("#[path = \"elsewhere/place.rs\"]\nmod renamed;\n", "src/elsewhere/place.rs"),
@@ -978,7 +976,7 @@ fn inline_modules_and_path_attributes_lead_to_the_file_read() -> Result<(), Box<
 }
 
 #[test]
-fn targets_declared_with_a_path_are_read() -> Result<(), Box<dyn Error>> {
+fn targets_declared_with_a_path_are_read() -> Result<(), laws::Unmet> {
     let declared = [
         ("[[test]]\nname = \"x\"\npath = \"check/x.rs\"\n", "check/x.rs"),
         ("[[example]]\nname = \"e\"\npath = \"alt/e.rs\"\n", "alt/e.rs"),
@@ -995,7 +993,7 @@ fn targets_declared_with_a_path_are_read() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn an_example_that_is_not_run_as_a_test_is_not_a_skipped_test() -> Result<(), Box<dyn Error>> {
+fn an_example_that_is_not_run_as_a_test_is_not_a_skipped_test() -> Result<(), laws::Unmet> {
     let declared = |kind: &str, file: &str| -> Result<Reported, FileFailure> {
         let root = Scratch::temporary()?;
         let table = format!("{MANIFEST}[[{kind}]]\nname = \"e\"\ntest = false\n");
@@ -1009,7 +1007,7 @@ fn an_example_that_is_not_run_as_a_test_is_not_a_skipped_test() -> Result<(), Bo
 }
 
 #[test]
-fn conditional_paths_and_nested_packages_are_read() -> Result<(), Box<dyn Error>> {
+fn conditional_paths_and_nested_packages_are_read() -> Result<(), laws::Unmet> {
     let conditional = Scratch::package()?;
     conditional.write("src/lib.rs", "#[cfg_attr(unix, path = \"b.rs\")]\nmod a;\n")?;
     conditional.write("src/a.rs", CLEAN)?;
@@ -1024,7 +1022,7 @@ fn conditional_paths_and_nested_packages_are_read() -> Result<(), Box<dyn Error>
 }
 
 #[test]
-fn a_package_with_its_own_workspace_inside_another_workspace_is_read() -> Result<(), Box<dyn Error>> {
+fn a_package_with_its_own_workspace_inside_another_workspace_is_read() -> Result<(), laws::Unmet> {
     let root = Scratch::temporary()?;
     root.write("Cargo.toml", "[workspace]\nmembers = []\n")?;
     root.write("nested/Cargo.toml", "[package]\nname = \"nested\"\n[workspace]\n")?;
@@ -1034,7 +1032,7 @@ fn a_package_with_its_own_workspace_inside_another_workspace_is_read() -> Result
 }
 
 #[test]
-fn hidden_and_build_directories_hide_their_packages() -> Result<(), Box<dyn Error>> {
+fn hidden_and_build_directories_hide_their_packages() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", CLEAN)?;
     let copies: Vec<PathBuf> = ["target/package/copy", ".cache/copy"]
@@ -1055,7 +1053,7 @@ fn hidden_and_build_directories_hide_their_packages() -> Result<(), Box<dyn Erro
 }
 
 #[test]
-fn a_workspace_manifest_is_not_a_package() -> Result<(), Box<dyn Error>> {
+fn a_workspace_manifest_is_not_a_package() -> Result<(), laws::Unmet> {
     let root = Scratch::temporary()?;
     root.write("Cargo.toml", "[workspace]\nmembers = [\"one\"]\n")?;
     root.write("src/lib.rs", DIRTY)?;
@@ -1066,7 +1064,7 @@ fn a_workspace_manifest_is_not_a_package() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_manifest_that_cannot_be_read_fails_closed() -> Result<(), Box<dyn Error>> {
+fn a_manifest_that_cannot_be_read_fails_closed() -> Result<(), laws::Unmet> {
     let root = Scratch::temporary()?;
     root.directory("Cargo.toml")?;
     assert!(root.reported().err.contains("Cargo.toml"));
@@ -1074,7 +1072,7 @@ fn a_manifest_that_cannot_be_read_fails_closed() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_manifest_beside_the_linted_member_that_cannot_be_read_fails_closed() -> Result<(), Box<dyn Error>> {
+fn a_manifest_beside_the_linted_member_that_cannot_be_read_fails_closed() -> Result<(), laws::Unmet> {
     let root = Scratch::temporary()?;
     root.write("Cargo.toml", "[workspace]\nmembers = [\"one\"]\n")?;
     root.write("one/Cargo.toml", MANIFEST)?;
@@ -1087,7 +1085,7 @@ fn a_manifest_beside_the_linted_member_that_cannot_be_read_fails_closed() -> Res
 }
 
 #[test]
-fn a_directory_that_cannot_be_listed_fails_closed_wherever_it_is_reached() -> Result<(), Box<dyn Error>> {
+fn a_directory_that_cannot_be_listed_fails_closed_wherever_it_is_reached() -> Result<(), laws::Unmet> {
     let scratch = Scratch::temporary()?;
     scratch.write("workspace/Cargo.toml", "[workspace]\nmembers = [\"one\"]\n")?;
     scratch.write("workspace/one/Cargo.toml", MANIFEST)?;
@@ -1113,7 +1111,7 @@ fn a_directory_that_cannot_be_listed_fails_closed_wherever_it_is_reached() -> Re
 }
 
 #[test]
-fn a_twenty_thousand_link_method_chain_is_linted_without_overflowing_the_stack() -> Result<(), Box<dyn Error>> {
+fn a_twenty_thousand_link_method_chain_is_linted_without_overflowing_the_stack() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", &format!("fn long(x: u8) {{ x{} }}\n", ".m()".repeat(LONG_CHAIN_LINKS)))?;
     let run = root.reported();
@@ -1122,7 +1120,7 @@ fn a_twenty_thousand_link_method_chain_is_linted_without_overflowing_the_stack()
 }
 
 #[test]
-fn source_nested_past_what_anyone_writes_is_refused_not_parsed() -> Result<(), Box<dyn Error>> {
+fn source_nested_past_what_anyone_writes_is_refused_not_parsed() -> Result<(), laws::Unmet> {
     let shapes = [
         format!("fn render_page() {{ let a = {}1{}; }}\n", "(".repeat(DEEP_NESTING), ")".repeat(DEEP_NESTING)),
         format!("fn render_page() {}{}\n", "{".repeat(DEEP_NESTING), "}".repeat(DEEP_NESTING)),
@@ -1142,7 +1140,7 @@ fn source_nested_past_what_anyone_writes_is_refused_not_parsed() -> Result<(), B
 }
 
 #[test]
-fn deep_but_ordinary_nesting_is_still_linted() -> Result<(), Box<dyn Error>> {
+fn deep_but_ordinary_nesting_is_still_linted() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     let nested = format!(
         "fn render_page() {{ let a = {}1{}; }}\n// note\n",
@@ -1157,7 +1155,7 @@ fn deep_but_ordinary_nesting_is_still_linted() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn nesting_is_counted_where_it_is_open_not_in_total() -> Result<(), Box<dyn Error>> {
+fn nesting_is_counted_where_it_is_open_not_in_total() -> Result<(), laws::Unmet> {
     let (open, close) = ("(".repeat(MIDDLING_NESTING), ")".repeat(MIDDLING_NESTING));
     let (angle, shut) = ("A<".repeat(MIDDLING_NESTING), ">".repeat(MIDDLING_NESTING));
     let cases = [
@@ -1184,7 +1182,7 @@ fn nesting_is_counted_where_it_is_open_not_in_total() -> Result<(), Box<dyn Erro
 }
 
 #[test]
-fn a_tree_read_by_many_workers_reports_the_same_each_time() -> Result<(), Box<dyn Error>> {
+fn a_tree_read_by_many_workers_reports_the_same_each_time() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", "mod first;\nmod second;\n#[cfg(test)]\nmod tests;\n")?;
     root.write("src/tests.rs", DIRTY)?;
@@ -1201,7 +1199,7 @@ fn a_tree_read_by_many_workers_reports_the_same_each_time() -> Result<(), Box<dy
 }
 
 #[test]
-fn the_graph_dump_command_prints_the_model_the_same_way_twice() -> Result<(), Box<dyn Error>> {
+fn the_graph_dump_command_prints_the_model_the_same_way_twice() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", "pub struct A;\npub fn made() -> A {\n    A\n}\n")?;
     let first = root.flagged(&["graph-dump"]);
@@ -1214,7 +1212,7 @@ fn the_graph_dump_command_prints_the_model_the_same_way_twice() -> Result<(), Bo
 }
 
 #[test]
-fn the_crates_query_sizes_the_workspace_s_crates() -> Result<(), Box<dyn Error>> {
+fn the_crates_query_sizes_the_workspace_s_crates() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", "pub struct A;\n")?;
     let run = root.described(&["query", "--crates", "--in"], &root.metadata());

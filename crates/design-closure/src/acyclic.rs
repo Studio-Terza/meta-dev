@@ -2,7 +2,7 @@ mod boundary;
 
 use design_model::{NodeId, NodeRelation, Segment, SegmentRelation};
 use named_derive::Named;
-use store_ports::{Statements, StoreFailure};
+use store_ports::{Execute, StoreFailure};
 
 pub use boundary::{Closing, Keyed};
 
@@ -47,7 +47,7 @@ pub trait Acyclic {
 
     const CLOSED: Closed;
 
-    fn keyed(end: &Self::End, statements: &mut Statements<'_>) -> Result<Keyed, StoreFailure>;
+    fn keyed(end: &Self::End, statements: &mut impl Execute) -> Result<Keyed, StoreFailure>;
 
     fn cycle(source: Self::End, target: Self::End) -> Cycle;
 }

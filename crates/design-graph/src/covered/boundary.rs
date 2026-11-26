@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use design_model::{Ordinal, Segment};
-use store_ports::{Columns, Query, Statements, StoreFailure};
+use store_ports::{Columns, Execute, Prepared, Query, StoreFailure};
 use transcript_ports::Uuid;
 
 use super::Covered;
@@ -13,8 +13,8 @@ struct CoveredRow {
 }
 
 impl Covered {
-    fn of_message(message: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<Segment>, StoreFailure> {
-        let rows = statements.rows(store_ports::query!(
+    fn of_message(message: &Uuid) -> Prepared<CoveredRow> {
+        store_ports::query!(
             CoveredRow,
             r#"
 SELECT DISTINCT
@@ -28,20 +28,15 @@ ORDER BY
   ordinal
 "#,
             message: Uuid
-        ))?;
-        Ok(rows.into_iter().map(|row| Segment::new(row.message, row.ordinal)).collect())
+        )
     }
 }
 
 impl Query for Covered {
     type Rows = BTreeSet<Segment>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<BTreeSet<Segment>, StoreFailure> {
-        let covered = self
-            .0
-            .iter()
-            .map(|message| Covered::of_message(message, statements))
-            .collect::<Result<Vec<Vec<Segment>>, StoreFailure>>()?;
-        Ok(covered.into_iter().flatten().collect())
+    fn rows(self, statements: &mut impl Execute) -> Result<BTreeSet<Segment>, StoreFailure> {
+        let covered = statements.read_all(self.0.iter().map(Covered::of_message))?;
+        Ok(covered.into_iter().flatten().map(|row| Segment::new(row.message, row.ordinal)).collect())
     }
 }

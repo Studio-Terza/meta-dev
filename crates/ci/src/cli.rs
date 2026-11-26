@@ -6,8 +6,8 @@ use std::ffi::OsString;
 
 use console_ports::Teller;
 
-pub use command::Telling;
-use command::{Command, Failure};
+pub use command::Unfolding;
+use command::{Command, Failure, Telling};
 use ports::Ports;
 
 #[derive(Debug)]
@@ -24,11 +24,17 @@ impl<'ports, P: Ports> Cli<'ports, P> {
 
 impl<P: Ports> Teller for Cli<'_, P> {
     type Told<'teller>
-        = Telling<'teller>
+        = Unfolding<'teller, P>
     where
         Self: 'teller;
 
-    fn told(&self) -> Telling<'_> {
+    fn told(&self) -> Unfolding<'_, P> {
+        Unfolding::new(self.telling(), self.ports)
+    }
+}
+
+impl<P: Ports> Cli<'_, P> {
+    fn telling(&self) -> Telling<'_> {
         match &self.command {
             Ok(command) => command.carry_out(self.ports),
             Err(refusal) => Telling::refused(refusal),

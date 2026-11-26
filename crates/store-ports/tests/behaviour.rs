@@ -2,7 +2,6 @@
 mod generated_laws;
 
 use std::collections::BTreeSet;
-use std::error::Error;
 use std::path::PathBuf;
 use std::sync::LazyLock;
 
@@ -26,7 +25,7 @@ use newtype::{Arbitrary, Counter, Newtype};
 use port_core::{Op, Run};
 use sqlite_ports::SqliteOpener;
 use store_ports::{
-    Batch, Busy, Column, ColumnFailure, Columns, Migrator, Query, Schema, Statements, Store, StoreFailure, Version,
+    Batch, Busy, Column, ColumnFailure, Columns, Execute, Migrator, Query, Schema, Store, StoreFailure, Version,
     Written,
 };
 use stream::{Relation, Shape};
@@ -53,7 +52,7 @@ struct Applied;
 impl Batch for Resumed {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         statements.written(store_ports::query!(
             r#"
 INSERT INTO
@@ -68,7 +67,7 @@ VALUES
 impl Batch for HalfWritten {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         statements.written(store_ports::query!(
             r#"
 INSERT INTO
@@ -94,7 +93,7 @@ struct Stale;
 impl Batch for Stale {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         statements.written(store_ports::query!(
             r#"
 INSERT INTO
@@ -129,7 +128,7 @@ struct Migrated {
 impl Query for Applied {
     type Rows = Vec<Version>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Version>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Vec<Version>, StoreFailure> {
         let rows = statements.rows(store_ports::query!(
             Migrated,
             r#"
@@ -164,7 +163,7 @@ impl Place {
         Sqlite::file::<S>(self.store())
     }
 
-    fn bodies(&self) -> Result<Vec<String>, Box<dyn Error>> {
+    fn bodies(&self) -> Result<Vec<String>, laws::Unmet> {
         let run = Run::root();
         let store = run.port(self.opened_as::<Untouched>());
         let shown = store.read(ShownMessage::named(Uuid::try_new("o1".to_owned())?))?.ok_or("o1 was not stored")?;
@@ -173,7 +172,7 @@ impl Place {
 
     const REFERENCED: &str = "the store's rewrite refuses to open it: re-deriving the stored segments would change these segments that stored rows refer to: o1#0";
 
-    fn shown(&self, message: &str) -> Result<Vec<String>, Box<dyn Error>> {
+    fn shown(&self, message: &str) -> Result<Vec<String>, laws::Unmet> {
         let run = Run::root();
         let store = run.port(self.opened_as::<Untouched>());
         let shown =
@@ -185,7 +184,7 @@ impl Place {
             .collect())
     }
 
-    fn refusal(remark: Remark) -> Result<Refusal, Box<dyn Error>> {
+    fn refusal(remark: Remark) -> Result<Refusal, laws::Unmet> {
         let place = Place::new()?;
         let run = Run::root();
         let older = run.port(place.opened_as::<Older>());
@@ -201,7 +200,7 @@ impl Place {
         Refusal { remark, refused: Some(Place::REFERENCED.to_owned()), applied: Older::versions(), stored }
     }
 
-    fn linked(&self, message: &str) -> Result<Vec<String>, Box<dyn Error>> {
+    fn linked(&self, message: &str) -> Result<Vec<String>, laws::Unmet> {
         let run = Run::root();
         let store = run.port(self.opened_as::<Untouched>());
         let shown =
@@ -216,7 +215,7 @@ impl Place {
             .collect())
     }
 
-    fn applied(&self) -> Result<BTreeSet<Version>, Box<dyn Error>> {
+    fn applied(&self) -> Result<BTreeSet<Version>, laws::Unmet> {
         Ok(Run::root().port(self.opened_as::<Untouched>()).read(Applied)?.into_iter().collect())
     }
 }
@@ -227,7 +226,7 @@ enum Rewriteless {}
 impl Batch for Rewriteless {
     type Failure = StoreFailure;
 
-    fn written(self, _statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, _statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         match self {}
     }
 }
@@ -300,7 +299,7 @@ impl Schema for Faulted {
 impl Batch for Crashing {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         self.0.written(statements)?;
         HalfWritten.written(statements)
     }
@@ -349,7 +348,7 @@ impl Schema for Early {
 impl Batch for Staged {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         statements.written(store_ports::query!(
             r#"
 INSERT INTO
@@ -370,7 +369,7 @@ struct Edited;
 impl Batch for Edited {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         statements.written(store_ports::query!(
             r#"
 UPDATE
@@ -390,7 +389,7 @@ struct Annotated;
 impl Batch for Annotated {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         statements.written(store_ports::query!(
             r#"
 INSERT INTO
@@ -435,7 +434,7 @@ enum Told {
 impl Batch for Told {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let context = Told::context(statements)?;
         let told = self.segments(statements)?;
         Ok(context.plus(told))
@@ -443,7 +442,7 @@ impl Batch for Told {
 }
 
 impl Told {
-    fn context(statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn context(statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let messages = statements.written(store_ports::query!(
             r#"
 INSERT INTO
@@ -478,7 +477,7 @@ VALUES
         Ok(messages.plus(segment))
     }
 
-    fn segments(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn segments(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         match self {
             Told::Stale => statements.written(store_ports::query!(
                 r#"
@@ -535,13 +534,13 @@ struct Remarked {
 impl Batch for Remarked {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         self.remark.written(&self.on, statements)
     }
 }
 
 impl Remark {
-    fn written(self, on: &Uuid, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, on: &Uuid, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         match self {
             Remark::Conversational => statements.written(store_ports::query!(
                 r#"
@@ -646,7 +645,7 @@ VALUES
 }
 
 impl Remarked {
-    fn spanned(on: &Uuid, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn spanned(on: &Uuid, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let node = statements.written(store_ports::query!(
             r#"
 INSERT INTO
@@ -667,7 +666,7 @@ VALUES
         Ok(node.plus(edge))
     }
 
-    fn flailed(on: &Uuid, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn flailed(on: &Uuid, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let job = statements.written(store_ports::query!(
             r#"
 INSERT INTO
@@ -728,7 +727,7 @@ impl Cited {
 impl Batch for Cited {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let messages = statements.written(store_ports::query!(
             r#"
 INSERT INTO
@@ -796,7 +795,7 @@ VALUES
 }
 
 #[test]
-fn a_store_opens_lazily_and_creates_its_directory_on_the_first_op() -> Result<(), Box<dyn Error>> {
+fn a_store_opens_lazily_and_creates_its_directory_on_the_first_op() -> Result<(), laws::Unmet> {
     let place = Place::new()?;
     let run = Run::root();
     let store = run.port(place.opened());
@@ -807,7 +806,7 @@ fn a_store_opens_lazily_and_creates_its_directory_on_the_first_op() -> Result<()
 }
 
 #[test]
-fn reopening_a_store_keeps_its_rows_and_runs_no_migration_or_rewrite_again() -> Result<(), Box<dyn Error>> {
+fn reopening_a_store_keeps_its_rows_and_runs_no_migration_or_rewrite_again() -> Result<(), laws::Unmet> {
     let place = Place::new()?;
     let run = Run::root();
     let first = run.port(place.opened());
@@ -824,7 +823,7 @@ fn reopening_a_store_keeps_its_rows_and_runs_no_migration_or_rewrite_again() -> 
 }
 
 #[test]
-fn a_failing_statement_rolls_back_the_whole_batch() -> Result<(), Box<dyn Error>> {
+fn a_failing_statement_rolls_back_the_whole_batch() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     assert!(store.write(HalfWritten).is_err());
@@ -835,7 +834,7 @@ fn a_failing_statement_rolls_back_the_whole_batch() -> Result<(), Box<dyn Error>
 
 #[test]
 fn a_store_whose_applied_migration_was_edited_is_refused_before_any_rewrite_and_left_as_it_was()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let place = Place::new()?;
     let run = Run::root();
     let older = run.port(place.opened_as::<Older>());
@@ -849,7 +848,7 @@ fn a_store_whose_applied_migration_was_edited_is_refused_before_any_rewrite_and_
 
 #[test]
 fn a_crash_after_the_migrations_and_the_rewrite_leaves_the_store_as_it_was_and_the_next_open_does_both()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let place = Place::new()?;
     let run = Run::root();
     run.port(place.opened_as::<Older>()).write(Stale)?;
@@ -865,7 +864,7 @@ fn a_crash_after_the_migrations_and_the_rewrite_leaves_the_store_as_it_was_and_t
 }
 
 #[test]
-fn a_store_migrated_past_what_the_code_declares_is_refused_and_left_as_it_was() -> Result<(), Box<dyn Error>> {
+fn a_store_migrated_past_what_the_code_declares_is_refused_and_left_as_it_was() -> Result<(), laws::Unmet> {
     let place = Place::new()?;
     let run = Run::root();
     run.port(place.opened()).read(Applied)?;
@@ -876,7 +875,7 @@ fn a_store_migrated_past_what_the_code_declares_is_refused_and_left_as_it_was() 
 }
 
 #[test]
-fn a_migration_failing_after_a_due_rewrite_leaves_the_store_as_it_was() -> Result<(), Box<dyn Error>> {
+fn a_migration_failing_after_a_due_rewrite_leaves_the_store_as_it_was() -> Result<(), laws::Unmet> {
     let place = Place::new()?;
     let run = Run::root();
     run.port(place.opened_as::<Older>()).write(Stale)?;
@@ -888,7 +887,7 @@ fn a_migration_failing_after_a_due_rewrite_leaves_the_store_as_it_was() -> Resul
 
 #[test]
 fn a_rederivation_that_would_drop_an_annotated_segment_refuses_and_leaves_the_store_as_it_was()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let place = Place::new()?;
     let run = Run::root();
     run.port(place.opened_as::<Older>()).write(Annotated)?;
@@ -905,7 +904,7 @@ fn a_rederivation_that_would_drop_an_annotated_segment_refuses_and_leaves_the_st
 
 #[test]
 fn a_rederivation_that_would_change_any_annotated_segment_refuses_naming_it_and_leaves_the_store_as_it_was()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let refusals = Remark::VARIANTS.iter().map(|remark| Place::refusal(*remark)).collect::<Result<Vec<_>, _>>()?;
     let refused: Vec<Refusal> = Remark::VARIANTS.iter().map(|remark| Place::refused(*remark)).collect();
     assert_eq!(refusals, refused);
@@ -913,7 +912,7 @@ fn a_rederivation_that_would_change_any_annotated_segment_refuses_naming_it_and_
 }
 
 #[test]
-fn a_rederivation_rewrites_a_changed_segment_that_carries_no_annotation() -> Result<(), Box<dyn Error>> {
+fn a_rederivation_rewrites_a_changed_segment_that_carries_no_annotation() -> Result<(), laws::Unmet> {
     let place = Place::new()?;
     let run = Run::root();
     let older = run.port(place.opened_as::<Older>());
@@ -926,7 +925,7 @@ fn a_rederivation_rewrites_a_changed_segment_that_carries_no_annotation() -> Res
 }
 
 #[test]
-fn a_rederivation_opens_a_store_whose_annotated_segments_it_does_not_change() -> Result<(), Box<dyn Error>> {
+fn a_rederivation_opens_a_store_whose_annotated_segments_it_does_not_change() -> Result<(), laws::Unmet> {
     let place = Place::new()?;
     let run = Run::root();
     let older = run.port(place.opened_as::<Older>());
@@ -941,7 +940,7 @@ fn a_rederivation_opens_a_store_whose_annotated_segments_it_does_not_change() ->
 
 #[test]
 fn a_rederivation_that_would_renumber_a_cited_segment_refuses_and_leaves_the_link_on_the_text_it_was_made_on()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let place = Place::new()?;
     let run = Run::root();
     run.port(place.opened_as::<Older>()).write(Cited)?;
@@ -962,7 +961,7 @@ fn a_rederivation_that_would_renumber_a_cited_segment_refuses_and_leaves_the_lin
 
 #[test]
 fn a_rederivation_refuses_to_change_a_segment_that_a_table_added_later_refers_to_by_foreign_key()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let place = Place::new()?;
     let run = Run::root();
     run.port(place.opened_as::<Older>()).write(Told::Stale)?;
@@ -975,8 +974,8 @@ fn a_rederivation_refuses_to_change_a_segment_that_a_table_added_later_refers_to
 }
 
 #[test]
-fn a_rewrite_due_with_the_first_migration_runs_on_the_schema_its_queries_are_checked_against()
--> Result<(), Box<dyn Error>> {
+fn a_rewrite_due_with_the_first_migration_runs_on_the_schema_its_queries_are_checked_against() -> Result<(), laws::Unmet>
+{
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<Early>());
     let cursors = store.read(SessionCursors)?;
@@ -985,7 +984,7 @@ fn a_rewrite_due_with_the_first_migration_runs_on_the_schema_its_queries_are_che
 }
 
 #[test]
-fn a_held_file_lock_refuses_every_other_handle_until_it_ends() -> Result<(), Box<dyn Error>> {
+fn a_held_file_lock_refuses_every_other_handle_until_it_ends() -> Result<(), laws::Unmet> {
     let place = Place::new()?;
     let run = Run::root();
     let (first, second) = (run.port(place.opened()), run.port(place.opened()));
