@@ -79,7 +79,7 @@ impl<'file> Concludes<'file> for Exits<'file> {
             .file
             .test_modules()
             .iter()
-            .flat_map(|module| Sweep::found(module, Box::new(Contributing::new(Exits::from(module)))));
+            .flat_map(|module| Sweep::found(module, Contributing::new(Exits::from(module))));
         found.into_iter().chain(tested).collect()
     }
 }

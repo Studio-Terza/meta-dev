@@ -2,7 +2,7 @@ mod ungenerated;
 
 use lint_core::{Headline, SourceFile};
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Contributing, Finds};
+use lint_sweep::{Concludes, Contributing};
 use ungenerated::Ungenerated;
 
 #[derive(Debug)]
@@ -12,7 +12,7 @@ impl SweptLint for ArbitraryNewtypes {
     const HEADLINE: Headline = Headline::new("a newtype that owns its value derives Arbitrary");
     const READS: Reads = Reads::Shipped;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Contributing::new(Ungenerated::from(file)))
+    fn watcher(file: &SourceFile) -> Contributing<impl Concludes<'_>> {
+        Contributing::new(Ungenerated::from(file))
     }
 }

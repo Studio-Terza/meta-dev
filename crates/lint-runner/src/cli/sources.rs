@@ -114,14 +114,12 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
         T: Sync,
     {
         let stopwatch = Stopwatch::started(self.wired.timer);
-        let mut share = self.gathering.gathered(readout, self.shared.heads(), starting);
-        let filed = share.filed();
+        let share = self.gathering.gathered(readout, self.shared.heads(), starting);
         let lowered = stopwatch.stopped(Step::Lower(worker));
-        let merged = share.into_merging().map_or_default(|complete| self.settled(complete));
-        Lowering { timings: [lowered].into_iter().chain(merged).collect(), filed }
+        share.lowered(lowered, |complete, lowering| self.settled(complete, lowering))
     }
 
-    fn settled(&self, complete: Merging<'run>) -> Vec<Timing>
+    fn settled<Part>(&self, complete: Merging<'run>, lowering: Lowering<Part>) -> Lowering<Part>
     where
         T: Sync,
     {
@@ -129,12 +127,12 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
         let waiting = Stopwatch::started(timer);
         let described = self.located().done().as_ref().ignoring(Ignored::Unlocated);
         let waited = waiting.stopped(Step::Model.waited());
-        let settled = complete.settled(
+        complete.settled(
             &self.gathering,
+            lowering.timed(waited),
             |facts| Stopwatch::measured(timer, Step::Model, || Self::merged(facts, described)),
             |parts| Stopwatch::measured(timer, Step::Contexts, || parts.into_iter().collect()),
-        );
-        [waited].into_iter().chain(settled).collect()
+        )
     }
 
     fn merged(facts: Vec<FileFacts>, described: Option<&Described>) -> Option<Model> {
@@ -160,5 +158,9 @@ impl<Part> Lowering<Part> {
 
     pub(crate) fn filed(&mut self) -> Vec<Part> {
         std::mem::take(&mut self.filed)
+    }
+
+    fn timed(self, timing: Timing) -> Lowering<Part> {
+        Lowering { timings: self.timings.into_iter().chain([timing]).collect(), ..self }
     }
 }

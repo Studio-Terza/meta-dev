@@ -16,6 +16,7 @@ use std::time::Duration;
 use cargo_ports::{Recorded, Toolchain};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 
+use crate::corpus::Corpus;
 use crate::fakes::{FakeCounted, FakeLinked, FakeUnlistable, FakeUnsized};
 use crate::ignored::Ignored;
 use invariants::Ignoring;
@@ -78,19 +79,7 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), laws::Unmet> {
         + mode.matches("::report(files, readout.workspaces())").count()
         + mode.matches("Report::from(Gleans::<").count();
     let runner = include_str!("../src/cli/mode/lints.rs");
-    let listed_by_the_runner = [
-        "::report(readout.files())",
-        "flows.report::<",
-        "::dirty(&system)",
-        "::of_names(extraction.names())",
-        "ModelLint>::report",
-        "WorkspaceLint>::report",
-        "as Registered>::ENTRY",
-        "<Grounded<",
-    ]
-    .iter()
-    .map(|call| runner.matches(call).count())
-    .sum::<usize>();
+    let listed_by_the_runner = Corpus::lints() + runner.matches("    Grounded<").count();
     assert!(listed_by_the_mode < implemented);
     let elegance = include_str!("../src/cli/mode/elegance.rs");
     let listed_by_elegance =

@@ -8,7 +8,7 @@ use lint_core::SourceFile;
 use lint_file::{Reads, SweptLint};
 use lint_layout::LibraryTests;
 use lint_placement::Role;
-use lint_sweep::{Contributing, Finds};
+use lint_sweep::{Concludes, Contributing};
 use skip_marks::SkipMarks;
 
 #[derive(Debug)]
@@ -44,8 +44,8 @@ impl SweptLint for NoIgnoredTests {
     const HEADLINE: Headline = Headline::new("every test runs");
     const READS: Reads = Reads::Every;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
+    fn watcher(file: &SourceFile) -> Contributing<impl Concludes<'_>> {
         let unrun = file.head().shipped().and_then(|_| Self::never_tested(file)).map(|_| ());
-        Box::new(Contributing::new(SkipMarks::new(file, unrun)))
+        Contributing::new(SkipMarks::new(file, unrun))
     }
 }

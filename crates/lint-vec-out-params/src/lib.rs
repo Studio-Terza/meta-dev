@@ -4,7 +4,7 @@ use std::path::Path;
 
 use finding::Finding;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Finds, Kind};
+use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Kind};
 use syntax::Spanned;
 use syntax::{ItemImpl, ItemMod, Macro, PathSegment, Signature, Type, TypePath, TypeReference};
 
@@ -20,8 +20,8 @@ impl SweptLint for VecOutParams {
     );
     const READS: Reads = Reads::Every;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Contributing::new(OutParams { path: AsRef::<Path>::as_ref(file.head()) }))
+    fn watcher(file: &SourceFile) -> Contributing<impl Concludes<'_>> {
+        Contributing::new(OutParams { path: AsRef::<Path>::as_ref(file.head()) })
     }
 }
 

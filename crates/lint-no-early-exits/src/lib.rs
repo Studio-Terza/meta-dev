@@ -3,7 +3,7 @@ mod exits;
 use exits::Exits;
 use lint_core::{Headline, SourceFile};
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Contributing, Finds};
+use lint_sweep::{Concludes, Contributing};
 
 #[derive(Debug)]
 pub struct NoEarlyExits;
@@ -13,7 +13,7 @@ impl SweptLint for NoEarlyExits {
         Headline::new("a body leaves through its tail value or ?, never through return, break or continue");
     const READS: Reads = Reads::Every;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Contributing::new(Exits::from(file)))
+    fn watcher(file: &SourceFile) -> Contributing<impl Concludes<'_>> {
+        Contributing::new(Exits::from(file))
     }
 }

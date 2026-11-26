@@ -10,4 +10,6 @@ src/lib.rs:3: bare u8 in run; take and return a domain type (a newtype, an enum 
 src/lib.rs:8: bare usize in all; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 a fact is read once: when the implementations of a trait method are run together (the trait is used as dyn, or its methods are listed as values in a const or static table), they do not each compute the same function of the same parameter; compute it once where the method is called and pass it in. Not caught: facts computed by method calls on a parameter, and a fact computed twice inside one type:
 src/lib.rs:6: Lint::run is implemented by types that each read fact on parameter 1; at src/lib.rs:6 src/lib.rs:7; compute it once where the method is called and pass it in
+no dyn: every type is known at compile time, so code takes a generic, returns impl Trait or names an enum instead of a trait object:
+src/lib.rs:8: dyn trait object; take a generic, return impl Trait, or list the known types in an enum
 fails

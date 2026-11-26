@@ -2,7 +2,7 @@ mod boundary;
 
 use std::fmt;
 
-use lint_core::{Contribute, Contributing, SourceFile, Unwalked, Violation, Visits};
+use lint_core::{Contribute, Contributing, Joined, SourceFile, Tallied, Unjoined, Unwalked, Violation, Visits};
 
 pub use boundary::{Member, Spelled};
 
@@ -11,7 +11,7 @@ pub trait Gathers<Part> {
 }
 
 pub trait Finds<'file>: fmt::Debug {
-    fn found(self: Box<Self>, file: &SourceFile) -> Found<'file>;
+    fn found(self, file: &SourceFile) -> Found<'file>;
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -55,7 +55,7 @@ impl<'file> IntoIterator for Found<'file> {
 }
 
 pub trait Sorts<'file>: fmt::Debug {
-    fn sorted(self: Box<Self>, file: &SourceFile) -> Ranked<'file>;
+    fn sorted(self, file: &SourceFile) -> Ranked<'file>;
 }
 
 pub trait Concludes<'file>: Contribute + fmt::Debug {
@@ -63,11 +63,35 @@ pub trait Concludes<'file>: Contribute + fmt::Debug {
 }
 
 impl<'file, Contributor: Concludes<'file>> Finds<'file> for Contributing<Contributor> {
-    fn found(self: Box<Self>, file: &SourceFile) -> Found<'file> {
-        self.tallied(file).concluded(|contributor, open, part, nodes| Found {
+    fn found(self, file: &SourceFile) -> Found<'file> {
+        Found::from(self.tallied(file))
+    }
+}
+
+impl<'file, Contributor: Concludes<'file>> From<Tallied<Contributor>> for Found<'file> {
+    fn from(tallied: Tallied<Contributor>) -> Found<'file> {
+        tallied.concluded(|contributor, open, part, nodes| Found {
             violations: contributor.violations(open, part),
             visited: Visited { contributor: Spelled::naming::<Contributor>(), nodes },
         })
+    }
+}
+
+pub trait Founds<'file> {
+    fn founds(self, found: Vec<Option<Found<'file>>>) -> Vec<Option<Found<'file>>>;
+}
+
+impl<'file> Founds<'file> for Unjoined {
+    fn founds(self, found: Vec<Option<Found<'file>>>) -> Vec<Option<Found<'file>>> {
+        found
+    }
+}
+
+impl<'file, Contributor: Concludes<'file>, Tail: Founds<'file>> Founds<'file>
+    for Joined<Option<Tallied<Contributor>>, Tail>
+{
+    fn founds(self, found: Vec<Option<Found<'file>>>) -> Vec<Option<Found<'file>>> {
+        self.concluded(|head, tail| tail.founds(found.into_iter().chain([head.map(Found::from)]).collect()))
     }
 }
 
@@ -91,7 +115,7 @@ pub trait Ranks<'file>: Contribute + fmt::Debug {
 }
 
 impl<'file, Contributor: Ranks<'file>> Sorts<'file> for Contributing<Contributor> {
-    fn sorted(self: Box<Self>, file: &SourceFile) -> Ranked<'file> {
+    fn sorted(self, file: &SourceFile) -> Ranked<'file> {
         self.concluded(file, Contributor::ranked)
     }
 }
@@ -109,22 +133,12 @@ impl Sweep {
     }
 
     #[must_use]
-    pub fn found<'file>(file: &'file SourceFile, watcher: Box<dyn Finds<'file> + '_>) -> Found<'file> {
+    pub fn found<'file>(file: &'file SourceFile, watcher: impl Finds<'file>) -> Found<'file> {
         watcher.found(file)
     }
-}
 
-#[derive(Debug, Default)]
-pub struct Watchers<'file>(Vec<Box<dyn Finds<'file> + 'file>>);
-
-impl<'file> FromIterator<Box<dyn Finds<'file> + 'file>> for Watchers<'file> {
-    fn from_iter<Found: IntoIterator<Item = Box<dyn Finds<'file> + 'file>>>(found: Found) -> Watchers<'file> {
-        Watchers(found.into_iter().collect())
-    }
-}
-
-impl<'file> Gathers<Vec<Violation<'file>>> for Watchers<'file> {
-    fn gathered(self, file: &SourceFile) -> Vec<Violation<'file>> {
-        self.0.into_iter().flat_map(|watcher| watcher.found(file)).collect()
+    #[must_use]
+    pub fn sorted<'file>(file: &'file SourceFile, watcher: impl Sorts<'file>) -> Ranked<'file> {
+        watcher.sorted(file)
     }
 }
