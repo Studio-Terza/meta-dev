@@ -1,5 +1,5 @@
 use design_model::{Ordinal, Segment};
-use store_ports::{Columns, Query, Statements, StoreFailure};
+use store_ports::{Columns, Execute, Query, StoreFailure};
 use transcript_ports::{Body, Uuid};
 
 use super::{Asked, AskedEarlier};
@@ -20,7 +20,7 @@ impl From<AskedRow> for Asked {
 impl Query for AskedEarlier<'_> {
     type Rows = Vec<Asked>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Asked>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Vec<Asked>, StoreFailure> {
         let job = AsRef::<Uuid>::as_ref(self.0);
         let ordinal = Ordinal::from(self.0);
         let rows = statements.rows(store_ports::query!(

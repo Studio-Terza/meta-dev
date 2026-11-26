@@ -5,15 +5,16 @@ use std::collections::BTreeSet;
 
 use newtype::Counter;
 use rusqlite::Connection;
-use store_ports::{Batch, Schema, Statements, StoreFailure, Version, Written};
+use store_ports::{Batch, Schema, StoreFailure, Version, Written};
 
+use super::opened::Connected;
 use ledger::Ledger;
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Migrations {
     schema: TypeId,
     declared: &'static store_ports::Migrator,
-    rewritten: fn(Version, &mut Statements<'_>) -> Result<Written, StoreFailure>,
+    rewritten: fn(Version, &mut Connected<'_>) -> Result<Written, StoreFailure>,
 }
 
 impl Migrations {
@@ -32,7 +33,7 @@ impl Migrations {
     pub(super) fn rewritten(
         self,
         pending: &BTreeSet<Version>,
-        statements: &mut Statements<'_>,
+        statements: &mut Connected<'_>,
     ) -> Result<Written, StoreFailure> {
         let written = pending
             .iter()
@@ -41,7 +42,7 @@ impl Migrations {
         Ok(Written::total(written.into_iter()))
     }
 
-    fn rewritten_by<S: Schema>(pending: Version, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn rewritten_by<S: Schema>(pending: Version, statements: &mut Connected<'_>) -> Result<Written, StoreFailure> {
         S::rewrite(pending).map_or_else(|| Ok(Written::zero()), |rewrite| rewrite.written(statements))
     }
 }

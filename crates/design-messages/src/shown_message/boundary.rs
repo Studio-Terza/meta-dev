@@ -1,4 +1,4 @@
-use store_ports::{Query, Statements, StoreFailure};
+use store_ports::{Execute, Query, StoreFailure};
 
 use super::ShownMessage;
 use crate::Stored;
@@ -8,7 +8,7 @@ use design_closure::Annotation;
 impl Query for ShownMessage {
     type Rows = Option<Stored>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Option<Stored>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Option<Stored>, StoreFailure> {
         let messages = MessageRow::named(&self.0, statements)?;
         let segments = SegmentRow::stored_for(&self.0, statements)?;
         let links = LinkRow::touching(&self.0, statements)?;

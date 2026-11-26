@@ -35,7 +35,7 @@ use newtype::{Checked, Counter, Display, Newtype, Wrapping};
 use port_core::{Op, Port, Run};
 use sqlite_ports::SqliteOpener;
 use store_ports::Record as _;
-use store_ports::{Batch, Columns, Migrator, Query, Schema, Statements, Store, StoreFailure, Version, Written};
+use store_ports::{Batch, Columns, Execute, Migrator, Query, Schema, Store, StoreFailure, Version, Written};
 use stream::{Message, Relation, Shape, Stream};
 use transcript_ports::{
     Authorship, Body, ClaudeCodeDir, Cursor, Instant, Malformed, SessionId, Skipped, Transcripts, Uuid,
@@ -283,7 +283,7 @@ impl Schema for Seeded {
 impl Batch for Seeding {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         match self {
             Seeding::Untrimmed => Around::untrimmed(statements),
             Seeding::Streamed(streamed) => streamed.written(statements),
@@ -312,7 +312,7 @@ const KEPT: [char; 7] = ['a', 'é', 'か', '.', '—', '\u{200b}', '😀'];
 struct Around(char);
 
 impl Around {
-    fn untrimmed(statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn untrimmed(statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let written = SHED
             .iter()
             .map(|blank| Around(*blank).stored(statements))
@@ -320,7 +320,7 @@ impl Around {
         Ok(Written::total(written.into_iter()))
     }
 
-    fn stored(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn stored(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let uuid = self.uuid().map_err(|failed| StoreFailure::Refused(store_ports::Cause::told(&failed)))?;
         let body = self.kept().map_err(|failed| StoreFailure::Refused(store_ports::Cause::told(&failed)))?;
         let message = statements.written(store_ports::query!(
@@ -487,7 +487,7 @@ impl SegmentKey {
 impl Query for SegmentKeys {
     type Rows = Vec<SegmentKey>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<SegmentKey>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Vec<SegmentKey>, StoreFailure> {
         statements.rows(store_ports::query!(
             SegmentKey,
             r#"
@@ -574,8 +574,8 @@ fn a_blank_the_segmenter_sheds_around_a_segment_stored_before_trimming_is_shed_a
 }
 
 #[test]
-fn a_point_the_segmenter_inks_around_a_segment_stored_before_trimming_is_kept_on_both_sides()
--> Result<(), laws::Unmet> {
+fn a_point_the_segmenter_inks_around_a_segment_stored_before_trimming_is_kept_on_both_sides() -> Result<(), laws::Unmet>
+{
     let inked: Vec<Around> = KEPT.iter().copied().map(Around).collect();
     let rederived = inked.iter().map(|point| point.rederived()).collect::<Result<Vec<Vec<Body>>, _>>()?;
     let both_sides =

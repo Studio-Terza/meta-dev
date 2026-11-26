@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use store_ports::{Query, Statements, StoreFailure};
+use store_ports::{Execute, Query, StoreFailure};
 
 use super::SearchSegments;
 use crate::boundary::{Hit, Rank, RankRow};
@@ -9,7 +9,7 @@ use design_closure::Keyed;
 impl Query for SearchSegments {
     type Rows = Vec<Hit>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Hit>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Vec<Hit>, StoreFailure> {
         let first = Hit::matching(self.terms.first(), self.scope, statements)?;
         let rest = self
             .terms

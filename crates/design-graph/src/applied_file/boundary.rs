@@ -1,7 +1,7 @@
 use design_model::Provenance;
 use file_ports::Bytes;
 use store_ports::Record as _;
-use store_ports::{Columns, Query, Statements, StoreFailure, Written};
+use store_ports::{Columns, Execute, Query, StoreFailure, Written};
 use transcript_ports::Instant;
 
 use super::{AppliedFile, AppliedId, Earlier, Seen, Unseen};
@@ -32,7 +32,7 @@ impl From<EarlierRow> for Earlier {
 impl Query for AppliedFile {
     type Rows = Seen;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Seen, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Seen, StoreFailure> {
         let content = &self.0;
         let rows = statements.rows(store_ports::query!(
             EarlierRow,
@@ -55,7 +55,7 @@ impl Unseen {
     pub(crate) fn written(
         &self,
         provenance: Provenance,
-        statements: &mut Statements<'_>,
+        statements: &mut impl Execute,
     ) -> Result<Written, StoreFailure> {
         let fresh = AppliedFileRowNew { content: self.0.clone(), provenance };
         statements.one(AppliedFileRow::created(&fresh)).map(|_stored| Written::new(1))

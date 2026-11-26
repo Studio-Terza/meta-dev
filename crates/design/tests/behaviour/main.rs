@@ -45,8 +45,8 @@ use newtype::Wrapping;
 use port_core::{Held, Op, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
 use sqlite_ports::SqliteOpener;
 use store_ports::{
-    Batch, Busy, Created, Opens, Query, Record, Schema, Statements, Store, StoreFailure, StoreFiller, StoreLock,
-    Written, store_ops,
+    Batch, Busy, Created, Execute, Opens, Query, Record, Schema, Store, StoreFailure, StoreFiller, StoreLock, Written,
+    store_ops,
 };
 use stream::{Relation, Shape};
 use structure::Staff;
@@ -458,7 +458,7 @@ struct Unstored {
 impl Batch for Unstored {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let Unstored { message, ordinal } = self;
         statements.written(store_ports::query!(
             r#"
@@ -2903,7 +2903,11 @@ impl StoreFiller for Unbooked {
     fn write<Q: Batch>(&self, pass: Pass<'_, Q>, batch: Q) -> Result<Written, Q::Failure> {
         (Q::NAME == FailuresReported::NAME).then_some(()).map_or_else(
             || StoreFiller::write(&self.0, pass, batch),
-            |()| Err(Q::Failure::from(StoreFailure::Statement(store_ports::Cause::told(&"the bookkeeping write was refused")))),
+            |()| {
+                Err(Q::Failure::from(StoreFailure::Statement(store_ports::Cause::told(
+                    &"the bookkeeping write was refused",
+                ))))
+            },
         )
     }
 

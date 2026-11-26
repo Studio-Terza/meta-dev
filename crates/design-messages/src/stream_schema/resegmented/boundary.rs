@@ -1,5 +1,5 @@
 use newtype::Counter;
-use store_ports::{Batch, Released, Statements, StoreFailure, Written};
+use store_ports::{Batch, Execute, Released, StoreFailure, Written};
 
 use super::{Referenced, Resegmented};
 use crate::boundary::{MessageRow, Row, SegmentRow};
@@ -7,7 +7,7 @@ use crate::boundary::{MessageRow, Row, SegmentRow};
 impl Batch for Resegmented {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let messages = MessageRow::every(statements)?;
         let derived: Vec<SegmentRow> = messages.iter().flat_map(SegmentRow::within).collect();
         let stale = Resegmented::stale(&derived, SegmentRow::every(statements)?);

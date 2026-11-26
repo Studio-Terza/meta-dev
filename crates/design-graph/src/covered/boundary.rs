@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use design_model::{Ordinal, Segment};
-use store_ports::{Columns, Query, Statements, StoreFailure};
+use store_ports::{Columns, Execute, Query, StoreFailure};
 use transcript_ports::Uuid;
 
 use super::Covered;
@@ -13,7 +13,7 @@ struct CoveredRow {
 }
 
 impl Covered {
-    fn of_message(message: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<Segment>, StoreFailure> {
+    fn of_message(message: &Uuid, statements: &mut impl Execute) -> Result<Vec<Segment>, StoreFailure> {
         let rows = statements.rows(store_ports::query!(
             CoveredRow,
             r#"
@@ -36,7 +36,7 @@ ORDER BY
 impl Query for Covered {
     type Rows = BTreeSet<Segment>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<BTreeSet<Segment>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<BTreeSet<Segment>, StoreFailure> {
         let covered = self
             .0
             .iter()

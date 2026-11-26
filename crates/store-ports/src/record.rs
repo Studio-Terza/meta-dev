@@ -1,6 +1,6 @@
 use port_core::Op;
 
-use crate::{Argument, Columns, Prepared, Statements, StoreFailure};
+use crate::{Argument, Columns, Execute, Prepared, StoreFailure};
 
 pub trait Record: Columns + Sized {
     type Key;
@@ -34,7 +34,7 @@ impl<R: Record> Created<R> {
         Created(record)
     }
 
-    pub fn stored(self, statements: &mut Statements<'_>) -> Result<R, StoreFailure> {
+    pub fn stored(self, statements: &mut impl Execute) -> Result<R, StoreFailure> {
         statements.one(R::created(&self.0))
     }
 }

@@ -3,12 +3,32 @@ use std::vec;
 
 use port_core::Op;
 
-use crate::{Argument, Batch, ColumnFailure, Columns, Query, Released, Statements, StoreFailure, Value, Written};
+use crate::{Argument, Batch, ColumnFailure, Columns, Query, Released, StoreFailure, Value, Written};
 
 pub trait Execute: Debug {
     fn fetched(&mut self, sql: &'static str, arguments: Vec<Argument>) -> Result<Vec<Vec<Value>>, StoreFailure>;
 
     fn executed(&mut self, sql: &'static str, arguments: Vec<Argument>) -> Result<Written, StoreFailure>;
+
+    fn rows<Row: Columns>(&mut self, query: Prepared<Row>) -> Result<Vec<Row>, StoreFailure> {
+        let decode = query.decode;
+        self.fetched(query.sql, query.arguments)?
+            .into_iter()
+            .map(|values| decode(&mut Values::from(values)).map_err(StoreFailure::from))
+            .collect()
+    }
+
+    fn one<Row: Columns>(&mut self, query: Prepared<Row>) -> Result<Row, StoreFailure> {
+        self.rows(query)?.into_iter().next().ok_or(StoreFailure::Missing)
+    }
+
+    fn written(&mut self, query: Prepared<()>) -> Result<Written, StoreFailure> {
+        self.executed(query.sql, query.arguments)
+    }
+
+    fn released(&mut self, query: Prepared<()>) -> Result<Released, StoreFailure> {
+        self.written(query).map(|_written| Released::Deleted).or_else(StoreFailure::released)
+    }
 }
 
 #[derive(Debug, Op)]
@@ -42,7 +62,7 @@ impl<Row: Columns> Prepared<Row> {
 impl<Row: Columns> Query for Prepared<Row> {
     type Rows = Vec<Row>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Row>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Vec<Row>, StoreFailure> {
         statements.rows(self)
     }
 }
@@ -50,8 +70,8 @@ impl<Row: Columns> Query for Prepared<Row> {
 impl Batch for Prepared<()> {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        statements.written(self)
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+        Execute::written(statements, self)
     }
 }
 
@@ -64,27 +84,5 @@ impl Values {
 impl From<Vec<Value>> for Values {
     fn from(values: Vec<Value>) -> Values {
         Values(values.into_iter())
-    }
-}
-
-impl dyn Execute + '_ {
-    pub fn rows<Row: Columns>(&mut self, query: Prepared<Row>) -> Result<Vec<Row>, StoreFailure> {
-        let decode = query.decode;
-        self.fetched(query.sql, query.arguments)?
-            .into_iter()
-            .map(|values| decode(&mut Values::from(values)).map_err(StoreFailure::from))
-            .collect()
-    }
-
-    pub fn one<Row: Columns>(&mut self, query: Prepared<Row>) -> Result<Row, StoreFailure> {
-        self.rows(query)?.into_iter().next().ok_or(StoreFailure::Missing)
-    }
-
-    pub fn written(&mut self, query: Prepared<()>) -> Result<Written, StoreFailure> {
-        self.executed(query.sql, query.arguments)
-    }
-
-    pub fn released(&mut self, query: Prepared<()>) -> Result<Released, StoreFailure> {
-        self.written(query).map(|_written| Released::Deleted).or_else(StoreFailure::released)
     }
 }

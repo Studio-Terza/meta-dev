@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use design_model::Segment;
 use newtype::Counter;
-use store_ports::{Batch, Query, Statements, StoreFailure, Written};
+use store_ports::{Batch, Execute, Query, StoreFailure, Written};
 use stream::Message;
 use transcript_ports::{Record, Uuid};
 
@@ -10,14 +10,14 @@ use super::{Anchoring, Held, Holding, SessionRecords};
 use crate::boundary::{LinkRow, MessageRow, Row, SegmentRow};
 
 impl SessionRecords {
-    fn all(rows: &[impl Row], statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn all(rows: &[impl Row], statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let written = rows.iter().map(|row| row.written(statements)).collect::<Result<Vec<Written>, StoreFailure>>()?;
         Ok(Written::total(written.into_iter()))
     }
 }
 
 impl Anchoring {
-    fn read(records: &SessionRecords, statements: &mut Statements<'_>) -> Result<Anchoring, StoreFailure> {
+    fn read(records: &SessionRecords, statements: &mut impl Execute) -> Result<Anchoring, StoreFailure> {
         let named: BTreeSet<Segment> = records.links.iter().flat_map(LinkRow::segments).collect();
         let speakers: BTreeSet<&Uuid> = named.iter().map(AsRef::<Uuid>::as_ref).collect();
         let stored = speakers
@@ -40,7 +40,7 @@ impl Anchoring {
 impl Query for Holding {
     type Rows = Held;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Held, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Held, StoreFailure> {
         let Holding(records) = self;
         let anchoring = Anchoring::read(&records, statements)?;
         let (links, refused): (Vec<LinkRow>, Vec<LinkRow>) =
@@ -52,7 +52,7 @@ impl Query for Holding {
 impl Batch for Held {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let Held(records) = self;
         let written = [
             SessionRecords::all(&records.messages, statements)?,

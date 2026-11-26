@@ -25,7 +25,7 @@ use newtype::{Arbitrary, Counter, Newtype};
 use port_core::{Op, Run};
 use sqlite_ports::SqliteOpener;
 use store_ports::{
-    Batch, Busy, Column, ColumnFailure, Columns, Migrator, Query, Schema, Statements, Store, StoreFailure, Version,
+    Batch, Busy, Column, ColumnFailure, Columns, Execute, Migrator, Query, Schema, Store, StoreFailure, Version,
     Written,
 };
 use stream::{Relation, Shape};
@@ -52,7 +52,7 @@ struct Applied;
 impl Batch for Resumed {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         statements.written(store_ports::query!(
             r#"
 INSERT INTO
@@ -67,7 +67,7 @@ VALUES
 impl Batch for HalfWritten {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         statements.written(store_ports::query!(
             r#"
 INSERT INTO
@@ -93,7 +93,7 @@ struct Stale;
 impl Batch for Stale {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         statements.written(store_ports::query!(
             r#"
 INSERT INTO
@@ -128,7 +128,7 @@ struct Migrated {
 impl Query for Applied {
     type Rows = Vec<Version>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Version>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Vec<Version>, StoreFailure> {
         let rows = statements.rows(store_ports::query!(
             Migrated,
             r#"
@@ -226,7 +226,7 @@ enum Rewriteless {}
 impl Batch for Rewriteless {
     type Failure = StoreFailure;
 
-    fn written(self, _statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, _statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         match self {}
     }
 }
@@ -299,7 +299,7 @@ impl Schema for Faulted {
 impl Batch for Crashing {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         self.0.written(statements)?;
         HalfWritten.written(statements)
     }
@@ -348,7 +348,7 @@ impl Schema for Early {
 impl Batch for Staged {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         statements.written(store_ports::query!(
             r#"
 INSERT INTO
@@ -369,7 +369,7 @@ struct Edited;
 impl Batch for Edited {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         statements.written(store_ports::query!(
             r#"
 UPDATE
@@ -389,7 +389,7 @@ struct Annotated;
 impl Batch for Annotated {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         statements.written(store_ports::query!(
             r#"
 INSERT INTO
@@ -434,7 +434,7 @@ enum Told {
 impl Batch for Told {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let context = Told::context(statements)?;
         let told = self.segments(statements)?;
         Ok(context.plus(told))
@@ -442,7 +442,7 @@ impl Batch for Told {
 }
 
 impl Told {
-    fn context(statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn context(statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let messages = statements.written(store_ports::query!(
             r#"
 INSERT INTO
@@ -477,7 +477,7 @@ VALUES
         Ok(messages.plus(segment))
     }
 
-    fn segments(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn segments(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         match self {
             Told::Stale => statements.written(store_ports::query!(
                 r#"
@@ -534,13 +534,13 @@ struct Remarked {
 impl Batch for Remarked {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         self.remark.written(&self.on, statements)
     }
 }
 
 impl Remark {
-    fn written(self, on: &Uuid, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, on: &Uuid, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         match self {
             Remark::Conversational => statements.written(store_ports::query!(
                 r#"
@@ -645,7 +645,7 @@ VALUES
 }
 
 impl Remarked {
-    fn spanned(on: &Uuid, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn spanned(on: &Uuid, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let node = statements.written(store_ports::query!(
             r#"
 INSERT INTO
@@ -666,7 +666,7 @@ VALUES
         Ok(node.plus(edge))
     }
 
-    fn flailed(on: &Uuid, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn flailed(on: &Uuid, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let job = statements.written(store_ports::query!(
             r#"
 INSERT INTO
@@ -727,7 +727,7 @@ impl Cited {
 impl Batch for Cited {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let messages = statements.written(store_ports::query!(
             r#"
 INSERT INTO

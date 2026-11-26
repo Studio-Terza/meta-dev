@@ -1,4 +1,4 @@
-use store_ports::{Query, Statements, StoreFailure};
+use store_ports::{Execute, Query, StoreFailure};
 
 use super::ShownNode;
 use crate::graph::{EdgeRow, NodeRow, RelativeRow};
@@ -8,7 +8,7 @@ use design_closure::Refines;
 impl Query for ShownNode {
     type Rows = Option<Placed>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Option<Placed>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Option<Placed>, StoreFailure> {
         let nodes = NodeRow::named(self.0, statements)?;
         let relatives = RelativeRow::around::<Refines>(self.0, statements)?;
         let links = EdgeRow::links(self.0, statements)?;

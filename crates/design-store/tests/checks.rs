@@ -10,7 +10,7 @@ use invariants::{Ignoring, ignored};
 use port_core::Op;
 use port_core::Run;
 use sqlite_ports::SqliteOpener;
-use store_ports::{Argument, Column, FromValue, Query, Statements, Store, StoreFailure};
+use store_ports::{Argument, Column, Execute, FromValue, Query, Store, StoreFailure};
 use stream::{Relation, Shape};
 
 ignored! {
@@ -46,7 +46,7 @@ impl Declared {
 impl Query for Declared {
     type Rows = String;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<String, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<String, StoreFailure> {
         let sql = "SELECT sql FROM sqlite_schema WHERE tbl_name = ?1 AND sql IS NOT NULL";
         let rows = statements.fetched(sql, vec![Argument::Text(self.0.to_owned())])?;
         Ok(rows

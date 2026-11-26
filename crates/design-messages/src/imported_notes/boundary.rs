@@ -1,6 +1,6 @@
 use design_model::{Project, Provenance, Title};
 use grammar_notes::Ending;
-use store_ports::{Columns, Query, Statements, StoreFailure};
+use store_ports::{Columns, Execute, Query, StoreFailure};
 
 use super::{ImportedEnding, ImportedNotes, Noted};
 
@@ -16,7 +16,7 @@ struct EndedRow {
 }
 
 impl EndedRow {
-    fn read(project: &Project, statements: &mut Statements<'_>) -> Result<Option<Ending>, StoreFailure> {
+    fn read(project: &Project, statements: &mut impl Execute) -> Result<Option<Ending>, StoreFailure> {
         let rows = statements.rows(store_ports::query!(
             EndedRow,
             r#"
@@ -44,7 +44,7 @@ impl NotedRow {
 impl Query for ImportedNotes {
     type Rows = Vec<Noted>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Noted>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Vec<Noted>, StoreFailure> {
         let project: Project = self.0;
         let rows = statements.rows(store_ports::query!(
             NotedRow,
@@ -68,7 +68,7 @@ ORDER BY
 impl Query for ImportedEnding {
     type Rows = Option<Ending>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Option<Ending>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Option<Ending>, StoreFailure> {
         EndedRow::read(&self.0, statements)
     }
 }

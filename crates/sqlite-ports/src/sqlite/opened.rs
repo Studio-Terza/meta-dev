@@ -9,7 +9,7 @@ use store_ports::{Batch, Created, Provenance, Query, Record, StoreFailure, Writt
 use super::failed::{Unexecuted, Unopened};
 use super::migrations::Migrations;
 pub(super) use boundary::Snapshot;
-use connected::Connected;
+pub(super) use connected::Connected;
 
 #[derive(Debug)]
 pub(super) struct Opened {

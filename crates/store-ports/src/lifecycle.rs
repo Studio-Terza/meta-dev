@@ -4,7 +4,7 @@ use newtype::Enumerated;
 use port_core::Op;
 
 use crate::store_failure::Unmoved;
-use crate::{Batch, Prepared, Statements, StoreFailure, Written};
+use crate::{Batch, Execute, Prepared, StoreFailure, Written};
 
 pub trait Lifecycle: Enumerated + Copy + Eq + Debug + 'static {
     const EDGES: &'static [Edge<Self>];
@@ -52,7 +52,7 @@ impl<S: Staged> Moved<S> {
 impl<S: Staged> Batch for Moved<S> {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         S::State::EDGES.iter().find(|listed| **listed == self.edge).ok_or(StoreFailure::Unmoved(Unmoved::Unlisted))?;
         let Edge { from, to } = self.edge;
         let written = statements.written(S::moved(&self.key, from, to))?;

@@ -5,7 +5,7 @@ use design_model::{
 };
 use newtype::Counter;
 use port_core::Op;
-use store_ports::{Batch, ColumnFailure, Columns, Query, Statements, StoreFailure, Written};
+use store_ports::{Batch, ColumnFailure, Columns, Execute, Query, StoreFailure, Written};
 
 use crate::Refusal;
 use crate::{Link, Relative};
@@ -144,7 +144,7 @@ pub(crate) struct EdgeRow {
 }
 
 impl Resolved {
-    pub(crate) fn read(id: NodeId, statements: &mut Statements<'_>) -> Result<Resolved, StoreFailure> {
+    pub(crate) fn read(id: NodeId, statements: &mut impl Execute) -> Result<Resolved, StoreFailure> {
         let row = statements.one(store_ports::query!(
             IdRow,
             r#"
@@ -175,7 +175,7 @@ impl From<NodeId> for Resolving {
 impl Query for Resolving {
     type Rows = Option<Resolved>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Option<Resolved>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Option<Resolved>, StoreFailure> {
         let id = self.0;
         let rows = statements.rows(store_ports::query!(
             IdRow,
@@ -211,14 +211,14 @@ impl Planting {
 }
 
 impl Root {
-    fn sown(&self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn sown(&self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         match self {
             Root::Sown(node) => NodeRow::proposed(node, statements),
             Root::Found(_) => Ok(Written::zero()),
         }
     }
 
-    fn resolved(&self, statements: &mut Statements<'_>) -> Result<Resolved, StoreFailure> {
+    fn resolved(&self, statements: &mut impl Execute) -> Result<Resolved, StoreFailure> {
         match self {
             Root::Sown(node) => Resolved::read(node.identity(), statements),
             Root::Found(root) => Ok(*root),
@@ -246,7 +246,7 @@ impl Linked {
         Linked { source, relation, target, provenance }
     }
 
-    fn closed(self, upheld: EdgeColumns, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
+    fn closed(self, upheld: EdgeColumns, statements: &mut impl Execute) -> Result<Written, Refusal> {
         match self.relation {
             NodeRelation::Refines => Closing::<Refines>::new(self.source.0, self.target.0)
                 .written(statements, |edged| upheld.inserted(edged)),
@@ -256,7 +256,7 @@ impl Linked {
         }
     }
 
-    fn succeeding(self, upheld: EdgeColumns, statements: &mut Statements<'_>) -> Result<EdgeColumns, Refusal> {
+    fn succeeding(self, upheld: EdgeColumns, statements: &mut impl Execute) -> Result<EdgeColumns, Refusal> {
         let relation = Closed::Refines;
         let old = self.target.0;
         let by = self.source.0;
@@ -279,7 +279,7 @@ WHERE
         lineage.into_iter().next().map_or(Ok(upheld), |_descended| Err(Refusal::Ancestral { old, by }))
     }
 
-    fn upheld(self, statements: &mut Statements<'_>) -> Result<EdgeColumns, Refusal> {
+    fn upheld(self, statements: &mut impl Execute) -> Result<EdgeColumns, Refusal> {
         let source_role = RoleRow::read(self.source, statements)?;
         let target_role = RoleRow::read(self.target, statements)?;
         let upheld = NodeEdge::new(self.source.0, self.relation, self.target.0).upheld(source_role, target_role)?;
@@ -290,7 +290,7 @@ WHERE
 }
 
 impl RoleRow {
-    fn read(end: Resolved, statements: &mut Statements<'_>) -> Result<Role, StoreFailure> {
+    fn read(end: Resolved, statements: &mut impl Execute) -> Result<Role, StoreFailure> {
         let id = end.0;
         let row = statements.one(store_ports::query!(
             RoleRow,
@@ -309,7 +309,7 @@ WHERE
 }
 
 impl EdgeColumns {
-    fn inserted(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn inserted(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let EdgeColumns { source, relation, target, provenance } = self;
         statements.written(store_ports::query!(
             r#"
@@ -329,7 +329,7 @@ VALUES
 impl Batch for Planting {
     type Failure = Refusal;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, Refusal> {
         let sown = self.root.sown(statements)?;
         let root = self.root.resolved(statements)?;
         let linked = self
@@ -345,7 +345,7 @@ impl Batch for Planting {
 impl Batch for Linked {
     type Failure = Refusal;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, Refusal> {
         let upheld = self.upheld(statements)?;
         self.closed(upheld, statements)
     }
@@ -354,7 +354,7 @@ impl Batch for Linked {
 impl Batch for Restaged {
     type Failure = Refusal;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, Refusal> {
         let id = self.node.0;
         let provenance = Provenance::Lead(Entered::Stage);
         let moved = self.transition.applied(NodeRow::loaded(self.node, statements)?)?;
@@ -385,7 +385,7 @@ WHERE
 impl Batch for Cast {
     type Failure = Refusal;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, Refusal> {
         let id = self.node.0;
         let role = self.casting.role();
         let provenance = self.casting.provenance();
@@ -510,7 +510,7 @@ impl From<EdgeRow> for Link {
 }
 
 impl NodeRow {
-    pub(crate) fn root(project: &Project, statements: &mut Statements<'_>) -> Result<Option<Resolved>, StoreFailure> {
+    pub(crate) fn root(project: &Project, statements: &mut impl Execute) -> Result<Option<Resolved>, StoreFailure> {
         let facet = Facet::Project;
         let rows = statements.rows(store_ports::query!(
             IdRow,
@@ -533,7 +533,7 @@ LIMIT
         Ok(rows.into_iter().next().map(|row| Resolved(row.id)))
     }
 
-    pub(crate) fn named(id: NodeId, statements: &mut Statements<'_>) -> Result<Vec<AnyNode>, StoreFailure> {
+    pub(crate) fn named(id: NodeId, statements: &mut impl Execute) -> Result<Vec<AnyNode>, StoreFailure> {
         let rows = statements.rows(store_ports::query!(
             NodeRow,
             r#"
@@ -561,7 +561,7 @@ WHERE
         Ok(rows.into_iter().map(AnyNode::try_from).collect::<Result<Vec<AnyNode>, ColumnFailure>>()?)
     }
 
-    fn loaded(node: Resolved, statements: &mut Statements<'_>) -> Result<AnyNode, StoreFailure> {
+    fn loaded(node: Resolved, statements: &mut impl Execute) -> Result<AnyNode, StoreFailure> {
         let id = node.0;
         let row = statements.one(store_ports::query!(
             NodeRow,
@@ -590,7 +590,7 @@ WHERE
         Ok(AnyNode::try_from(row)?)
     }
 
-    pub(crate) fn next(statements: &mut Statements<'_>) -> Result<NodeId, StoreFailure> {
+    pub(crate) fn next(statements: &mut impl Execute) -> Result<NodeId, StoreFailure> {
         let row = statements.one(store_ports::query!(
             NextRow,
             r#"
@@ -603,7 +603,7 @@ FROM
         Ok(row.next)
     }
 
-    pub(crate) fn proposed(node: &Node<Vague>, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    pub(crate) fn proposed(node: &Node<Vague>, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let id = node.identity();
         let entry = node.entry();
         let project = entry.project();
@@ -644,7 +644,7 @@ VALUES
 impl RelativeRow {
     pub(crate) fn around<R: Acyclic<End = NodeId>>(
         id: NodeId,
-        statements: &mut Statements<'_>,
+        statements: &mut impl Execute,
     ) -> Result<Vec<Relative>, StoreFailure> {
         let ancestor = Kin::Ancestor;
         let child = Kin::Child;
@@ -705,7 +705,7 @@ ORDER BY
 }
 
 impl EdgeRow {
-    fn around(id: NodeId, statements: &mut Statements<'_>) -> Result<Vec<EdgeRow>, StoreFailure> {
+    fn around(id: NodeId, statements: &mut impl Execute) -> Result<Vec<EdgeRow>, StoreFailure> {
         statements.rows(store_ports::query!(
             EdgeRow,
             r#"
@@ -728,7 +728,7 @@ ORDER BY
         ))
     }
 
-    pub(crate) fn links(node: NodeId, statements: &mut Statements<'_>) -> Result<Vec<Link>, StoreFailure> {
+    pub(crate) fn links(node: NodeId, statements: &mut impl Execute) -> Result<Vec<Link>, StoreFailure> {
         Ok(EdgeRow::around(node, statements)?.into_iter().map(Link::from).collect())
     }
 }
@@ -742,7 +742,7 @@ impl From<Resolved> for Ended {
 impl Query for Ended {
     type Rows = Option<Ending>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Option<Ending>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Option<Ending>, StoreFailure> {
         let node = self.0.0;
         let rows = statements.rows(store_ports::query!(
             EndingRow,
@@ -767,7 +767,7 @@ LIMIT
 impl Query for ContextNodes {
     type Rows = Vec<Outline>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Outline>, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Vec<Outline>, StoreFailure> {
         let relation = Closed::Refines;
         let rows = statements.rows(store_ports::query!(
             OutlineRow,

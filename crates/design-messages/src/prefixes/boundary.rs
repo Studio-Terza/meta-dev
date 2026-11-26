@@ -1,5 +1,5 @@
 use design_model::Prefix;
-use store_ports::{Columns, Query, Statements, StoreFailure};
+use store_ports::{Columns, Execute, Query, StoreFailure};
 use transcript_ports::Uuid;
 
 use super::{Prefixes, Shortest};
@@ -12,7 +12,7 @@ struct PrefixRow {
 impl Query for Prefixes {
     type Rows = Shortest;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Shortest, StoreFailure> {
+    fn rows(self, statements: &mut impl Execute) -> Result<Shortest, StoreFailure> {
         let shortest = self
             .0
             .into_iter()
@@ -23,7 +23,7 @@ impl Query for Prefixes {
 }
 
 impl PrefixRow {
-    fn shortest(message: &Uuid, statements: &mut Statements<'_>) -> Result<Prefix, StoreFailure> {
+    fn shortest(message: &Uuid, statements: &mut impl Execute) -> Result<Prefix, StoreFailure> {
         let row = statements.one(store_ports::query!(
             PrefixRow,
             r#"
