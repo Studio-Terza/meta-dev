@@ -65,9 +65,13 @@ impl<'found, 'file> Containment<'found, 'file> {
         let members = Members::from(model);
         let located = members.implemented();
         let implemented: BTreeSet<Link<'found>> =
-            located.iter().filter_map(Implemented::link).filter_map(Link::apart).collect();
-        let defined: BTreeSet<Link<'found>> =
-            members.held().into_iter().filter_map(Link::apart).chain(implemented.iter().copied()).collect();
+            located.iter().filter_map(Implemented::link).filter(|link| link.looped().is_none()).collect();
+        let defined: BTreeSet<Link<'found>> = members
+            .held()
+            .into_iter()
+            .filter(|link| link.looped().is_none())
+            .chain(implemented.iter().copied())
+            .collect();
         let outsiders = located.iter().filter_map(Implemented::outsider).fold(
             BTreeMap::new(),
             |mut outsiders: BTreeMap<Member<'found>, BTreeSet<Outsider<'found, 'file>>>, outsider| {
@@ -76,7 +80,7 @@ impl<'found, 'file> Containment<'found, 'file> {
             },
         );
         let links: BTreeSet<Link<'found>> =
-            defined.iter().copied().chain(members.used()).filter_map(Link::apart).collect();
+            defined.iter().copied().chain(members.used()).filter(|link| link.looped().is_none()).collect();
         let users = Self::adjacency(links.iter().copied().map(Reversed::from).map(Link::from));
         Containment {
             slices: Slice::all(members.declared(), &users),

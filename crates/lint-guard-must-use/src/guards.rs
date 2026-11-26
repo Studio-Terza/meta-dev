@@ -55,7 +55,7 @@ impl<'file> Guards<'file> {
 
     pub fn scanning(parsed: Parsed<'_, 'file>) -> Guards<'file> {
         let head = parsed.head();
-        let kinds = <&SourceFile>::from(parsed).shipped().map_or(&[][..], |_| Self::KINDS);
+        let kinds = <&SourceFile>::from(parsed).head().shipped().map_or(&[][..], |_| Self::KINDS);
         let scan = Contributing::new(GuardScan { path: AsRef::<Path>::as_ref(head), kinds });
         Guards { scan, module: Module::of_head(head) }
     }

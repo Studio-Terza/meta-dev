@@ -713,6 +713,19 @@ const EXPANDING_MANIFESTS: [Source; 4] = [
 ];
 
 const ROLE_MANIFESTS: [Source; 5] = [LOGOS_PORT, NOTES_LEXER, IDENT_LEXER, MODEL, DERIVE];
+const NOTES_ON_MODEL: Source = Source::new(
+    Located::new("crates/grammar-notes/Cargo.toml"),
+    Text::new(
+        "[package]\nname = \"grammar-notes\"\n\n[package.metadata.lexer]\nformat = \"notes\"\n\n[dependencies]\ngrammar = { path = \"../grammar\" }\ndesign-model = { path = \"../design-model\" }\n",
+    ),
+);
+const MACRO_BEHIND_MODEL_MANIFESTS: [Source; 5] = [LOGOS_PORT, NOTES_ON_MODEL, IDENT_LEXER, MODEL, DERIVE];
+const OWNED_ONLY_BEHIND_A_MACRO: Text = roles!(
+    node!("grammar-notes", "grammar", "design-model"),
+    "{\"lexer\": {\"format\": \"ident\"}}",
+    node!("design-model", "port-derive"),
+    node!("port-derive", "grammar")
+);
 
 laws::table!(
     a_crate_outside_every_owning_unit_is_flagged_where_it_depends_on_a_package_an_owned_package_reaches,
@@ -895,6 +908,13 @@ fn a_lexer_sharing_its_format_is_told_which_other_lexer_shares_it() {
     let told = Shown::placed_in::<KeyDependencyRoles>(&ROLE_MANIFESTS, ROLE_CRATES, SHARED_FORMAT);
     let ident = told.iter().filter(|line| line.contains("grammar-ident/Cargo.toml"));
     assert_eq!(ident.filter(|line| line.contains("which grammar-notes also lexes")).count(), 1, "{told:?}");
+}
+
+#[test]
+fn a_lexer_whose_only_route_to_an_owned_crate_runs_through_a_proc_macro_stays_a_leaf() {
+    let flagged =
+        Shown::placed_in::<KeyDependencyRoles>(&MACRO_BEHIND_MODEL_MANIFESTS, ROLE_CRATES, OWNED_ONLY_BEHIND_A_MACRO);
+    assert_eq!(flagged.iter().filter(|line| line.contains("is a lexer and depends on")).count(), 0, "{flagged:?}");
 }
 
 #[test]

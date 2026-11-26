@@ -5,7 +5,7 @@ use std::path::Path;
 use super::change::Change;
 use super::check::Check;
 use super::fault::{Fault, Owed};
-use super::hub::PullRequest;
+use super::hub::Purpose;
 use crate::cli::command::failure::Failure;
 use crate::cli::command::step::changed::Changed;
 use crate::cli::command::step::journal::Journal;
@@ -34,16 +34,16 @@ impl<'journal> Scope<'journal> {
         &self,
         ports: &impl Ports,
         checks: &[Check],
-        refactor: Option<&PullRequest>,
+        purpose: Purpose,
         changes: &'change [Change],
     ) -> Result<Vec<Owed<'change>>, Failure<'static>> {
         let asked: Vec<(Check, Vec<&'change Change>)> = checks
             .iter()
-            .map(|check| (*check, changes.iter().filter_map(|change| check.flagging(change)).collect()))
+            .map(|check| (*check, changes.iter().filter(|change| check.flagging(change).is_some()).collect()))
             .collect();
         let produced: BTreeSet<&Path> = asked
             .iter()
-            .filter(|(check, _)| check.waived_by(refactor).is_none())
+            .filter(|(check, _)| check.waived_by(purpose).is_none())
             .flat_map(|(_, flagged)| flagged)
             .flat_map(|change| change.paths())
             .collect();
@@ -53,30 +53,28 @@ impl<'journal> Scope<'journal> {
             .zip(Changed::reaches(ports, &questions))
             .map(|(path, answer)| answer.map(|text| (path, text)))
             .collect::<Result<_, Failure<'static>>>()?;
-        Ok(asked.into_iter().map(|(check, flagged)| Self::owed(&answers, check, refactor, flagged)).collect())
+        let settled: BTreeSet<&Path> =
+            answers.iter().filter(|(_, listed)| listed.as_ref().is_empty()).map(|(path, _)| *path).collect();
+        Ok(asked.into_iter().map(|(check, flagged)| Self::owed(&settled, check, purpose, flagged)).collect())
     }
 
     fn owed<'change>(
-        answers: &BTreeMap<&Path, Text>,
+        settled: &BTreeSet<&Path>,
         check: Check,
-        refactor: Option<&PullRequest>,
+        purpose: Purpose,
         flagged: Vec<&'change Change>,
     ) -> Owed<'change> {
-        match check.waived_by(refactor) {
+        match check.waived_by(purpose) {
             Some(fault) => Owed::new(fault, flagged),
             None => Owed::new(
                 Fault::Beyond(check),
-                flagged.into_iter().filter(|change| Self::reaching(answers, change).is_none()).collect(),
+                flagged.into_iter().filter(|change| Self::beyond(settled, change).is_some()).collect(),
             ),
         }
     }
 
-    fn reaching<'change>(answers: &BTreeMap<&Path, Text>, change: &'change Change) -> Option<&'change Change> {
-        change
-            .paths()
-            .iter()
-            .all(|produced| answers.get(produced).is_some_and(|listed| listed.as_ref().is_empty()))
-            .then_some(change)
+    fn beyond<'change>(settled: &BTreeSet<&Path>, change: &'change Change) -> Option<&'change Path> {
+        change.paths().into_iter().find(|produced| settled.get(produced).is_none())
     }
 
     fn arguments<'question>(&'question self, produced: &'question Path) -> impl Iterator<Item = &'question OsStr> {

@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use algebra::{Monoid, Semigroup};
@@ -100,9 +100,11 @@ impl<'tree> Assignment<'tree> {
                 Some(file.in_crate_file(main.crate_file).with_test_modules(tests))
             })
             .collect();
-        let found: Readout = self.repo_files.into_iter().collect();
+        let mut ordered = files;
+        ordered.sort_by(|left, right| AsRef::<Path>::as_ref(left.head()).cmp(AsRef::<Path>::as_ref(right.head())));
+        let found: Readout = self.repo_files.into_iter().collect::<BTreeSet<RepoFile>>().into_iter().collect();
         let failed: Readout = self.failures.into_iter().collect();
-        found.combine(files.into_iter().collect()).combine(failed).sorted()
+        found.combine(ordered.into_iter().collect()).combine(failed)
     }
 }
 
@@ -176,7 +178,7 @@ impl<'tree> Parsed<'tree> {
         let parsed: Parsed<'tree> =
             Monoid::concat(nodes.iter().zip(sources).map(|(node, source)| Parsed::sighted(node, source)));
         let candidates: Vec<PathBuf> = parsed.sightings.iter().flat_map(Sighting::candidates).collect();
-        let survey = Survey::default().learn(files, Fact::Followed, &candidates);
+        let survey = Survey::learned(files, Fact::Followed, &candidates);
         into(Report { sightings: parsed.sightings, survey }, parsed.kept)
     }
 

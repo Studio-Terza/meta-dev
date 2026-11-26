@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use transcript_ports::{Authorship, Skipped, Uuid};
 
+use super::reply::Reply;
 use super::turn::Turn;
 use crate::Message;
 
@@ -18,17 +19,19 @@ impl<'stream> Chain<'stream> {
         }
     }
 
-    pub fn parent(&self, message: &Message) -> Option<&'stream Message> {
+    pub fn replied(&self, message: &'stream Message) -> Option<Reply<'stream>> {
         std::iter::successors(message.record().parent(), |uuid| self.skipped.get(*uuid).copied())
             .take(self.skipped.len().saturating_add(1))
             .find_map(|uuid| self.known.get(uuid).copied())
+            .map(|parent| Reply::new(message, parent))
     }
 
     pub fn turn(&self, owner: &'stream Message) -> Turn<'stream> {
         Turn::closed_by(
             owner,
-            std::iter::successors(self.parent(owner), |message| self.parent(message))
+            std::iter::successors(self.replied(owner), |reply| self.replied(reply.replied()))
                 .take(self.known.len())
+                .map(|reply| reply.replied())
                 .take_while(|message| message.record().author() == Authorship::Lead)
                 .collect(),
         )

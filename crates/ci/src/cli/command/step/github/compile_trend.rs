@@ -10,10 +10,11 @@ use std::path::PathBuf;
 use super::Step;
 use super::issue::{Issue, Title};
 use crate::cli::command::failure::Failure;
-use crate::cli::command::step::Arguments;
+use crate::cli::command::step::{Arguments, Ended, Location};
 use crate::cli::ports::{Exit, Invocation, Ports};
 use build::Build;
 use fortnight::Fortnight;
+use grammar_output::Record;
 use notice::{Notice, Report};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -22,9 +23,12 @@ enum Pace {
     Steady,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Record)]
+#[record(source = Arguments)]
 pub struct CompileTrend {
+    #[field(Location)]
     today: PathBuf,
+    #[field(Location, via = Fortnight::downloading_to)]
     fortnight: Fortnight,
 }
 
@@ -52,11 +56,7 @@ impl CompileTrend {
 
 impl Step for CompileTrend {
     fn from_arguments(given: Vec<OsString>) -> Result<CompileTrend, Failure<'static>> {
-        let mut arguments = Arguments::from(given);
-        let today = &arguments.taken()?;
-        let downloads = &arguments.taken()?;
-        arguments.ended()?;
-        Ok(CompileTrend { today: PathBuf::from(today), fortnight: Fortnight::downloading_to(PathBuf::from(downloads)) })
+        CompileTrend::read(Arguments::from(given))?.ended()
     }
 
     fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {

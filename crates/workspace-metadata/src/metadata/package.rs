@@ -2,7 +2,7 @@ mod declared;
 mod dependency;
 mod target;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
@@ -15,7 +15,7 @@ use declared::Declared;
 pub use declared::{Expanders, MacroName, PortTable};
 use dependency::Dependency;
 pub use target::Form;
-use target::Target;
+use target::{Target, TargetKind};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Package {
@@ -37,8 +37,8 @@ impl Package {
         self.targets.iter().find(|target| target.form().is_some())
     }
 
-    pub fn proc_macro(&self) -> Option<&Package> {
-        self.targets.iter().filter_map(Target::form).find(|form| *form == Form::ProcMacro).map(|_| self)
+    pub fn proc_macro(&self) -> Option<Form> {
+        self.targets.iter().filter_map(Target::form).find(|form| *form == Form::ProcMacro)
     }
 
     pub fn port(&self) -> Option<&PortTable> {
@@ -72,9 +72,8 @@ impl Package {
         self.dependencies.iter().filter_map(|dependency| dependency.key_of(required))
     }
 
-    pub fn test_support(&self, shipped: &BTreeSet<&CrateName>) -> Option<&Package> {
-        self.targets.iter().find_map(Target::binary).map_or(Some(()), |_| None)?;
-        shipped.get(&self.name).map_or(Some(self), |_| None)
+    pub(crate) fn binary(&self) -> Option<&TargetKind> {
+        self.targets.iter().find_map(Target::binary)
     }
 
     pub fn shipped_dependencies(&self) -> impl Iterator<Item = &CrateName> {

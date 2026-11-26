@@ -90,8 +90,8 @@ impl<'scan, 'file> EdgeResolution<'scan, 'file> {
         edge: Edge<'scan>,
     ) {
         match context.public(function) {
-            Some(public) => {
-                self.edges.entry(edge).or_default().entry(context.edge_name(public)).or_insert_with(|| shape.site());
+            Some(_exposure) => {
+                self.edges.entry(edge).or_default().entry(context.edge_name(function)).or_insert_with(|| shape.site());
             }
             None => self.violations.push(Violation::new(shape.site(), Finding::HiddenEdge { edge })),
         }

@@ -34,7 +34,7 @@ impl Workspace {
             trees.into_iter().zip(read).map(|(tree, outcomes)| tree.and_then(|_| Self::keyed(outcomes))).collect();
         let named_paths: Vec<PathBuf> =
             manifests.iter().flatten().flat_map(BTreeMap::values).flat_map(Manifest::named_paths).collect();
-        let named = Survey::default().learn(files, Fact::Canonical, &named_paths);
+        let named = Survey::learned(files, Fact::Canonical, &named_paths);
         roots
             .iter()
             .zip(manifests)

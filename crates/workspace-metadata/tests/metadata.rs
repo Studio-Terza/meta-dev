@@ -95,7 +95,7 @@ const CHAINED: &str = concat!(
 fn each_member_knows_its_depth_and_the_workspace_crates_below_and_above_it_on_the_compile_chain()
 -> Result<(), Box<dyn Error>> {
     let metadata: Metadata = serde_json::from_str(CHAINED)?;
-    let graph: Graph<'_> = std::iter::once(&metadata).collect();
+    let graph = Graph::from(&metadata);
     let placed: Vec<String> =
         graph.chained().iter().map(|chained| format!("{}: {chained}", AsRef::<CrateName>::as_ref(chained))).collect();
     assert_eq!(
@@ -115,7 +115,7 @@ fn a_lexer_dependency_reaching_an_owned_package_breaches_unless_a_proc_macro_sta
 -> Result<(), Box<dyn Error>> {
     let unleafed = |fixture: &str| -> Result<Vec<String>, serde_json::Error> {
         let metadata: Metadata = serde_json::from_str(fixture)?;
-        let graph: Graph<'_> = std::iter::once(&metadata).collect();
+        let graph = Graph::from(&metadata);
         Ok(graph.role_breaches().unleafed().iter().map(ToString::to_string).collect())
     };
     assert_eq!(unleafed(include_str!("fixtures/lexer-through-library.json"))?.len(), 1);
@@ -126,7 +126,7 @@ fn a_lexer_dependency_reaching_an_owned_package_breaches_unless_a_proc_macro_sta
 #[test]
 fn a_crate_reaching_an_owned_package_only_through_a_proc_macro_breaches_no_role() -> Result<(), Box<dyn Error>> {
     let metadata: Metadata = serde_json::from_str(include_str!("fixtures/roles.json"))?;
-    let graph: Graph<'_> = std::iter::once(&metadata).collect();
+    let graph = Graph::from(&metadata);
     let breaches = graph.role_breaches();
     let breaching: Vec<String> = breaches
         .unported()

@@ -39,10 +39,7 @@ impl<'stream> Links<'stream> {
     }
 
     fn replies(&self) -> Vec<Reply<'stream>> {
-        self.messages
-            .iter()
-            .filter_map(|message| self.chain.parent(message).map(|replied| Reply::new(message, replied)))
-            .collect()
+        self.messages.iter().filter_map(|message| self.chain.replied(message)).collect()
     }
 
     fn turns(&self) -> Vec<Turn<'stream>> {

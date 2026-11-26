@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use super::super::unit_key::UnitKey;
 use super::super::weighed::Weighed;
 use crate::cli::command::step::seconds::Seconds;
@@ -24,11 +22,5 @@ impl Reach {
 
     pub(super) fn via(&self) -> Option<UnitKey> {
         self.via.clone()
-    }
-
-    pub(super) fn kept(self, key: &UnitKey, reached: &mut BTreeMap<UnitKey, Reach>) -> Seconds {
-        let seconds = self.seconds;
-        reached.insert(key.clone(), self);
-        seconds
     }
 }

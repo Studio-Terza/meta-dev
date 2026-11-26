@@ -79,11 +79,6 @@ impl SourceFile {
     }
 
     #[must_use]
-    pub fn shipped(&self) -> Option<&SourceFile> {
-        self.head.shipped().map(|_| self)
-    }
-
-    #[must_use]
     pub fn text(&self) -> &SourceText {
         &self.text
     }

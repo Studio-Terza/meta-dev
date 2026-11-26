@@ -1,33 +1,28 @@
 use crate::cli::command::Telling;
 use console_ports::Shown;
 use std::ffi::OsString;
-use std::path::Path;
 
 use super::Step;
 use super::{Journal, Measured, Revision};
 use crate::cli::command::failure::Failure;
-use crate::cli::command::step::Arguments;
+use crate::cli::command::step::{Arguments, Ended, Journaled, Recording, Utf8};
 use crate::cli::ports::{Exit, Ports};
+use grammar_output::Record;
 
-#[derive(Debug)]
+#[derive(Debug, Record)]
+#[record(source = Arguments)]
 pub struct MeasuredHistory {
+    #[field(Recording)]
     measured: Measured,
+    #[field(Journaled)]
     file: Journal,
+    #[field(Utf8, via = Revision::new)]
     revision: Revision,
 }
 
 impl Step for MeasuredHistory {
     fn from_arguments(given: Vec<OsString>) -> Result<MeasuredHistory, Failure<'static>> {
-        let mut arguments = Arguments::from(given);
-        let measured = &arguments.taken()?;
-        let file = &arguments.taken()?;
-        let revision = &arguments.taken()?;
-        arguments.ended()?;
-        Ok(MeasuredHistory {
-            measured: Measured::file(Path::new(measured)),
-            file: Journal::file(Path::new(file)),
-            revision: Revision::new(revision.to_str().ok_or(Failure::Usage)?.to_owned()),
-        })
+        MeasuredHistory::read(Arguments::from(given))?.ended()
     }
 
     fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {

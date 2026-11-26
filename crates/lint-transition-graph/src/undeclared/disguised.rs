@@ -57,7 +57,11 @@ impl<'model> Disguised<'model> {
         let declared = Declared::collected(model, &core);
         core.into_iter()
             .filter_map(|placed| Disguised::std_of(placed).map(|std| Disguised { placed, std }))
-            .filter(|disguised| disguised.closed().is_some())
+            .filter(|disguised| {
+                disguised
+                    .subject()
+                    .is_some_and(|subject| disguised.closing().and_then(Declared::identity) == Some(subject))
+            })
             .filter(|disguised| declared.declares(disguised.std.wanted(), disguised.subject()).is_none())
             .collect()
     }
@@ -73,11 +77,6 @@ impl<'model> Disguised<'model> {
 
     fn subject(&self) -> Option<&'model Resolved> {
         Declared::identity(self.placed.entity().subject_type())
-    }
-
-    fn closed(&self) -> Option<&Disguised<'model>> {
-        let subject = self.subject();
-        subject.filter(|_| self.closing().and_then(Declared::identity) == subject).map(|_| self)
     }
 
     fn closing(&self) -> Option<&'model TypeRef> {

@@ -3,7 +3,9 @@ mod package;
 use std::path::{Path, PathBuf};
 
 use super::target::Target;
-use crate::survey::{Fact, Settled, Survey};
+use algebra::Semigroup;
+
+use crate::survey::{Fact, Failed, Survey};
 use crate::tree::Tree;
 use file_ports::{Files, Kind};
 use lint_layout::Failure;
@@ -21,17 +23,29 @@ impl Packages {
         admitted: Vec<Result<Vec<Manifest>, Failure>>,
     ) -> Vec<Result<Vec<Target>, Failure>> {
         let named_paths: Vec<PathBuf> = admitted.iter().flatten().flatten().flat_map(Manifest::named_paths).collect();
-        let named = Survey::default().learn(files, Fact::Canonical, &named_paths);
+        let named = Survey::learned(files, Fact::Canonical, &named_paths);
         let groups: Vec<Result<Vec<Package>, Failure>> =
             admitted.into_iter().map(|group| group.map(|manifests| Self::packages(&named, &manifests))).collect();
         let packages: Vec<&Package> = groups.iter().flatten().flatten().collect();
-        let mut survey = Self::surveyed(files, &packages);
+        Self::surveyed(files, &packages).settling(|known, failed| Self::targeted(trees, groups, known, failed))
+    }
+
+    fn targeted(
+        trees: &[&Tree<'_>],
+        groups: Vec<Result<Vec<Package>, Failure>>,
+        known: &Survey,
+        failed: Failed,
+    ) -> Vec<Result<Vec<Target>, Failure>> {
+        let real: Vec<Vec<PathBuf>> = groups.iter().map(|group| Self::real(known, group)).collect();
+        let orders: Vec<Vec<&Path>> = real.iter().map(|order| order.iter().map(PathBuf::as_path).collect()).collect();
+        let outcomes = failed.settled(known, &orders);
         trees
             .iter()
             .zip(groups)
-            .map(|(tree, group)| {
+            .zip(outcomes)
+            .map(|((tree, group), outcome)| {
                 let members = group?;
-                let settled = Self::checked(&mut survey, &members)?;
+                let settled = outcome?;
                 Ok(members.into_iter().filter_map(|package| package.into_target(settled, tree)).collect())
             })
             .collect()
@@ -51,28 +65,31 @@ impl Packages {
         let candidates: Vec<PathBuf> = packages.iter().flat_map(|package| package.candidates()).collect();
         let directories: Vec<PathBuf> =
             packages.iter().flat_map(|package| package.target_directories()).map(Wrapping::into_inner).collect();
-        let followed =
-            Survey::default().learn(files, Fact::Followed, &candidates).learn(files, Fact::Kind, &directories);
+        let followed = Survey::learned(files, Fact::Followed, &candidates).combine(Survey::learned(
+            files,
+            Fact::Kind,
+            &directories,
+        ));
         let real: Vec<PathBuf> =
             directories.into_iter().filter(|directory| followed.kind(directory) == Kind::Directory).collect();
-        let listed = followed.learn(files, Fact::Listed, &real);
+        let listed = followed.combine(Survey::learned(files, Fact::Listed, &real));
         let entries: Vec<PathBuf> = real.iter().flat_map(|directory| listed.entries(directory)).cloned().collect();
-        let survey = listed.learn(files, Fact::Kind, &entries);
+        let survey = listed.combine(Survey::learned(files, Fact::Kind, &entries));
         let mains: Vec<PathBuf> = entries
             .iter()
             .filter(|entry| survey.kind(entry) == Kind::Directory)
             .map(|entry| entry.join(Package::BINARY_ROOT))
             .collect();
-        survey.learn(files, Fact::Followed, &mains)
+        survey.combine(Survey::learned(files, Fact::Followed, &mains))
     }
 
-    fn checked<'survey>(survey: &'survey mut Survey, packages: &[Package]) -> Result<Settled<'survey>, Failure> {
-        let real: Vec<PathBuf> = packages
+    fn real(known: &Survey, group: &Result<Vec<Package>, Failure>) -> Vec<PathBuf> {
+        group
             .iter()
+            .flatten()
             .flat_map(Package::target_directories)
             .map(Wrapping::into_inner)
-            .filter(|directory| survey.kind(directory) == Kind::Directory)
-            .collect();
-        survey.settled(&real)
+            .filter(|directory| known.kind(directory) == Kind::Directory)
+            .collect()
     }
 }

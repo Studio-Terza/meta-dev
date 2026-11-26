@@ -7,13 +7,16 @@ use std::path::{Path, PathBuf};
 use super::Step;
 use super::changed::Changed;
 use crate::cli::command::failure::Failure;
-use crate::cli::command::step::Arguments;
+use crate::cli::command::step::{Arguments, Ended, Location};
 use crate::cli::ports::{Exit, Invocation, Ports};
 use boundary::Located;
 use file_ports::Files;
+use grammar_output::Record;
 
-#[derive(Debug)]
+#[derive(Debug, Record)]
+#[record(source = Arguments)]
 pub struct BuildSqlite {
+    #[field(Location)]
     library: PathBuf,
 }
 
@@ -33,10 +36,7 @@ impl BuildSqlite {
 
 impl Step for BuildSqlite {
     fn from_arguments(given: Vec<OsString>) -> Result<BuildSqlite, Failure<'static>> {
-        let mut arguments = Arguments::from(given);
-        let library = PathBuf::from(arguments.taken()?);
-        arguments.ended()?;
-        Ok(BuildSqlite { library })
+        BuildSqlite::read(Arguments::from(given))?.ended()
     }
 
     fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {

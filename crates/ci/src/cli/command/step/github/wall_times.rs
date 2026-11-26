@@ -9,16 +9,21 @@ use std::fmt;
 
 use super::Step;
 use crate::cli::command::failure::Failure;
-use crate::cli::command::step::Arguments;
+use crate::cli::command::step::{Arguments, Ended, Utf8};
 use crate::cli::ports::{Exit, Invocation, Ports};
+use grammar_output::Record;
 use job::Job;
 use repository::Repository;
 use run_id::RunId;
 
-#[derive(Debug)]
+#[derive(Debug, Record)]
+#[record(source = Arguments)]
 pub struct WallTimes {
+    #[field(Utf8, via = Repository::new)]
     repository: Repository,
+    #[field(Utf8, via = RunId::new)]
     run: RunId,
+    #[field(Utf8, via = Job::new)]
     job: Job,
 }
 
@@ -47,16 +52,7 @@ impl fmt::Display for WallTimes {
 
 impl Step for WallTimes {
     fn from_arguments(given: Vec<OsString>) -> Result<WallTimes, Failure<'static>> {
-        let mut arguments = Arguments::from(given);
-        let repository = &arguments.taken()?;
-        let run = &arguments.taken()?;
-        let job = &arguments.taken()?;
-        arguments.ended()?;
-        Ok(WallTimes {
-            repository: Repository::new(repository.to_str().ok_or(Failure::Usage)?.to_owned()),
-            run: RunId::new(run.to_str().ok_or(Failure::Usage)?.to_owned()),
-            job: Job::new(job.to_str().ok_or(Failure::Usage)?.to_owned()),
-        })
+        WallTimes::read(Arguments::from(given))?.ended()
     }
 
     fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {

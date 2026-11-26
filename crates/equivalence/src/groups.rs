@@ -35,11 +35,12 @@ impl<Member: Keyed> Groups<Member> {
 
 impl<Member: Keyed + Nested> Groups<Member> {
     #[must_use]
-    pub fn outermost<'file, Rank: Ord>(mut self, rank: impl Fn(&Member::Key) -> Rank) -> Groups<Member>
+    pub fn outermost<'file, Rank: Ord>(self, rank: impl Fn(&Member::Key) -> Rank) -> Vec<Group<Member>>
     where
         Member: AsRef<Site<'file>>,
     {
-        self.0.sort_by_key(|group| Reverse(rank(group.key())));
-        Groups(self.0.into_iter().collect::<Kept<'file, Member>>().into_groups())
+        let mut ranked = self.0;
+        ranked.sort_by_key(|group| Reverse(rank(group.key())));
+        ranked.into_iter().collect::<Kept<'file, Member>>().into_groups()
     }
 }

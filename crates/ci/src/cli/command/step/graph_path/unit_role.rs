@@ -42,11 +42,11 @@ impl UnitRole {
 
     pub(super) fn before(&self, key: &UnitKey, crates: &Crates) -> Vec<UnitKey> {
         match self {
-            UnitRole::BuildRun => vec![key.sibling(UnitRole::BuildScript)],
+            UnitRole::BuildRun => vec![UnitKey::new(key.package().clone(), UnitRole::BuildScript)],
             UnitRole::BuildScript => Self::hosted(crates.dependencies(key.package(), &Self::BUILD)),
             UnitRole::HostBuild => Self::hosted(crates.dependencies(key.package(), &Self::NORMAL))
                 .into_iter()
-                .chain(iter::once(key.sibling(UnitRole::BuildRun)))
+                .chain(iter::once(UnitKey::new(key.package().clone(), UnitRole::BuildRun)))
                 .collect(),
             UnitRole::Library => Self::checked(key, crates, &Self::NORMAL),
             UnitRole::LibraryTest => Self::checked(key, crates, &Self::NORMAL_AND_DEV),
@@ -64,12 +64,12 @@ impl UnitRole {
             .dependencies(key.package(), kinds)
             .into_iter()
             .map(|package| crates.linked(package))
-            .chain(iter::once(key.sibling(UnitRole::BuildRun)))
+            .chain(iter::once(UnitKey::new(key.package().clone(), UnitRole::BuildRun)))
             .collect()
     }
 
     fn beside_library(key: &UnitKey, checked: Vec<UnitKey>) -> Vec<UnitKey> {
-        checked.into_iter().chain(iter::once(key.sibling(UnitRole::Library))).collect()
+        checked.into_iter().chain(iter::once(UnitKey::new(key.package().clone(), UnitRole::Library))).collect()
     }
 }
 
