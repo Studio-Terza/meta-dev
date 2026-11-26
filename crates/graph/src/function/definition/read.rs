@@ -1,10 +1,16 @@
+use std::ops::Range;
+
 use lint_layout::{LineNumber, Name};
+use newtype::proptest::arbitrary::{Arbitrary, any};
+use newtype::proptest::collection;
+use newtype::proptest::prop_oneof;
+use newtype::proptest::strategy::{BoxedStrategy, Just, Strategy};
 
 use super::operator::Operator;
 use crate::boundary::{LiteralValue, ParamIndex};
 use crate::resolved::Resolved;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Reader {
     Named(Resolved),
     Constructor(Resolved),
@@ -54,7 +60,40 @@ impl Argument {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+impl Argument {
+    const DEPTH: u32 = 3;
+    const NODES: u32 = 12;
+    const BRANCHES: u32 = 3;
+    const SAMPLED: Range<usize> = 0..3;
+
+    fn grown(inner: BoxedStrategy<Argument>) -> BoxedStrategy<Argument> {
+        Strategy::prop_map((any::<Operator>(), collection::vec(inner, Argument::SAMPLED)), |(operator, operands)| {
+            Argument::applied(operator, operands)
+        })
+        .boxed()
+    }
+}
+
+impl Arbitrary for Argument {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Argument>;
+
+    fn arbitrary_with((): ()) -> BoxedStrategy<Argument> {
+        let parameter = (any::<ParamIndex>(), collection::vec(any::<Name>(), Argument::SAMPLED))
+            .prop_map(|(parameter, fields)| Argument::Parameter { parameter, fields });
+        prop_oneof![
+            parameter,
+            any::<Reader>().prop_map(Argument::Named),
+            any::<LiteralValue>().prop_map(Argument::Literal),
+            Just(Argument::Opaque),
+        ]
+        .prop_recursive(Argument::DEPTH, Argument::NODES, Argument::BRANCHES, Argument::grown)
+        .boxed()
+    }
+}
+
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[newtype(generate = Read::sampled)]
 pub struct Read {
     reader: Reader,
     parameter: ParamIndex,
@@ -85,6 +124,23 @@ impl Unpassed {
 }
 
 impl Read {
+    const SAMPLED: Range<usize> = 0..3;
+
+    fn sampled() -> impl Strategy<Value = Read> {
+        Strategy::prop_map(
+            (
+                any::<Reader>(),
+                any::<ParamIndex>(),
+                collection::vec(any::<Name>(), Read::SAMPLED),
+                any::<LineNumber>(),
+                collection::vec(any::<Argument>(), Read::SAMPLED),
+            ),
+            |(reader, parameter, fields, line, arguments)| {
+                Unpassed::new(reader, parameter, fields, line).passing(arguments)
+            },
+        )
+    }
+
     #[must_use]
     pub fn comparable(&self) -> Option<&[Argument]> {
         let opaque = self.arguments.iter().find(|argument| matches!(argument, Argument::Opaque));

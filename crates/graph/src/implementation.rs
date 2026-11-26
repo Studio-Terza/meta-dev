@@ -1,4 +1,9 @@
+use std::ops::Range;
+
 use lint_layout::Name;
+use newtype::proptest::arbitrary::any;
+use newtype::proptest::collection::vec;
+use newtype::proptest::strategy::Strategy;
 
 use crate::boundary::ItemId;
 use crate::function::Parameter;
@@ -7,13 +12,13 @@ use crate::resolved::Resolved;
 use crate::sited::{Sited, Spelling};
 use crate::type_ref::TypeRef;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Origin {
     Written,
     Derived,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub struct Subject {
     written: Name,
     ty: TypeRef,
@@ -26,13 +31,22 @@ impl Subject {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
+#[newtype(generate = Interface::sampled)]
 pub struct Interface {
     sited: Sited,
     arguments: Vec<TypeRef>,
 }
 
 impl Interface {
+    const SAMPLED: Range<usize> = 0..3;
+
+    fn sampled() -> impl Strategy<Value = Interface> {
+        Strategy::prop_map((any::<Sited>(), vec(any::<TypeRef>(), Interface::SAMPLED)), |(sited, arguments)| {
+            Interface::new(sited, arguments)
+        })
+    }
+
     #[must_use]
     pub fn new(sited: Sited, arguments: Vec<TypeRef>) -> Interface {
         Interface { sited, arguments }
@@ -50,7 +64,8 @@ impl AsRef<Sited> for Interface {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
+#[newtype(generate = Implementation::sampled)]
 pub struct Implementation {
     subject: Subject,
     implemented: Option<Interface>,
@@ -60,7 +75,7 @@ pub struct Implementation {
     assigned: Vec<Assigned>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub struct Assigned {
     name: Name,
     ty: TypeRef,
@@ -107,9 +122,32 @@ impl Unparameterised {
 }
 
 impl Implementation {
+    const SAMPLED: Range<usize> = 0..3;
+
+    fn sampled() -> impl Strategy<Value = Implementation> {
+        Strategy::prop_map(
+            (
+                any::<Subject>(),
+                any::<Option<Interface>>(),
+                any::<Origin>(),
+                any::<Region>(),
+                vec(any::<Parameter>(), Implementation::SAMPLED),
+                vec(any::<Assigned>(), Implementation::SAMPLED),
+            ),
+            |(subject, implemented, origin, region, parameters, assigned)| {
+                Unparameterised::new(subject, implemented, origin, region).parameterised(parameters, assigned)
+            },
+        )
+    }
+
     #[must_use]
     pub fn assigned(&self) -> &[Assigned] {
         &self.assigned
+    }
+
+    #[must_use]
+    pub fn parameters(&self) -> &[Parameter] {
+        &self.parameters
     }
 
     #[must_use]

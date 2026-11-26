@@ -5,7 +5,7 @@ use golden::golden;
 use graph_reader::Reader;
 use lint_file::ModelLint;
 use lint_fixtures::{Lines, Located, Queried, Source, Sources, Text};
-use lint_laws::{HandWrittenLaws, LawRunners};
+use lint_laws::{HandWrittenLaws, LawRunners, UngeneratedLaws};
 
 const NEWTYPE: &str = "pub use newtype_derive::Arbitrary;\n";
 const ALGEBRA: &str = "pub trait Semigroup {}\npub trait Monoid: Semigroup {}\n";
@@ -17,6 +17,7 @@ const HAND_WRITTEN: &str = "laws::generates!(total_generates, any::<x::Total>())
 const JOINED: &str = "#[derive(newtype::Arbitrary)]\npub struct Joined(u8);\nimpl algebra::Semigroup for Joined {}\n";
 const BARE: &str =
     "pub struct Bare;\nimpl algebra::Semigroup for Bare {}\npub struct Empty;\nimpl algebra::Monoid for Empty {}\n";
+const GENERIC: &str = "#[derive(newtype::Arbitrary)]\npub struct Wrapped<Item>(Item);\nimpl<Item> algebra::Semigroup for Wrapped<Item> {}\n";
 const HIDDEN: &str = "struct Hidden;\nimpl algebra::Semigroup for Hidden {}\n";
 
 struct Workspace;
@@ -32,6 +33,11 @@ impl Workspace {
             Source::new(Located::new("crates/x/src/b.rs"), Text::new(PUBLIC_MODULE)),
             extra,
         ]
+    }
+
+    fn ungenerated(sources: &[Source]) -> Lines {
+        let model = Reader::read_files(&Sources::parsed(sources));
+        Sources::lines(&UngeneratedLaws::listed(&model, &LawRunners::from(&model)))
     }
 }
 
@@ -74,13 +80,15 @@ fn a_semigroup_that_is_no_monoid_gets_only_associativity() -> Result<(), FileFai
     Ok(())
 }
 
-laws::table!(a_public_semigroup_the_runner_cannot_generate_is_refused, |sources: &Vec<Source>| Sources::flagged::<Queried<HandWrittenLaws>>(sources), [
+laws::table!(a_public_semigroup_the_runner_cannot_generate_is_listed, Workspace::ungenerated, [
     Workspace::with(Source::new(Located::new("crates/y/src/lib.rs"), Text::new(BARE)))
-        => Lines::from(["crates/x/src/lib.rs:1", "crates/y/src/lib.rs:1", "crates/y/src/lib.rs:3"]),
+        => Lines::from(["crates/y/src/lib.rs:1", "crates/y/src/lib.rs:3"]),
     Workspace::with(Source::new(Located::new("crates/y/src/lib.rs"), Text::new(JOINED)))
-        => Lines::from(["crates/x/src/lib.rs:1", "crates/y/src/lib.rs:1"]),
+        => Lines::default(),
     Workspace::with(Source::new(Located::new("crates/y/src/lib.rs"), Text::new(HIDDEN)))
-        => Lines::from(["crates/x/src/lib.rs:1"]),
+        => Lines::default(),
+    Workspace::with(Source::new(Located::new("crates/y/src/lib.rs"), Text::new(GENERIC)))
+        => Lines::from(["crates/y/src/lib.rs:2"]),
 ]);
 
 #[test]

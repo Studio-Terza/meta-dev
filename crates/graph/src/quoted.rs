@@ -1,7 +1,7 @@
 use crate::boundary::Quote;
 use crate::resolved::Resolved;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub struct Quoted {
     invoked: Resolved,
     quote: Quote,

@@ -1,11 +1,15 @@
 use std::collections::BTreeSet;
 use std::fmt;
+use std::ops::Range;
 
 use lint_layout::Name;
+use newtype::proptest::arbitrary::any;
+use newtype::proptest::collection::{btree_set, vec};
+use newtype::proptest::strategy::Strategy;
 
 use crate::type_ref::TypeRef;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(newtype::Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Property {
     Associative,
     Commutative,
@@ -18,7 +22,7 @@ pub enum Property {
     Acting,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LawKind {
     Roundtrip,
     Crud,
@@ -27,33 +31,34 @@ pub enum LawKind {
     Property(Property),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(newtype::Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Side {
     Input,
     Output,
     Edge,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub enum OperationOwner {
     Typed(TypeRef),
     Operand,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub struct Operation {
     owner: OperationOwner,
     member: Name,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub struct Route {
     side: Side,
     operation: Option<Operation>,
     fallback: Option<OperationOwner>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
+#[newtype(generate = Law::sampled)]
 pub struct Law {
     kind: LawKind,
     title: Name,
@@ -133,6 +138,20 @@ impl Route {
 }
 
 impl Law {
+    const SAMPLED: Range<usize> = 0..3;
+
+    fn sampled() -> impl Strategy<Value = Law> {
+        Strategy::prop_map(
+            (
+                any::<LawKind>(),
+                any::<Name>(),
+                btree_set(any::<Name>(), Law::SAMPLED),
+                vec(any::<Route>(), Law::SAMPLED),
+            ),
+            |(kind, title, mentions, routes)| Law::new(kind, title, mentions, routes),
+        )
+    }
+
     #[must_use]
     pub fn new(kind: LawKind, title: Name, mentions: BTreeSet<Name>, routes: Vec<Route>) -> Law {
         Law { kind, title, mentions, routes }

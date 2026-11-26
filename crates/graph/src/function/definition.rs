@@ -2,16 +2,20 @@ mod operator;
 mod read;
 
 use std::fmt;
+use std::ops::Range;
 
 use body_lifts::{Body, Branching, Propagated};
 use lint_layout::{Casing, LineNumber, Name, Whole, Word};
+use newtype::proptest::arbitrary::any;
+use newtype::proptest::collection::vec;
+use newtype::proptest::strategy::Strategy;
 
 use crate::boundary::{CallOrder, ParamIndex};
 use crate::type_ref::{Named, TypeRef};
 pub use operator::{Infix, Operator, Prefix};
 pub use read::{Argument, Read, Reader, Unpassed};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub enum Receiving {
     Owner,
     Bound(TypeRef),
@@ -19,7 +23,7 @@ pub enum Receiving {
     Unknown,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub enum Invocation {
     Method { receiver: Receiving, name: Name },
     Path { owner: Option<Name>, name: Name },
@@ -32,7 +36,8 @@ pub enum CallOwner<'name> {
     Unknown,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
+#[newtype(generate = Definition::sampled)]
 pub struct Definition {
     shape: Body,
     branching: Branching,
@@ -64,6 +69,24 @@ impl Invoking {
 }
 
 impl Definition {
+    const SAMPLED: Range<usize> = 0..3;
+
+    fn sampled() -> impl Strategy<Value = Definition> {
+        Strategy::prop_map(
+            (
+                any::<Body>(),
+                any::<Branching>(),
+                any::<Propagated>(),
+                vec(any::<Invocation>(), Definition::SAMPLED),
+                vec(any::<Repetition>(), Definition::SAMPLED),
+                vec(any::<Read>(), Definition::SAMPLED),
+            ),
+            |(shape, branching, propagated, invocations, repetitions, reads)| {
+                Invoking::new(shape, branching, propagated, invocations).walked(repetitions, reads)
+            },
+        )
+    }
+
     #[must_use]
     pub fn propagated(&self) -> Propagated {
         self.propagated
@@ -194,26 +217,26 @@ impl fmt::Display for Invocation {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(newtype::Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Looping {
     For,
     While,
     Bare,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Repeating {
     Closure(Name),
     Loop(Looping),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Reached {
     Parameter { index: ParamIndex, name: Name },
     Field(Name),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub struct Repetition {
     reach: Reached,
     line: LineNumber,

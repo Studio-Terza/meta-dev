@@ -25,7 +25,7 @@ pub enum ItemKind {
     Macro,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(newtype::Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Exposure {
     Public,
     Restricted,

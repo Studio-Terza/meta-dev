@@ -4,6 +4,7 @@ use lint_complexity::Complexity;
 use lint_core::{Lint, Report, SourceFile};
 use lint_effect_sites::EffectSites;
 use lint_file::ModelLint;
+use lint_laws::{LawRunners, UngeneratedLaws};
 use lint_linear_flow::FlowShapes;
 use lint_named_invariants::NamedInvariants;
 use lint_narrowed_returns::NarrowedReturns;
@@ -44,6 +45,7 @@ impl Elegance {
             <NamedInvariants as ModelLint>::report(model),
             PairedApis::report(files),
             Clones::report(files),
+            UngeneratedLaws::listed(model, &LawRunners::from(model)),
         ]
     }
 }

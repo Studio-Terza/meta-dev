@@ -1,7 +1,7 @@
 use crate::boundary::ItemId;
 use crate::region::Region;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ItemDeclaration {
     item: ItemId,
     region: Region,

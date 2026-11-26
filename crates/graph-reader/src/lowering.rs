@@ -23,7 +23,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use syntax::Spanned;
-use syntax::{Attribute, Ident, ItemImpl, ItemMod};
+use syntax::{Attribute, Generics, Ident, ItemImpl, ItemMod};
 
 use graph::{
     Alias, Aliases, Assigned, Declarations, Entry, Evaluation, Exports, Exposure, FileId, FileTable, Interface, Model,
@@ -57,6 +57,13 @@ use signature::{DeclaredParameter, InScope, LoweredInput, LoweredParameter, Writ
 
 use uses::UseRow;
 pub(crate) use walk::Lowering;
+
+#[derive(Clone, Copy, Debug)]
+struct Deriving<'item> {
+    subject: &'item Ident,
+    scope: &'item InScope,
+    generics: &'item Generics,
+}
 
 #[derive(Debug)]
 struct ImplRow {
@@ -104,24 +111,24 @@ impl ImplRow {
         }
     }
 
-    fn derived(seat: &Seat, region: Region, path: &syntax::Path, subject: &Ident) -> ImplRow {
+    fn derived(seat: &Seat, region: Region, path: &syntax::Path, deriving: Deriving<'_>) -> ImplRow {
         let position = Position::from(path.span());
         ImplRow {
             located: seat.located(position),
-            subject: Name::from(subject),
-            ty: TypeRef::Named(Named::new(Written::path(UsePath::from(subject), position), Vec::new())),
+            subject: Name::from(deriving.subject),
+            ty: TypeRef::Named(Named::new(Written::path(UsePath::from(deriving.subject), position), Vec::new())),
             implemented: Some(UsePath::from(path)),
             arguments: Vec::new(),
             domain: Domain::Macros,
             origin: Origin::Derived,
             region,
-            parameters: Vec::new(),
+            parameters: LoweredParameter::declared(deriving.scope, deriving.generics),
             assigned: Vec::new(),
         }
     }
 
-    fn derives(seat: &Seat, region: Region, attributes: &Attributes, subject: &Ident) -> Vec<ImplRow> {
-        attributes.derived().iter().map(|path| ImplRow::derived(seat, region, path, subject)).collect()
+    fn derives(seat: &Seat, region: Region, attributes: &Attributes, deriving: Deriving<'_>) -> Vec<ImplRow> {
+        attributes.derived().iter().map(|path| ImplRow::derived(seat, region, path, deriving)).collect()
     }
 }
 

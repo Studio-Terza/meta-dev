@@ -20,7 +20,7 @@ use super::held::{Holder, Link};
 use super::regions::{Context, Regions};
 use super::seat::Seat;
 use super::signature::{InScope, LoweredParameter};
-use super::{AliasRow, FileShape, FnRow, Frame, Framed, Grain, Grains, Lowered, Slot, Sorted};
+use super::{AliasRow, Deriving, FileShape, FnRow, Frame, Framed, Grain, Grains, Lowered, Slot, Sorted};
 use crate::namespace::{
     Domain, Entries, Exposing, KeyRole, NodeKey, Openings, ScopeKey, ScopeKind, ScopeOp, UsePath, Visibility,
 };
@@ -358,8 +358,9 @@ impl<'read> Contribute for Lowering<'read> {
         let frame = self.frame(around);
         let scope = InScope::clone(&frame.generics).combine(InScope::from(&item.generics));
         let link = Link::declaring(&item.ident, Domain::Types);
+        let deriving = Deriving { subject: &item.ident, scope: &scope, generics: &item.generics };
         let rows = frame
-            .attributed(&Attributes::from(item.attrs.as_slice()), &item.ident)
+            .attributed(&Attributes::from(item.attrs.as_slice()), deriving)
             .combine(frame.parameters(&Holder::named(&item.ident, Held::StructParameter), &item.generics, &link))
             .combine(frame.struct_held(item, &scope, &link));
         frame.owned_by(&item.ident, Domain::Types, &item.attrs, rows)
@@ -383,8 +384,9 @@ impl<'read> Contribute for Lowering<'read> {
             let holder = Holder::named(&variant.ident, Held::EnumField);
             unit.combine(frame.fields_held(&holder, &link, variant.fields.iter(), &scope))
         });
+        let deriving = Deriving { subject: &item.ident, scope: &scope, generics: &item.generics };
         let rows = frame
-            .attributed(&Attributes::from(item.attrs.as_slice()), &item.ident)
+            .attributed(&Attributes::from(item.attrs.as_slice()), deriving)
             .combine(frame.parameters(&Holder::named(&item.ident, Held::Bound), &item.generics, &link))
             .combine(Monoid::concat(variants));
         frame.owned_by(&item.ident, Domain::Types, &item.attrs, rows)
@@ -399,7 +401,8 @@ impl<'read> Contribute for Lowering<'read> {
         let frame = self.frame(around);
         let scope = InScope::clone(&frame.generics).combine(InScope::from(&item.generics));
         let link = Link::declaring(&item.ident, Domain::Types);
-        let rows = frame.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident).combine(frame.fields_held(
+        let deriving = Deriving { subject: &item.ident, scope: &scope, generics: &item.generics };
+        let rows = frame.attributed(&Attributes::from(item.attrs.as_slice()), deriving).combine(frame.fields_held(
             &Holder::named(&item.ident, Held::UnionField),
             &link,
             item.fields.named.iter(),

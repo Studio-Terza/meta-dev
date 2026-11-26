@@ -2,7 +2,7 @@ use crate::item_path::ItemPath;
 use crate::path_use::PathUse;
 use crate::resolved::Resolved;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Dispatch {
     written: ItemPath,
     resolved: Resolved,

@@ -4,7 +4,7 @@ use crate::boundary::ItemId;
 use crate::region::Region;
 use crate::type_ref::TypeRef;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Held {
     StructField,
     EnumField,
@@ -17,7 +17,7 @@ pub enum Held {
     Variant,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub struct Holding {
     name: Name,
     held: Held,

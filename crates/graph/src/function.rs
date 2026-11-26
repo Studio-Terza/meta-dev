@@ -2,8 +2,12 @@ pub(crate) mod definition;
 mod shape;
 
 use std::fmt;
+use std::ops::Range;
 
 use lint_layout::Name;
+use newtype::proptest::arbitrary::any;
+use newtype::proptest::collection::vec;
+use newtype::proptest::strategy::Strategy;
 
 use crate::item::Exposure;
 use crate::region::{Region, Seat};
@@ -12,7 +16,7 @@ use crate::type_ref::TypeRef;
 use definition::Definition;
 pub use shape::{MethodShape, Returned, Taken};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Owner {
     Free,
     Inherent,
@@ -22,20 +26,20 @@ pub enum Owner {
     Foreign,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Evaluation {
     Runtime,
     Constant,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Entry {
     Test,
     Main,
     Called,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub enum Output {
     Implicit,
     Written(TypeRef),
@@ -68,7 +72,7 @@ impl fmt::Display for Receiver {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub enum Input {
     Receiver(Receiver),
     Typed(TypeRef),
@@ -92,20 +96,29 @@ impl Input {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(newtype::Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Mutation {
     Absent,
     ThroughSelf,
     ThroughParameter,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
+#[newtype(generate = Parameter::sampled)]
 pub struct Parameter {
     name: Name,
     bounds: Vec<TypeRef>,
 }
 
 impl Parameter {
+    const SAMPLED: Range<usize> = 0..3;
+
+    fn sampled() -> impl Strategy<Value = Parameter> {
+        Strategy::prop_map((any::<Name>(), vec(any::<TypeRef>(), Parameter::SAMPLED)), |(name, bounds)| {
+            Parameter::new(name, bounds)
+        })
+    }
+
     #[must_use]
     pub fn new(name: Name, bounds: Vec<TypeRef>) -> Parameter {
         Parameter { name, bounds }
@@ -123,7 +136,8 @@ impl AsRef<Name> for Parameter {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
+#[newtype(generate = Signature::sampled)]
 pub struct Signature {
     inputs: Vec<Input>,
     output: Output,
@@ -182,6 +196,25 @@ impl Monomorphic {
 }
 
 impl Signature {
+    const SAMPLED: Range<usize> = 0..3;
+
+    fn sampled() -> impl Strategy<Value = Signature> {
+        let listed = || vec(any::<TypeRef>(), Signature::SAMPLED);
+        Strategy::prop_map(
+            (
+                vec(any::<Input>(), Signature::SAMPLED),
+                any::<Output>(),
+                listed(),
+                vec(any::<Parameter>(), Signature::SAMPLED),
+                any::<Mutation>(),
+                listed(),
+            ),
+            |(inputs, output, constraints, parameters, mutation, mutated)| {
+                Monomorphic::new(inputs, output, constraints).generic(parameters, mutation, mutated)
+            },
+        )
+    }
+
     #[must_use]
     pub fn mutation(&self) -> Mutation {
         self.mutation
@@ -202,7 +235,7 @@ impl Signature {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub struct Function {
     name: Name,
     owner: Owner,

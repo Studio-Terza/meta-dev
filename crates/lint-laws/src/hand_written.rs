@@ -32,10 +32,6 @@ impl HandWrittenLaws {
         ),
         Fix::new("add #[path = \"generated/laws.rs\"] mod generated_laws; to one of the crate's integration tests"),
     );
-    const UNGENERATED: Message = Message::new(
-        Problem::new("a Semigroup or Monoid the law runner cannot generate, so its laws never run"),
-        Fix::new("derive newtype::Arbitrary on the type and run lint laws to regenerate"),
-    );
 }
 
 impl ModelLint for HandWrittenLaws {
@@ -49,15 +45,11 @@ impl ModelLint for HandWrittenLaws {
             .undeclared(&read)
             .into_iter()
             .map(|root| Violation::new(Site::of_file(root), HandWrittenLaws::UNDECLARED));
-        let unlawful = model
-            .items()
-            .filter(|placed| runners.ungenerated().contains(&placed.entity().declared()))
-            .map(|placed| Violation::new(placed.site(), HandWrittenLaws::UNGENERATED));
         Report::new(
             Headline::new(
                 "laws are labels: the law macros lint laws emits appear only in the runners it generates, and each runner is declared in one of its crate's test binaries, so the graph owns every such law and every one runs",
             ),
-            refused.chain(undeclared).chain(unlawful).collect(),
+            refused.chain(undeclared).collect(),
         )
     }
 }

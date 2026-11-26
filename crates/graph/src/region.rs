@@ -136,7 +136,7 @@ impl From<Writing> for Region {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub struct Seat {
     region: Region,
     subject: Option<TypeRef>,

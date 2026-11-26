@@ -1,6 +1,6 @@
 use lint_layout::LineNumber;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub struct Found<Entity> {
     line: LineNumber,
     entity: Entity,

@@ -1,6 +1,7 @@
 mod hand_written;
 mod label;
 mod runner;
+mod ungenerated;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Not;
@@ -13,6 +14,7 @@ use lint_layout::{Name, Word, words};
 pub use hand_written::HandWrittenLaws;
 use label::{Label, Law};
 use runner::Runner;
+pub use ungenerated::UngeneratedLaws;
 
 #[derive(Debug)]
 pub struct LawRunners<'model> {
@@ -119,6 +121,7 @@ impl<'model> From<&'model Model> for Labels<'model> {
         Labels {
             generated: shipped
                 .iter()
+                .filter(|placed| placed.entity().parameters().is_empty())
                 .filter_map(|placed| Some((Labels::subject(arbitrary, placed)?, placed.root())))
                 .collect(),
             monoids: shipped.iter().filter_map(|placed| Labels::subject(monoid, placed)).collect(),

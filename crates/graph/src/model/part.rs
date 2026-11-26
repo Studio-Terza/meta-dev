@@ -1,7 +1,11 @@
+use std::ops::Range;
 use std::sync::OnceLock;
 
 use algebra::{Monoid, Semigroup};
 use lint_layout::LineNumber;
+use newtype::proptest::arbitrary::any;
+use newtype::proptest::collection::vec;
+use newtype::proptest::strategy::Strategy;
 
 use crate::boundary::FileId;
 use crate::call::Call;
@@ -18,7 +22,8 @@ use crate::quoted::Quoted;
 
 use super::{Declarations, FileTable, Filed, Model};
 
-#[derive(Debug, Default)]
+#[derive(newtype::Arbitrary, Clone, Debug, Default, PartialEq, Eq)]
+#[newtype(generate = ModelPart::sampled)]
 pub struct ModelPart {
     implementations: Vec<Filed<Implementation>>,
     functions: Vec<Filed<Function>>,
@@ -54,6 +59,53 @@ impl Semigroup for ModelPart {
 impl Monoid for ModelPart {}
 
 impl ModelPart {
+    const SAMPLED: Range<usize> = 0..3;
+
+    fn sampled() -> impl Strategy<Value = ModelPart> {
+        Strategy::prop_map(
+            (
+                vec(any::<Filed<Implementation>>(), ModelPart::SAMPLED),
+                vec(any::<Filed<Function>>(), ModelPart::SAMPLED),
+                vec(any::<Filed<Holding>>(), ModelPart::SAMPLED),
+                vec(any::<Filed<Call>>(), ModelPart::SAMPLED),
+                vec(any::<Filed<PathUse>>(), ModelPart::SAMPLED),
+                vec(any::<Filed<PathUse>>(), ModelPart::SAMPLED),
+                vec(any::<Filed<PathUse>>(), ModelPart::SAMPLED),
+                vec(any::<Dispatch>(), ModelPart::SAMPLED),
+                vec(any::<Filed<ItemDeclaration>>(), ModelPart::SAMPLED),
+                vec(any::<Filed<Law>>(), ModelPart::SAMPLED),
+                vec(any::<Filed<Quoted>>(), ModelPart::SAMPLED),
+            ),
+            |(
+                implementations,
+                functions,
+                holdings,
+                calls,
+                uses,
+                interpolated,
+                typed,
+                dispatched,
+                placed,
+                laws,
+                quoted,
+            )| {
+                ModelPart {
+                    implementations,
+                    functions,
+                    holdings,
+                    calls,
+                    uses,
+                    interpolated,
+                    typed,
+                    dispatched,
+                    placed,
+                    laws,
+                    quoted,
+                }
+            },
+        )
+    }
+
     #[must_use]
     pub fn implementation(file: FileId, found: Found<Implementation>) -> ModelPart {
         ModelPart { implementations: vec![Filed::new(file, found)], ..ModelPart::default() }

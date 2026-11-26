@@ -4,7 +4,7 @@ use crate::placed::Placed;
 
 use super::file_model::FileModel;
 
-#[derive(Debug)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Filed<Entity> {
     file: FileId,
     found: Found<Entity>,

@@ -6,7 +6,8 @@ use newtype::Arbitrary;
 use crate::item_path::ItemPath;
 use crate::type_ref::TypeRef;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[newtype(from = FileId)]
 pub struct FileId(usize);
 
 impl FileId {
@@ -56,7 +57,8 @@ impl TypeRef {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[newtype(from = CallOrder)]
 pub struct CallOrder(usize);
 
 impl CallOrder {
@@ -84,7 +86,8 @@ impl fmt::Display for ItemPath {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[newtype(from = ParamIndex)]
 pub struct ParamIndex(usize);
 
 impl From<usize> for ParamIndex {
@@ -106,7 +109,8 @@ impl ParamIndex {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Arbitrary, Clone, Debug, PartialEq, Eq)]
+#[newtype(from = Quote)]
 pub struct Quote(String);
 
 impl From<String> for Quote {
@@ -121,7 +125,8 @@ impl AsRef<str> for Quote {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Arbitrary, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[newtype(from = LiteralValue)]
 pub struct LiteralValue(String);
 
 impl From<&str> for LiteralValue {

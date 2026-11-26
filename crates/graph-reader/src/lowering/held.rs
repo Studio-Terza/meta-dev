@@ -10,10 +10,10 @@ use lint_layout::{Name, Position};
 
 use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
 
-use super::ImplRow;
 use super::attributes::Attributes;
 use super::seat::{Footing, Located, Lowers};
 use super::signature::{InScope, Written};
+use super::{Deriving, ImplRow};
 use graph::{Region, TypeRef};
 
 #[derive(Clone, Debug)]
@@ -95,8 +95,8 @@ impl<'read> Frame<'read> {
         Grains::from(Grain::Holding(row))
     }
 
-    pub(super) fn attributed(&self, attributes: &Attributes, ident: &Ident) -> Grains {
-        let rows = ImplRow::derives(&self.here, self.context.region(), attributes, ident);
+    pub(super) fn attributed(&self, attributes: &Attributes, deriving: Deriving<'_>) -> Grains {
+        let rows = ImplRow::derives(&self.here, self.context.region(), attributes, deriving);
         Monoid::concat(rows.into_iter().map(Grain::Impl).map(Grains::from))
     }
 

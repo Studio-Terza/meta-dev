@@ -5,7 +5,7 @@ use crate::item_path::ItemPath;
 use crate::region::{Region, Seat};
 use crate::resolved::Resolved;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(newtype::Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Mention {
     Expression,
     Invoked,
@@ -17,7 +17,7 @@ pub enum Mention {
     Expanded,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub struct PathUse {
     written: ItemPath,
     resolved: Resolved,
