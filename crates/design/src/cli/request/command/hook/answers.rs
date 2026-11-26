@@ -1,13 +1,14 @@
 mod boundary;
 
-use design_store::{ContextNodes, OwnerSaid, Said};
-use dispatch_ports::{Clock, Dispatch, Prompt, Timeout};
+use design_store::{ContextNodes, OwnerHistory, Quote, Said};
+use dispatch_ports::{Clock, Dispatch, Model, Prompt, Timeout};
 use store_ports::Store;
 use transcript_ports::Body;
 
+use super::super::eval::Called;
 use super::super::structure::Crew;
 use crate::cli::failure::Failure;
-pub use boundary::{Answers, Asked, Recollection, Remembered, Replied, Role, Traced};
+pub use boundary::{Answers, Asked, Reading, Recollection, Remembered, Replied, Role, Traced};
 use boundary::{Question, Recalling};
 
 #[derive(Debug)]
@@ -41,14 +42,15 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Answering<'ports, S, D, C> {
     }
 
     fn selected(&self, asked: Asked) -> Result<Traced, Failure> {
-        let candidates: Vec<Said> =
-            asked.terms().map(|terms| self.store.read(OwnerSaid::any(terms))).transpose()?.unwrap_or_default();
-        let picked = candidates
+        let history: Vec<Said> = self.store.read(OwnerHistory)?;
+        let reading = asked.reading(&history);
+        let called = self.crew.fanned(&reading, Self::TIMEOUT)?;
+        let quoted: Vec<Quote> = reading.quoted(&called).into_iter().flatten().collect();
+        let trimmed = quoted
             .first()
-            .map(|_| self.crew.replied(&Prompt::from(&asked.selecting(&candidates)), Self::TIMEOUT))
-            .transpose()?
-            .flatten();
-        let answers = picked.and_then(|reply| Answers::verified(&reply, &candidates));
-        Ok(Traced::Question(Question::new(asked, candidates, answers)))
+            .map(|_| self.crew.called(&Prompt::from(&asked.trimming(&quoted)), Self::TIMEOUT, Model::Sonnet))
+            .transpose()?;
+        let answers = trimmed.as_ref().and_then(Called::reply).and_then(|reply| Answers::kept(reply, &quoted));
+        Ok(Traced::Question(Question::new(asked, history.len(), quoted.len(), answers)))
     }
 }

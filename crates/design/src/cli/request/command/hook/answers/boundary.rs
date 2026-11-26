@@ -3,14 +3,14 @@ use std::fmt;
 use std::ops::Not;
 
 use design_model::{NodeId, Outline, Stage, Title};
-use design_store::{Quote, Said};
-use dispatch_ports::Reply;
-use grammar_search::Terms;
+use design_store::{Quote, Said, Unabridged};
+use dispatch_ports::{Prompt, Reply};
 use newtype::Wrapping;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use transcript_ports::{Body, Uuid};
 
+use super::super::super::eval::Called;
 use crate::cli::request::ignored::Ignored;
 use invariants::Ignoring;
 
@@ -21,8 +21,18 @@ pub struct Role(&'static str);
 pub struct Asked {
     kind: Kind,
     question: Body,
-    #[serde(default)]
-    terms: Vec<Body>,
+}
+
+#[derive(Debug)]
+pub struct Reading<'history> {
+    chunks: Vec<&'history [Said]>,
+    prompts: Vec<Prompt>,
+}
+
+#[derive(Debug)]
+pub struct Trimming<'asked> {
+    question: &'asked Body,
+    quotes: Vec<String>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
@@ -44,7 +54,8 @@ pub struct Answers(Vec<Quote>);
 #[derive(Debug)]
 pub struct Question {
     asked: Asked,
-    candidates: Vec<Said>,
+    read: usize,
+    quoted: usize,
     answers: Option<Answers>,
 }
 
@@ -163,18 +174,16 @@ impl fmt::Display for Traced {
 }
 
 impl Question {
-    pub fn new(asked: Asked, candidates: Vec<Said>, answers: Option<Answers>) -> Question {
-        Question { asked, candidates, answers }
+    pub fn new(asked: Asked, read: usize, quoted: usize, answers: Option<Answers>) -> Question {
+        Question { asked, read, quoted, answers }
     }
 }
 
 impl fmt::Display for Question {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let terms: Vec<String> = self.asked.terms.iter().map(ToString::to_string).collect();
-        let found: Vec<String> = self.candidates.iter().map(|said| AsRef::<Uuid>::as_ref(said).to_string()).collect();
         writeln!(formatter, "question: {}", self.asked.question)?;
-        writeln!(formatter, "terms: {}", terms.join(" "))?;
-        writeln!(formatter, "candidates: {}", found.join(" "))?;
+        writeln!(formatter, "read: {} owner messages", self.read)?;
+        writeln!(formatter, "quoted: {}", self.quoted)?;
         let shown = self.answers.as_ref().map_or_else(|| String::from("answers: none"), ToString::to_string);
         write!(formatter, "{shown}")
     }
@@ -198,12 +207,47 @@ impl Asked {
         Replied(reply).object::<Asked>().ignoring(Ignored::Unclassified).filter(|asked| asked.kind == Kind::Question)
     }
 
-    pub fn terms(&self) -> Option<Terms> {
-        Terms::lexed(self.terms.iter().map(AsRef::as_ref))
-    }
-
     pub fn selecting(&self, shown: &[impl fmt::Display]) -> Selecting<'_> {
         Selecting { question: &self.question, shown: shown.iter().map(ToString::to_string).collect() }
+    }
+
+    pub fn reading<'history>(&self, history: &'history [Said]) -> Reading<'history> {
+        let chunks: Vec<&[Said]> = history.chunks(Reading::CHUNK).collect();
+        let prompts = chunks
+            .iter()
+            .map(|chunk| {
+                let whole: Vec<Unabridged<'_>> = chunk.iter().map(Unabridged::from).collect();
+                Prompt::from(&self.selecting(&whole))
+            })
+            .collect();
+        Reading { chunks, prompts }
+    }
+
+    pub fn trimming(&self, quotes: &[Quote]) -> Trimming<'_> {
+        Trimming {
+            question: &self.question,
+            quotes: quotes.iter().zip(1..).map(|(quote, number)| format!("{number}. {quote}")).collect(),
+        }
+    }
+}
+
+impl<'history> Reading<'history> {
+    const CHUNK: usize = 300;
+
+    pub fn prompts(&self) -> &[Prompt] {
+        &self.prompts
+    }
+
+    pub fn chunks(&self) -> &[&'history [Said]] {
+        &self.chunks
+    }
+
+    pub fn quoted(&self, called: &[Called]) -> Vec<Vec<Quote>> {
+        self.chunks
+            .iter()
+            .zip(called)
+            .map(|(chunk, call)| call.reply().map_or_default(|reply| Answers::quoted(reply, chunk)))
+            .collect()
     }
 }
 
@@ -237,9 +281,18 @@ impl Replied<'_> {
 }
 
 impl Answers {
-    pub fn verified(reply: &Reply, candidates: &[Said]) -> Option<Answers> {
-        let quotes = Answers::quoted(reply, candidates);
-        quotes.is_empty().not().then_some(Answers(quotes))
+    const KEPT: usize = 8;
+
+    pub fn kept(reply: &Reply, quotes: &[Quote]) -> Option<Answers> {
+        let named: BTreeSet<usize> = Replied(reply).listed::<usize>().into_iter().collect();
+        let kept: Vec<Quote> = quotes
+            .iter()
+            .zip(1..)
+            .filter(|(_quote, number)| named.contains(number))
+            .map(|(quote, _number)| quote.clone())
+            .take(Answers::KEPT)
+            .collect();
+        kept.is_empty().not().then_some(Answers(kept))
     }
 
     pub fn quoted(reply: &Reply, candidates: &[Said]) -> Vec<Quote> {
@@ -258,7 +311,7 @@ impl fmt::Display for Classifying {
             "You read the last message an AI agent wrote at the end of its turn. The agent is {}.\n\
              Decide whether the message asks its owner a question, or asks the owner to make a decision, approve something, or choose between options.\n\
              Reply with JSON only, no prose and no code fence:\n\
-             {{\"kind\": \"question\" or \"statement\", \"question\": the question restated in one line (empty for a statement), \"terms\": 6 to 14 single lowercase search words for finding where the owner may already have answered it: the question's key words, plus plain everyday synonyms and word forms the owner might have used instead, with compounds split into their words}}\n\n\
+             {{\"kind\": \"question\" or \"statement\", \"question\": the question restated in one line (empty for a statement)}}\n\n\
              Message:\n{}",
             self.role.0, self.said
         )
@@ -275,6 +328,21 @@ impl fmt::Display for Selecting<'_> {
              Reply with JSON only, no prose and no code fence: a list of {{\"uuid\": the full uuid from the header, \"quote\": an excerpt of that message copied exactly, character for character, one or two sentences}}. Reply [] if none bear on it.\n\n{}",
             self.question,
             self.shown.join("\n\n")
+        )
+    }
+}
+
+impl fmt::Display for Trimming<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "An AI agent is about to ask its owner this question:\n{}\n\n\
+             Below, numbered, are passages the owner wrote earlier, each with its message uuid and timestamp.\n\
+             Keep only the passages that answer the question: the owner already stated the decision, rule, preference or fact the question needs, so the agent could act without asking. Keep at most {}.\n\
+             Reply with JSON only, no prose and no code fence: a list of passage numbers, such as [3, 1]. Reply [] if none answer it.\n\n{}",
+            self.question,
+            Answers::KEPT,
+            self.quotes.join("\n")
         )
     }
 }

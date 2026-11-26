@@ -279,26 +279,21 @@ ORDER BY
         ))
     }
 
-    pub(crate) fn answering(self, statements: &mut Statements<'_>) -> Result<Vec<MessageRow>, StoreFailure> {
-        let answers = [&self]
+    pub(crate) fn owned(statements: &mut Statements<'_>) -> Result<Vec<Said>, StoreFailure> {
+        let owned: BTreeMap<(Instant, Uuid), MessageRow> = MessageRow::all(statements)?
             .into_iter()
-            .filter(|row| row.author == Authorship::Lead)
-            .map(|row| LinkRow::replies_to(&row.uuid, statements))
-            .collect::<Result<Vec<Vec<Uuid>>, StoreFailure>>()?;
-        let answered = answers
-            .into_iter()
-            .flatten()
-            .map(|reply| MessageRow::named(&reply, statements))
-            .collect::<Result<Vec<Vec<MessageRow>>, StoreFailure>>()?;
-        Ok([self]
-            .into_iter()
-            .chain(answered.into_iter().flatten())
             .filter(|row| row.author == Authorship::Owner)
-            .collect())
+            .map(|row| ((row.at.clone(), row.uuid.clone()), row))
+            .collect();
+        Ok(owned.into_values().map(Said::from).collect())
     }
 
     pub(crate) fn every(statements: &mut Statements<'_>) -> Result<Vec<Message>, StoreFailure> {
-        let rows = statements.rows(store_ports::query!(
+        Ok(MessageRow::all(statements)?.into_iter().map(Record::from).map(Message::from).collect())
+    }
+
+    fn all(statements: &mut Statements<'_>) -> Result<Vec<MessageRow>, StoreFailure> {
+        statements.rows(store_ports::query!(
             MessageRow,
             r#"
 SELECT
@@ -311,8 +306,7 @@ SELECT
 FROM
   messages
 "#
-        ))?;
-        Ok(rows.into_iter().map(Record::from).map(Message::from).collect())
+        ))
     }
 
     pub(crate) fn earlier(session: &SessionId, statements: &mut Statements<'_>) -> Result<Vec<Record>, StoreFailure> {
@@ -442,16 +436,6 @@ ORDER BY
         ))
     }
 
-    pub(crate) fn replies_to(uuid: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<Uuid>, StoreFailure> {
-        let links = LinkRow::touching(uuid, statements)?;
-        Ok(links
-            .into_iter()
-            .filter(|link| link.target_message == *uuid)
-            .filter(|link| matches!(link.relation, Relation::RepliesTo | Relation::Answers))
-            .map(|link| link.source_message)
-            .collect())
-    }
-
     #[must_use]
     pub fn anchors(&self) -> [Anchor; 2] {
         [self.source.clone(), self.target.clone()]
@@ -547,17 +531,6 @@ WHERE
 
     pub(crate) fn ranking(&self, other: &Hit) -> Ordering {
         self.rank.ordered(other.rank).then(self.id.cmp(&other.id))
-    }
-
-    pub(crate) fn best_per_message(hits: Vec<Hit>, before: Option<&Instant>) -> BTreeMap<Uuid, f64> {
-        hits.into_iter().filter(|hit| before.is_none_or(|bound| hit.at < *bound)).fold(
-            BTreeMap::new(),
-            |mut best: BTreeMap<Uuid, f64>, hit| {
-                let rank = hit.rank.0;
-                best.entry(hit.uuid).and_modify(|held| *held = held.min(rank)).or_insert(rank);
-                best
-            },
-        )
     }
 }
 

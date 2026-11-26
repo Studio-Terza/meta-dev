@@ -69,9 +69,6 @@ pub struct Checked {
 #[derive(Debug)]
 pub struct Judged {
     truth: Truth,
-    twelve: BTreeSet<Uuid>,
-    candidates: BTreeSet<Uuid>,
-    store: Checked,
     base: Checked,
     chunked: Checked,
 }
@@ -112,14 +109,10 @@ struct Agreement {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-struct Retrieval {
+struct Grounded {
     judged: usize,
     answered: usize,
     truths: usize,
-    twelve_any: usize,
-    all_any: usize,
-    twelve_truths: usize,
-    all_truths: usize,
     truth_tokens: u64,
 }
 
@@ -127,7 +120,6 @@ struct Retrieval {
 struct Picking {
     found_any: usize,
     found: usize,
-    reachable: usize,
     picks: usize,
     verified: usize,
     tokens: u64,
@@ -137,8 +129,7 @@ struct Picking {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct Tally {
     agreement: Agreement,
-    retrieval: Retrieval,
-    store: Picking,
+    grounded: Grounded,
     base: Picking,
     chunked: Picking,
 }
@@ -225,13 +216,12 @@ impl Arm {
 }
 
 impl Checked {
-    fn picking(&self, truth: &BTreeSet<Uuid>, reachable: usize) -> Picking {
+    fn picking(&self, truth: &BTreeSet<Uuid>) -> Picking {
         let picked: BTreeSet<&Uuid> = self.arm.quotes.iter().map(AsRef::<Uuid>::as_ref).collect();
         let found = truth.iter().filter(|uuid| picked.contains(uuid)).count();
         Picking {
             found_any: usize::from(found > 0),
             found,
-            reachable,
             picks: self.arm.quotes.len(),
             verified: self
                 .arm
@@ -246,39 +236,22 @@ impl Checked {
 }
 
 impl Judged {
-    const TWELVE: usize = 12;
-
-    pub fn new(truth: Truth, candidates: &[Said], [store, base, chunked]: [Checked; 3]) -> Judged {
-        let uuids = candidates.iter().map(AsRef::<Uuid>::as_ref).cloned();
-        Judged {
-            truth,
-            twelve: uuids.clone().take(Self::TWELVE).collect(),
-            candidates: uuids.collect(),
-            store,
-            base,
-            chunked,
-        }
+    pub fn new(truth: Truth, [base, chunked]: [Checked; 2]) -> Judged {
+        Judged { truth, base, chunked }
     }
 
     fn tally(&self) -> Tally {
         let truths = &self.truth.uuids;
-        let twelve = truths.intersection(&self.twelve).count();
-        let all = truths.intersection(&self.candidates).count();
         Tally {
             agreement: Agreement::default(),
-            retrieval: Retrieval {
+            grounded: Grounded {
                 judged: 1,
                 answered: usize::from(truths.is_empty().not()),
                 truths: truths.len(),
-                twelve_any: usize::from(twelve > 0),
-                all_any: usize::from(all > 0),
-                twelve_truths: twelve,
-                all_truths: all,
                 truth_tokens: self.truth.spent.tokens,
             },
-            store: self.store.picking(truths, all),
-            base: self.base.picking(truths, truths.len()),
-            chunked: self.chunked.picking(truths, truths.len()),
+            base: self.base.picking(truths),
+            chunked: self.chunked.picking(truths),
         }
     }
 }
@@ -333,29 +306,24 @@ impl Semigroup for Agreement {
 
 impl Monoid for Agreement {}
 
-impl Semigroup for Retrieval {
-    fn combine(self, other: Retrieval) -> Retrieval {
-        Retrieval {
+impl Semigroup for Grounded {
+    fn combine(self, other: Grounded) -> Grounded {
+        Grounded {
             judged: self.judged + other.judged,
             answered: self.answered + other.answered,
             truths: self.truths + other.truths,
-            twelve_any: self.twelve_any + other.twelve_any,
-            all_any: self.all_any + other.all_any,
-            twelve_truths: self.twelve_truths + other.twelve_truths,
-            all_truths: self.all_truths + other.all_truths,
             truth_tokens: self.truth_tokens + other.truth_tokens,
         }
     }
 }
 
-impl Monoid for Retrieval {}
+impl Monoid for Grounded {}
 
 impl Semigroup for Picking {
     fn combine(self, other: Picking) -> Picking {
         Picking {
             found_any: self.found_any + other.found_any,
             found: self.found + other.found,
-            reachable: self.reachable + other.reachable,
             picks: self.picks + other.picks,
             verified: self.verified + other.verified,
             tokens: self.tokens + other.tokens,
@@ -386,8 +354,7 @@ impl Semigroup for Tally {
     fn combine(self, other: Tally) -> Tally {
         Tally {
             agreement: self.agreement.combine(other.agreement),
-            retrieval: self.retrieval.combine(other.retrieval),
-            store: self.store.combine(other.store),
+            grounded: self.grounded.combine(other.grounded),
             base: self.base.combine(other.base),
             chunked: self.chunked.combine(other.chunked),
         }
@@ -451,21 +418,11 @@ impl fmt::Display for Turn {
 
 impl fmt::Display for Tally {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let retrieval = self.retrieval;
+        let grounded = self.grounded;
         write!(
             formatter,
-            "judged={} answered={} truths={} twelve_any={} all_any={} twelve_truths={} all_truths={} truth_tokens={} store=[{}] base=[{}] chunked=[{}]",
-            retrieval.judged,
-            retrieval.answered,
-            retrieval.truths,
-            retrieval.twelve_any,
-            retrieval.all_any,
-            retrieval.twelve_truths,
-            retrieval.all_truths,
-            retrieval.truth_tokens,
-            self.store,
-            self.base,
-            self.chunked
+            "judged={} answered={} truths={} truth_tokens={} base=[{}] chunked=[{}]",
+            grounded.judged, grounded.answered, grounded.truths, grounded.truth_tokens, self.base, self.chunked
         )
     }
 }
@@ -474,8 +431,8 @@ impl fmt::Display for Picking {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
-            "found_any={} found={} reachable={} picks={} verified={} tokens={} seconds={}",
-            self.found_any, self.found, self.reachable, self.picks, self.verified, self.tokens, self.seconds
+            "found_any={} found={} picks={} verified={} tokens={} seconds={}",
+            self.found_any, self.found, self.picks, self.verified, self.tokens, self.seconds
         )
     }
 }

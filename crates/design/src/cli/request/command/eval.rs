@@ -1,6 +1,6 @@
 mod boundary;
 
-use design_store::{OwnerBefore, OwnerSaid, Said, TurnEnd, Unabridged};
+use design_store::{OwnerBefore, Said, TurnEnd, Unabridged};
 use dispatch_ports::{Clock, Dispatch, Model, Prompt, Timeout};
 use store_ports::Store;
 use transcript_ports::{Body, Instant};
@@ -33,7 +33,6 @@ impl Eval {
 
 impl<S: Store, D: Dispatch, C: Clock> Evaluating<'_, S, D, C> {
     const TIMEOUT: Timeout = Timeout::new(600);
-    const CHUNK: usize = 300;
 
     fn turn(&self, end: &TurnEnd) -> Result<Turn, Failure> {
         let said: &Body = end.asked().as_ref();
@@ -53,33 +52,16 @@ impl<S: Store, D: Dispatch, C: Clock> Evaluating<'_, S, D, C> {
     fn judged(&self, end: &TurnEnd, asked: &Asked, truly: &Asked) -> Result<Judged, Failure> {
         let at: &Instant = end.asked().as_ref();
         let history: Vec<Said> = self.store.read(OwnerBefore::from(at.clone()))?;
-        let candidates: Vec<Said> = asked
-            .terms()
-            .map(|terms| self.store.read(OwnerSaid::before(terms, at.clone())))
-            .transpose()?
-            .unwrap_or_default();
         let grounding = Prompt::from(&Grounding::new(truly, end.replied(), &history));
         let truth = Truth::read(&self.crew.called(&grounding, Self::TIMEOUT, Model::Sonnet)?, &history);
-        let selected = self.crew.called(&Prompt::from(&asked.selecting(&candidates)), Self::TIMEOUT, Model::Haiku)?;
-        let stored = Arm::picked(&selected, &candidates);
         let whole: Vec<Unabridged<'_>> = history.iter().map(Unabridged::from).collect();
         let read = self.crew.called(&Prompt::from(&asked.selecting(&whole)), Self::TIMEOUT, Model::Haiku)?;
         let based = Arm::picked(&read, &history);
-        let chunks = history.chunks(Self::CHUNK).map(|chunk| self.chunk_read(asked, chunk));
-        let chunked = Arm::concat(chunks.collect::<Result<Vec<Arm>, Failure>>()?);
-        let store_checked = self.crew.called(&Prompt::from(&stored.verifying(truly)), Self::TIMEOUT, Model::Sonnet)?;
+        let reading = asked.reading(&history);
+        let fanned = self.crew.fanned(&reading, Self::TIMEOUT)?;
+        let chunked = Arm::concat(reading.chunks().iter().zip(&fanned).map(|(chunk, call)| Arm::picked(call, chunk)));
         let base_checked = self.crew.called(&Prompt::from(&based.verifying(truly)), Self::TIMEOUT, Model::Sonnet)?;
         let chunk_checked = self.crew.called(&Prompt::from(&chunked.verifying(truly)), Self::TIMEOUT, Model::Sonnet)?;
-        Ok(Judged::new(
-            truth,
-            &candidates,
-            [stored.checked(&store_checked), based.checked(&base_checked), chunked.checked(&chunk_checked)],
-        ))
-    }
-
-    fn chunk_read(&self, asked: &Asked, chunk: &[Said]) -> Result<Arm, Failure> {
-        let whole: Vec<Unabridged<'_>> = chunk.iter().map(Unabridged::from).collect();
-        let read = self.crew.called(&Prompt::from(&asked.selecting(&whole)), Self::TIMEOUT, Model::Haiku)?;
-        Ok(Arm::picked(&read, chunk))
+        Ok(Judged::new(truth, [based.checked(&base_checked), chunked.checked(&chunk_checked)]))
     }
 }

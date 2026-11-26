@@ -22,6 +22,7 @@ use transcript_ports::{Body, SessionId};
 
 use super::apply::{Application, Parsed};
 use super::eval::Called;
+use super::hook::answers::Reading;
 use crate::Outcome;
 use crate::cli::failure::{Failure, Flail, Flails};
 use crate::cli::output::{Attempted, Count, Flailing, Lapsed, Line};
@@ -147,6 +148,14 @@ impl<'ports, D: Dispatch, C: Clock> Crew<'ports, D, C> {
         let held = self.dispatch.dispatch(&Job::due_by(Deadline::after(start, timeout), model), prompt)?;
         let watched = Watch::over(self.dispatch, self.clock).watched(held)?;
         Ok(Called::new(&watched, [start, self.clock.now()]))
+    }
+
+    pub fn fanned(&self, reading: &Reading<'_>, timeout: Timeout) -> Result<Vec<Called>, Failure> {
+        let start = self.clock.now();
+        let job = Job::due_by(Deadline::after(start, timeout), Model::Haiku);
+        let watched = Watch::over(self.dispatch, self.clock).fanned(&job, reading.prompts())?;
+        let spanned = [start, self.clock.now()];
+        Ok(watched.iter().map(|each| Called::new(each, spanned)).collect())
     }
 }
 

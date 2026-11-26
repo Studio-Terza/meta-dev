@@ -1,16 +1,12 @@
 mod boundary;
 
-use grammar_search::Terms;
 use port_core::Op;
 use transcript_ports::{Instant, SessionId};
 
 pub use boundary::{Quote, Said, TurnEnd, Unabridged};
 
-#[derive(Clone, Debug, Op)]
-pub struct OwnerSaid {
-    terms: Terms,
-    before: Option<Instant>,
-}
+#[derive(Clone, Copy, Debug, Op)]
+pub struct OwnerHistory;
 
 #[derive(Clone, Debug, Op)]
 pub struct LastSaid(SessionId);
@@ -23,22 +19,6 @@ pub struct TurnEnds {
     session: SessionId,
     from: Instant,
     until: Instant,
-}
-
-impl OwnerSaid {
-    pub const MOST: usize = 60;
-    const EACH: usize = 10;
-    const SHARPEST: usize = 5;
-
-    #[must_use]
-    pub fn any(terms: Terms) -> OwnerSaid {
-        OwnerSaid { terms, before: None }
-    }
-
-    #[must_use]
-    pub fn before(terms: Terms, at: Instant) -> OwnerSaid {
-        OwnerSaid { terms, before: Some(at) }
-    }
 }
 
 impl TurnEnds {

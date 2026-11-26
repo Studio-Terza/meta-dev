@@ -31,16 +31,15 @@ impl Asking {
     const RULED: &str = "the lint wall time limit stays at three seconds";
     const QUEUED: &str = "yes keep it first in first out";
     const QUOTED: &str = "\"the lint wall time limit stays at three seconds\"";
-    const LINT: &str =
-        "{\"kind\":\"question\",\"question\":\"should the lint limit change\",\"terms\":[\"lint\",\"banana\"]}";
-    const QUEUE: &str =
-        "{\"kind\":\"question\",\"question\":\"what order should the queue keep\",\"terms\":[\"queue\",\"order\"]}";
+    const LINT: &str = "{\"kind\":\"question\",\"question\":\"should the lint limit change\"}";
     const PICKED: &str = "[{\"uuid\":\"o1\",\"quote\":\"the lint wall time limit stays at three seconds\"}]";
+    const KEPT: &str = "[1]";
+    const STATEMENT: &str = "{\"kind\":\"statement\",\"question\":\"\"}";
     const COVERED: &str = "conversational(o1.0)\nconversational(o2.0)";
     const STOPPING: &str = "{\"hook_event_name\":\"Stop\",\"stop_hook_active\":false,\"last_assistant_message\":\"Should the lint limit change?\"}";
 
     fn over(replies: &[&str]) -> Result<Asking, Failure> {
-        let session = Session::working(
+        Asking::spoken(
             [
                 Session::line(Speaker::Owner, "o1", "null", Asking::RULED),
                 Session::line(Speaker::Lead, "l1", "\"o1\"", "should the queue keep its order"),
@@ -48,7 +47,12 @@ impl Asking {
                 Session::line(Speaker::Lead, "l2", "\"o2\"", "noted"),
             ]
             .concat(),
-        );
+            replies,
+        )
+    }
+
+    fn spoken(lines: String, replies: &[&str]) -> Result<Asking, Failure> {
+        let session = Session::working(lines);
         let asking = Asking {
             store: Sqlite::in_memory::<StreamSchema>(),
             files: session.files(),
@@ -87,23 +91,12 @@ impl Asking {
         Ok(Asking::over(replies)?.asked("", &["answer", question]))
     }
 
-    fn scored(replies: &[&str]) -> Result<Asking, Failure> {
-        let crowd = (1..=8_u8).flat_map(|index| {
-            [
-                Session::line(Speaker::Owner, &format!("a{index}"), "null", "lint alpha beta"),
-                Session::line(Speaker::Owner, &format!("b{index}"), "null", "wall alpha beta"),
-            ]
-        });
-        let session = Session::working(
-            crowd.chain([Session::line(Speaker::Owner, "x1", "null", "lint wall alpha beta")]).collect::<String>(),
-        );
-        let asking = Asking {
-            store: Sqlite::in_memory::<StreamSchema>(),
-            files: session.files(),
-            script: Scripted::replying(replies.iter().map(|reply| Some(Output::Finished(Asking::finished(reply))))),
-        };
-        Invocation::within(&asking.store, FakeLent::new(&asking.files), &["ingest"])?;
-        Ok(asking)
+    fn crowded(replies: &[&str]) -> Result<Asking, Failure> {
+        let crowd = (1..=300_u16).map(|index| Session::line(Speaker::Owner, &format!("m{index:03}"), "null", "noted"));
+        Asking::spoken(
+            crowd.chain([Session::stamped(Speaker::Owner, "o1", "null", Asking::RULED, "2026-01-02")]).collect(),
+            replies,
+        )
     }
 }
 
@@ -117,8 +110,7 @@ fn an_eval_scores_each_stage_of_a_turn_that_asked_against_the_owners_earlier_ans
         ]
         .concat(),
     );
-    let replies =
-        [Asking::LINT, Asking::LINT, "[\"o1\",\"o9\"]", Asking::PICKED, Asking::PICKED, "[]", "[\"o1\"]", "[]", "[]"];
+    let replies = [Asking::LINT, Asking::LINT, "[\"o1\",\"o9\"]", Asking::PICKED, Asking::PICKED, "[\"o1\"]", "[]"];
     let asking = Asking {
         store: Sqlite::in_memory::<StreamSchema>(),
         files: session.files(),
@@ -126,7 +118,7 @@ fn an_eval_scores_each_stage_of_a_turn_that_asked_against_the_owners_earlier_ans
     };
     Invocation::within(&asking.store, FakeLent::new(&asking.files), &["ingest"])?;
     let evaluated = asking.asked("", &["eval", "s", "2026-01-03T00:00:00Z", "2026-01-04T00:00:00Z"]);
-    let tallied = "judged=1 answered=1 truths=1 twelve_any=1 all_any=1 twelve_truths=1 all_truths=1 truth_tokens=37 store=[found_any=1 found=1 reachable=1 picks=1 verified=1 tokens=37 seconds=0] base=[found_any=1 found=1 reachable=1 picks=1 verified=0 tokens=37 seconds=0] chunked=[found_any=0 found=0 reachable=1 picks=0 verified=0 tokens=37 seconds=0]";
+    let tallied = "judged=1 answered=1 truths=1 truth_tokens=37 base=[found_any=1 found=1 picks=1 verified=1 tokens=37 seconds=0] chunked=[found_any=1 found=1 picks=1 verified=0 tokens=37 seconds=0]";
     assert_eq!(evaluated.outcome?, Outcome::Evaluated);
     assert!(
         evaluated.text.contains(&format!("turn l1 2026-01-02T00:00:00Z haiku=Asks sonnet=Asks truth=[o1] {tallied}")),
@@ -137,17 +129,7 @@ fn an_eval_scores_each_stage_of_a_turn_that_asked_against_the_owners_earlier_ans
     assert!(evaluated.text.contains(&format!("total {tallied}")), "{}", evaluated.text);
     assert_eq!(
         asking.script.models(),
-        [
-            Model::Haiku,
-            Model::Sonnet,
-            Model::Sonnet,
-            Model::Haiku,
-            Model::Haiku,
-            Model::Haiku,
-            Model::Sonnet,
-            Model::Sonnet,
-            Model::Sonnet
-        ]
+        [Model::Haiku, Model::Sonnet, Model::Sonnet, Model::Haiku, Model::Haiku, Model::Sonnet, Model::Sonnet]
     );
     let grounding = evaluated.prompts.get(2).cloned().unwrap_or_default();
     assert!(grounding.contains(&format!("[o1 2026-01-01T00:00:00Z] {}", Asking::RULED)), "{grounding}");
@@ -156,27 +138,40 @@ fn an_eval_scores_each_stage_of_a_turn_that_asked_against_the_owners_earlier_ans
 }
 
 #[test]
-fn the_classifier_reads_the_message_and_the_selector_reads_each_candidate_under_its_header() -> Result<(), Failure> {
-    let asked = Asking::answered(&[Asking::LINT, Asking::PICKED], "is the lint limit still three seconds")?;
+fn haiku_reads_every_earlier_owner_message_under_its_header_and_sonnet_trims_the_quotes() -> Result<(), Failure> {
+    let asking = Asking::over(&[Asking::LINT, Asking::PICKED, Asking::KEPT])?;
+    let asked = asking.asked("", &["answer", "is the lint limit still three seconds"]);
     let classifying = asked.prompts.first().cloned().unwrap_or_default();
     let selecting = asked.prompts.get(1).cloned().unwrap_or_default();
+    let trimming = asked.prompts.get(2).cloned().unwrap_or_default();
     assert!(classifying.contains("is the lint limit still three seconds"), "{classifying}");
     assert!(selecting.contains("should the lint limit change"), "{selecting}");
     assert!(selecting.contains(&format!("[o1 2026-01-01T00:00:00Z] {}", Asking::RULED)), "{selecting}");
+    assert!(selecting.contains(&format!("[o2 2026-01-01T00:00:00Z] {}", Asking::QUEUED)), "{selecting}");
+    assert!(trimming.contains(&format!("1. o1 2026-01-01T00:00:00Z: {}", Asking::QUOTED)), "{trimming}");
+    assert_eq!(asking.script.models(), [Model::Haiku, Model::Haiku, Model::Sonnet]);
     Ok(())
 }
 
 #[test]
-fn a_message_matching_two_terms_outranks_many_that_match_one() -> Result<(), Failure> {
-    let wall = "{\"kind\":\"question\",\"question\":\"lint wall\",\"terms\":[\"lint\",\"wall\"]}";
-    let asked = Asking::scored(&[wall, "[]"])?.asked("", &["answer", "lint wall"]);
-    assert!(asked.text.contains(" x1"), "{}", asked.text);
+fn the_owner_messages_are_read_in_chunks_of_300_and_each_quote_is_checked_against_its_own_chunk() -> Result<(), Failure>
+{
+    let asking = Asking::crowded(&[Asking::LINT, Asking::PICKED, Asking::PICKED, Asking::KEPT])?;
+    let asked = asking.asked("", &["answer", "should the lint limit change"]);
+    let first = asked.prompts.get(1).cloned().unwrap_or_default();
+    let second = asked.prompts.get(2).cloned().unwrap_or_default();
+    assert_eq!(
+        (first.contains("[m300 "), first.contains("[o1 "), second.contains("[m001 "), second.contains("[o1 ")),
+        (true, false, false, true)
+    );
+    assert!(asked.text.contains("read: 301 owner messages\nquoted: 1\n"), "{}", asked.text);
+    assert!(asked.text.contains(&format!("o1 2026-01-02T00:00:00Z: {}", Asking::QUOTED)), "{}", asked.text);
     Ok(())
 }
 
 #[test]
 fn a_stop_without_its_last_message_reads_the_sessions_last_lead_message() -> Result<(), Failure> {
-    let asking = Asking::over(&[Asking::COVERED, "{\"kind\":\"statement\",\"question\":\"\",\"terms\":[]}"])?;
+    let asking = Asking::over(&[Asking::COVERED, Asking::STATEMENT])?;
     let stopping = "{\"hook_event_name\":\"Stop\",\"stop_hook_active\":false,\"session_id\":\"s\"}";
     let stopped = asking.asked(stopping, &["hook", "stop"]);
     let classifying = stopped.prompts.get(1).cloned().unwrap_or_default();
@@ -186,42 +181,56 @@ fn a_stop_without_its_last_message_reads_the_sessions_last_lead_message() -> Res
 }
 
 #[test]
-fn an_answer_quotes_the_owner_message_that_shares_any_one_term_with_the_question() -> Result<(), Failure> {
-    let asked = Asking::answered(&[Asking::LINT, Asking::PICKED], "should the lint limit change")?;
+fn an_answer_quotes_the_owner_messages_the_trim_keeps() -> Result<(), Failure> {
+    let asked = Asking::answered(&[Asking::LINT, Asking::PICKED, Asking::KEPT], "should the lint limit change")?;
     assert_eq!(asked.outcome?, Outcome::Answered);
-    assert!(asked.text.contains("candidates: o1\n"), "{}", asked.text);
+    assert!(asked.text.contains("read: 2 owner messages\nquoted: 1\n"), "{}", asked.text);
     assert!(asked.text.contains(&format!("o1 2026-01-01T00:00:00Z: {}", Asking::QUOTED)), "{}", asked.text);
     Ok(())
 }
 
 #[test]
-fn an_answer_reaches_the_owner_reply_to_a_lead_question_that_matched() -> Result<(), Failure> {
-    let asked = Asking::answered(&[Asking::QUEUE, "[]"], "what order should the queue keep")?;
-    assert!(asked.text.contains("candidates: o2\n"), "{}", asked.text);
-    assert!(asked.text.contains("answers: none"), "{}", asked.text);
+fn an_answer_drops_the_quotes_the_trim_rejects() -> Result<(), Failure> {
+    let asked = Asking::answered(&[Asking::LINT, Asking::PICKED, "[]"], "should the lint limit change")?;
+    assert!(asked.text.contains("quoted: 1\nanswers: none"), "{}", asked.text);
     Ok(())
 }
 
 #[test]
-fn an_answer_drops_a_quote_the_owner_never_wrote() -> Result<(), Failure> {
+fn the_trim_keeps_at_most_eight_quotes() -> Result<(), Failure> {
+    let picked: Vec<String> = (4..=13)
+        .map(|count| {
+            let quote: String = Asking::QUEUED.chars().take(count).collect();
+            format!("{{\"uuid\":\"o2\",\"quote\":\"{quote}\"}}")
+        })
+        .collect();
+    let picks = format!("[{}]", picked.join(","));
+    let asked =
+        Asking::answered(&[Asking::LINT, &picks, "[1,2,3,4,5,6,7,8,9,10]"], "what order should the queue keep")?;
+    assert_eq!(asked.text.matches("o2 2026-01-01T00:00:00Z: ").count(), 8, "{}", asked.text);
+    Ok(())
+}
+
+#[test]
+fn an_answer_drops_a_quote_the_owner_never_wrote_and_sends_no_trim() -> Result<(), Failure> {
     let invented = "[{\"uuid\":\"o1\",\"quote\":\"the limit is gone\"},{\"uuid\":\"o2\",\"quote\":\"the lint wall\"}]";
     let asked = Asking::answered(&[Asking::LINT, invented], "should the lint limit change")?;
-    assert!(asked.text.contains("answers: none"), "{}", asked.text);
+    assert!(asked.text.contains("quoted: 0\nanswers: none"), "{}", asked.text);
+    assert_eq!(asked.prompts.len(), 2);
     Ok(())
 }
 
 #[test]
-fn a_statement_is_not_searched_and_sends_no_selection() -> Result<(), Failure> {
-    let statement = "{\"kind\":\"statement\",\"question\":\"\",\"terms\":[]}";
-    let asked = Asking::answered(&[statement], "the build is green")?;
+fn a_statement_reads_no_owner_messages() -> Result<(), Failure> {
+    let asked = Asking::answered(&[Asking::STATEMENT], "the build is green")?;
     assert!(asked.text.contains("statement: asks the owner nothing"), "{}", asked.text);
-    assert_eq!((asked.text.contains("candidates"), asked.prompts.len()), (false, 1));
+    assert_eq!((asked.text.contains("read:"), asked.prompts.len()), (false, 1));
     Ok(())
 }
 
 #[test]
 fn a_stop_that_asks_the_owner_blocks_with_the_quotes_that_answer_it() -> Result<(), Box<dyn Error>> {
-    let asking = Asking::over(&[Asking::COVERED, Asking::LINT, Asking::PICKED])?;
+    let asking = Asking::over(&[Asking::COVERED, Asking::LINT, Asking::PICKED, Asking::KEPT])?;
     let stopped = asking.asked(Asking::STOPPING, &["hook", "stop"]);
     let decision: Value = serde_json::from_str(&stopped.text)?;
     let reason = decision.get("reason").and_then(Value::as_str).unwrap_or_default();
