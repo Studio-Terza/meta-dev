@@ -18,6 +18,7 @@ path = "tests/fuzz/main.rs"
 required-features = ["campaign"]
 
 [dependencies]
+invariants = { path = "../crates/invariants" }
 file-ports = { path = "../crates/file-ports" }
 
 [dev-dependencies]

@@ -6,15 +6,17 @@ mod place;
 use std::fs::{self, OpenOptions};
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use port_core::Pass;
 
+use invariants::Unpoisoned;
 use migrations::Migrations;
 use opened::Opened;
 use place::Place;
 use store_ports::{
-    Batch, Busy, Claim, Created, Opens, Query, Record, Schema, StoreFailure, StoreFiller, StoreLock, Written, store_ops,
+    Batch, Busy, Claim, Created, Opens, Provenance, Query, Record, Schema, StoreFailure, StoreFiller, StoreLock,
+    Written, store_ops,
 };
 
 #[derive(Clone, Debug)]
@@ -45,6 +47,11 @@ impl Sqlite {
         Sqlite::placed(Place::Memory, Migrations::declared::<S>())
     }
 
+    #[must_use]
+    pub fn provenance(&self) -> Option<Provenance> {
+        self.shared.opened.lock().unpoisoned().as_ref().map(Opened::provenance)
+    }
+
     fn placed(place: Place, migrations: Migrations) -> Sqlite {
         let shared = Shared { place, migrations, opened: Mutex::default(), claim: Arc::default() };
         Sqlite { shared: Arc::new(shared) }
@@ -57,7 +64,7 @@ impl Shared {
         prepare: impl FnOnce(&Path) -> io::Result<()>,
         body: impl FnOnce(&mut Opened) -> Result<T, Failure>,
     ) -> Result<T, Failure> {
-        let mut slot = self.opened.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut slot = self.opened.lock().unpoisoned();
         let opened = slot.take().map_or_else(|| self.place.opened(prepare, self.migrations), Ok)?;
         body(slot.insert(opened))
     }

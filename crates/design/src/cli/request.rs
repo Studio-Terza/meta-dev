@@ -1,5 +1,6 @@
 mod command;
 mod ground;
+mod ignored;
 mod persistence;
 mod projects;
 mod said;

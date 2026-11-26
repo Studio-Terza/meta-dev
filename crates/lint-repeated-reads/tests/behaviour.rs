@@ -20,6 +20,7 @@ const CONSTRUCTORS: &str = "struct Ctx { a: u8 }\nstruct Held<'c>(&'c Ctx);\nenu
 const ASSOCIATED: &str = "struct Ctx { a: u8 }\nstruct Facts;\nimpl Facts { fn of(c: &Ctx) -> u8 { c.a } }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { Facts::of(c) + 1 } }\nimpl Lint for B { fn run(&self, c: &Ctx) -> u8 { Facts::of(c) + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 const GENERIC_OWNER: &str = "struct Ctx { a: u8 }\ntrait Fact { fn of(c: &Ctx) -> u8; }\ntrait Lint { fn run<F: Fact>(&self, c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run<F: Fact>(&self, c: &Ctx) -> u8 { F::of(c) + 1 } }\nimpl Lint for B { fn run<F: Fact>(&self, c: &Ctx) -> u8 { F::of(c) + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 const FORWARDS: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { fact(c) } }\nimpl Lint for B { fn run(&self, c: &Ctx) -> u8 { fact(c) } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
+const FORWARDS_AFTER_A_METHOD: &str = "struct Ctx { a: u8 }\nimpl Ctx { fn touch(&self) {} }\nfn fact(c: &Ctx) -> u8 { c.a }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { c.touch(); fact(c) } }\nimpl Lint for B { fn run(&self, c: &Ctx) -> u8 { c.touch(); fact(c) } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 const PRIMITIVES: &str = "fn fact(c: u8) -> u8 { c }\ntrait Lint { fn run(&self, c: u8) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, c: u8) -> u8 { fact(c) + 1 } }\nimpl Lint for B { fn run(&self, c: u8) -> u8 { fact(c) + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 const TABLE: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a }\ntrait Lint { fn run(c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(c: &Ctx) -> u8 { fact(c) + 1 } }\nimpl Lint for B { fn run(c: &Ctx) -> u8 { fact(c) + 2 } }\nconst RUNS: [fn(&Ctx) -> u8; 2] = [<A as Lint>::run, <B as Lint>::run];\n";
 const VALUE_OUTSIDE_TABLE: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a }\ntrait Lint { fn run(c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(c: &Ctx) -> u8 { fact(c) + 1 } }\nimpl Lint for B { fn run(c: &Ctx) -> u8 { fact(c) + 2 } }\nfn pick() -> fn(&Ctx) -> u8 { <A as Lint>::run }\n";
@@ -31,7 +32,7 @@ const VALUE_AFTER_TABLES: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 {
 const SINKS: &str = "struct Out { a: u8 }\nfn write(o: &mut Out) { o.a = 1; }\ntrait Lint { fn run(&self, o: &mut Out, p: Out) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, o: &mut Out, mut p: Out) -> u8 { write(o); write(&mut p); 1 } }\nimpl Lint for B { fn run(&self, o: &mut Out, mut p: Out) -> u8 { write(o); write(&mut p); 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 const METHOD_CALLS: &str = "struct Ctx { a: u8 }\nimpl Ctx { fn fact(&self) -> u8 { self.a } }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { c.fact() + 1 } }\nimpl Lint for B { fn run(&self, c: &Ctx) -> u8 { c.fact() + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 
-const CASES: [Case; 29] = [
+const CASES: [Case; 30] = [
     Case::new(
         Title::new("the same literal is one fact"),
         &[Source::new(Located::new("a.rs"), Text::new(SAME_LITERAL))],
@@ -126,6 +127,11 @@ const CASES: [Case; 29] = [
         Title::new("bodies that only forward the parameter"),
         &[Source::new(Located::new("a.rs"), Text::new(FORWARDS))],
         Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a body that calls a method before its tail call is not a forwarder"),
+        &[Source::new(Located::new("a.rs"), Text::new(FORWARDS_AFTER_A_METHOD))],
+        Flagged::new(&["a.rs:7"]),
     ),
     Case::new(
         Title::new("a primitive parameter"),

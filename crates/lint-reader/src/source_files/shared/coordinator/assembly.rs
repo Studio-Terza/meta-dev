@@ -64,9 +64,7 @@ impl<'tree> Planned<'tree> {
     ) -> Assembled<'tree> {
         match self {
             Planned::Main(main) => Planned::main(main, outcome, hands),
-            Planned::Failed(_) => {
-                Assembled { failures: outcome.into_iter().filter_map(Result::err).collect(), ..Assembled::default() }
-            }
+            Planned::Failed(_) => Assembled { failures: Planned::failed(outcome), ..Assembled::default() },
         }
     }
 
@@ -78,6 +76,13 @@ impl<'tree> Planned<'tree> {
         let hand = hands.get(main.as_ref()).copied().unwrap_or(Partition::MAIN);
         let failures = outcome.into_iter().flatten().flat_map(Declared::failures).collect();
         Assembled { mains: BTreeMap::from([(hand, vec![main])]), failures }
+    }
+
+    fn failed(outcome: Option<Result<Declared, Failure>>) -> Vec<Failure> {
+        match outcome {
+            Some(Err(failure)) => vec![failure],
+            Some(Ok(_)) | None => Vec::new(),
+        }
     }
 }
 

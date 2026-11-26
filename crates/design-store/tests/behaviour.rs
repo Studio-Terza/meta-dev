@@ -25,6 +25,7 @@ use design_store::{
 use dispatch_ports::{Deadline, Pid, Wall};
 use file_ports::{Bytes, Files, Memory};
 use grammar_search::Terms;
+use invariants::{Ignoring, ignored};
 use laws::proptest::collection::{btree_set, vec};
 use laws::proptest::prelude::{Just, any, prop_assert_eq, prop_oneof};
 use laws::proptest::sample::{Index, select};
@@ -40,6 +41,12 @@ use stream::{Message, Relation, Shape, Stream};
 use transcript_ports::{
     Authorship, Body, ClaudeCodeDir, Cursor, Instant, Malformed, SessionId, Skipped, Transcripts, Uuid,
 };
+
+ignored! {
+    enum Ignored {
+        BeyondRange => "a node index past the i64 range saturates at its maximum",
+    }
+}
 
 const DIRECTORY: &str = "/projects/work";
 
@@ -505,6 +512,18 @@ ORDER BY
 }
 
 #[test]
+fn an_in_memory_store_opened_after_two_of_its_schema_is_copied_from_the_migrated_template() -> Result<(), Box<dyn Error>>
+{
+    let run = Run::root();
+    let opened: Vec<Option<store_ports::Provenance>> = iter::repeat_with(Sqlite::in_memory::<StreamSchema>)
+        .take(3)
+        .map(|store| run.port(store.clone()).read(SegmentKeys).map(|_keys| store.provenance()))
+        .collect::<Result<_, _>>()?;
+    assert_eq!(opened.last(), Some(&Some(store_ports::Provenance::Copied)));
+    Ok(())
+}
+
+#[test]
 fn every_foreign_key_into_segments_is_immediate_and_neither_cascades_nor_sets() -> Result<(), Box<dyn Error>> {
     let run = Run::root();
     let keys = run.port(Sqlite::in_memory::<StreamSchema>()).read(SegmentKeys)?;
@@ -613,7 +632,7 @@ impl Dag {
     }
 
     fn id(node: usize) -> NodeId {
-        NodeId::new(i64::try_from(node).unwrap_or(i64::MAX).saturating_add(1))
+        NodeId::new(i64::try_from(node).ignoring(Ignored::BeyondRange).unwrap_or(i64::MAX).saturating_add(1))
     }
 
     fn node(store: &Port<'_, Sqlite>, facet: Facet) -> Result<Planting, Box<dyn Error>> {
@@ -895,8 +914,8 @@ fn a_file_is_seen_once_its_directions_are_written_and_not_when_they_are_refused(
     let job = Remit::job(first, [asked.clone(), answered.clone()]);
     let unpaid = Proposals::unseen(&store, "unpaid")?;
     let directed = vec![Proposals::child(root, 2)?, Directed::Conversational { segment: asked.clone() }];
-    let refusal = store.write(Directions::new(Provenance::from(Entered::Apply), unpaid, directed.clone(), job)).err();
-    assert!(matches!(refusal, Some(Refusal::Unpaid(_))));
+    let refusal = store.write(Directions::new(Provenance::from(Entered::Apply), unpaid, directed.clone(), job));
+    assert!(matches!(refusal, Err(Refusal::Unpaid(_))));
     assert_eq!(Proposals::open(&store)?, [first, second]);
     let kept = Proposals::unseen(&store, "kept")?;
     store.write(Directions::new(
@@ -1315,16 +1334,26 @@ impl Staging {
             .map(|step| {
                 let before = Staging::stored(&store, root)?;
                 let transition = Staging::transition(*step)?;
-                let wanted = transition.clone().applied(before.clone()).map_or_else(
-                    |misstaged| Restaging { refused: Some(misstaged), node: before },
-                    |moved| Restaging { refused: None, node: moved },
-                );
-                let refused =
-                    store.write(Restaged::new(resolved, transition)).err().map(Staging::misstaged).transpose()?;
+                let wanted = Staging::wanted(transition.clone().applied(before.clone()), before);
+                let refused = Staging::refused(store.write(Restaged::new(resolved, transition)))?;
                 Ok(Mismatch { wanted, stored: Restaging { refused, node: Staging::stored(&store, root)? } })
             })
             .collect::<Result<Vec<Mismatch>, Box<dyn Error>>>()?;
         Ok(moved.into_iter().filter(|mismatch| mismatch.wanted != mismatch.stored).collect())
+    }
+
+    fn refused<Written>(written: Result<Written, Refusal>) -> Result<Option<Misstaged>, Box<dyn Error>> {
+        match written {
+            Ok(_written) => Ok(None),
+            Err(refusal) => Self::misstaged(refusal).map(Some),
+        }
+    }
+
+    fn wanted(applied: Result<AnyNode, Misstaged>, before: AnyNode) -> Restaging {
+        match applied {
+            Ok(moved) => Restaging { refused: None, node: moved },
+            Err(misstaged) => Restaging { refused: Some(misstaged), node: before },
+        }
     }
 
     fn misstaged(refusal: Refusal) -> Result<Misstaged, Box<dyn Error>> {
@@ -1367,7 +1396,7 @@ fn a_vague_node_is_refused_a_specification_and_keeps_its_stage() -> Result<(), B
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     let root = Projects::rooted(&store, "p")?;
     let specified = store.write(Restaged::new(Dag::resolved(&store, root)?, Staging::transition(Step::Specify)?));
-    let refused = specified.err().map(Staging::misstaged).transpose()?;
+    let refused = Staging::refused(specified)?;
     assert_eq!(refused.map(Misstaged::stage), Some(Stage::Vague));
     assert_eq!(Staging::stored(&store, root)?.stage().stage(), Stage::Vague);
     Ok(())

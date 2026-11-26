@@ -1,5 +1,6 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
+use grammar::{Ignoring, Unlexed};
 use grammar_notes::{Date, Ending, Entry, Line, Marking, Notes, Quote, Reading, Unclosed};
 use laws::proptest::collection::vec;
 use laws::proptest::prelude::{Strategy, any, prop_assert_eq, prop_oneof};
@@ -484,7 +485,7 @@ laws::table!(
 
 laws::table!(
     a_date_is_exactly_four_digits_then_two_then_two_joined_by_dashes,
-    |day: &&str| Date::try_new((*day).to_owned()).ok().map(Date::into_inner),
+    |day: &&str| Date::try_new((*day).to_owned()).ignoring(Unlexed::NotThisGrammar).map(Date::into_inner),
     [
         "2026-11-05" => Some("2026-11-05".to_owned()),
         "" => None,
@@ -500,7 +501,7 @@ laws::table!(
 
 laws::table!(
     a_date_parses_from_text_only_when_it_is_spelled_as_one,
-    |day: &&str| day.parse::<Date>().ok().map(|date| date.to_string()),
+    |day: &&str| day.parse::<Date>().ignoring(Unlexed::NotThisGrammar).map(|date| date.to_string()),
     [
         "1999-12-31" => Some("1999-12-31".to_owned()),
         "1999-12" => None,
@@ -513,7 +514,7 @@ laws::roundtrip!(
     a_date_is_displayed_and_parsed_back,
     any::<Date>(),
     |date: &Date| date.to_string(),
-    |text: &String| text.parse::<Date>().ok().map(|date| date.to_string()),
+    |text: &String| text.parse::<Date>().ignoring(Unlexed::NotThisGrammar).map(|date| date.to_string()),
     |date: Date| Some(date.to_string())
 );
 

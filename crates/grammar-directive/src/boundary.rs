@@ -1,6 +1,7 @@
 use std::ops::Range;
 
 use grammar::logos::{Lexer, Logos};
+use grammar::{Ignoring, Unlexed};
 use newtype::{Arbitrary, Display, Newtype};
 
 use grammar_cited::Cited;
@@ -21,7 +22,7 @@ enum Token {
     Word(String),
     #[regex(r"new[ \t]+[A-Za-z_][A-Za-z0-9_-]*", Fresh::lexed)]
     Fresh(Fresh),
-    #[regex(r"[A-Za-z0-9_][A-Za-z0-9_-]*\.(0|[1-9][0-9]*)", |lexer| lexer.slice().parse::<Cited>().ok())]
+    #[regex(r"[A-Za-z0-9_][A-Za-z0-9_-]*\.(0|[1-9][0-9]*)", |lexer| lexer.slice().parse::<Cited>().ignoring(Unlexed::NotThisGrammar))]
     Segment(Cited),
     #[regex(r#""([^"\\\r\n]|\\["\\])*""#, Quote::lexed)]
     Quoted(Quote),

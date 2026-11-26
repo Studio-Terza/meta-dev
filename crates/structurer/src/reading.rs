@@ -3,9 +3,11 @@ use std::str::FromStr;
 use design_model::Title;
 use grammar_directive::{Classes, Lexed, Line, Location, Piece};
 
+use crate::ignored::Ignored;
 use crate::misread::Wanted;
 use crate::verb::{By, New, Verb};
 use crate::{Directive, Edge, Label, Misread, NodeRef, Proposal, SegmentRef};
+use invariants::Ignoring;
 
 #[derive(Debug)]
 pub(crate) struct Reader<'line> {
@@ -90,7 +92,7 @@ impl<'line> Call<'line> {
     }
 
     pub(crate) fn named<Word: FromStr>(&self) -> Option<Word> {
-        self.name.piece().word().and_then(|word| word.parse().ok())
+        self.name.piece().word().and_then(|word| word.parse().ignoring(Ignored::Unparsed))
     }
 }
 
@@ -130,7 +132,7 @@ impl<'line> Term<'line> {
     pub(crate) fn named<Name: FromStr>(&self, wanted: Wanted) -> Result<Name, Misread> {
         self.atom()
             .and_then(|lexed| lexed.piece().word())
-            .and_then(|word| word.parse().ok())
+            .and_then(|word| word.parse().ignoring(Ignored::Unparsed))
             .ok_or_else(|| Misread::expected(self.located(), wanted))
     }
 
@@ -164,8 +166,14 @@ impl<'line> Term<'line> {
 
     pub(crate) fn fresh(&self) -> Result<Option<Label>, Misread> {
         let piece = self.atom().map(Lexed::piece);
-        let anonymous = piece.and_then(Piece::word).and_then(|word| word.parse::<New>().ok()).map(|New::New| None);
-        let labelled = piece.and_then(Piece::fresh).and_then(|label| label.as_ref().parse::<Label>().ok()).map(Some);
+        let anonymous = piece
+            .and_then(Piece::word)
+            .and_then(|word| word.parse::<New>().ignoring(Ignored::Unparsed))
+            .map(|New::New| None);
+        let labelled = piece
+            .and_then(Piece::fresh)
+            .and_then(|label| label.as_ref().parse::<Label>().ignoring(Ignored::Unparsed))
+            .map(Some);
         anonymous.or(labelled).ok_or_else(|| Misread::expected(self.located(), Wanted::New))
     }
 
@@ -187,7 +195,7 @@ impl<'line> Term<'line> {
     pub(crate) fn within<Word: FromStr>(&self, wanted: Wanted) -> Result<&Term<'line>, Misread> {
         self.call()
             .filter(|call| call.named::<Word>().is_some())
-            .and_then(|call| <&[Term<'line>; 1]>::try_from(call.arguments.as_slice()).ok())
+            .and_then(|call| <&[Term<'line>; 1]>::try_from(call.arguments.as_slice()).ignoring(Ignored::OtherShape))
             .map(|[inner]| inner)
             .ok_or_else(|| Misread::expected(self.located(), wanted))
     }

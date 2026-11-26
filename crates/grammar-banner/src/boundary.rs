@@ -2,6 +2,7 @@ use std::fmt;
 use std::str::FromStr;
 
 use grammar::logos::Logos;
+use grammar::{Ignoring, Unlexed};
 use newtype::{Arbitrary, Checked, Newtype};
 
 use grammar_unspelled::Unspelled;
@@ -95,8 +96,8 @@ impl Checked for Banner {
     fn checked(label: &String) -> Result<&String, Unspelled> {
         let spelled: Vec<Result<Spelling<'_>, ()>> = Spelling::lexer(label).collect();
         <[Result<Spelling<'_>, ()>; 1]>::try_from(spelled)
-            .ok()
-            .and_then(|[only]| only.ok())
+            .ignoring(Unlexed::OtherShape)
+            .and_then(|[only]| only.ignoring(Unlexed::NotThisGrammar))
             .and_then(Spelling::word)
             .map(|_word| label)
             .ok_or(Unspelled)
@@ -140,7 +141,8 @@ struct InBuild<'text> {
 
 impl<'text> InDeps<'text> {
     fn read(window: &[Spelling<'text>]) -> Option<InDeps<'text>> {
-        let [_target, profile, deps, name, close] = <&[Spelling<'text>; 5]>::try_from(window.get(..5)?).ok()?;
+        let [_target, profile, deps, name, close] =
+            <&[Spelling<'text>; 5]>::try_from(window.get(..5)?).ignoring(Unlexed::OtherShape)?;
         profile.word()?;
         Some(deps).filter(|spelling| **spelling == Spelling::Deps)?;
         Some(close).filter(|spelling| **spelling == Spelling::Close)?;
@@ -153,7 +155,7 @@ impl<'text> InBuild<'text> {
 
     fn read(window: &[Spelling<'text>]) -> Option<InBuild<'text>> {
         let [_target, profile, build, package, slash, hash, out, binary, close] =
-            <&[Spelling<'text>; 9]>::try_from(window.get(..9)?).ok()?;
+            <&[Spelling<'text>; 9]>::try_from(window.get(..9)?).ignoring(Unlexed::OtherShape)?;
         profile.word()?;
         Some(build).filter(|spelling| **spelling == Spelling::Build)?;
         Some(slash).filter(|spelling| **spelling == Spelling::Slash)?;

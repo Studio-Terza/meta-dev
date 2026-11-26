@@ -1,3 +1,5 @@
+mod ignored;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Instant;
 
@@ -6,6 +8,8 @@ use sha2::{Digest, Sha384};
 use store_ports::{Migration, Migrator, Version};
 
 use super::super::super::failed::Unmigrated;
+use crate::sqlite::migrations::ledger::boundary::ignored::Ignored;
+use invariants::Ignoring;
 
 #[derive(Debug)]
 pub(in super::super) struct Ledger {
@@ -77,7 +81,7 @@ impl Step {
     fn applied(&self, connection: &Connection) -> Result<Option<Version>, Unmigrated> {
         let start = Instant::now();
         connection.execute_batch(self.sql)?;
-        let elapsed = i64::try_from(start.elapsed().as_nanos()).unwrap_or(i64::MAX);
+        let elapsed = i64::try_from(start.elapsed().as_nanos()).ignoring(Ignored::BeyondRange).unwrap_or(i64::MAX);
         connection.execute(Ledger::RECORDED, params![self.version, self.description, self.checksum, elapsed])?;
         Ok(Some(Version::new(self.version)))
     }

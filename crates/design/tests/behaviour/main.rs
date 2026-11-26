@@ -1,5 +1,6 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
+mod ignored;
 mod notes;
 mod structure;
 mod view;
@@ -27,9 +28,10 @@ use design_model::{
 };
 use design_runs::{Excerpt, FailuresReported, RunState};
 use design_store::{AppliedId, Linked, Planting, Resolved, Resolving, ShownMessage, ShownNode, Stored, StreamSchema};
-use dispatch_ports::{Tokens, Usage};
+use dispatch_ports::{Reply, Tokens, Usage};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Offset, Size, Text};
 use grammar_notes::{Cite, Quote};
+use invariants::{Ignoring, Unpoisoned};
 use laws::proptest;
 use laws::proptest::prelude::{Just, any, prop_oneof};
 use laws::proptest::sample::select;
@@ -44,10 +46,34 @@ use store_ports::{
 };
 use stream::{Relation, Shape};
 use structure::Staff;
-use structurer::{Directive, Directives, Lapse, NodeRef, Proposal, SegmentRef, Uncovered};
+use structurer::{Attempt, Directive, Lapse, NodeRef, Proposal, Reading, SegmentRef, Uncovered};
 use transcript_ports::{Authorship, Body, Cursor, Instant, SessionId, Uuid};
 
+use ignored::Ignored;
+
 const HOME: &str = "/home/tester";
+
+struct Retrying;
+
+impl Retrying {
+    fn lapse(reply: &str) -> Option<Lapse> {
+        match Attempt::First.read(&Reply::new(reply.to_owned())) {
+            Reading::Again(retry) => retry.lapse().cloned(),
+            Reading::Parsed { .. } | Reading::Flailed(_) => None,
+        }
+    }
+}
+
+struct Refusal;
+
+impl Refusal {
+    fn said<Done>(done: &Result<Done, Failure>) -> String {
+        match done {
+            Ok(_done) => String::new(),
+            Err(failure) => failure.to_string(),
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 enum Speaker {
@@ -214,8 +240,8 @@ impl Session {
 
     fn files(&self) -> Memory {
         let memory = Memory::default();
-        memory.create_directories(Path::new(self.directory)).ok();
-        memory.write(&Path::new(self.directory).join("s.jsonl"), Bytes::from(&self.lines)).ok();
+        memory.create_directories(Path::new(self.directory)).ignoring(Ignored::Unseeded);
+        memory.write(&Path::new(self.directory).join("s.jsonl"), Bytes::from(&self.lines)).ignoring(Ignored::Unseeded);
         memory
     }
 }
@@ -350,7 +376,7 @@ impl Links {
         let port = run.port(store.clone());
         let shown = Session::SAID
             .iter()
-            .filter_map(|spelled| Uuid::try_new((*spelled).to_owned()).ok())
+            .filter_map(|spelled| Uuid::try_new((*spelled).to_owned()).ignoring(Ignored::Refused))
             .map(|uuid| {
                 port.read(ShownMessage::named(uuid.clone()))?
                     .ok_or(Failure::Unmatched(Unmatched::NoMatch(Prefix::new(uuid.into_inner()))))
@@ -463,7 +489,7 @@ impl Unheld {
         out.parse::<text_lines::Lines>()
             .into_iter()
             .flatten()
-            .filter_map(|line| line.parse::<Line>().ok())
+            .filter_map(|line| line.parse::<Line>().ignoring(Ignored::Unparsed))
             .filter(|line| matches!(line, Line::Refused(_)))
             .collect()
     }
@@ -588,14 +614,14 @@ impl Opened {
             &Invocation::at(directory),
             files,
             Opening(|path: PathBuf| {
-                opened.lock().map(|mut paths| paths.push(path)).ok();
+                opened.lock().unpoisoned().push(path);
                 Sqlite::in_memory::<StreamSchema>()
             }),
             Staff::idle(),
         )
         .report(&run, arguments.iter().map(OsString::from));
         let out = Answered::told(uttered)?;
-        Ok(Opened { paths: opened.into_inner().unwrap_or_default(), out })
+        Ok(Opened { paths: opened.into_inner().unpoisoned(), out })
     }
 }
 
@@ -926,7 +952,7 @@ struct Repository {
 impl Repository {
     fn at(root: &str) -> Repository {
         let files = Session::typical().files();
-        files.create_directories(&Path::new(root).join(".git")).ok();
+        files.create_directories(&Path::new(root).join(".git")).ignoring(Ignored::Unseeded);
         Repository { files }
     }
 
@@ -996,8 +1022,8 @@ impl Applying {
     }
 
     fn applied(&self, directives: &str) -> Result<String, Failure> {
-        self.files.create_directories(Path::new("/work/notes")).ok();
-        self.files.write(Path::new("/work/notes/directives"), Bytes::from(directives)).ok();
+        self.files.create_directories(Path::new("/work/notes")).ignoring(Ignored::Unseeded);
+        self.files.write(Path::new("/work/notes/directives"), Bytes::from(directives)).ignoring(Ignored::Unseeded);
         self.run(&["apply", "notes/directives"])
     }
 
@@ -1094,8 +1120,8 @@ fn a_superseded_node_stays_resolvable() -> Result<(), Failure> {
 }
 
 impl Applying {
-    fn refused(&self, directives: &str) -> Option<Failure> {
-        self.applied(&format!("propose(new, refines(n1), feature, \"first\")\n{directives}")).err()
+    fn refused(&self, directives: &str) -> Result<String, Failure> {
+        self.applied(&format!("propose(new, refines(n1), feature, \"first\")\n{directives}"))
     }
 }
 
@@ -1114,12 +1140,12 @@ fn an_unknown_reference_is_refused_and_nothing_is_written() -> Result<(), Failur
     assert!(matches!(
         refusals,
         [
-            Some(Failure::Unresolved(Unresolved::Unheard(_))),
-            Some(Failure::Unresolved(Unresolved::Ambiguous(_))),
-            Some(Failure::Unresolved(Unresolved::Unsegmented(_))),
-            Some(Failure::Unresolved(Unresolved::Unplaced(_))),
-            Some(Failure::Unresolved(Unresolved::Unplaced(_))),
-            Some(Failure::Misread(_)),
+            Err(Failure::Unresolved(Unresolved::Unheard(_))),
+            Err(Failure::Unresolved(Unresolved::Ambiguous(_))),
+            Err(Failure::Unresolved(Unresolved::Unsegmented(_))),
+            Err(Failure::Unresolved(Unresolved::Unplaced(_))),
+            Err(Failure::Unresolved(Unresolved::Unplaced(_))),
+            Err(Failure::Misread(_)),
         ]
     ));
     assert!(matches!(applying.run(&["show", "n2"]), Err(Failure::Unplaced(_))));
@@ -1132,16 +1158,17 @@ fn a_supersession_across_project_roots_is_refused_naming_both_nodes_and_nothing_
     let run = Run::root();
     let entry = Entry::new("other".parse()?, Facet::Project, Entered::Init.into());
     run.port(applying.store.clone()).write(Planting::sown(Node::new(NodeId::new(2), entry)))?;
-    assert!(matches!(applying.refused("supersede(n1, by(n2))"), Some(Failure::Unresolved(Unresolved::Straddling(_)))));
+    assert!(matches!(applying.refused("supersede(n1, by(n2))"), Err(Failure::Unresolved(Unresolved::Straddling(_)))));
     assert!(matches!(applying.run(&["show", "n3"]), Err(Failure::Unplaced(_))));
     assert_eq!(applying.run(&["show", "n2"])?.matches("supersedes").count(), 0);
     Ok(())
 }
 
 impl Applying {
-    fn cyclic(&self, directives: &str) -> Option<Failure> {
-        self.applied("propose(new, refines(n1), feature, \"a\")\npropose(new, refines(n1), feature, \"b\")").ok();
-        self.applied(directives).err()
+    fn cyclic(&self, directives: &str) -> Result<String, Failure> {
+        self.applied("propose(new, refines(n1), feature, \"a\")\npropose(new, refines(n1), feature, \"b\")")
+            .ignoring(Ignored::Unseeded);
+        self.applied(directives)
     }
 }
 
@@ -1153,19 +1180,19 @@ fn a_supersession_that_closes_a_cycle_or_names_one_node_twice_is_refused() -> Re
         "supersede(n2, by(n3))\nsupersede(n3, by(n1))\nsupersede(n1, by(n2))",
         "propose(new x, refines(n1), feature, \"c\")\nsupersede(n4, by(x))",
     ]
-    .map(|directives| Applying::ready().ok().and_then(|applying| applying.cyclic(directives)));
+    .map(|directives| Applying::ready().ignoring(Ignored::Unrun).map(|applying| applying.cyclic(directives)));
     assert!(matches!(
         refusals,
         [
-            Some(Failure::Misread(_)),
-            Some(Failure::Unresolved(Unresolved::Cyclic { .. })),
-            Some(Failure::Unresolved(Unresolved::Cyclic { .. })),
-            Some(Failure::Unresolved(Unresolved::Cyclic { .. })),
+            Some(Err(Failure::Misread(_))),
+            Some(Err(Failure::Unresolved(Unresolved::Cyclic { .. }))),
+            Some(Err(Failure::Unresolved(Unresolved::Cyclic { .. }))),
+            Some(Err(Failure::Unresolved(Unresolved::Cyclic { .. }))),
         ]
     ));
     let applying = Applying::ready()?;
-    applying.cyclic("supersede(n2, by(n3))");
-    assert!(matches!(applying.cyclic("supersede(n3, by(n2))"), Some(Failure::Unresolved(Unresolved::Cyclic { .. }))));
+    applying.cyclic("supersede(n2, by(n3))").ignoring(Ignored::Unseeded);
+    assert!(matches!(applying.cyclic("supersede(n3, by(n2))"), Err(Failure::Unresolved(Unresolved::Cyclic { .. }))));
     assert!(applying.applied("propose(new, refines(n1), feature, \"d\")\nsupersede(n3, by(n4))").is_ok());
     Ok(())
 }
@@ -1195,40 +1222,42 @@ impl Applying {
 #[test]
 fn a_segment_supersession_or_correction_that_closes_a_cycle_is_refused() {
     let refusals = [["supersedes", "corrects"], ["corrects", "corrects"]].map(|[first, second]| {
-        Applying::ready().ok().and_then(|applying| {
-            applying.linked(first, &[[0, 1]]).ok();
-            applying.linked(second, &[[1, 0]]).err()
+        Applying::ready().ignoring(Ignored::Unrun).map(|applying| {
+            applying.linked(first, &[[0, 1]]).ignoring(Ignored::Unseeded);
+            applying.linked(second, &[[1, 0]])
         })
     });
-    assert!(matches!(refusals, [None, Some(Failure::Unresolved(Unresolved::Circular { .. }))]));
-    let ordered = ["supersedes", "corrects"]
-        .map(|relation| Applying::ready().ok().and_then(|applying| applying.linked(relation, &[[0, 1], [1, 0]]).err()));
+    assert!(matches!(refusals, [Some(Ok(_)), Some(Err(Failure::Unresolved(Unresolved::Circular { .. })))]));
+    let ordered = ["supersedes", "corrects"].map(|relation| {
+        Applying::ready().ignoring(Ignored::Unrun).map(|applying| applying.linked(relation, &[[0, 1], [1, 0]]))
+    });
     assert!(matches!(
         ordered,
         [
-            Some(Failure::Unresolved(Unresolved::Circular { .. })),
-            Some(Failure::Unresolved(Unresolved::Circular { .. }))
+            Some(Err(Failure::Unresolved(Unresolved::Circular { .. }))),
+            Some(Err(Failure::Unresolved(Unresolved::Circular { .. })))
         ]
     ));
-    let mutual = ["answers", "refers-to"]
-        .map(|relation| Applying::ready().ok().map(|applying| applying.linked(relation, &[[0, 1], [1, 0]]).is_ok()));
+    let mutual = ["answers", "refers-to"].map(|relation| {
+        Applying::ready().ignoring(Ignored::Unrun).map(|applying| applying.linked(relation, &[[0, 1], [1, 0]]).is_ok())
+    });
     assert_eq!(mutual, [Some(true), Some(true)]);
 }
 
 #[test]
 fn a_segment_linked_to_itself_under_another_spelling_is_refused_for_every_relation() {
-    let refusals: Vec<Option<Failure>> = SegmentRelation::VARIANTS
+    let refusals: Vec<Result<String, Failure>> = SegmentRelation::VARIANTS
         .iter()
         .map(|relation| {
             let said = Session::line(Speaker::Owner, "cccccccc-0000-4000-8000-000000000001", "null", "alone");
             let applying =
                 Applying { store: Sqlite::in_memory::<StreamSchema>(), files: Session::working(said).files() };
-            applying.run(&["ingest"]).ok();
-            applying.applied(&format!("link(cccccccc.0, cccccccc-0000.0, {relation})")).err()
+            applying.run(&["ingest"]).ignoring(Ignored::Unseeded);
+            applying.applied(&format!("link(cccccccc.0, cccccccc-0000.0, {relation})"))
         })
         .collect();
     assert_eq!(refusals.len(), SegmentRelation::VARIANTS.len());
-    assert!(refusals.iter().all(|refused| matches!(refused, Some(Failure::Unresolved(Unresolved::Looped(_))))));
+    assert!(refusals.iter().all(|refused| matches!(refused, Err(Failure::Unresolved(Unresolved::Looped(_))))));
 }
 
 #[test]
@@ -1302,10 +1331,10 @@ fn a_node_proposed_in_a_file_is_placed_later_in_it_by_label_or_by_its_id() -> Re
         "place(aaaaaaaa-0000-4000-8000-000000000003.0, c, defines)",
         "propose(new first, refines(n1), feature, \"again\")",
     ]
-    .map(|refused| applying.applied(&format!("propose(new first, refines(n1), feature, \"x\")\n{refused}")).err());
+    .map(|refused| applying.applied(&format!("propose(new first, refines(n1), feature, \"x\")\n{refused}")));
     assert!(matches!(
         refusals,
-        [Some(Failure::Unresolved(Unresolved::Unbound(_))), Some(Failure::Unresolved(Unresolved::Rebound(_)))]
+        [Err(Failure::Unresolved(Unresolved::Unbound(_))), Err(Failure::Unresolved(Unresolved::Rebound(_)))]
     ));
     Ok(())
 }
@@ -1330,8 +1359,8 @@ fn apply_reads_its_file_from_the_working_directory_and_names_its_outcome() -> Re
 
 impl Applying {
     fn rooted(&self, directives: Bytes) -> Result<Answered, Failure> {
-        self.files.create_directories(Path::new("/work/notes")).ok();
-        self.files.write(Path::new("/work/notes/directives"), directives).ok();
+        self.files.create_directories(Path::new("/work/notes")).ignoring(Ignored::Unseeded);
+        self.files.write(Path::new("/work/notes/directives"), directives).ignoring(Ignored::Unseeded);
         let uttered = Cli::new(
             &Invocation::environment(),
             FakeLent::new(&self.files),
@@ -1388,10 +1417,10 @@ fn a_file_one_byte_away_from_an_applied_one_applies() -> Result<(), Failure> {
 fn a_file_refused_in_resolution_is_refused_again_and_its_fix_applies() -> Result<(), Failure> {
     let applying = Applying::ready()?;
     let broken = format!("place({}, n9, defines)", Applying::answer(0));
-    let refusals = [(); 2].map(|()| applying.rooted(Bytes::from(&broken)).err());
+    let refusals = [(); 2].map(|()| applying.rooted(Bytes::from(&broken)));
     assert!(matches!(
         refusals,
-        [Some(Failure::Unresolved(Unresolved::Unplaced(_))), Some(Failure::Unresolved(Unresolved::Unplaced(_)))]
+        [Err(Failure::Unresolved(Unresolved::Unplaced(_))), Err(Failure::Unresolved(Unresolved::Unplaced(_)))]
     ));
     let fixed = applying.rooted(Bytes::from(&format!("place({}, n1, defines)", Applying::answer(0))))?;
     assert_eq!(fixed.outcome, Outcome::Applied);
@@ -1813,7 +1842,7 @@ struct Roles {
 impl Applying {
     fn role(&self, node: NodeId) -> Option<Role> {
         let run = Run::root();
-        let placed = run.port(self.store.clone()).read(ShownNode::from(node)).ok().flatten();
+        let placed = run.port(self.store.clone()).read(ShownNode::from(node)).ignoring(Ignored::Unread).flatten();
         placed.map(|shown| shown.node().casting().role())
     }
 }
@@ -1874,8 +1903,8 @@ impl Unplanted {
 impl Workspace {
     fn split() -> Workspace {
         let files = Session::typical().files();
-        files.create_directories(Path::new("/p/.git")).ok();
-        files.create_directories(Path::new("/q/.git")).ok();
+        files.create_directories(Path::new("/p/.git")).ignoring(Ignored::Unseeded);
+        files.create_directories(Path::new("/q/.git")).ignoring(Ignored::Unseeded);
         Workspace { store: Sqlite::in_memory::<StreamSchema>(), files }
     }
 
@@ -2051,14 +2080,17 @@ struct Rendered;
 
 impl Rendered {
     fn applied(workspace: &Workspace, directives: &str) -> Result<String, Failure> {
-        workspace.files.write(Path::new("/q/directives"), Bytes::from(directives)).ok();
+        workspace.files.write(Path::new("/q/directives"), Bytes::from(directives)).ignoring(Ignored::Unseeded);
         workspace.run("/q", &["apply", "directives"])
     }
 
     fn placed(workspace: &Workspace) -> Result<String, Failure> {
         let transcripts = Path::new(HOME).join(".claude/projects/-q");
-        workspace.files.create_directories(&transcripts).ok();
-        workspace.files.write(&transcripts.join("s.jsonl"), Bytes::from(&Session::linked().lines)).ok();
+        workspace.files.create_directories(&transcripts).ignoring(Ignored::Unseeded);
+        workspace
+            .files
+            .write(&transcripts.join("s.jsonl"), Bytes::from(&Session::linked().lines))
+            .ignoring(Ignored::Unseeded);
         workspace.run("/q", &["ingest"])?;
         Rendered::applied(
             workspace,
@@ -2181,15 +2213,21 @@ impl Generated {
     }
 
     fn project() -> BoxedStrategy<Project> {
-        "[a-z0-9][a-z0-9._-]{0,10}".prop_filter_map("a project name", |name| name.parse().ok()).boxed()
+        "[a-z0-9][a-z0-9._-]{0,10}"
+            .prop_filter_map("a project name", |name| name.parse().ignoring(Ignored::Refused))
+            .boxed()
     }
 
     fn sentence<Spelled: FromStr + std::fmt::Debug + 'static>() -> BoxedStrategy<Spelled> {
-        "[a-z][a-z \"]{0,20}[a-z]".prop_filter_map("one line of text", |text| text.parse().ok()).boxed()
+        "[a-z][a-z \"]{0,20}[a-z]"
+            .prop_filter_map("one line of text", |text| text.parse().ignoring(Ignored::Refused))
+            .boxed()
     }
 
     fn artifact() -> BoxedStrategy<Artifact> {
-        "(lint|hook|tool|behaviour):[a-z][a-z-]{0,10}".prop_filter_map("an artifact", |text| text.parse().ok()).boxed()
+        "(lint|hook|tool|behaviour):[a-z][a-z-]{0,10}"
+            .prop_filter_map("an artifact", |text| text.parse().ignoring(Ignored::Refused))
+            .boxed()
     }
 
     fn sense() -> BoxedStrategy<Sense> {
@@ -2342,8 +2380,7 @@ impl Generated {
             "[^\u{0}]{0,20}".prop_map(|refusal| Lapse::refused(&std::io::Error::other(refusal))),
             (Generated::segment(), proptest::collection::vec(Generated::segment(), 0..4))
                 .prop_map(|(first, rest)| Lapse::from(Uncovered::new(first, rest))),
-            "[ -~]{0,20}"
-                .prop_filter_map("a misread reply", |reply| reply.parse::<Directives>().err().map(Lapse::from)),
+            "[ -~]{0,20}".prop_filter_map("a misread reply", |reply| Retrying::lapse(&reply)),
         ]
         .boxed()
     }
@@ -2461,7 +2498,7 @@ laws::roundtrip!(
     every_output_line_is_displayed_and_parsed_back,
     Generated::line(),
     |line: &Line| line.to_string(),
-    |text: &String| text.parse::<Line>().ok(),
+    |text: &String| text.parse::<Line>().ignoring(Ignored::Refused),
     Some
 );
 
@@ -2492,7 +2529,7 @@ impl Spread {
         starts
             .zip(ends.iter())
             .filter_map(|(start, end)| out.get(start..*end))
-            .filter_map(|line| line.parse::<Line>().ok())
+            .filter_map(|line| line.parse::<Line>().ignoring(Ignored::Unparsed))
             .collect()
     }
 
@@ -2556,8 +2593,11 @@ fn show_and_search_print_the_shortest_unique_ref_and_every_one_printed_applies()
     let refs = ["12345678.0", "12345678.1", "abcdef01-0.0", "abcdef01-1.0"];
     let directives: Vec<String> = refs.iter().map(|reference| format!("conversational({reference})")).collect();
     let applied = Spread::parsed(&applying.applied(&directives.join("\n"))?);
-    let echoed: Vec<Line> =
-        directives.iter().filter_map(|directive| directive.parse().ok()).map(Line::Applied).collect();
+    let echoed: Vec<Line> = directives
+        .iter()
+        .filter_map(|directive| directive.parse().ignoring(Ignored::Refused))
+        .map(Line::Applied)
+        .collect();
     assert_eq!(echoed.len(), refs.len());
     assert!(echoed.iter().all(|echo| applied.contains(echo)));
     refs.iter().try_for_each(|reference| applying.run(&["show", reference]).map(|_shown| ()))?;

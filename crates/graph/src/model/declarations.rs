@@ -1,3 +1,5 @@
+mod ignored;
+
 use std::collections::BTreeMap;
 
 use algebra::{Monoid, Semigroup};
@@ -6,9 +8,11 @@ use crate::boundary::ItemId;
 use crate::domain::Domain;
 use crate::item::{Alias, Item};
 use crate::item_path::ItemPath;
+use crate::model::declarations::ignored::Ignored;
 use crate::resolved::Resolved;
 use crate::sited::Sited;
 use crate::type_ref::{Named, Rebuild, TypeRef};
+use invariants::Ignoring;
 
 #[derive(Clone, Debug)]
 struct StdAlias {
@@ -49,7 +53,10 @@ impl Aliases {
     }
 
     pub(crate) fn expanded(&self, ty: &TypeRef) -> TypeRef {
-        Expanding { aliases: self, steps: Steps::LIMIT }.child(ty).unwrap_or_else(|_| ty.clone())
+        Expanding { aliases: self, steps: Steps::LIMIT }
+            .child(ty)
+            .ignoring(Ignored::Unexpanded)
+            .unwrap_or_else(|| ty.clone())
     }
 
     pub(crate) fn aliasing(&self, path: &Resolved) -> Option<&Alias> {

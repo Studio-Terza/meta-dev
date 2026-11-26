@@ -22,10 +22,15 @@ impl Answer {
 
     #[must_use]
     pub fn reported<Outcome, Failure: Display>(result: Result<Outcome, Failure>) -> Answer {
-        result.map_or_else(
-            |failure| Answer::complained(ExitCode::FAILURE, format_args!("{failure}\n")),
-            |_outcome| Answer::new(ExitCode::SUCCESS),
-        )
+        Answer::answered(result.map(|_outcome| Answer::new(ExitCode::SUCCESS)))
+    }
+
+    #[must_use]
+    pub fn answered<Failure: Display>(result: Result<Answer, Failure>) -> Answer {
+        match result {
+            Ok(answer) => answer,
+            Err(failure) => Answer::complained(ExitCode::FAILURE, format_args!("{failure}\n")),
+        }
     }
 
     #[must_use]

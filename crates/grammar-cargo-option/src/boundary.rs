@@ -1,4 +1,5 @@
 use grammar::logos::Logos;
+use grammar::{Ignoring, Unlexed};
 
 use grammar_unspelled::Unspelled;
 
@@ -82,7 +83,7 @@ impl Options {
     #[must_use]
     pub fn spelled(text: &str) -> CargoOption<'_> {
         let mut head = Head::lexer(text);
-        let lead = head.next().and_then(Result::ok);
+        let lead = head.next().and_then(|lexed| lexed.ignoring(Unlexed::NotThisGrammar));
         let mut tail = head.morph::<Tail<'_>>();
         let value = tail.next();
         lead.and_then(|lexed| CargoOption::led(lexed, value)).unwrap_or(CargoOption::Plain)

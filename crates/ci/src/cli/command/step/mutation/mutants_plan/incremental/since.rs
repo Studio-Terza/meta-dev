@@ -8,7 +8,9 @@ use super::super::super::kept::{Commits, Mutant, Places};
 use super::super::tested::{Reach, Tested};
 use super::boundary::Choice;
 use crate::cli::command::failure::Failure;
+use crate::cli::ignored::Ignored;
 use crate::cli::ports::{Invocation, Ports, Text};
+use invariants::Ignoring;
 
 const ASKED: usize = 3;
 
@@ -37,8 +39,8 @@ impl<'run> Since<'run> {
     pub(super) fn chosen(&self, ports: &impl Ports, missed: &[Mutant]) -> Result<Choice, Failure<'static>> {
         let tree = self.commits.tree();
         let fetch = Invocation::new("git", ["fetch", "--no-tags", "--quiet", "origin", tree.as_ref()]);
-        ports.output(&fetch).map_or_else(
-            |_| Ok(Choice::unfetched(tree)),
+        ports.output(&fetch).ignoring(Ignored::Unfetched).map_or_else(
+            || Ok(Choice::unfetched(tree)),
             |_| self.named(ports, missed).map(|named| Choice::named(named.as_deref(), missed.len(), self.commits)),
         )
     }
@@ -67,7 +69,7 @@ impl<'run> Since<'run> {
         let names = moved
             .as_ref()
             .parse::<Patch>()
-            .ok()
+            .ignoring(Ignored::Unparsed)
             .map(|patch| changed_since.either(&Places::moved(missed, &patch), &mutants));
         names.as_deref().map(|found| self.written(ports, found)).transpose()?;
         Ok(names)

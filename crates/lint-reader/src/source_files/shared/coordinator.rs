@@ -15,9 +15,11 @@ use super::protocol::{Assigned, Assignment, Due, Parsed, Reads, Report, Sighting
 use super::reader::{Assembling, Dispatched, Linked, Reader, Remote};
 use crate::source_files::Stage;
 use crate::source_files::declared::{Declared, Kind};
+use crate::source_files::ignored::Ignored;
 use crate::source_files::located::{Located, Node};
 use crate::source_files::staged::Staged;
 use assembly::{Assembled, Outcomes, Planner};
+use invariants::Ignoring;
 
 #[derive(Debug)]
 pub struct SharedRead<'tree> {
@@ -120,8 +122,12 @@ impl<'tree> Level<'tree> {
     }
 
     fn dealt(self, hands: &Hands, files: &impl Files) -> Dealt<'tree> {
-        let weighed =
-            |due: &Due<'tree>| files.size(AsRef::<Path>::as_ref(AsRef::<Located>::as_ref(due))).unwrap_or_default();
+        let weighed = |due: &Due<'tree>| {
+            files
+                .size(AsRef::<Path>::as_ref(AsRef::<Located>::as_ref(due)))
+                .ignoring(Ignored::Unsized)
+                .unwrap_or_default()
+        };
         Dealt { assigned: hands.dealt(self.due, weighed), seen: self.seen }
     }
 }

@@ -2,6 +2,12 @@ use std::path::PathBuf;
 
 use crate::{Schema, StoreFiller};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Provenance {
+    Fresh,
+    Copied,
+}
+
 pub trait Opens {
     type Store: StoreFiller;
 

@@ -10,6 +10,8 @@ use std::time::Instant;
 use file_ports::Disk;
 
 use super::{Exit, Invocation, Ports, Run, Text};
+use crate::cli::ignored::Ignored;
+use invariants::Ignoring;
 pub use tee::Tee;
 
 #[derive(Debug)]
@@ -22,13 +24,22 @@ impl System {
                 Exit::Failure(
                     status
                         .code()
-                        .and_then(|code| u8::try_from(code).ok())
+                        .and_then(|code| u8::try_from(code).ignoring(Ignored::BeyondRange))
                         .and_then(NonZeroU8::new)
                         .unwrap_or(NonZeroU8::MIN),
                 )
             },
             |_| Exit::Success,
         )
+    }
+
+    fn printed(Output { status, stdout, stderr }: Output) -> io::Result<Text> {
+        match Some(status).filter(ExitStatus::success).map(|_| stdout).ok_or(stderr) {
+            Ok(printed) => String::from_utf8(printed).map(Text::new).map_err(io::Error::other),
+            Err(failed) => {
+                Err(io::Error::other(String::from_utf8(failed).ignoring(Ignored::NotUtf8).unwrap_or_default()))
+            }
+        }
     }
 
     fn command(invocation: &Invocation) -> Command {
@@ -52,11 +63,7 @@ impl Ports for System {
     }
 
     fn output(&self, invocation: &Invocation) -> io::Result<Text> {
-        let Output { status, stdout, stderr } = Self::command(invocation).output()?;
-        Some(status).filter(ExitStatus::success).map(|_| stdout).ok_or(stderr).map_or_else(
-            |failed| Err(io::Error::other(String::from_utf8(failed).unwrap_or_default())),
-            |printed| String::from_utf8(printed).map(Text::new).map_err(io::Error::other),
-        )
+        Self::command(invocation).output().and_then(Self::printed)
     }
 
     fn logged(&self, invocation: &Invocation, log: &Path) -> io::Result<Run> {

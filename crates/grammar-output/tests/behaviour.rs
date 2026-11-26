@@ -1,5 +1,6 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
+use grammar::{Ignoring, Unlexed};
 use grammar_cited::Cited;
 use grammar_output::field::{Bare, Id, Integer, Quoted};
 use grammar_output::{Fields, Record};
@@ -26,11 +27,21 @@ struct Read6 {
 
 impl Read {
     fn quoted(text: &str) -> Option<Term> {
-        Fields::lexed(&Fields::quoting(text)).ok()?.field::<Quoted<Term>>().ok()?.ended().ok()
+        Fields::lexed(&Fields::quoting(text))
+            .ignoring(Unlexed::NotThisGrammar)?
+            .field::<Quoted<Term>>()
+            .ignoring(Unlexed::NotThisGrammar)?
+            .ended()
+            .ignoring(Unlexed::NotThisGrammar)
     }
 
     fn line(text: &&str) -> Option<Read6> {
-        Fields::lexed(text).ok()?.record::<Read6>().ok()?.ended().ok()
+        Fields::lexed(text)
+            .ignoring(Unlexed::NotThisGrammar)?
+            .record::<Read6>()
+            .ignoring(Unlexed::NotThisGrammar)?
+            .ended()
+            .ignoring(Unlexed::NotThisGrammar)
     }
 }
 

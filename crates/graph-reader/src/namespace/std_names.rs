@@ -7,6 +7,8 @@ use lint_layout::{Name, TestMarks, Whole, Word, words};
 use super::binding::Binding;
 use super::tables::{Key, Keyed};
 use super::view::View;
+use crate::ignored::Ignored;
+use invariants::Ignoring;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Kind {
@@ -540,7 +542,8 @@ impl StdNames {
     }
 
     fn listed_kind(path: &ItemPath) -> Option<Kind> {
-        let [_, module, name] = <&[Name; Self::CANONICAL_SEGMENTS]>::try_from(path.as_ref()).ok()?;
+        let [_, module, name] =
+            <&[Name; Self::CANONICAL_SEGMENTS]>::try_from(path.as_ref()).ignoring(Ignored::OtherShape)?;
         Self::kind(module, name)
     }
 

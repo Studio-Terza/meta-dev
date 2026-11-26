@@ -9,6 +9,16 @@ use boundary::Record;
 
 #[proc_macro_derive(Record, attributes(field, optional, repeated, past, record))]
 pub fn derive_record(input: TokenStream) -> TokenStream {
-    let read = syntax::parse::parse2::<DeriveInput>(input.into()).and_then(Record::try_from);
-    read.map_or_else(|error: Error| error.to_compile_error(), |record| syntax::TokenStream::from(&record)).into()
+    Derived::expanded(syntax::parse::parse2::<DeriveInput>(input.into()).and_then(Record::try_from)).into()
+}
+
+struct Derived;
+
+impl Derived {
+    fn expanded(read: Result<Record, Error>) -> syntax::TokenStream {
+        match read {
+            Ok(record) => syntax::TokenStream::from(&record),
+            Err(error) => error.to_compile_error(),
+        }
+    }
 }

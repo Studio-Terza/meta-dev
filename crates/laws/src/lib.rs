@@ -150,12 +150,15 @@ macro_rules! table {
         $(#[$meta])*
         #[test]
         fn $name() {
-            ::core::iter::IntoIterator::into_iter($domain)
+            let checked = ::core::iter::IntoIterator::into_iter($domain)
                 .try_for_each(|$row| -> Result<(), Box<dyn ::std::error::Error>> {
                     let _: () = $body;
                     Ok(())
-                })
-                .unwrap_or_else(|failure| panic!("the table row is broken: {failure}"));
+                });
+            match checked {
+                Ok(()) => {}
+                Err(failure) => panic!("the table row is broken: {failure}"),
+            }
         }
     };
 }
@@ -280,7 +283,10 @@ macro_rules! crud {
             $crate::proptest::prop_assert_eq!(read(&store)?, Some(made.clone()), "create then read returns what was created");
             let again = store.create(Created::<$record>::new(first.clone()));
             $crate::proptest::prop_assert_eq!(
-                again.map_or_else(|_refused| read(&store), |_twice| Ok(Some(made.clone())))?,
+                match again {
+                    Ok(_twice) => Ok(Some(made.clone())),
+                    Err(_refused) => read(&store),
+                }?,
                 Some(made.clone()),
                 "a refused create leaves the store as it was"
             );

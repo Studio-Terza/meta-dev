@@ -1,4 +1,5 @@
 use grammar::logos::{Lexer, Logos};
+use grammar::{Ignoring, Unlexed};
 
 #[derive(Logos, Clone, Debug, PartialEq)]
 #[logos(crate = grammar::logos)]
@@ -28,7 +29,10 @@ pub struct Opened<'line>(&'line str);
 impl Opened<'_> {
     #[must_use]
     pub fn summary(self) -> Option<Summary> {
-        Piece::lexer(self.0).collect::<Result<Vec<Piece>, ()>>().ok().and_then(|pieces| Piece::summary(&pieces))
+        Piece::lexer(self.0)
+            .collect::<Result<Vec<Piece>, ()>>()
+            .ignoring(Unlexed::NotThisGrammar)
+            .and_then(|pieces| Piece::summary(&pieces))
     }
 }
 
@@ -48,7 +52,7 @@ impl Piece {
     const FRAME: [Piece; 4] = [Piece::Head, Piece::Outcome, Piece::Finishing, Piece::Second];
 
     fn number(lexer: &Lexer<'_, Piece>) -> Option<f64> {
-        lexer.slice().parse().ok()
+        lexer.slice().parse().ignoring(Unlexed::OutOfRange)
     }
 
     fn summary(pieces: &[Piece]) -> Option<Summary> {

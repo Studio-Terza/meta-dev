@@ -12,10 +12,12 @@ use newtype::Enumerated;
 use newtype::Wrapping;
 use text_lines::Lines;
 
+use crate::ignored::Ignored;
 use crate::job::Listing;
 use crate::lapse::Retried;
 use crate::verb::Form;
 use crate::{Attempt, Directive, Edge, Job, Label, Lapse, NodeRef, Proposal, Said};
+use invariants::Ignoring;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Briefing(Vec<Brief>);
@@ -201,11 +203,14 @@ impl Briefing {
             relation: SpanRelation::Mentions,
         });
         let label = Label::from(Sample::Label);
-        let proposed = node.and_then(|refines| Edge::new(label.clone(), refines).ok()).map(|edge| Directive::Propose {
-            proposal: Proposal::Labelled(edge),
-            facet: Facet::Feature,
-            title: Title::new(Sample::Title.to_string()),
-        });
+        let proposed =
+            node.and_then(|refines| Edge::new(label.clone(), refines).ignoring(Ignored::SelfEdge)).map(|edge| {
+                Directive::Propose {
+                    proposal: Proposal::Labelled(edge),
+                    facet: Facet::Feature,
+                    title: Title::new(Sample::Title.to_string()),
+                }
+            });
         let labelled = segment.cloned().zip(proposed).map(|(said, propose)| {
             [propose, Directive::Place { segment: said, node: NodeRef::from(label), relation: SpanRelation::Mentions }]
         });

@@ -1,6 +1,6 @@
 use std::ffi::OsStr;
 
-use golden::{Difference, Mode, Output, golden};
+use golden::{Difference, Failure, Mode, Output, golden};
 
 struct Row {
     golden: &'static str,
@@ -50,8 +50,20 @@ laws::table!(
 
 #[test]
 fn a_refused_recording_says_how_to_record() {
-    let refused = |record, ci| {
-        Mode::chosen(Some(OsStr::new(record)), ci).map_or_else(|failure| failure.to_string(), |_| String::new())
-    };
-    golden!("refused.txt", &format!("{}\n{}\n", refused("yes", None), refused("1", Some(OsStr::new("true")))));
+    let unknown = Mode::chosen(Some(OsStr::new("yes")), None);
+    let in_ci = Mode::chosen(Some(OsStr::new("1")), Some(OsStr::new("true")));
+    assert!(matches!(&unknown, Err(Failure::UnknownValue { value }) if value == OsStr::new("yes")));
+    assert!(matches!(&in_ci, Err(Failure::RecordInCi)));
+    golden!("refused.txt", &format!("{}\n{}\n", Refusal::said(unknown), Refusal::said(in_ci)));
+}
+
+struct Refusal;
+
+impl Refusal {
+    fn said(chosen: Result<Mode, Failure>) -> String {
+        match chosen {
+            Ok(_mode) => String::new(),
+            Err(failure) => failure.to_string(),
+        }
+    }
 }

@@ -2,7 +2,9 @@ use syntax::ToTokens;
 use syntax::{Delimiter, Group, TokenStream, TokenTree};
 use syntax::{LitStr, Macro, Type};
 
+use crate::ignored::Ignored;
 use graph::Quote;
+use invariants::Ignoring;
 use lint_layout::Name;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -111,7 +113,9 @@ impl Quotation {
 
     fn literal(tree: TokenTree) -> Option<LitStr> {
         match tree {
-            TokenTree::Literal(literal) => syntax::parse::parse2(TokenTree::Literal(literal).into()).ok(),
+            TokenTree::Literal(literal) => {
+                syntax::parse::parse2(TokenTree::Literal(literal).into()).ignoring(Ignored::Unparsed)
+            }
             TokenTree::Group(_) | TokenTree::Ident(_) | TokenTree::Punct(_) => None,
         }
     }

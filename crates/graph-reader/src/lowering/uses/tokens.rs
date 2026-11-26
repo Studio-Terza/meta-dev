@@ -9,7 +9,9 @@ use syntax::{LitStr, Macro, Path, braced, bracketed, parenthesized, token};
 
 use lint_layout::Position;
 
+use crate::ignored::Ignored;
 use crate::namespace::UsePath;
+use invariants::Ignoring;
 
 #[derive(Debug)]
 pub(super) struct Spelled {
@@ -65,7 +67,9 @@ impl FromStr for Holes {
             .iter()
             .zip(braces.iter().skip(1))
             .filter(|((_, left), (_, right))| [*left, *right] == [Holes::OPENING, Holes::CLOSING])
-            .filter_map(|((open, _), (close, _))| text.get(open + 1..*close)?.parse::<TokenStream>().ok());
+            .filter_map(|((open, _), (close, _))| {
+                text.get(open + 1..*close)?.parse::<TokenStream>().ignoring(Ignored::Unparsed)
+            });
         Ok(Holes(holes.collect()))
     }
 }
@@ -88,6 +92,7 @@ impl Interpolated {
 
     fn holes(literal: &Literal) -> Vec<TokenStream> {
         let text = syntax::parse::parse2::<LitStr>(TokenTree::Literal(literal.clone()).into())
+            .ignoring(Ignored::Unparsed)
             .map_or_default(|found| found.value());
         let Ok(Holes(holes)) = text.parse::<Holes>();
         let spanned = Respanned(literal.span());
@@ -106,7 +111,7 @@ impl TokenPaths {
     }
 
     pub(super) fn within(tokens: TokenStream) -> Vec<Spelled> {
-        syntax::parse::parse2::<TokenPaths>(tokens).map_or_default(|paths| paths.0)
+        syntax::parse::parse2::<TokenPaths>(tokens).ignoring(Ignored::Unparsed).map_or_default(|paths| paths.0)
     }
 
     fn attempted(input: ParseStream, attempt: &ParseBuffer) -> syntax::Result<Vec<Spelled>> {

@@ -1,4 +1,5 @@
 mod boundary;
+mod ignored;
 mod rust_files;
 
 use std::borrow::Cow;
@@ -16,7 +17,9 @@ use rust_files::RustFiles;
 use text_lines::LossyText;
 
 use crate::cli::report::failure::Failure;
+use crate::cli::report::golden_tests::ignored::Ignored;
 use crate::cli::report::test_name::TestName;
+use invariants::Ignoring;
 
 #[derive(Debug, Default)]
 pub struct GoldenTests(BTreeSet<TestName>);
@@ -32,7 +35,13 @@ impl GoldenTests {
         found.into_iter().zip(read).try_fold(GoldenTests::default(), |tests, (file, outcome)| {
             let bytes =
                 outcome.map_err(|failure| Failure::Io { path: Cow::Owned(file), source: io::Error::from(failure) })?;
-            Ok(tests.combine(LossyText::from(bytes.as_ref()).as_ref().parse::<GoldenTests>().unwrap_or_default()))
+            Ok(tests.combine(
+                LossyText::from(bytes.as_ref())
+                    .as_ref()
+                    .parse::<GoldenTests>()
+                    .ignoring(Ignored::Unlisted)
+                    .unwrap_or_default(),
+            ))
         })
     }
 
@@ -63,7 +72,7 @@ impl FromStr for GoldenTests {
                 .iter()
                 .zip(ends)
                 .filter_map(|((start, length), end)| text.get(start + length..end))
-                .filter_map(|chunk| chunk.parse::<GoldenTest>().ok())
+                .filter_map(|chunk| chunk.parse::<GoldenTest>().ignoring(Ignored::Unlisted))
                 .map(GoldenTest::into_inner)
                 .collect(),
         ))

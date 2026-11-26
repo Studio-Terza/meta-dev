@@ -7,7 +7,9 @@ use text_lines::Lines;
 
 use super::super::super::kept::Mutant;
 use crate::cli::command::failure::Failure;
+use crate::cli::ignored::Ignored;
 use crate::cli::ports::Text;
+use invariants::Ignoring;
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(super) struct Narrowed(BTreeMap<PathBuf, BTreeSet<u32>>);
@@ -31,7 +33,9 @@ impl Narrowed {
     fn patched(file: &Path, lines: &BTreeSet<u32>, numbered: &[String]) -> String {
         let header = format!("--- a/{0}\n+++ b/{0}\n", file.display());
         let hunks = lines.iter().filter_map(|line| {
-            let text = usize::try_from(*line).ok().and_then(|found| numbered.get(found.checked_sub(1)?))?;
+            let text = usize::try_from(*line)
+                .ignoring(Ignored::BeyondRange)
+                .and_then(|found| numbered.get(found.checked_sub(1)?))?;
             Some(format!("@@ -{line},1 +{line},1 @@\n-{text}\n+{text}\n"))
         });
         iter::once(header).chain(hunks).collect()

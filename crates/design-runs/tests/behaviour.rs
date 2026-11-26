@@ -7,6 +7,7 @@ use design_runs::{
 };
 use design_store::StreamSchema;
 use dispatch_ports::{Deadline, Finished, Pid, Reply, Started, Tokens, Usage, Wall};
+use invariants::{Ignoring, ignored};
 use laws::proptest::option;
 use laws::proptest::prelude::{Just, any, prop_assert, prop_assert_eq};
 use laws::proptest::sample::select;
@@ -16,6 +17,12 @@ use newtype::{Enumerated, Wrapping};
 use port_core::Run;
 use sqlite_ports::SqliteOpener;
 use store_ports::Store;
+
+ignored! {
+    enum Ignored {
+        Refused => "a generated start time that does not parse is filtered out",
+    }
+}
 
 type Sqlite = <SqliteOpener as store_ports::Opens>::Store;
 
@@ -34,7 +41,8 @@ impl Spawning {
         (
             any::<Pid>(),
             option::of(
-                Just("Sat Nov  7 10:00:00 2026").prop_filter_map("a start time", |text| text.parse::<Started>().ok()),
+                Just("Sat Nov  7 10:00:00 2026")
+                    .prop_filter_map("a start time", |text| text.parse::<Started>().ignoring(Ignored::Refused)),
             ),
             any::<Wall>(),
             select(

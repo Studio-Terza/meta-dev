@@ -7,7 +7,9 @@ use lint_placement::Packages;
 
 use super::boundary::Partition;
 use super::protocol::{Assignment, Parsed, Reads, Report};
+use crate::source_files::ignored::Ignored;
 use crate::source_files::located::{Located, Node};
+use invariants::Ignoring;
 
 #[derive(Debug)]
 enum Order<'tree> {
@@ -77,14 +79,14 @@ impl<'tree> Reader<'tree> {
         Parsed::read(files, self.packages, nodes, |report, fresh| {
             let mut held = kept;
             held.extend(fresh);
-            self.sighted.send(report).map_or_default(|()| self.awaiting(files, held))
+            self.sighted.send(report).ignoring(Ignored::HungUp).map_or_default(|()| self.awaiting(files, held))
         })
     }
 
     fn assembled(self, assignment: Assignment<'tree>, kept: BTreeMap<Located<'tree>, SourceFile>) -> Readout {
         let readout = assignment.readout(kept);
         let heads = readout.files().iter().map(|file| file.head().clone()).collect();
-        self.heads.send(heads).map_or_default(|()| readout)
+        self.heads.send(heads).ignoring(Ignored::HungUp).map_or_default(|()| readout)
     }
 }
 
@@ -94,11 +96,14 @@ impl<'tree> Remote<'tree> {
     }
 
     pub(super) fn dispatched(&self, nodes: Vec<Node<'tree>>) -> Option<Dispatched<'_, 'tree>> {
-        self.orders.send(Order::Parse(nodes)).map_or(None, |()| Some(Dispatched { sighted: &self.sighted }))
+        self.orders.send(Order::Parse(nodes)).ignoring(Ignored::HungUp).map(|()| Dispatched { sighted: &self.sighted })
     }
 
     pub(super) fn assigned(&self, assignment: Assignment<'tree>) -> Option<Assembling<'_>> {
-        self.orders.send(Order::Assemble(assignment)).map_or(None, |()| Some(Assembling { heads: &self.heads }))
+        self.orders
+            .send(Order::Assemble(assignment))
+            .ignoring(Ignored::HungUp)
+            .map(|()| Assembling { heads: &self.heads })
     }
 }
 
@@ -109,12 +114,12 @@ pub(super) struct Assembling<'remote> {
 
 impl Assembling<'_> {
     pub(super) fn heads(self) -> Vec<FileHead> {
-        self.heads.recv().unwrap_or_default()
+        self.heads.recv().ignoring(Ignored::HungUp).unwrap_or_default()
     }
 }
 
 impl<'tree> Dispatched<'_, 'tree> {
     pub(super) fn sighted(self) -> Report<'tree> {
-        self.sighted.recv().unwrap_or_default()
+        self.sighted.recv().ignoring(Ignored::HungUp).unwrap_or_default()
     }
 }

@@ -8,7 +8,9 @@ use serde::Deserialize;
 use serde::de::IgnoredAny;
 use text_lines::{Lines, OneLine};
 
+use crate::cli::ignored::Ignored;
 use crate::cli::ports::Text;
+use invariants::Ignoring;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
 struct Function {
@@ -197,7 +199,7 @@ impl Outcomes {
 impl Commits {
     pub(in super::super) fn read(text: &Text) -> Option<Commits> {
         let lines: Vec<String> = text.as_ref().parse::<Lines>().into_iter().flatten().collect();
-        let [tree, head] = <[String; 2]>::try_from(lines).ok()?;
+        let [tree, head] = <[String; 2]>::try_from(lines).ignoring(Ignored::OtherShape)?;
         Some(Commits { tree: Tree(tree), head: Head(head) })
     }
 
@@ -231,8 +233,10 @@ impl Outcomes {
 impl Outcome {
     fn spent(self) -> Option<Spent> {
         let phases = self.phase_results.first().map(|_| &self.phase_results)?;
-        let seconds =
-            phases.iter().map(|phase| Duration::try_from_secs_f64(phase.duration).ok()).sum::<Option<Duration>>()?;
+        let seconds = phases
+            .iter()
+            .map(|phase| Duration::try_from_secs_f64(phase.duration).ignoring(Ignored::BeyondRange))
+            .sum::<Option<Duration>>()?;
         let mutant = self.scenario.mutant()?;
         Some(Spent { package: mutant.package(), seconds })
     }
@@ -247,7 +251,7 @@ impl Spent {
         grouped
             .into_iter()
             .filter_map(|(package, durations)| {
-                let runs = u32::try_from(durations.len()).ok()?;
+                let runs = u32::try_from(durations.len()).ignoring(Ignored::BeyondRange)?;
                 Some((package, durations.iter().sum::<Duration>().checked_div(runs)?))
             })
             .collect()

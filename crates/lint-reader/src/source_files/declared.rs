@@ -17,6 +17,15 @@ pub(super) enum Resolution {
     Failed(Failure),
 }
 
+impl From<Result<Vec<Child>, Failure>> for Resolution {
+    fn from(resolved: Result<Vec<Child>, Failure>) -> Resolution {
+        match resolved {
+            Ok(children) => Resolution::Modules(children),
+            Err(failure) => Resolution::Failed(failure),
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub(super) struct Declared {
     modules: Vec<Child>,
