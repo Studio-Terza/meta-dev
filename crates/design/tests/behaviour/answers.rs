@@ -117,7 +117,8 @@ fn an_eval_scores_each_stage_of_a_turn_that_asked_against_the_owners_earlier_ans
         ]
         .concat(),
     );
-    let replies = [Asking::LINT, Asking::LINT, "[\"o1\",\"o9\"]", Asking::PICKED, Asking::PICKED, "[\"o1\"]", "[]"];
+    let replies =
+        [Asking::LINT, Asking::LINT, "[\"o1\",\"o9\"]", Asking::PICKED, Asking::PICKED, "[]", "[\"o1\"]", "[]", "[]"];
     let asking = Asking {
         store: Sqlite::in_memory::<StreamSchema>(),
         files: session.files(),
@@ -125,7 +126,7 @@ fn an_eval_scores_each_stage_of_a_turn_that_asked_against_the_owners_earlier_ans
     };
     Invocation::within(&asking.store, FakeLent::new(&asking.files), &["ingest"])?;
     let evaluated = asking.asked("", &["eval", "s", "2026-01-03T00:00:00Z", "2026-01-04T00:00:00Z"]);
-    let tallied = "judged=1 answered=1 truths=1 twelve_any=1 all_any=1 twelve_truths=1 all_truths=1 truth_tokens=37 store=[found_any=1 found=1 reachable=1 picks=1 verified=1 tokens=37 seconds=0] base=[found_any=1 found=1 reachable=1 picks=1 verified=0 tokens=37 seconds=0]";
+    let tallied = "judged=1 answered=1 truths=1 twelve_any=1 all_any=1 twelve_truths=1 all_truths=1 truth_tokens=37 store=[found_any=1 found=1 reachable=1 picks=1 verified=1 tokens=37 seconds=0] base=[found_any=1 found=1 reachable=1 picks=1 verified=0 tokens=37 seconds=0] chunked=[found_any=0 found=0 reachable=1 picks=0 verified=0 tokens=37 seconds=0]";
     assert_eq!(evaluated.outcome?, Outcome::Evaluated);
     assert!(
         evaluated.text.contains(&format!("turn l1 2026-01-02T00:00:00Z haiku=Asks sonnet=Asks truth=[o1] {tallied}")),
@@ -136,7 +137,17 @@ fn an_eval_scores_each_stage_of_a_turn_that_asked_against_the_owners_earlier_ans
     assert!(evaluated.text.contains(&format!("total {tallied}")), "{}", evaluated.text);
     assert_eq!(
         asking.script.models(),
-        [Model::Haiku, Model::Sonnet, Model::Sonnet, Model::Haiku, Model::Haiku, Model::Sonnet, Model::Sonnet]
+        [
+            Model::Haiku,
+            Model::Sonnet,
+            Model::Sonnet,
+            Model::Haiku,
+            Model::Haiku,
+            Model::Haiku,
+            Model::Sonnet,
+            Model::Sonnet,
+            Model::Sonnet
+        ]
     );
     let grounding = evaluated.prompts.get(2).cloned().unwrap_or_default();
     assert!(grounding.contains(&format!("[o1 2026-01-01T00:00:00Z] {}", Asking::RULED)), "{grounding}");

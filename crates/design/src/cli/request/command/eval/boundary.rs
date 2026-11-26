@@ -43,7 +43,7 @@ struct Spanned {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-struct Spent {
+pub struct Spent {
     tokens: u64,
     seconds: i64,
 }
@@ -54,7 +54,7 @@ pub struct Truth {
     spent: Spent,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Arm {
     quotes: Vec<Quote>,
     spent: Spent,
@@ -73,6 +73,7 @@ pub struct Judged {
     candidates: BTreeSet<Uuid>,
     store: Checked,
     base: Checked,
+    chunked: Checked,
 }
 
 #[derive(Debug)]
@@ -139,6 +140,7 @@ struct Tally {
     retrieval: Retrieval,
     store: Picking,
     base: Picking,
+    chunked: Picking,
 }
 
 impl TryFrom<&[Token]> for Eval {
@@ -246,9 +248,16 @@ impl Checked {
 impl Judged {
     const TWELVE: usize = 12;
 
-    pub fn new(truth: Truth, candidates: &[Said], store: Checked, base: Checked) -> Judged {
+    pub fn new(truth: Truth, candidates: &[Said], [store, base, chunked]: [Checked; 3]) -> Judged {
         let uuids = candidates.iter().map(AsRef::<Uuid>::as_ref).cloned();
-        Judged { truth, twelve: uuids.clone().take(Self::TWELVE).collect(), candidates: uuids.collect(), store, base }
+        Judged {
+            truth,
+            twelve: uuids.clone().take(Self::TWELVE).collect(),
+            candidates: uuids.collect(),
+            store,
+            base,
+            chunked,
+        }
     }
 
     fn tally(&self) -> Tally {
@@ -269,6 +278,7 @@ impl Judged {
             },
             store: self.store.picking(truths, all),
             base: self.base.picking(truths, truths.len()),
+            chunked: self.chunked.picking(truths, truths.len()),
         }
     }
 }
@@ -356,6 +366,22 @@ impl Semigroup for Picking {
 
 impl Monoid for Picking {}
 
+impl Semigroup for Spent {
+    fn combine(self, other: Spent) -> Spent {
+        Spent { tokens: self.tokens + other.tokens, seconds: self.seconds.max(other.seconds) }
+    }
+}
+
+impl Monoid for Spent {}
+
+impl Semigroup for Arm {
+    fn combine(self, other: Arm) -> Arm {
+        Arm { quotes: self.quotes.combine(other.quotes), spent: self.spent.combine(other.spent) }
+    }
+}
+
+impl Monoid for Arm {}
+
 impl Semigroup for Tally {
     fn combine(self, other: Tally) -> Tally {
         Tally {
@@ -363,6 +389,7 @@ impl Semigroup for Tally {
             retrieval: self.retrieval.combine(other.retrieval),
             store: self.store.combine(other.store),
             base: self.base.combine(other.base),
+            chunked: self.chunked.combine(other.chunked),
         }
     }
 }
@@ -427,7 +454,7 @@ impl fmt::Display for Tally {
         let retrieval = self.retrieval;
         write!(
             formatter,
-            "judged={} answered={} truths={} twelve_any={} all_any={} twelve_truths={} all_truths={} truth_tokens={} store=[{}] base=[{}]",
+            "judged={} answered={} truths={} twelve_any={} all_any={} twelve_truths={} all_truths={} truth_tokens={} store=[{}] base=[{}] chunked=[{}]",
             retrieval.judged,
             retrieval.answered,
             retrieval.truths,
@@ -437,7 +464,8 @@ impl fmt::Display for Tally {
             retrieval.all_truths,
             retrieval.truth_tokens,
             self.store,
-            self.base
+            self.base,
+            self.chunked
         )
     }
 }

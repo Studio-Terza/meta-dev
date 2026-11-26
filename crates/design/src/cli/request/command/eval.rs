@@ -5,6 +5,8 @@ use dispatch_ports::{Clock, Dispatch, Model, Prompt, Timeout};
 use store_ports::Store;
 use transcript_ports::{Body, Instant};
 
+use algebra::Monoid;
+
 use super::hook::answers::{Asked, Role};
 use super::structure::Crew;
 use crate::cli::failure::Failure;
@@ -31,6 +33,7 @@ impl Eval {
 
 impl<S: Store, D: Dispatch, C: Clock> Evaluating<'_, S, D, C> {
     const TIMEOUT: Timeout = Timeout::new(600);
+    const CHUNK: usize = 300;
 
     fn turn(&self, end: &TurnEnd) -> Result<Turn, Failure> {
         let said: &Body = end.asked().as_ref();
@@ -62,8 +65,21 @@ impl<S: Store, D: Dispatch, C: Clock> Evaluating<'_, S, D, C> {
         let whole: Vec<Unabridged<'_>> = history.iter().map(Unabridged::from).collect();
         let read = self.crew.called(&Prompt::from(&asked.selecting(&whole)), Self::TIMEOUT, Model::Haiku)?;
         let based = Arm::picked(&read, &history);
+        let chunks = history.chunks(Self::CHUNK).map(|chunk| self.chunk_read(asked, chunk));
+        let chunked = Arm::concat(chunks.collect::<Result<Vec<Arm>, Failure>>()?);
         let store_checked = self.crew.called(&Prompt::from(&stored.verifying(truly)), Self::TIMEOUT, Model::Sonnet)?;
         let base_checked = self.crew.called(&Prompt::from(&based.verifying(truly)), Self::TIMEOUT, Model::Sonnet)?;
-        Ok(Judged::new(truth, &candidates, stored.checked(&store_checked), based.checked(&base_checked)))
+        let chunk_checked = self.crew.called(&Prompt::from(&chunked.verifying(truly)), Self::TIMEOUT, Model::Sonnet)?;
+        Ok(Judged::new(
+            truth,
+            &candidates,
+            [stored.checked(&store_checked), based.checked(&base_checked), chunked.checked(&chunk_checked)],
+        ))
+    }
+
+    fn chunk_read(&self, asked: &Asked, chunk: &[Said]) -> Result<Arm, Failure> {
+        let whole: Vec<Unabridged<'_>> = chunk.iter().map(Unabridged::from).collect();
+        let read = self.crew.called(&Prompt::from(&asked.selecting(&whole)), Self::TIMEOUT, Model::Haiku)?;
+        Ok(Arm::picked(&read, chunk))
     }
 }
