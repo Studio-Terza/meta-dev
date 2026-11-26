@@ -22,12 +22,9 @@ thiserror.workspace = true
 
 [dev-dependencies]
 sqlite-ports = { path = "../sqlite-ports" }
-design-model = { path = "../design-model" }
-design-store = { path = "../design-store" }
+design-messages = { path = "../design-messages" }
 dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports" }
-grammar-search = { path = "../grammar-search" }
-stream = { path = "../stream" }
 strum.workspace = true
 tempfile.workspace = true
 transcript-ports = { path = "../transcript-ports" }

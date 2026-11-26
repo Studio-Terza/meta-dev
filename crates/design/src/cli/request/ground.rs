@@ -1,14 +1,9 @@
-use std::path::Path;
-
-use design_model::Project;
-use file_ports::{Bytes, FileFailure, Files};
-use local_config::Kept;
+use file_ports::Files;
 use port_core::{Port, Run};
 use store_ports::Store;
 use transcript_ports::ClaudeCodeDir;
 
 use super::projects::Located;
-use crate::cli::failure::Failure;
 
 #[derive(Debug)]
 pub struct Ground<'run, F: Files, S: Store> {
@@ -33,17 +28,5 @@ impl<'run, F: Files, S: Store> Ground<'run, F, S> {
 
     pub fn transcripts(self) -> Port<'run, ClaudeCodeDir<F>> {
         self.run.port(self.located.transcripts(self.files))
-    }
-
-    pub fn read(&self, path: &Path) -> Result<Bytes, FileFailure> {
-        self.files.read(&self.located.within(path))
-    }
-
-    pub fn located(&self) -> &Located {
-        &self.located
-    }
-
-    pub fn configured(&self, project: Project) -> Result<Kept, Failure> {
-        Ok(self.located.configured(project).kept(&self.files, self.located.repo())?)
     }
 }

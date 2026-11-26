@@ -12,31 +12,19 @@ doctest = false
 [dependencies]
 invariants = { path = "../invariants" }
 console-ports = { path = "../console-ports" }
-design-model = { path = "../design-model" }
-design-store = { path = "../design-store" }
+design-messages = { path = "../design-messages" }
 dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports" }
-grammar-cited = { path = "../grammar-cited" }
-grammar-flag = { path = "../grammar-flag" }
 grammar-lines = { path = "../grammar-lines" }
-grammar-notes = { path = "../grammar-notes" }
-grammar-output = { path = "../grammar-output" }
-grammar-search = { path = "../grammar-search" }
 grammar-slug = { path = "../grammar-slug" }
-local-config = { path = "../local-config" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 serde.workspace = true
 serde_json.workspace = true
 store-ports = { path = "../store-ports" }
-stream = { path = "../stream" }
 strum.workspace = true
 thiserror.workspace = true
 transcript-ports = { path = "../transcript-ports" }
-
-[dev-dependencies]
-sqlite-ports = { path = "../sqlite-ports" }
-text-lines = { path = "../text-lines" }
 
 [lints]
 workspace = true

@@ -14,8 +14,6 @@ use newtype::{Guarded, Inner, Listed, Newtype, Stored, Validated};
 enum Lexeme {
     #[regex(r"[A-Za-z0-9_][A-Za-z0-9_-]*")]
     Bare,
-    #[regex(r"[A-Za-z0-9_][A-Za-z0-9_-]*\.(0|[1-9][0-9]*)")]
-    Cited,
     #[regex(r#""([^"\\\r\n]|\\["\\nrt])*""#, Lexeme::unquoted)]
     Quoted(String),
     #[regex(r"\r?\n")]
@@ -73,7 +71,6 @@ enum Special {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Kind {
     Bare,
-    Cited,
     Quoted,
     End,
 }
@@ -245,7 +242,6 @@ impl From<(Lexeme, String)> for Token {
     fn from((lexeme, slice): (Lexeme, String)) -> Token {
         match lexeme {
             Lexeme::Bare => Token { kind: Kind::Bare, text: slice },
-            Lexeme::Cited => Token { kind: Kind::Cited, text: slice },
             Lexeme::Quoted(quoted) => Token { kind: Kind::Quoted, text: quoted },
             Lexeme::End => Token { kind: Kind::End, text: slice },
         }

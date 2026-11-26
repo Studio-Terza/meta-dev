@@ -1,23 +1,12 @@
 use std::path::PathBuf;
 
-use design_store::StreamSchema;
+use design_messages::StreamSchema;
 use store_ports::Opens;
-
-use super::Token;
-use crate::cli::failure::Failure;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Persistence {
     File,
     DryRun,
-}
-
-impl TryFrom<&[Token]> for Persistence {
-    type Error = Failure;
-
-    fn try_from(rest: &[Token]) -> Result<Persistence, Failure> {
-        rest.iter().try_fold(Persistence::File, |earlier, token| token.persisted(earlier))
-    }
 }
 
 impl Persistence {

@@ -1,35 +1,17 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
-mod asked_earlier;
 mod boundary;
 mod cursors;
-mod earlier_lines;
-mod imported_notes;
 mod owner_said;
-mod prefixes;
-mod quoted;
-mod scope;
-mod search_segments;
 mod session_cursors;
 mod session_records;
-mod shown_message;
 mod stop_trail;
-mod stored;
 mod stream_schema;
 
-pub use asked_earlier::{Asked, AskedEarlier};
-pub use boundary::{CursorRow, CursorRowNew, Hit, LinkRow};
+pub use boundary::{CursorRow, CursorRowNew};
 pub use cursors::Cursors;
-pub use earlier_lines::EarlierLines;
-pub use imported_notes::{ImportedEnding, ImportedNotes, Noted};
 pub use owner_said::{LastSaid, OwnerHistory, Quote, Said, Unabridged};
-pub use prefixes::{Prefixes, Shortest};
-pub use quoted::{Quoted, QuotedSegments};
-pub use scope::Scope;
-pub use search_segments::SearchSegments;
 pub use session_cursors::SessionCursors;
-pub use session_records::{Holding, SessionRecords};
-pub use shown_message::ShownMessage;
-pub use stop_trail::{Overran, Overruns, StopRow, StopTrail, Stopped, Tally};
-pub use stored::Stored;
+pub use session_records::SessionRecords;
+pub use stop_trail::{Fate, Halt, Overran, Overruns, StopRow, StopTrail, Stopped, Tally};
 pub use stream_schema::StreamSchema;

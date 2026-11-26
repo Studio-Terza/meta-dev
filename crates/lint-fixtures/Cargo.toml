@@ -13,10 +13,8 @@ doctest = false
 file-ports = { path = "../file-ports" }
 invariants = { path = "../invariants" }
 lint-core = { path = "../lint-core" }
-lint-file = { path = "../lint-file" }
 lint-placement = { path = "../lint-placement" }
 newtype = { path = "../newtype" }
-workspace-metadata = { path = "../workspace-metadata" }
 
 [dev-dependencies]
 

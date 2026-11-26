@@ -3,7 +3,7 @@ mod boundary;
 use port_core::Op;
 use transcript_ports::Body;
 
-pub use boundary::{StopRow, Tally};
+pub use boundary::{Fate, Halt, StopRow, Tally};
 
 #[derive(Debug, Op)]
 pub struct Stopped(StopRow);

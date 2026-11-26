@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use newtype::Counter;
 
-use crate::cli::output::{Count, Line};
+use crate::cli::Count;
 
 #[derive(Debug)]
 pub struct Counts<Of>(BTreeMap<Of, Count>);
@@ -17,8 +17,8 @@ impl<Of: Ord> FromIterator<Of> for Counts<Of> {
     }
 }
 
-impl<Of: Clone> Counts<Of> {
-    pub fn lines(&self, line: impl Fn(Of, Count) -> Line) -> Vec<Line> {
-        self.0.iter().map(|(key, count)| line(key.clone(), *count)).collect()
+impl<Of> Counts<Of> {
+    pub fn counted(&self) -> impl Iterator<Item = (&Of, &Count)> {
+        self.0.iter()
     }
 }

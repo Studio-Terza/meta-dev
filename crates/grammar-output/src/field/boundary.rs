@@ -4,7 +4,6 @@ use std::str::FromStr;
 use newtype::Stored;
 
 use crate::{Decimal, Field, Kind, Numbered, Token, Unwrapping};
-use grammar_cited::Cited;
 
 #[derive(Debug)]
 pub struct Word<T>(PhantomData<T>);
@@ -87,11 +86,3 @@ impl<T: TryFrom<u64>> Field for Integer<T> {
     }
 }
 
-impl Field for Cited {
-    type Value = Cited;
-
-    fn taken(token: Token) -> Result<Cited, Token> {
-        let kept = token.clone();
-        token.expected(Kind::Cited).and_then(|text| text.parse::<Cited>().map_err(|_uncited| kept))
-    }
-}

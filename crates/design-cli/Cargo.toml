@@ -18,7 +18,6 @@ sqlite-ports = { path = "../sqlite-ports" }
 
 [dev-dependencies]
 invariants = { path = "../invariants" }
-design-model = { path = "../design-model" }
 newtype = { path = "../newtype" }
 grammar-slug = { path = "../grammar-slug" }
 serde_json.workspace = true

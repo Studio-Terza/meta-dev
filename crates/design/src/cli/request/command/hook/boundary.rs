@@ -6,9 +6,7 @@ use std::ops::Not;
 use std::path::PathBuf;
 
 use console_ports::{Heard, Shown};
-use design_model::{Fate, Halt};
-use design_runs::{Account, FailuresReported, UnreportedFailures};
-use design_store::{LastSaid, Overran, Overruns, StopRow, Stopped, Tally};
+use design_messages::{Fate, Halt, LastSaid, Overran, Overruns, StopRow, Stopped, Tally};
 use dispatch_ports::{Clock, Dispatch, Moment, Wall};
 use file_ports::{Epoch, Files};
 use newtype::Wrapping;
@@ -17,8 +15,8 @@ use store_ports::Store;
 use transcript_ports::{Body, SessionId};
 
 use super::super::Ground;
-use super::super::structure::Crew;
-use super::answers::{Answering, Answers, Recollection, Remembered, Search};
+use super::super::crew::Crew;
+use super::answers::{Answering, Answers, Search};
 use crate::cli::failure::Failure;
 use crate::cli::request::ignored::Ignored;
 use crate::{HookEvent, Outcome, Uttered};
@@ -41,11 +39,6 @@ struct Handler {
     kind: &'static str,
     command: String,
     timeout: u32,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Prompting {
-    prompt: Option<Body>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -75,24 +68,9 @@ struct Continuing;
 struct Continuation(Option<Continuing>);
 
 #[derive(Debug, Serialize)]
-#[serde(untagged)]
-pub enum Decision {
-    Block {
-        decision: Verdict,
-        reason: String,
-    },
-    Context {
-        #[serde(rename = "hookSpecificOutput")]
-        specific: Specific,
-    },
-}
-
-#[derive(Debug, Serialize)]
-pub struct Specific {
-    #[serde(rename = "hookEventName")]
-    event: HookEvent,
-    #[serde(rename = "additionalContext")]
-    context: String,
+pub struct Decision {
+    decision: Verdict,
+    reason: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -147,7 +125,7 @@ impl Stopping {
     ) -> Result<Uttered, Failure> {
         match self.continuation.0 {
             Some(Continuing) => Ok(Uttered::silent(Ok(Outcome::Hooked(HookEvent::Stop)))),
-            None => Decision::told(observed.store, HookEvent::Stop, &[], observed.blocking(crew, self)),
+            None => Decision::told(&observed.blocking(crew, self)),
         }
     }
 
@@ -207,62 +185,11 @@ impl From<bool> for Continuation {
 }
 
 impl Decision {
-    const RECALLED: &'static str = "Design nodes bearing on this message (design show <id>):";
-
-    pub fn told(
-        store: &impl Store,
-        event: HookEvent,
-        recalled: &[Remembered],
-        stopped: Vec<String>,
-    ) -> Result<Uttered, Failure> {
-        let unreported = store.read(UnreportedFailures)?;
-        let accounts = unreported.iter().map(|failure| AsRef::<Account>::as_ref(failure).to_string());
-        let nodes = recalled
-            .first()
-            .map(|_first| Self::RECALLED.to_owned())
-            .into_iter()
-            .chain(recalled.iter().map(Remembered::to_string));
-        let told: Vec<String> = accounts.chain(nodes).chain(stopped).collect();
-        told.first().map(|_first| told.join("\n")).map_or(Ok(Uttered::silent(Ok(Outcome::Hooked(event)))), |joined| {
-            let decision = Decision::telling(event, joined);
-            let said = decision.said()?;
-            let reported = store.write(unreported.into_iter().collect::<FailuresReported>());
-            Ok(Uttered::new(said, reported.map(|_reported| decision.outcome()).map_err(Failure::from)))
+    fn told(stopped: &[String]) -> Result<Uttered, Failure> {
+        stopped.first().map_or(Ok(Uttered::silent(Ok(Outcome::Hooked(HookEvent::Stop)))), |_first| {
+            let decision = Decision { decision: Verdict::Block, reason: stopped.join("\n") };
+            let json = serde_json::to_string(&decision).map_err(Failure::Render)?;
+            Ok(Uttered::new(Shown::said(format_args!("{json}\n")), Ok(Outcome::Blocked)))
         })
-    }
-
-    fn telling(event: HookEvent, told: String) -> Decision {
-        match event {
-            HookEvent::Stop => Decision::Block { decision: Verdict::Block, reason: told },
-            HookEvent::UserPromptSubmit => Decision::Context { specific: Specific { event, context: told } },
-        }
-    }
-
-    fn said(&self) -> Result<Shown, Failure> {
-        let json = serde_json::to_string(self).map_err(Failure::Render)?;
-        Ok(Shown::said(format_args!("{json}\n")))
-    }
-
-    fn outcome(&self) -> Outcome {
-        match self {
-            Decision::Block { .. } => Outcome::Blocked,
-            Decision::Context { .. } => Outcome::Told,
-        }
-    }
-}
-
-impl Prompting {
-    pub fn heard(heard: Heard) -> Result<Prompting, Failure> {
-        let text = heard.into_inner();
-        text.is_empty()
-            .then_some(Prompting { prompt: None })
-            .map_or_else(|| serde_json::from_str(&text).map_err(Failure::Unheard), Ok)
-    }
-
-    pub fn recalled<S: Store, D: Dispatch, C: Clock>(&self, answering: &Answering<'_, S, D, C>) -> Recollection {
-        self.prompt
-            .as_ref()
-            .and_then(|prompt| answering.recalled(prompt).ignoring(Ignored::Unrecalled))
-            .unwrap_or_default()
     }
 }
