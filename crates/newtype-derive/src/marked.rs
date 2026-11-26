@@ -1,7 +1,13 @@
 use syntax::Compiled;
 use syntax::TokenStream;
-use syntax::quote;
-use syntax::{DeriveInput, Generics, Ident};
+use syntax::{DeriveInput, Generics, Ident, Visibility};
+use syntax::{format_ident, quote};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Mark {
+    Spelled,
+    Listed,
+}
 
 pub struct Marked<'item> {
     ident: &'item Ident,
@@ -13,10 +19,49 @@ impl<'item> Marked<'item> {
         Marked { ident, generics }
     }
 
-    pub fn spelled(tokens: TokenStream) -> TokenStream {
+    pub fn expanded(tokens: TokenStream, mark: Mark) -> TokenStream {
         syntax::parse::parse2::<DeriveInput>(tokens)
-            .map(|input| Marked::new(&input.ident, &input.generics).stored(&quote!(::newtype::Spelled)))
+            .map(|input| Marked::new(&input.ident, &input.generics).marked(mark, &input.vis))
             .compiled()
+    }
+
+    fn marked(&self, mark: Mark, visibility: &Visibility) -> TokenStream {
+        match mark {
+            Mark::Spelled => self.stored(&quote!(::newtype::Spelled)),
+            Mark::Listed => self.listed(visibility),
+        }
+    }
+
+    fn listed(&self, visibility: &Visibility) -> TokenStream {
+        let name = self.ident;
+        let unknown = format_ident!("Unknown{}", name);
+        let stored = self.stored(&quote!(::newtype::Listed));
+        quote! {
+            #stored
+
+            #[derive(Debug)]
+            #visibility struct #unknown(::std::string::String);
+
+            impl ::core::fmt::Display for #unknown {
+                fn fmt(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                    ::core::write!(formatter, "{:?} names no {}", self.0, ::core::stringify!(#name))
+                }
+            }
+
+            impl ::std::error::Error for #unknown {}
+
+            impl ::core::str::FromStr for #name {
+                type Err = #unknown;
+
+                fn from_str(text: &str) -> ::core::result::Result<#name, #unknown> {
+                    <#name as ::newtype::Enumerated>::VARIANTS
+                        .iter()
+                        .copied()
+                        .find(|variant| <&'static str as ::core::convert::From<#name>>::from(*variant) == text)
+                        .ok_or_else(|| #unknown(::std::borrow::ToOwned::to_owned(text)))
+                }
+            }
+        }
     }
 
     pub fn stored(&self, kind: &TokenStream) -> TokenStream {

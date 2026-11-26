@@ -1,6 +1,7 @@
-use std::str::FromStr;
+use strum::EnumString;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(EnumString, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case", parse_err_ty = Unplaced, parse_err_fn = Unplaced::from)]
 pub enum Origin {
     Key,
     GeneratedKey,
@@ -9,12 +10,6 @@ pub enum Origin {
 }
 
 impl Origin {
-    const NAMED: [(&'static str, Origin); 4] = [
-        ("key", Origin::Key),
-        ("generated_key", Origin::GeneratedKey),
-        ("given", Origin::Given),
-        ("generated", Origin::Generated),
-    ];
     pub const INSERTED: [Origin; 2] = [Origin::Key, Origin::Given];
     pub const KEYS: [Origin; 2] = [Origin::Key, Origin::GeneratedKey];
     pub const ASSIGNED: [Origin; 2] = [Origin::Given, Origin::Generated];
@@ -24,15 +19,9 @@ impl Origin {
 #[error("an origin is key, generated_key, given or generated, not {0:?}")]
 pub struct Unplaced(String);
 
-impl FromStr for Origin {
-    type Err = Unplaced;
-
-    fn from_str(name: &str) -> Result<Origin, Unplaced> {
-        Self::NAMED
-            .iter()
-            .find(|(named, _)| *named == name)
-            .map(|(_, origin)| *origin)
-            .ok_or_else(|| Unplaced(name.to_owned()))
+impl From<&str> for Unplaced {
+    fn from(name: &str) -> Unplaced {
+        Unplaced(name.to_owned())
     }
 }
 

@@ -14,9 +14,8 @@ doctest = false
 
 [dependencies]
 grammar = { path = "../grammar" }
-named-derive = { path = "../named-derive" }
+strum.workspace = true
 newtype = { path = "../newtype" }
-thiserror.workspace = true
 
 [dev-dependencies]
 laws = { path = "../laws" }

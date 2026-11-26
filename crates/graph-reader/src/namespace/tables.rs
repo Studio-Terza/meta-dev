@@ -4,6 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use graph::{Domain, Unresolved};
 use lint_layout::Name;
+use newtype::Enumerated;
 
 use algebra::{Monoid, Semigroup};
 
@@ -33,7 +34,7 @@ impl<'name> Key<'name> {
     }
 
     pub(super) fn every(name: &'name Name) -> impl Iterator<Item = Key<'name>> {
-        Domain::ALL.into_iter().map(move |domain| Key { domain, name })
+        Domain::VARIANTS.iter().map(move |domain| Key { domain: *domain, name })
     }
 }
 

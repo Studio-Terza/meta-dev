@@ -16,6 +16,7 @@ lint-layout = { path = "../lint-layout" }
 graph = { path = "../graph" }
 lint-placement = { path = "../lint-placement" }
 newtype = { path = "../newtype" }
+strum.workspace = true
 
 [dev-dependencies]
 graph-reader = { path = "../graph-reader" }

@@ -1,14 +1,19 @@
-use std::fmt;
-
 use lint_transition_graph::Ground;
+use strum::Display;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Kind {
+    #[strum(serialize = "trait")]
     Trait,
+    #[strum(serialize = "port trait")]
     PortTrait,
+    #[strum(serialize = "store trait")]
     StoreTrait,
+    #[strum(serialize = "generic impl")]
     GenericImpl,
+    #[strum(serialize = "port")]
     Port,
+    #[strum(serialize = "store")]
     Store,
 }
 
@@ -32,9 +37,11 @@ impl Kind {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Relation {
+    #[strum(serialize = "implemented by")]
     ImplementedBy,
+    #[strum(serialize = "implements")]
     Implements,
 }
 
@@ -44,28 +51,6 @@ impl Kind {
         match self {
             Kind::Trait | Kind::PortTrait | Kind::StoreTrait => Relation::ImplementedBy,
             Kind::GenericImpl | Kind::Port | Kind::Store => Relation::Implements,
-        }
-    }
-}
-
-impl fmt::Display for Relation {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Relation::ImplementedBy => formatter.write_str("implemented by"),
-            Relation::Implements => formatter.write_str("implements"),
-        }
-    }
-}
-
-impl fmt::Display for Kind {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Kind::Trait => formatter.write_str("trait"),
-            Kind::PortTrait => formatter.write_str("port trait"),
-            Kind::StoreTrait => formatter.write_str("store trait"),
-            Kind::GenericImpl => formatter.write_str("generic impl"),
-            Kind::Port => formatter.write_str("port"),
-            Kind::Store => formatter.write_str("store"),
         }
     }
 }

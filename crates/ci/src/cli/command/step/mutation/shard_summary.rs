@@ -22,6 +22,7 @@ use grammar_output::Record;
 use mutant::Mutant;
 use outcome::Outcome;
 use report::Report;
+use strum::VariantArray;
 use tally::Tally;
 
 #[derive(Debug, Record)]
@@ -42,15 +43,17 @@ impl ShardSummary {
 
     fn texts(&self, files: &impl Files) -> Result<Vec<Text>, Failure<'_>> {
         let directories = self.directories(files)?;
-        let (tags, journals): (Vec<Outcome>, Vec<Journal>) = Outcome::ALL
-            .into_iter()
+        let (tags, journals): (Vec<Outcome>, Vec<Journal>) = Outcome::VARIANTS
+            .iter()
+            .copied()
             .flat_map(|outcome| directories.iter().map(move |directory| (outcome, directory.join(outcome.file_name()))))
             .map(|(outcome, path)| (outcome, Journal::from(path)))
             .unzip();
         let read: Vec<Option<Text>> =
             Journal::read_present(files, journals).into_iter().map(Option::transpose).collect::<Result<_, _>>()?;
-        Ok(Outcome::ALL
-            .into_iter()
+        Ok(Outcome::VARIANTS
+            .iter()
+            .copied()
             .map(|outcome| {
                 let texts = tags.iter().zip(&read).filter(|(tag, _)| **tag == outcome).flat_map(|(_, text)| text);
                 Text::new(texts.map(AsRef::as_ref).collect())
@@ -60,14 +63,15 @@ impl ShardSummary {
 
     fn report(&self, files: &impl Files) -> Result<Report, Failure<'_>> {
         let texts = self.texts(files)?;
-        let tallies = Outcome::ALL
-            .into_iter()
+        let tallies = Outcome::VARIANTS
+            .iter()
+            .copied()
             .zip(&texts)
             .map(|(outcome, text)| {
                 Tally::new(outcome, Count::new(text.as_ref().parse::<Lines>().into_iter().flatten().count()))
             })
             .collect();
-        let listed: String = Outcome::ALL
+        let listed: String = Outcome::VARIANTS
             .iter()
             .zip(&texts)
             .filter(|(outcome, _)| Outcome::LISTED.contains(outcome))

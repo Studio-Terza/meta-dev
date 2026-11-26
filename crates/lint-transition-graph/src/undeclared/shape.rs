@@ -12,11 +12,15 @@ use crate::edge::Edge;
 use crate::form::Acting;
 use crate::transitions::{Declares, Ground};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(strum::Display, Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Shape {
+    #[strum(serialize = "unary T -> T")]
     Unary,
+    #[strum(serialize = "builder (T, X) -> T")]
     Builder,
+    #[strum(serialize = "binary (T, T) -> T")]
     Binary,
+    #[strum(serialize = "mutating &mut")]
     Mutating,
 }
 
@@ -112,17 +116,6 @@ impl Shape {
             ),
             Shape::Binary => Fix::new("implement algebra::Semigroup for the type and make this its combine"),
             Shape::Mutating => Fix::new("return a new value, or move the mutation into a store operation"),
-        }
-    }
-}
-
-impl fmt::Display for Shape {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Shape::Unary => write!(formatter, "unary T -> T"),
-            Shape::Builder => write!(formatter, "builder (T, X) -> T"),
-            Shape::Binary => write!(formatter, "binary (T, T) -> T"),
-            Shape::Mutating => write!(formatter, "mutating &mut"),
         }
     }
 }

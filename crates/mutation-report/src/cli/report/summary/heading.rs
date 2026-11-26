@@ -1,22 +1,15 @@
-use std::fmt;
+use strum::Display;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Heading {
+    #[strum(serialize = "Surviving mutants")]
     Surviving,
+    #[strum(serialize = "Timed out mutants")]
     TimedOut,
+    #[strum(serialize = "Tests that kill no mutant")]
     KillingNothing,
+    #[strum(serialize = "Mutants killed while no golden test fails")]
     KilledWithoutGolden,
+    #[strum(serialize = "Unviable mutants by crate")]
     Unviable,
-}
-
-impl fmt::Display for Heading {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Heading::Surviving => formatter.write_str("Surviving mutants"),
-            Heading::TimedOut => formatter.write_str("Timed out mutants"),
-            Heading::KillingNothing => formatter.write_str("Tests that kill no mutant"),
-            Heading::KilledWithoutGolden => formatter.write_str("Mutants killed while no golden test fails"),
-            Heading::Unviable => formatter.write_str("Unviable mutants by crate"),
-        }
-    }
 }

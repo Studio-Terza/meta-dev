@@ -25,6 +25,7 @@ use super::use_path::{Leaf, UsePath};
 use super::view::View;
 use crate::ignored::Ignored;
 use invariants::Ignoring;
+use newtype::Enumerated;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Visibility {
@@ -368,7 +369,7 @@ impl Imported {
     fn domains(name: &Name) -> &'static [Domain] {
         match name.casing() {
             Casing::Camel => &Self::TYPED,
-            Casing::Lower | Casing::Shouting | Casing::Other => &Domain::ALL,
+            Casing::Lower | Casing::Shouting | Casing::Other => Domain::VARIANTS,
         }
     }
 

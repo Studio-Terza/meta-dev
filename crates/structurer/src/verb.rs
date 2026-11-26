@@ -1,11 +1,13 @@
 use design_model::Sense;
-use named_derive::Named;
+use newtype::Listed;
+use strum::{Display, IntoStaticStr, VariantArray};
 
 use crate::misread::Wanted;
 use crate::reading::{Call, Term};
 use crate::{Directive, Misread};
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
 pub enum Verb {
     Place,
     Sense,
@@ -15,33 +17,36 @@ pub enum Verb {
     Conversational,
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Form {
-    #[name("place(<segment>, <node>, <span-relation>)")]
+    #[strum(serialize = "place(<segment>, <node>, <span-relation>)")]
     Place,
-    #[name("sense(<segment>, <kind>, <specificity>, <confidence>, <explicitness>)")]
+    #[strum(serialize = "sense(<segment>, <kind>, <specificity>, <confidence>, <explicitness>)")]
     Sense,
-    #[name("link(<segment>, <segment>, <segment-relation>)")]
+    #[strum(serialize = "link(<segment>, <segment>, <segment-relation>)")]
     Link,
-    #[name("propose(new <label>, refines(<node>), <facet>, \"<title>\")")]
+    #[strum(serialize = "propose(new <label>, refines(<node>), <facet>, \"<title>\")")]
     Propose,
-    #[name("supersede(<node>, by(<node>))")]
+    #[strum(serialize = "supersede(<node>, by(<node>))")]
     Supersede,
-    #[name("conversational(<segment>)")]
+    #[strum(serialize = "conversational(<segment>)")]
     Conversational,
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
 pub(crate) enum New {
     New,
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
 pub(crate) enum Refines {
     Refines,
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
 pub(crate) enum By {
     By,
 }

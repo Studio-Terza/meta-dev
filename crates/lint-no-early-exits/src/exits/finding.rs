@@ -1,22 +1,12 @@
-use std::fmt;
-
 use lint_core::Fix;
+use strum::Display;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Display, Clone, Copy, Debug)]
+#[strum(serialize_all = "snake_case")]
 pub enum Finding {
     Return,
     Break,
     Continue,
-}
-
-impl fmt::Display for Finding {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Finding::Return => formatter.write_str("return"),
-            Finding::Break => formatter.write_str("break"),
-            Finding::Continue => formatter.write_str("continue"),
-        }
-    }
 }
 
 impl lint_core::Finding for Finding {

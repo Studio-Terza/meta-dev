@@ -1,13 +1,15 @@
-use std::fmt;
-
 use algebra::Semigroup;
 use lint_core::Fix;
 use lint_placement::Role;
+use strum::Display;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Kind {
+    #[strum(serialize = "test")]
     Tests,
+    #[strum(serialize = "shipped")]
     Shipped,
+    #[strum(serialize = "test and shipped")]
     Mixed,
 }
 
@@ -36,16 +38,6 @@ impl Kind {
             Kind::Mixed => {
                 Fix::new("the test re-implements shipped logic; test through the shipped code instead of copying it")
             }
-        }
-    }
-}
-
-impl fmt::Display for Kind {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Kind::Tests => formatter.write_str("test"),
-            Kind::Shipped => formatter.write_str("shipped"),
-            Kind::Mixed => formatter.write_str("test and shipped"),
         }
     }
 }

@@ -27,6 +27,7 @@ use git::Git;
 use grammar_output::Record;
 use hub::Hub;
 use scope::Scope;
+use strum::VariantArray;
 
 #[derive(Debug, Record)]
 #[record(source = Arguments)]
@@ -57,7 +58,7 @@ impl Step for Labels {
         let scope = Scope::reached_by(&self.metadata, &changes);
         let carried = pull_request.carried();
         let checks: Vec<Check> =
-            Check::ALL.into_iter().filter(|check| carried.iter().all(|label| label != check)).collect();
+            Check::VARIANTS.iter().copied().filter(|check| carried.iter().all(|label| label != check)).collect();
         let judged: Vec<Owed> = scope.judged(ports, &checks, pull_request.purpose(), &changes)?;
         let faults: Vec<&Owed> = judged.iter().filter(|owed| owed.outstanding().is_some()).collect();
         let said = [Shown::said(format_args!("{self}\n"))].into_iter().chain(faults.iter().map(Shown::said)).collect();

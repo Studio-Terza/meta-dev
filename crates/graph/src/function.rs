@@ -1,9 +1,8 @@
 pub(crate) mod definition;
 mod shape;
 
-use std::fmt;
-
 use lint_layout::Name;
+use strum::Display;
 
 use crate::item::Exposure;
 use crate::region::{Region, Seat};
@@ -51,21 +50,14 @@ impl Output {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Receiver {
+    #[strum(serialize = "self")]
     Owned,
+    #[strum(serialize = "&self")]
     Shared,
+    #[strum(serialize = "&mut self")]
     Mutable,
-}
-
-impl fmt::Display for Receiver {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Receiver::Owned => formatter.write_str("self"),
-            Receiver::Shared => formatter.write_str("&self"),
-            Receiver::Mutable => formatter.write_str("&mut self"),
-        }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
