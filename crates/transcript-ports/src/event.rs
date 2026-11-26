@@ -10,6 +10,7 @@ pub enum Happening {
     Notice,
     Relayed,
     Launch,
+    Sent,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -35,7 +36,7 @@ pub(crate) struct Placed {
 }
 
 impl Happening {
-    const ALL: [Happening; 3] = [Happening::Notice, Happening::Relayed, Happening::Launch];
+    const ALL: [Happening; 4] = [Happening::Notice, Happening::Relayed, Happening::Launch, Happening::Sent];
 }
 
 impl fmt::Display for Happening {
@@ -44,6 +45,7 @@ impl fmt::Display for Happening {
             Happening::Notice => formatter.write_str("notice"),
             Happening::Relayed => formatter.write_str("relayed"),
             Happening::Launch => formatter.write_str("launch"),
+            Happening::Sent => formatter.write_str("sent"),
         }
     }
 }

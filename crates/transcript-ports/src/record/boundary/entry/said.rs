@@ -5,6 +5,9 @@ use crate::{Body, Ignored, Line, Unrecognised};
 #[derive(Debug)]
 pub struct Launch(Body);
 
+#[derive(Debug)]
+pub struct Sent(Body);
+
 impl From<Body> for Launch {
     fn from(tool: Body) -> Launch {
         Launch(tool)
@@ -17,10 +20,23 @@ impl From<Launch> for Body {
     }
 }
 
+impl From<Body> for Sent {
+    fn from(to: Body) -> Sent {
+        Sent(to)
+    }
+}
+
+impl From<Sent> for Body {
+    fn from(sent: Sent) -> Body {
+        sent.0
+    }
+}
+
 #[derive(Debug)]
 pub enum Said {
     Text(Body),
     Launched(Launch),
+    Sent(Sent),
     Silent,
     Unrecognised(Unrecognised),
 }
@@ -29,6 +45,8 @@ pub trait Hears {
     fn text(self, text: Body) -> Line;
 
     fn launched(self, launch: Launch) -> Line;
+
+    fn sent(self, sent: Sent) -> Line;
 
     fn silence(self) -> Line;
 
@@ -40,6 +58,7 @@ impl Said {
         match self {
             Said::Text(text) => by.text(text),
             Said::Launched(launch) => by.launched(launch),
+            Said::Sent(sent) => by.sent(sent),
             Said::Silent => by.silence(),
             Said::Unrecognised(unrecognised) => by.unrecognised(unrecognised),
         }
@@ -49,6 +68,7 @@ impl Said {
         match self {
             Said::Text(text) => next.after(text),
             Said::Launched(launch) => Said::Launched(launch),
+            Said::Sent(sent) => Said::Sent(sent),
             Said::Silent => next,
             Said::Unrecognised(unrecognised) => Said::Unrecognised(unrecognised),
         }
@@ -58,6 +78,7 @@ impl Said {
         match self {
             Said::Text(text) => before.joined(&text).ignoring(Ignored::Oversized).map_or(Said::Silent, Said::Text),
             Said::Launched(launch) => Said::Launched(launch),
+            Said::Sent(sent) => Said::Sent(sent),
             Said::Silent => Said::Text(before),
             Said::Unrecognised(unrecognised) => Said::Unrecognised(unrecognised),
         }

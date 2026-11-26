@@ -456,6 +456,7 @@ laws::table!(
         r#""message":{"model":"claude","content":[{"type":"tool_use","name":"Bash"}]}"# => ["8 after 1"],
         r#""message":{"model":"claude","content":[{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"run_in_background":true}}]}"# => ["Launch toolu_1", "8 after 1"],
         r#""message":{"model":"claude","content":[{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"run_in_background":false}}]}"# => ["8 after 1"],
+        r#""message":{"model":"claude","content":[{"type":"tool_use","id":"toolu_2","name":"SendMessage","input":{"to":"nodyn","message":"go on"}}]}"# => ["Sent nodyn", "8 after 1"],
         r#""message":{"model":"claude","content":[{"type":"tool_use","name":"Bash","input":{"run_in_background":true}}]}"# => ["8 after 1"],
         r#""isSidechain":true,"message":{"model":"claude","content":[{"type":"text","text":"subagent words"}]}"# => ["8 after 1"],
         r#""isSidechain":true,"message":{"model":"claude","content":[{"type":"thinking","thinking":"hmm"}]}"# => ["8 after 1"],
@@ -536,7 +537,7 @@ laws::roundtrip!(
 
 laws::roundtrip!(
     a_happening_is_read_back_from_its_display,
-    select(vec![Happening::Notice, Happening::Relayed, Happening::Launch]),
+    select(vec![Happening::Notice, Happening::Relayed, Happening::Launch, Happening::Sent]),
     |happening: &Happening| happening.to_string(),
     |name: &String| name.parse::<Happening>().ignoring(Ignored::Refused),
     Some,
