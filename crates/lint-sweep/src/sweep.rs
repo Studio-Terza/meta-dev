@@ -2,7 +2,7 @@ mod boundary;
 
 use std::fmt;
 
-use lint_core::{Contribute, Contributing, SourceFile, Unwalked, Violation, Visits};
+use lint_core::{Contribute, Contributing, Joined, SourceFile, Tallied, Unjoined, Unwalked, Violation, Visits};
 
 pub use boundary::{Member, Spelled};
 
@@ -64,10 +64,34 @@ pub trait Concludes<'file>: Contribute + fmt::Debug {
 
 impl<'file, Contributor: Concludes<'file>> Finds<'file> for Contributing<Contributor> {
     fn found(self, file: &SourceFile) -> Found<'file> {
-        self.tallied(file).concluded(|contributor, open, part, nodes| Found {
+        Found::from(self.tallied(file))
+    }
+}
+
+impl<'file, Contributor: Concludes<'file>> From<Tallied<Contributor>> for Found<'file> {
+    fn from(tallied: Tallied<Contributor>) -> Found<'file> {
+        tallied.concluded(|contributor, open, part, nodes| Found {
             violations: contributor.violations(open, part),
             visited: Visited { contributor: Spelled::naming::<Contributor>(), nodes },
         })
+    }
+}
+
+pub trait Founds<'file> {
+    fn founds(self, found: Vec<Option<Found<'file>>>) -> Vec<Option<Found<'file>>>;
+}
+
+impl<'file> Founds<'file> for Unjoined {
+    fn founds(self, found: Vec<Option<Found<'file>>>) -> Vec<Option<Found<'file>>> {
+        found
+    }
+}
+
+impl<'file, Contributor: Concludes<'file>, Tail: Founds<'file>> Founds<'file>
+    for Joined<Option<Tallied<Contributor>>, Tail>
+{
+    fn founds(self, found: Vec<Option<Found<'file>>>) -> Vec<Option<Found<'file>>> {
+        self.concluded(|head, tail| tail.founds(found.into_iter().chain([head.map(Found::from)]).collect()))
     }
 }
 

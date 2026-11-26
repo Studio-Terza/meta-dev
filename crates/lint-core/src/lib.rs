@@ -22,7 +22,9 @@ mod watch;
 
 pub use boundary::{Bound, Finding, Fix, Message, Problem, Violation};
 pub use contents::Contents;
-pub use contribution::{Around, Contributed, Contributing, Contribution, Scope, Visits, WalkPosition};
+pub use contribution::{
+    Around, Contributed, Contributing, Contribution, Joined, Joint, Scope, Tallied, Unjoined, Visits, WalkPosition,
+};
 pub use gate::Gate;
 pub use headline::Headline;
 pub use lint::Lint;

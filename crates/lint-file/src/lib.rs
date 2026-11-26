@@ -7,7 +7,7 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use lint_core::{Headline, Lint, Parsed, Report, SourceFile, Violation};
-use lint_sweep::{Finds, Gathers, Member, Sweep};
+use lint_sweep::{Concludes, Contributing, Gathers, Member, Sweep};
 
 pub use concluded::{Concluded, Listed};
 pub use lead::{Leader, Led};
@@ -41,7 +41,7 @@ pub trait SweptLint {
     const HEADLINE: Headline;
     const READS: Reads;
 
-    fn watcher(file: &SourceFile) -> impl Finds<'_>;
+    fn watcher(file: &SourceFile) -> Contributing<impl Concludes<'_>>;
 }
 
 pub trait KinLint {

@@ -3,7 +3,7 @@ mod finding;
 use finding::Finding;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Finds, Kind};
+use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Kind};
 
 use std::path::Path;
 
@@ -26,7 +26,7 @@ impl SweptLint for NamedLifetimes {
     const HEADLINE: Headline = Headline::new("lifetimes are named with a word, never a letter");
     const READS: Reads = Reads::Every;
 
-    fn watcher(file: &SourceFile) -> impl Finds<'_> {
+    fn watcher(file: &SourceFile) -> Contributing<impl Concludes<'_>> {
         Contributing::new(ShortLifetimes { path: AsRef::<Path>::as_ref(file.head()) })
     }
 }

@@ -20,7 +20,7 @@ use lint_file::{
 use lint_file::{ModelLint, WorkspaceLint};
 use lint_port_dependencies::RoleFacts;
 use lint_reader::{Described, Unlocated};
-use lint_sweep::{Gathers, Member};
+use lint_sweep::{Found, Founds, Gathers, Joined, Joint, Member, Unjoined};
 use timer_ports::Timer;
 use workspace_metadata::Metadata;
 
@@ -400,10 +400,19 @@ trait Registered {
     fn judged<'file, 'settled, 'run: 'file>(judging: Judging<'file, 'settled, 'run>) -> Judging<'file, 'settled, 'run> {
         judging
     }
+
+    fn joined<'file>(
+        _: &'file SourceFile,
+        tail: impl Joint<Tallied: Founds<'file>> + 'file,
+    ) -> impl Joint<Tallied: Founds<'file>> + 'file {
+        tail
+    }
 }
 
 trait Walk {
     fn entries(entries: Vec<Entry>) -> Vec<Entry>;
+
+    fn watching(file: &SourceFile) -> impl Joint<Tallied: Founds<'_>> + '_;
 
     fn filed(filing: Filing<'_>) -> Filing<'_>;
 
@@ -413,6 +422,10 @@ trait Walk {
 impl Walk for Ended {
     fn entries(entries: Vec<Entry>) -> Vec<Entry> {
         entries
+    }
+
+    fn watching(_: &SourceFile) -> impl Joint<Tallied: Founds<'_>> + '_ {
+        Unjoined
     }
 
     fn filed(filing: Filing<'_>) -> Filing<'_> {
@@ -427,6 +440,10 @@ impl Walk for Ended {
 impl<Head: Registered, Tail: Walk> Walk for Listed<Head, Tail> {
     fn entries(entries: Vec<Entry>) -> Vec<Entry> {
         Tail::entries(entries.into_iter().chain([Head::ENTRY]).collect())
+    }
+
+    fn watching(file: &SourceFile) -> impl Joint<Tallied: Founds<'_>> + '_ {
+        Head::joined(file, Tail::watching(file))
     }
 
     fn filed(filing: Filing<'_>) -> Filing<'_> {
@@ -471,18 +488,31 @@ struct Filing<'file> {
     slot: Slot,
     leds: BTreeMap<TypeId, Led<'file>>,
     admitted: Vec<Admitted>,
+    swept: std::vec::IntoIter<Option<Found<'file>>>,
 }
 
 impl<'file> Filing<'file> {
     fn led<Leading: Leader>(self, reads: Reads, member: Member) -> Filing<'file> {
-        let Filing { file, slot, leds: started, mut admitted } = self;
+        let Filing { file, slot, leds: started, mut admitted, swept } = self;
         let found = reads.admits(file).map(|_| Admitted { slot, key: TypeId::of::<Leading>(), member });
         let leds = found.iter().fold(started, |mut kept, admit| {
             kept.entry(admit.key).or_insert_with(|| Leading::led(file));
             kept
         });
         admitted.extend(found);
-        Filing { file, slot, leds, admitted }
+        Filing { file, slot, leds, admitted, swept }
+    }
+
+    fn swept<Sweeping: 'static>(self, member: Member) -> Filing<'file> {
+        let Filing { file, slot, leds: started, mut admitted, mut swept } = self;
+        let found =
+            swept.next().flatten().map(|sweep| (Admitted { slot, key: TypeId::of::<Sweeping>(), member }, sweep));
+        let leds = found.into_iter().fold(started, |mut kept, (admit, sweep)| {
+            admitted.push(admit);
+            kept.entry(admit.key).or_insert_with(|| Led::from(sweep));
+            kept
+        });
+        Filing { file, slot, leds, admitted, swept }
     }
 
     fn advanced(self) -> Filing<'file> {
@@ -518,7 +548,9 @@ impl<'file> Gathers<FileWork<'file>> for Filer<'file> {
     fn gathered(self, _: &SourceFile) -> FileWork<'file> {
         let file = <&SourceFile>::from(self.claimed);
         let order = self.claimed.order();
-        let filing = Filing { file, slot: Slot::FIRST, leds: BTreeMap::new(), admitted: Vec::new() };
+        let joint = Registry::watching(file);
+        let swept = joint.swept(file).founds(Vec::new()).into_iter();
+        let filing = Filing { file, slot: Slot::FIRST, leds: BTreeMap::new(), admitted: Vec::new(), swept };
         FileWork { order, worked: Registry::filed(filing).worked(order), file }
     }
 }
@@ -535,7 +567,14 @@ impl<Lint: SweptLint + 'static> Registered for Swept<Lint> {
     const ENTRY: Entry = Entry::spelled::<Lint>(Work::Filed(Lint::HEADLINE));
 
     fn filed(filing: Filing<'_>) -> Filing<'_> {
-        filing.led::<Swept<Lint>>(Lint::READS, Member::FIRST)
+        filing.swept::<Swept<Lint>>(Member::FIRST)
+    }
+
+    fn joined<'file>(
+        file: &'file SourceFile,
+        tail: impl Joint<Tallied: Founds<'file>> + 'file,
+    ) -> impl Joint<Tallied: Founds<'file>> + 'file {
+        Joined::new(Lint::READS.admits(file).map(Lint::watcher), tail)
     }
 }
 

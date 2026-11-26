@@ -1,3 +1,5 @@
+mod joint;
+
 use std::fmt;
 use std::iter;
 use std::rc::Rc;
@@ -10,6 +12,9 @@ use crate::macros::Macros;
 use crate::source_file::SourceFile;
 use crate::watch::Descend;
 use crate::watch::{Contribute, Kind};
+
+pub(crate) use joint::Sweeping;
+pub use joint::{Alive, Hook, Joined, Joint, Lanes, Unjoined};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Scope(Kind);
@@ -50,7 +55,7 @@ impl<Contributor: Contribute> Tallied<Contributor> {
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct Walked<Open, Part> {
+pub struct Walked<Open, Part> {
     contribution: Contribution<Open, Part>,
     entered: WalkPosition,
     visits: Visits,
@@ -95,6 +100,7 @@ struct Frame<'up, Open> {
 #[derive(Debug)]
 pub struct Around<'up, Open> {
     frame: Option<&'up Frame<'up, Open>>,
+    stacked: &'up [Open],
     position: WalkPosition,
 }
 
@@ -152,8 +158,14 @@ impl<'up, Open> Around<'up, Open> {
         self.position
     }
 
+    const TOP: Around<'up, Open> = Around { frame: None, stacked: &[], position: WalkPosition(0) };
+
+    fn moved(&self, by: WalkPosition) -> Around<'up, Open> {
+        Around { frame: self.frame, stacked: self.stacked, position: self.position.combine(by) }
+    }
+
     pub fn nearest(&self) -> impl Iterator<Item = &'up Open> {
-        iter::successors(self.frame, |frame| frame.enclosing).map(|frame| frame.open)
+        iter::successors(self.frame, |frame| frame.enclosing).map(|frame| frame.open).chain(self.stacked.iter().rev())
     }
 }
 
@@ -216,7 +228,7 @@ impl<Contributor: Contribute> Contributing<Contributor> {
     }
 
     fn walked_file(&self, file: &SourceFile) -> Walked<Contributor::Open, Contributor::Part> {
-        let top = Around { frame: None, position: WalkPosition::default() };
+        let top = Around::TOP;
         let cursors = Some(file.kind_index().top());
         self.siblings(Some(file), Node::top_level(file.syntax()), cursors, &top)
     }
@@ -226,7 +238,7 @@ impl<Contributor: Contribute> Contributing<Contributor> {
         &self,
         items: impl IntoIterator<Item = &'item syntax::Item>,
     ) -> Contribution<Contributor::Open, Contributor::Part> {
-        let top = Around { frame: None, position: WalkPosition::default() };
+        let top = Around::TOP;
         self.siblings(None, items.into_iter().map(Node::Item), None, &top).contribution
     }
 
@@ -245,12 +257,7 @@ impl<Contributor: Contribute> Contributing<Contributor> {
         let fallback = iter::repeat(None).map_while(|none| unindexed.map(|()| none));
         let positions = cursors.into_iter().flatten().map(Some).chain(fallback);
         nodes.into_iter().zip(positions).fold(Walked::default(), |walked, (node, cursor)| {
-            let next = self.walked(
-                file,
-                node,
-                cursor,
-                &Around { frame: around.frame, position: around.position.combine(walked.entered) },
-            );
+            let next = self.walked(file, node, cursor, &around.moved(walked.entered));
             walked.combine(next)
         })
     }
@@ -276,8 +283,7 @@ impl<Contributor: Contribute> Contributing<Contributor> {
         let start = Stepping { walked: Walked::default(), cursors };
         node.folded(start, |Stepping { walked, cursors: mut rest }, child| {
             let cursor = rest.as_mut().and_then(Iterator::next);
-            let position = around.position.combine(walked.entered);
-            let next = self.walked(file, child, cursor, &Around { frame: around.frame, position });
+            let next = self.walked(file, child, cursor, &around.moved(walked.entered));
             Stepping { walked: walked.combine(next), cursors: rest }
         })
         .walked
@@ -303,12 +309,13 @@ impl<Contributor: Contribute> Contributing<Contributor> {
         let frame = Frame { open: &within.open, enclosing: around.frame };
         let inner = Around {
             frame: scoping.framed(&frame).or(around.frame),
+            stacked: around.stacked,
             position: around.position.combine(WalkPosition::ONE),
         };
         let children = descend
             .descending(visit.node)
             .map_or_default(|node| self.unwatched(visit.file, node, visit.indexed.map(Indexed::children), &inner));
-        let after = Around { frame: inner.frame, position: inner.position.combine(children.entered) };
+        let after = inner.moved(children.entered);
         let expansion = self.siblings(visit.file, visit.expanded(descend).iter().map(Node::Stmt), None, &after);
         let below = children.combine(expansion);
         let entered = below.entered.combine(WalkPosition::ONE);
@@ -318,7 +325,7 @@ impl<Contributor: Contribute> Contributing<Contributor> {
 }
 
 #[derive(Clone, Copy, Debug)]
-enum Scoping {
+pub enum Scoping {
     Scoped,
     Flat,
 }

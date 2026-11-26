@@ -4,7 +4,7 @@ use algebra::Semigroup;
 use finding::Finding;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Finds, Kind};
+use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Kind};
 use std::path::Path;
 
 use syntax::{Attribute, Ident, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro};
@@ -40,7 +40,7 @@ impl SweptLint for LiteralNames {
     const HEADLINE: Headline = Headline::new("function names say what the function does");
     const READS: Reads = Reads::Shipped;
 
-    fn watcher(file: &SourceFile) -> impl Finds<'_> {
+    fn watcher(file: &SourceFile) -> Contributing<impl Concludes<'_>> {
         Contributing::new(VagueNames { path: AsRef::<Path>::as_ref(file.head()) })
     }
 }

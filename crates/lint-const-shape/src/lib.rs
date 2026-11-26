@@ -1,7 +1,7 @@
 use algebra::{Monoid, Semigroup};
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Contribution, Descend, Facts, Finds, Kind, Scope};
+use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Contribution, Descend, Facts, Kind, Scope};
 use std::path::Path;
 use syntax::Span;
 use syntax::Spanned;
@@ -36,7 +36,7 @@ impl SweptLint for ConstShape {
         Headline::new("casts live in const fns or boundary modules, and const loops walk slices");
     const READS: Reads = Reads::Every;
 
-    fn watcher(file: &SourceFile) -> impl Finds<'_> {
+    fn watcher(file: &SourceFile) -> Contributing<impl Concludes<'_>> {
         Contributing::new(ConstContexts { path: AsRef::<Path>::as_ref(file.head()), zone: Zone::of_file(file) })
     }
 }

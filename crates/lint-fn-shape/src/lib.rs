@@ -5,7 +5,7 @@ use algebra::{Monoid, Semigroup};
 use finding::Finding;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Contribution, Descend, Facts, Finds, Kind, Scope};
+use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Contribution, Descend, Facts, Kind, Scope};
 use std::path::Path;
 use syntax::Span;
 use syntax::Spanned;
@@ -92,7 +92,7 @@ impl SweptLint for FnShape {
         Headline::new("hairy control flow; booleans and tuples become types, nesting becomes methods");
     const READS: Reads = Reads::Shipped;
 
-    fn watcher(file: &SourceFile) -> impl Finds<'_> {
+    fn watcher(file: &SourceFile) -> Contributing<impl Concludes<'_>> {
         Contributing::new(Shapes { path: AsRef::<Path>::as_ref(file.head()) })
     }
 }

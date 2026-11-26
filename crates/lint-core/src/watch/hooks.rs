@@ -5,7 +5,9 @@ use lint_layout::Name;
 
 use super::Descend;
 use super::facts::Facts;
-use crate::contribution::{Around, Contributed, Contributing, Contribution, Scope, Visit, Walked};
+use crate::contribution::{
+    Alive, Around, Contributed, Contributing, Contribution, Hook, Lanes, Scope, Sweeping, Visit, Walked,
+};
 use crate::kind_index::Indexed;
 use crate::macros::Macros;
 use crate::source_file::SourceFile;
@@ -86,6 +88,48 @@ macro_rules! hooks {
                     inner.concluded(|_, part| part)
                 }
             )*
+        }
+
+        $(
+            impl Hook for syntax::$node {
+                type Facts<'node> = Facts<'node, syntax::$node>;
+
+                fn node(&self) -> Node<'_> {
+                    Node::$kind(self)
+                }
+
+                fn facts(&self) -> Facts<'_, syntax::$node> {
+                    Facts::new(self)
+                }
+
+                fn opened<Contributor: Contribute>(
+                    &self,
+                    contributor: &Contributor,
+                    facts: &Facts<'_, syntax::$node>,
+                    around: &Around<'_, Contributor::Open>,
+                ) -> Contributed<Contributor::Open, Contributor::Part> {
+                    contributor.$on(self, facts, around)
+                }
+
+                fn closed<Contributor: Contribute>(
+                    &self,
+                    contributor: &Contributor,
+                    facts: &Facts<'_, syntax::$node>,
+                    inner: Contribution<Contributor::Open, Contributor::Part>,
+                ) -> Contributor::Part {
+                    contributor.$off(self, facts, inner)
+                }
+            }
+        )*
+
+        impl<Lane: Lanes> Sweeping<'_, '_, Lane> {
+            pub(crate) fn dispatched(&mut self, node: Node<'_>, indexed: Option<Indexed<'_>>, alive: Alive) {
+                match node {
+                    Node::Macro(found) => self.macro_entered(found, indexed, alive),
+                    Node::Ident(found) => self.ident_entered(found, indexed, alive),
+                    $(Node::$kind(found) => self.entered(found, indexed, alive),)*
+                }
+            }
         }
 
         impl<Contributor: Contribute> Contributing<Contributor> {
