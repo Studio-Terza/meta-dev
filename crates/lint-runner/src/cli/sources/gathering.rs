@@ -173,6 +173,7 @@ impl<'run> Gathering<'run> {
     }
 
     pub(crate) fn kept(&self) -> Vec<Kept> {
+        self.contexts.wait();
         mem::take(&mut *self.kept.lock().unpoisoned())
     }
 

@@ -103,8 +103,7 @@ impl Crew<'_> {
     ) -> Verdict {
         let mine = Lints::worked(readout.done(), sources, Worker::MAIN);
         let worked: Worked = [mine].into_iter().chain(self.helpers.into_iter().map(Helper::joined)).collect();
-        let remembered = sources.remembered().map(|written| written.timing());
-        let first = sources.earlier().chain([readout.timing()]).chain(remembered);
+        let first = sources.earlier().chain([readout.timing()]);
         let table = sources.wired().table(first.chain(worked.timings().iter().copied()), worked.visited().clone());
         let outcome = Lints::gathered(readout.done(), sources.located().done(), worked);
         outcome.surveyed(&[table], out, err)
@@ -240,9 +239,13 @@ impl Lints {
                 .ignoring(Ignored::Unspawned)
         });
         let locating = Helper::spawned(scope, move || Self::locating(sources)).ignoring(Ignored::Unspawned);
-        let recalling =
-            Helper::spawned(scope, move || Worked::timed(sources.recalled().timing())).ignoring(Ignored::Unspawned);
-        Crew { helpers: locating.into_iter().chain(recalling).chain(helpers).collect() }
+        let remembering = Helper::spawned(scope, move || {
+            let recalled = Worked::timed(sources.recalled().timing());
+            let remembered = sources.remembered().map_or_default(|written| Worked::timed(written.timing()));
+            [recalled, remembered].into_iter().collect()
+        })
+        .ignoring(Ignored::Unspawned);
+        Crew { helpers: locating.into_iter().chain(remembering).chain(helpers).collect() }
     }
 
     fn gathered<'run>(
