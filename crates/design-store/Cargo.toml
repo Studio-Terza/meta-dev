@@ -12,16 +12,16 @@ test = false
 doctest = false
 
 [dependencies]
-design-model = { path = "../design-model" }
-grammar-search = { path = "../grammar-search" }
-newtype = { path = "../newtype" }
-port-core = { path = "../port-core" }
-store-ports = { path = "../store-ports" }
 design-closure = { path = "../design-closure" }
 design-graph = { path = "../design-graph" }
 design-messages = { path = "../design-messages" }
 
 [dev-dependencies]
+design-model = { path = "../design-model" }
+grammar-search = { path = "../grammar-search" }
+newtype = { path = "../newtype" }
+port-core = { path = "../port-core" }
+store-ports = { path = "../store-ports" }
 invariants = { path = "../invariants" }
 dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports" }

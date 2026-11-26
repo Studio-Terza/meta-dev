@@ -17,8 +17,8 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use console_ports::Environment;
+use design_store::Scope;
 use design_store::StreamSchema;
-use design_store::{Recall, Recollection, Scope};
 use dispatch_ports::{Clock, Dispatch};
 use file_ports::Files;
 use grammar_search::Terms;
@@ -53,7 +53,7 @@ pub enum Command {
     Search(Terms, Scope),
     Answer(Body),
     Eval(Eval),
-    Recall(Terms),
+    Recall(Body),
     Init(Init),
     Apply(PathBuf),
     Move(Move),
@@ -155,13 +155,7 @@ impl Verb {
                 .map(|terms| Command::Search(terms, scope)),
             Verb::Answer => Self::spoken(rest).map(Command::Answer),
             Verb::Eval => Eval::try_from(rest).map(Command::Eval),
-            Verb::Recall => rest
-                .iter()
-                .map(Token::text)
-                .collect::<Option<Vec<&str>>>()
-                .and_then(Terms::lexed)
-                .ok_or(Failure::Usage)
-                .map(Command::Recall),
+            Verb::Recall => Self::spoken(rest).map(Command::Recall),
             Verb::Init => Init::try_from(rest).map(Command::Init),
             Verb::Apply => Token::only(rest).map(PathBuf::from).map(Command::Apply),
             Verb::Move(moving) => Move::read(moving, rest).map(Command::Move),
@@ -225,11 +219,9 @@ impl Command {
             Command::Answer(said) => Answering::new(ground.store(), crew)
                 .traced(&said)
                 .map(|traced| Uttered::new(Shown::said(traced), Ok(Outcome::Answered))),
-            Command::Recall(terms) => {
-                ground.store().read(Recall::telling(&terms)).map_err(Failure::from).map(|recalled| {
-                    Uttered::new(Shown::said(Recollection::from(recalled.as_slice())), Ok(Outcome::Recalled))
-                })
-            }
+            Command::Recall(said) => Answering::new(ground.store(), crew)
+                .recalled(&said)
+                .map(|recalled| Uttered::new(Shown::said(recalled), Ok(Outcome::Recalled))),
             Command::Init(init) => init.planted(&ground).map(|initialised| {
                 Uttered::new(Shown::said(Lines::from(&initialised.lines())), Ok(Outcome::Initialised))
             }),

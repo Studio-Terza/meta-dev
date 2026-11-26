@@ -1,9 +1,12 @@
+use std::collections::BTreeSet;
 use std::fmt;
 use std::ops::Not;
 
+use design_model::{NodeId, Outline, Stage, Title};
 use design_store::{Quote, Said};
 use dispatch_ports::Reply;
 use grammar_search::Terms;
+use newtype::Wrapping;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use transcript_ports::{Body, Uuid};
@@ -65,6 +68,81 @@ pub struct Selecting<'asked> {
 
 #[derive(Clone, Copy, Debug)]
 pub struct Replied<'reply>(&'reply Reply);
+
+#[derive(Debug)]
+pub struct Recalling<'nodes> {
+    said: &'nodes Body,
+    nodes: &'nodes [Outline],
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Remembered {
+    node: NodeId,
+    stage: Stage,
+    title: Title,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Recollection(Vec<Remembered>);
+
+impl<'nodes> Recalling<'nodes> {
+    pub fn new(said: &'nodes Body, nodes: &'nodes [Outline]) -> Recalling<'nodes> {
+        Recalling { said, nodes }
+    }
+}
+
+impl Recollection {
+    pub fn recalled(reply: &Reply, nodes: &[Outline]) -> Recollection {
+        let named: BTreeSet<i64> = Replied(reply).listed::<i64>().into_iter().collect();
+        Recollection(
+            nodes
+                .iter()
+                .filter(|outline| named.contains(&outline.node().into_inner()))
+                .filter_map(|outline| {
+                    outline.title().map(|title| Remembered {
+                        node: outline.node(),
+                        stage: outline.stage(),
+                        title: title.clone(),
+                    })
+                })
+                .collect(),
+        )
+    }
+}
+
+impl AsRef<[Remembered]> for Recollection {
+    fn as_ref(&self) -> &[Remembered] {
+        &self.0
+    }
+}
+
+impl fmt::Display for Recollection {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.iter().try_for_each(|remembered| writeln!(formatter, "{remembered}"))
+    }
+}
+
+impl fmt::Display for Remembered {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "n{} {}: {}", self.node.into_inner(), self.stage, self.title)
+    }
+}
+
+impl fmt::Display for Recalling<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "The owner of a software project just sent its AI agent this message:\n{}\n\n\
+             Below are the project's design nodes, one per line as n<number> <stage>: <title>.\n\
+             List the numbers of every node that genuinely bears on the message: a node it asks about, decides, changes or depends on. Leave out nodes that only share a word with it.\n\
+             Reply with JSON only, no prose and no code fence: a list of node numbers, such as [12, 40]. Reply [] if none bear on it.\n\n",
+            self.said
+        )?;
+        self.nodes.iter().filter_map(|outline| outline.title().map(|title| (outline, title))).try_for_each(
+            |(outline, title)| writeln!(formatter, "n{} {}: {}", outline.node().into_inner(), outline.stage(), title),
+        )
+    }
+}
 
 impl Traced {
     pub fn answers(self) -> Option<Answers> {

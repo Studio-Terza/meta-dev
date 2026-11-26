@@ -2,15 +2,14 @@ use std::collections::BTreeMap;
 
 use console_ports::{Heard, Shown};
 use design_runs::{Account, FailuresReported, UnreportedFailures};
-use design_store::{LastSaid, Recalled};
+use design_store::LastSaid;
 use dispatch_ports::{Clock, Dispatch};
-use grammar_search::Terms;
 use newtype::Wrapping;
 use serde::{Deserialize, Serialize};
 use store_ports::Store;
 use transcript_ports::{Body, SessionId};
 
-use super::answers::{Answering, Answers};
+use super::answers::{Answering, Answers, Recollection, Remembered};
 use crate::cli::failure::Failure;
 use crate::cli::output::Count;
 use crate::cli::request::ignored::Ignored;
@@ -158,12 +157,12 @@ impl From<bool> for Continuation {
 }
 
 impl Decision {
-    const RECALLED: &'static str = "Design nodes matching this message (design show <id>):";
+    const RECALLED: &'static str = "Design nodes bearing on this message (design show <id>):";
 
     pub fn told(
         store: &impl Store,
         event: HookEvent,
-        recalled: &[Recalled],
+        recalled: &[Remembered],
         answers: Option<&Answers>,
     ) -> Result<Uttered, Failure> {
         let unreported = store.read(UnreportedFailures)?;
@@ -172,7 +171,7 @@ impl Decision {
             .first()
             .map(|_first| Self::RECALLED.to_owned())
             .into_iter()
-            .chain(recalled.iter().map(Recalled::to_string));
+            .chain(recalled.iter().map(Remembered::to_string));
         let told: Vec<String> = accounts.chain(nodes).chain(answers.map(ToString::to_string)).collect();
         told.first().map(|_first| told.join("\n")).map_or(Ok(Uttered::silent(Ok(Outcome::Hooked(event)))), |joined| {
             let decision = Decision::telling(event, joined);
@@ -215,7 +214,10 @@ impl Prompting {
             .map_or_else(|| serde_json::from_str(&text).map_err(Failure::Unheard), Ok)
     }
 
-    pub fn terms(&self) -> Option<Terms> {
-        self.prompt.as_ref().map(Body::to_string).and_then(|prompt| Terms::lexed([prompt.as_str()]))
+    pub fn recalled<S: Store, D: Dispatch, C: Clock>(&self, answering: &Answering<'_, S, D, C>) -> Recollection {
+        self.prompt
+            .as_ref()
+            .and_then(|prompt| answering.recalled(prompt).ignoring(Ignored::Unrecalled))
+            .unwrap_or_default()
     }
 }

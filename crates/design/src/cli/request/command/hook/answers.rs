@@ -1,14 +1,14 @@
 mod boundary;
 
-use design_store::{OwnerSaid, Said};
+use design_store::{ContextNodes, OwnerSaid, Said};
 use dispatch_ports::{Clock, Dispatch, Prompt, Timeout};
 use store_ports::Store;
 use transcript_ports::Body;
 
 use super::super::structure::Crew;
 use crate::cli::failure::Failure;
-use boundary::Question;
-pub use boundary::{Answers, Asked, Replied, Role, Traced};
+pub use boundary::{Answers, Asked, Recollection, Remembered, Replied, Role, Traced};
+use boundary::{Question, Recalling};
 
 #[derive(Debug)]
 pub struct Answering<'ports, S: Store, D: Dispatch, C: Clock> {
@@ -19,6 +19,7 @@ pub struct Answering<'ports, S: Store, D: Dispatch, C: Clock> {
 
 impl<'ports, S: Store, D: Dispatch, C: Clock> Answering<'ports, S, D, C> {
     const TIMEOUT: Timeout = Timeout::new(120);
+    const RECALLING: Timeout = Timeout::new(45);
 
     pub fn new(store: &'ports S, crew: &'ports Crew<'ports, D, C>) -> Answering<'ports, S, D, C> {
         Answering { store, crew, role: Role::LEAD }
@@ -26,6 +27,12 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Answering<'ports, S, D, C> {
 
     pub fn answered(&self, said: &Body) -> Result<Option<Answers>, Failure> {
         self.traced(said).map(Traced::answers)
+    }
+
+    pub fn recalled(&self, said: &Body) -> Result<Recollection, Failure> {
+        let nodes = self.store.read(ContextNodes)?;
+        let replied = self.crew.replied(&Prompt::from(&Recalling::new(said, &nodes)), Self::RECALLING)?;
+        Ok(replied.map_or_default(|reply| Recollection::recalled(&reply, &nodes)))
     }
 
     pub fn traced(&self, said: &Body) -> Result<Traced, Failure> {
