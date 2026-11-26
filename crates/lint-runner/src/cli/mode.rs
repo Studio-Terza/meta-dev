@@ -130,11 +130,14 @@ impl Run<'_, '_> {
                 out,
                 err,
             ),
-            Run::Laws => sources
-                .wired()
-                .files()
-                .write_each(LawRunners::from(&Reader::read_files(readout.done().files())).written())
-                .map_or_else(|failure| Verdict::refused(&failure, err), |()| Verdict::Clean),
+            Run::Laws => Verdict::ran(
+                sources
+                    .wired()
+                    .files()
+                    .write_each(LawRunners::from(&Reader::read_files(readout.done().files())).written())
+                    .map(|()| Verdict::Clean),
+                err,
+            ),
         }
     }
 

@@ -1,3 +1,4 @@
+use syntax::Compiled;
 use syntax::TokenStream;
 use syntax::quote;
 use syntax::{DeriveInput, Generics, Ident};
@@ -13,10 +14,9 @@ impl<'item> Marked<'item> {
     }
 
     pub fn spelled(tokens: TokenStream) -> TokenStream {
-        syntax::parse::parse2::<DeriveInput>(tokens).map_or_else(
-            |error| error.to_compile_error(),
-            |input| Marked::new(&input.ident, &input.generics).stored(&quote!(::newtype::Spelled)),
-        )
+        syntax::parse::parse2::<DeriveInput>(tokens)
+            .map(|input| Marked::new(&input.ident, &input.generics).stored(&quote!(::newtype::Spelled)))
+            .compiled()
     }
 
     pub fn stored(&self, kind: &TokenStream) -> TokenStream {

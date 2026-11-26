@@ -8,11 +8,18 @@ use design_model::{
 use design_runs::{Delivery, Halted, RunState};
 use design_store::StreamSchema;
 use dispatch_ports::{Pid, Tokens};
+use invariants::{Ignoring, ignored};
 use port_core::Op;
 use port_core::Run;
 use sqlite_ports::SqliteOpener;
 use store_ports::{Argument, Column, FromValue, Query, Statements, Store, StoreFailure};
 use stream::{Relation, Shape};
+
+ignored! {
+    enum Ignored {
+        NotText => "a schema value that is not text has no SQL to list",
+    }
+}
 
 type Sqlite = <SqliteOpener as store_ports::Opens>::Store;
 
@@ -29,6 +36,15 @@ impl Spelled {
 #[derive(Clone, Copy, Debug, Op)]
 struct Declared(&'static str);
 
+impl Declared {
+    fn refusal<Written>(written: Result<Written, StoreFailure>) -> Option<String> {
+        match written {
+            Ok(_written) => None,
+            Err(failure) => Some(failure.to_string()),
+        }
+    }
+}
+
 impl Query for Declared {
     type Rows = String;
 
@@ -38,7 +54,7 @@ impl Query for Declared {
         Ok(rows
             .into_iter()
             .flatten()
-            .filter_map(|value| String::from_value(value).ok())
+            .filter_map(|value| String::from_value(value).ignoring(Ignored::NotText))
             .collect::<Vec<String>>()
             .join("\n"))
     }
@@ -131,8 +147,7 @@ fn a_partial_usage_a_sense_superseding_another_segment_and_a_second_root_sense_a
         .try_for_each(|sql| store.write(store_ports::Prepared::written(sql, Vec::new())).map(|_written| ()))?;
     let refused: Vec<String> = REFUSED
         .iter()
-        .filter_map(|sql| store.write(store_ports::Prepared::written(sql, Vec::new())).err())
-        .map(|failure| failure.to_string())
+        .filter_map(|sql| Declared::refusal(store.write(store_ports::Prepared::written(sql, Vec::new()))))
         .collect();
     let explained = REASONS.iter().zip(&refused).filter(|(reason, failure)| failure.contains(**reason)).count();
     assert_eq!(explained, REASONS.len(), "{refused:?}");

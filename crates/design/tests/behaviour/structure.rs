@@ -20,16 +20,18 @@ use dispatch_ports::{
     Reply, Stall, Started, SystemClock, Tokens, Usage, Wall, dispatch_ops,
 };
 use file_ports::{Bytes, Files};
+use invariants::Ignoring;
 use newtype::Wrapping;
 use port_core::Run;
 use port_core::{Calls, Snapshot};
 use serde_json::Value;
 use store_ports::{Store, Written};
-use structurer::{Briefing, Directives, Lapse, SegmentRef, Uncovered};
+use structurer::{Briefing, Lapse, SegmentRef, Uncovered};
 use text_lines::Lines;
 use transcript_ports::transcripts_ops::ReadFrom;
 
-use super::{Applying, FakeLent, Invocation, Session, Speaker};
+use super::ignored::Ignored;
+use super::{Applying, FakeLent, Invocation, Refusal, Retrying, Session, Speaker};
 
 #[derive(Debug)]
 pub struct Script;
@@ -76,7 +78,11 @@ impl Script {
     }
 
     fn briefs(scripted: &Scripted) -> Vec<Option<Briefing>> {
-        scripted.prompts().into_iter().map(|prompt| prompt.into_inner().parse::<Briefing>().ok()).collect()
+        scripted
+            .prompts()
+            .into_iter()
+            .map(|prompt| prompt.into_inner().parse::<Briefing>().ignoring(Ignored::Unparsed))
+            .collect()
     }
 }
 
@@ -116,7 +122,7 @@ impl Structuring {
             agents,
         )
         .report(&run, arguments.iter().map(OsString::from));
-        let counted = run.finish().settled().unwrap_or_default();
+        let counted = run.finish().settled().ignoring(Ignored::Unsettled).unwrap_or_default();
         let text = super::Answered::said(&uttered);
         let outcome = uttered.ended();
         let lines = Structured::parsed(&text);
@@ -132,14 +138,22 @@ impl Structuring {
         let run = Run::root();
         let store = run.port(self.applying.store.clone());
         store.write(JobOpened::from(JobId::new(1)))?;
-        let spawned = Spawned::new(Pid::new(pid), started.parse::<Started>().ok(), Deadline::new(Wall::new(0)));
+        let spawned = Spawned::new(
+            Pid::new(pid),
+            started.parse::<Started>().ignoring(Ignored::Unparsed),
+            Deadline::new(Wall::new(0)),
+        );
         Ok(store.write(RunSpawned::new(RunId::new(1), JobId::new(1), spawned))?)
     }
 }
 
 impl Structured {
     fn parsed(text: &str) -> Vec<Line> {
-        text.parse::<Lines>().into_iter().flatten().filter_map(|line| line.parse::<Line>().ok()).collect()
+        text.parse::<Lines>()
+            .into_iter()
+            .flatten()
+            .filter_map(|line| line.parse::<Line>().ignoring(Ignored::Unparsed))
+            .collect()
     }
 
     fn has(&self, wanted: &[Line]) -> Vec<Line> {
@@ -342,7 +356,7 @@ fn a_flailed_job_holds_its_segments_and_the_run_goes_on_and_the_next_run_does_no
         sleep: Pause::new(0),
     };
     let first = structuring.structured(&["structure"]);
-    let told = first.outcome.as_ref().err().map_or_default(ToString::to_string);
+    let told = Refusal::said(&first.outcome);
     assert!(matches!(first.outcome, Err(Failure::Flailed { sequel: Sequel::WentOn, .. })));
     let second = structuring.structured(&["structure"]);
     assert_eq!(Script::briefs(&structuring.script).len(), 3, "the second run re-sent the flailed job's segments");
@@ -476,7 +490,7 @@ fn a_misread_reply_is_retried_once_with_its_misread_in_the_prompt_then_flails() 
     let structuring =
         Structuring::over(Script::replying(&[Some(Script::MISREAD), Some(Script::MISREAD)]), Pause::new(0))?;
     let structured = structuring.structured(&["structure"]);
-    let lapse = Script::MISREAD.parse::<Directives>().err().map(Lapse::from);
+    let lapse = Retrying::lapse(Script::MISREAD);
     let prompts = Script::briefs(&structuring.script);
     let retried = prompts.first().cloned().flatten().zip(lapse.clone()).map(|(first, lapsed)| first.retried(&lapsed));
     assert_eq!(prompts.get(1).cloned().flatten(), retried);
@@ -563,7 +577,7 @@ fn an_agent_that_errs_writes_no_result_cannot_start_or_cannot_be_read_stalls_the
             Agents::new(|_scratch| HeadlessClaude::new(scratch.clone(), agent), SystemClock),
             &["structure"],
         );
-        let failure = structured.outcome.as_ref().err().map_or_default(ToString::to_string);
+        let failure = Refusal::said(&structured.outcome);
         format!("design structure\n{}{failure}\n", structured.text)
     });
     golden::golden!("structure-unreadable.txt", &reported.concat());

@@ -1,10 +1,14 @@
+mod ignored;
+
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 
 use file_ports::{Bytes, Text};
 use port_core::Pass;
 
+use crate::toolchain::ignored::Ignored;
 use crate::{CargoFailure, CargoFiller, cargo_ops};
+use invariants::Ignoring;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Toolchain;
@@ -15,7 +19,7 @@ impl Toolchain {
         status.success().then(|| Bytes::new(stdout)).ok_or_else(|| CargoFailure::Exited {
             manifest: manifest.to_path_buf(),
             status,
-            stderr: Text::new(String::from_utf8(stderr).unwrap_or_default()),
+            stderr: Text::new(String::from_utf8(stderr).ignoring(Ignored::NotUtf8).unwrap_or_default()),
         })
     }
 }

@@ -3,6 +3,7 @@ use syntax::quote;
 use syntax::{DeriveInput, Generics, Ident};
 
 use super::declared::{Constant, Spelling};
+use syntax::Compiled;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Derived {
@@ -38,7 +39,8 @@ impl Named {
     pub fn expanded(tokens: TokenStream, derived: Derived) -> TokenStream {
         syntax::parse::parse2::<DeriveInput>(tokens)
             .map(|DeriveInput { ident, generics, .. }| Named { ident, generics })
-            .map_or_else(|error| error.to_compile_error(), |named| named.implementing(derived))
+            .map(|named| named.implementing(derived))
+            .compiled()
     }
 
     fn implementing(&self, derived: Derived) -> TokenStream {

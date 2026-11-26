@@ -1,3 +1,5 @@
+use crate::readers::ignored::Ignored;
+use invariants::Ignoring;
 use syn::{File, Item, Macro};
 
 #[derive(Debug)]
@@ -22,7 +24,7 @@ impl MacroTree {
 
     #[must_use]
     pub fn items(invocation: &Macro) -> Vec<Item> {
-        syn::parse2::<File>(invocation.tokens.clone()).map_or_else(|_| Vec::new(), |file| file.items)
+        syn::parse2::<File>(invocation.tokens.clone()).ignoring(Ignored::Unparsed).map_or_default(|file| file.items)
     }
 
     #[must_use]

@@ -4,7 +4,9 @@ use super::branch::Branch;
 use super::change::Change;
 use crate::cli::command::failure::Failure;
 use crate::cli::command::step::revision::Revision;
+use crate::cli::ignored::Ignored;
 use crate::cli::ports::{Invocation, Ports, Text};
+use invariants::Ignoring;
 
 #[derive(Debug)]
 pub struct Git<'ports, Host: Ports> {
@@ -40,7 +42,7 @@ impl<'ports, Host: Ports> Git<'ports, Host> {
             .parse::<Lines>()
             .into_iter()
             .flatten()
-            .filter_map(|line| line.parse::<Change>().ok())
+            .filter_map(|line| line.parse::<Change>().ignoring(Ignored::Unparsed))
             .collect())
     }
 

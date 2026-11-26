@@ -2,6 +2,7 @@ use std::path::Path;
 use std::str::FromStr;
 
 use grammar::logos::Logos;
+use grammar::{Ignoring, Unlexed};
 
 use grammar_unspelled::Unspelled;
 
@@ -38,7 +39,7 @@ enum Line {
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
 enum Mark {
-    #[regex("[0-9]+", |lexer| lexer.slice().parse().ok())]
+    #[regex("[0-9]+", |lexer| lexer.slice().parse().ignoring(Unlexed::OutOfRange))]
     Number(u32),
     #[token(",")]
     Comma,
@@ -106,7 +107,7 @@ impl Span {
     }
 
     fn counted(marks: &[Mark]) -> Option<u32> {
-        let [comma, number] = <[Mark; Self::COUNTED]>::try_from(marks).ok()?;
+        let [comma, number] = <[Mark; Self::COUNTED]>::try_from(marks).ignoring(Unlexed::OtherShape)?;
         Some(comma).filter(|mark| *mark == Mark::Comma)?;
         number.number()
     }
@@ -118,8 +119,10 @@ impl Span {
 
 impl Hunk {
     fn header(slice: &str) -> Option<Hunk> {
-        let marks: Vec<Mark> =
-            Mark::lexer(slice).map_while(Result::ok).take_while(|mark| *mark != Mark::Close).collect();
+        let marks: Vec<Mark> = Mark::lexer(slice)
+            .map_while(|mark| mark.ignoring(Unlexed::NotThisGrammar))
+            .take_while(|mark| *mark != Mark::Close)
+            .collect();
         let (opening, rest) = marks.split_first()?;
         Some(opening).filter(|mark| **mark == Mark::Old)?;
         let middle = rest.iter().position(|mark| *mark == Mark::New)?;
@@ -158,7 +161,7 @@ impl Changed {
     pub fn moved(&self, line: u32) -> Option<u32> {
         self.hunks.iter().find_map(|hunk| hunk.old.holds(line)).map_or(Some(()), |()| None)?;
         let shift: i64 = self.hunks.iter().filter_map(|hunk| hunk.before(line)).sum();
-        u32::try_from(i64::from(line) + shift).ok()
+        u32::try_from(i64::from(line) + shift).ignoring(Unlexed::OutOfRange)
     }
 }
 
@@ -182,7 +185,7 @@ impl Reading {
                 |changed| Changed { hunks: changed.hunks.into_iter().chain([hunk]).collect(), ..changed },
                 hunk.lines(),
             ),
-            Line::Minus | Line::Plus | Line::Context => self.counted().ok(),
+            Line::Minus | Line::Plus | Line::Context => self.counted().ignoring(Unlexed::NotThisGrammar),
         }
     }
 
@@ -194,7 +197,7 @@ impl Reading {
     }
 
     fn content_or(self, change: impl FnOnce(Changed) -> Changed) -> Option<Reading> {
-        self.counted().or_else(|reading| reading.last(change, 0).ok_or(())).ok()
+        self.counted().or_else(|reading| reading.last(change, 0).ok_or(())).ignoring(Unlexed::NotThisGrammar)
     }
 
     fn last(self, change: impl FnOnce(Changed) -> Changed, left: u32) -> Option<Reading> {
@@ -211,7 +214,7 @@ impl FromStr for Patch {
     fn from_str(text: &str) -> Result<Patch, Unspelled> {
         let lines: Result<Vec<Line>, ()> = Line::lexer(text).collect();
         lines
-            .ok()
+            .ignoring(Unlexed::NotThisGrammar)
             .and_then(|lexed| lexed.into_iter().try_fold(Reading::default(), Reading::read))
             .filter(|read| read.left == 0)
             .map(|read| Patch(read.changed))

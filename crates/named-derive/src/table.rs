@@ -7,6 +7,7 @@ use syntax::{format_ident, quote, quote_spanned};
 
 use case::Case;
 use row::Row;
+use syntax::Compiled;
 
 pub struct Table {
     visibility: Visibility,
@@ -16,9 +17,7 @@ pub struct Table {
 
 impl Table {
     pub fn expanded(tokens: TokenStream) -> TokenStream {
-        syntax::parse::parse2(tokens)
-            .and_then(Self::read)
-            .map_or_else(|error| error.to_compile_error(), |table| table.generated())
+        syntax::parse::parse2(tokens).and_then(Self::read).map(|table| table.generated()).compiled()
     }
 
     fn read(DeriveInput { attrs, vis, ident, data, .. }: DeriveInput) -> syntax::Result<Table> {

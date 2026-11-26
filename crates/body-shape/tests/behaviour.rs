@@ -1,11 +1,24 @@
 #[path = "generated/laws.rs"]
 mod generated_laws;
 
-use body_shape::{Bounds, Erasure, Literals, Reading, Shape, Shaper};
+use body_shape::{Bounds, Erasure, Literals, Reading, Shape, Shaper, TokenCount};
 use equivalence::{Equivalence, Erased};
+use invariants::{Ignoring, ignored};
 use syntax::Item;
+use syntax_lexer::TokenTable;
+
+ignored! {
+    enum Ignored {
+        Unlexed => "a fixture that does not lex yields no shape, which the case reports",
+    }
+}
 
 struct Shapes;
+
+struct Body {
+    table: TokenTable,
+    bounds: Bounds,
+}
 
 impl Shapes {
     const BODIES: Equivalence = Equivalence::erasing(&[Erased::Locals, Erased::Literals]);
@@ -18,10 +31,18 @@ impl Shapes {
     }
 
     fn read(text: &str, equivalence: Equivalence) -> Option<Reading> {
-        let mut lexed = syntax_lexer::Lexed::parsed(&format!("fn f() {text}")).ok()?;
+        Self::lexed(text).map(|body| Erasure::reading(&body.table, equivalence).read(body.bounds))
+    }
+
+    fn sized(text: &str) -> Option<TokenCount> {
+        Self::lexed(text).map(|body| Shaper::reading(&body.table, Self::BODIES).sized(body.bounds))
+    }
+
+    fn lexed(text: &str) -> Option<Body> {
+        let mut lexed = syntax_lexer::Lexed::parsed(&format!("fn f() {text}")).ignoring(Ignored::Unlexed)?;
         let table = lexed.tokens_taken();
         let bounds = lexed.into_file().items.iter().find_map(Self::body)?;
-        Some(Erasure::reading(&table, equivalence).read(bounds))
+        Some(Body { table, bounds })
     }
 
     fn body(item: &Item) -> Option<Bounds> {
@@ -63,7 +84,7 @@ impl Shapes {
     }
 
     fn prefix(text: &str) -> Option<Reading> {
-        let table = syntax_lexer::Lexed::parsed(text).ok()?.tokens_taken();
+        let table = syntax_lexer::Lexed::parsed(text).ignoring(Ignored::Unlexed)?.tokens_taken();
         let lexemes = table.lexemes();
         let bounds = Bounds::new(lexemes.first()?.place(), lexemes.get(Self::PREFIX)?.place());
         Some(Erasure::reading(&table, Self::BODIES).read(bounds))
@@ -74,7 +95,8 @@ impl Shapes {
     }
 
     fn shaped_size(text: &&str) -> String {
-        let shaped = syntax_lexer::Lexed::parsed(&format!("fn f() {text}")).ok().and_then(|mut lexed| {
+        let parsed = syntax_lexer::Lexed::parsed(&format!("fn f() {text}"));
+        let shaped = parsed.ignoring(Ignored::Unlexed).and_then(|mut lexed| {
             let table = lexed.tokens_taken();
             let bounds = lexed.into_file().items.iter().find_map(Self::body)?;
             Some(Shaper::reading(&table, Self::BODIES).sized(bounds))
@@ -87,6 +109,15 @@ impl Shapes {
         left.zip(right).filter(|_| pair.len() == 2).is_some_and(|(first, second)| first.shape() == second.shape())
     }
 }
+
+laws::table!(
+    a_body_counts_the_tokens_it_shapes_and_not_the_sign_of_an_erased_literal,
+    |text: &&str| Shapes::sized(text),
+    [
+        "{ f(1) }" => Some(TokenCount::new(6)),
+        "{ f(-1) }" => Some(TokenCount::new(6)),
+    ]
+);
 
 laws::table!(
     two_bodies_are_alike_when_only_names_and_literals_differ,

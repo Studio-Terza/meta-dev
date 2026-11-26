@@ -22,6 +22,7 @@ design-graph = { path = "../design-graph" }
 design-messages = { path = "../design-messages" }
 
 [dev-dependencies]
+invariants = { path = "../invariants" }
 dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports" }
 stream = { path = "../stream" }

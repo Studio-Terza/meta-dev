@@ -3,6 +3,8 @@ use std::str::FromStr;
 use design_model::{NodeId, Unnumbered};
 
 use crate::briefing::Sample;
+use crate::ignored::Ignored;
+use invariants::Ignoring;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Label(String);
@@ -48,11 +50,14 @@ impl FromStr for Label {
     type Err = Unlabelled;
 
     fn from_str(text: &str) -> Result<Label, Unlabelled> {
-        text.parse::<NodeId>()
-            .err()
-            .and_then(|unnumbered| unnumbered.unspelled().ok())
-            .map(Label)
-            .ok_or_else(|| Unlabelled(text.to_owned()))
+        match text.parse::<NodeId>() {
+            Ok(_numbered) => Err(Unlabelled(text.to_owned())),
+            Err(unnumbered) => unnumbered
+                .unspelled()
+                .ignoring(Ignored::Unspelled)
+                .map(Label)
+                .ok_or_else(|| Unlabelled(text.to_owned())),
+        }
     }
 }
 

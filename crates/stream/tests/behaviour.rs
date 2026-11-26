@@ -2,6 +2,7 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, Files, Memory};
+use invariants::{Ignoring, ignored};
 use laws::proptest::prelude::{prop_assert, prop_assert_eq};
 use laws::proptest::strategy::Strategy;
 use laws::proptest::test_runner::TestCaseError;
@@ -9,8 +10,26 @@ use port_core::Run;
 use stream::{Anchor, Message, Relation, Shape, Stream};
 use transcript_ports::{Authorship, ClaudeCodeDir, Cursor, Transcripts, Uuid};
 
+ignored! {
+    enum Ignored {
+        Unread => "a fixture that fails to read yields nothing, which the row reports",
+        Refused => "a text that does not parse as an anchor is the None the case expects",
+    }
+}
+
 const CITED: &str = "85b287b3-4d5e-4f60-8a9b-0c1d2e3f4a5b";
 const DIRECTORY: &str = "/projects/work";
+
+struct Said;
+
+impl Said {
+    fn text(text: Result<impl std::fmt::Display, impl std::fmt::Display>) -> String {
+        match text {
+            Ok(body) => body.to_string(),
+            Err(nul) => nul.to_string(),
+        }
+    }
+}
 
 struct Wire {
     kind: &'static str,
@@ -118,7 +137,7 @@ impl Fixture {
     }
 
     fn related(relation: Relation, said: &[Say<'_>]) -> Vec<String> {
-        Self::stream(said).map_or_default(|stream| {
+        Self::stream(said).ignoring(Ignored::Unread).map_or_default(|stream| {
             stream.links().iter().filter(|link| link.relation() == relation).map(ToString::to_string).collect()
         })
     }
@@ -149,18 +168,14 @@ impl Cases {
     }
 
     fn shapes(text: &&str) -> Vec<String> {
-        Fixture::first(text).map_or_default(|message| {
+        Fixture::first(text).ignoring(Ignored::Unread).map_or_default(|message| {
             message.segments().iter().map(|segment| Shape::from(segment.form()).to_string()).collect()
         })
     }
 
     fn bodies(text: &&str) -> Vec<String> {
-        Fixture::first(text).map_or_default(|message| {
-            message
-                .segments()
-                .iter()
-                .map(|segment| segment.text(&message).map_or_else(|nul| nul.to_string(), |body| body.to_string()))
-                .collect()
+        Fixture::first(text).ignoring(Ignored::Unread).map_or_default(|message| {
+            message.segments().iter().map(|segment| Said::text(segment.text(&message))).collect()
         })
     }
 
@@ -183,7 +198,7 @@ impl Cases {
     }
 
     fn unrecognised(chain: &[Turn]) -> Vec<String> {
-        Fixture::stream(&Self::said(chain)).map_or_default(|stream| {
+        Fixture::stream(&Self::said(chain)).ignoring(Ignored::Unread).map_or_default(|stream| {
             stream.unrecognised().iter().map(|unrecognised| unrecognised.kind().to_string()).collect()
         })
     }
@@ -230,6 +245,7 @@ impl Touching {
                 .map(ToString::to_string)
                 .collect())
         })
+        .ignoring(Ignored::Unread)
         .unwrap_or_default()
     }
 }
@@ -247,11 +263,7 @@ laws::table!(
 
 laws::law!(segments_tile_the_ink_of_the_message_without_loss_or_stray_whitespace, "[ -~\n\t•]{0,80}", text, {
     let message = Fixture::first(&text).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-    let bodies: Vec<String> = message
-        .segments()
-        .iter()
-        .map(|segment| segment.text(&message).map_or_else(|nul| nul.to_string(), |body| body.to_string()))
-        .collect();
+    let bodies: Vec<String> = message.segments().iter().map(|segment| Said::text(segment.text(&message))).collect();
     let inked = |text: &str| text.chars().filter(|letter| !letter.is_whitespace()).collect::<String>();
     prop_assert_eq!(inked(&bodies.concat()), inked(&text));
     let ends = |body: &String| [body.chars().next(), body.chars().last()].into_iter().flatten().collect::<Vec<char>>();
@@ -358,8 +370,9 @@ laws::table!(
 
 laws::roundtrip!(
     every_anchor_is_displayed_and_parsed_back,
-    "[0-9a-f-]{1,36}(#(0|[1-9][0-9]{0,5}))?".prop_filter_map("an anchor", |text| text.parse::<Anchor>().ok()),
+    "[0-9a-f-]{1,36}(#(0|[1-9][0-9]{0,5}))?"
+        .prop_filter_map("an anchor", |text| text.parse::<Anchor>().ignoring(Ignored::Refused)),
     |anchor: &Anchor| anchor.to_string(),
-    |text: &String| text.parse::<Anchor>().ok(),
+    |text: &String| text.parse::<Anchor>().ignoring(Ignored::Refused),
     Some
 );

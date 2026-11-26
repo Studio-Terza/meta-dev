@@ -11,6 +11,7 @@ doctest = false
 
 [dependencies]
 algebra = { path = "../algebra" }
+invariants = { path = "../invariants" }
 newtype = { path = "../newtype" }
 text-lines = { path = "../text-lines" }
 serde.workspace = true

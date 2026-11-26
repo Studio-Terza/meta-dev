@@ -512,10 +512,9 @@ impl Scratch {
     }
 
     fn judged(sources: &&[[&str; 2]]) -> Option<usize> {
-        Scratch::package().map_or(None, |root| {
-            let written = sources.iter().try_for_each(|[path, text]| root.write(path, text).map(|_| ()));
-            written.map_or(None, |()| Some(root.reported().violations()))
-        })
+        let root = Scratch::package().ignoring(Ignored::Unwritten)?;
+        let written = sources.iter().try_for_each(|[path, text]| root.write(path, text).map(|_| ()));
+        written.ignoring(Ignored::Unwritten).map(|()| root.reported().violations())
     }
 
     fn reported_at(&self, below: &str) -> Reported {
@@ -550,7 +549,7 @@ impl Scratch {
         let readout = SourceFiles::read(&self.files, &self.root)?;
         let shown = |file: &lint_core::SourceFile| {
             let path: &Path = file.head().as_ref();
-            path.strip_prefix(&self.root).unwrap_or(path).display().to_string()
+            path.strip_prefix(&self.root).ignoring(Ignored::Outside).unwrap_or(path).display().to_string()
         };
         Ok(readout
             .files()
@@ -605,7 +604,7 @@ fn a_panic_while_reading_reaches_the_caller_rather_than_stranding_the_helpers() 
     thread::spawn(move || {
         let sizing = FakeUnsized::new(&root.files);
         let ran = panic::catch_unwind(AssertUnwindSafe(|| Trees::flagged(&sizing, &root.root, &[]).exit));
-        sending.send(ran.map_or(Verdicts::Panicked, |_| Verdicts::Returned))
+        sending.send(Verdicts::from(ran))
     });
     assert_eq!(receiving.recv_timeout(Duration::from_secs(10))?, Verdicts::Panicked);
     Ok(())
@@ -615,6 +614,15 @@ fn a_panic_while_reading_reaches_the_caller_rather_than_stranding_the_helpers() 
 enum Verdicts {
     Panicked,
     Returned,
+}
+
+impl From<thread::Result<ExitCode>> for Verdicts {
+    fn from(ran: thread::Result<ExitCode>) -> Verdicts {
+        match ran {
+            Ok(_) => Verdicts::Returned,
+            Err(_) => Verdicts::Panicked,
+        }
+    }
 }
 
 struct Printed {

@@ -1,13 +1,14 @@
 use std::str::FromStr;
 
 use grammar::logos::Logos;
+use grammar::{Ignoring, Unlexed};
 
 use grammar_unspelled::Unspelled;
 
 #[derive(Logos, Clone, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
 enum Piece {
-    #[regex("[0-9]+", |lexer| lexer.slice().parse().ok(), priority = 3)]
+    #[regex("[0-9]+", |lexer| lexer.slice().parse().ignoring(Unlexed::OutOfRange), priority = 3)]
     Number(i64),
     #[regex("[a-z0-9]+", |lexer| lexer.slice().to_owned())]
     Word(String),
@@ -65,7 +66,7 @@ impl Piece {
     }
 
     fn described(pair: &[Piece]) -> Option<String> {
-        let [underscore, word] = <&[Piece; 2]>::try_from(pair).ok()?;
+        let [underscore, word] = <&[Piece; 2]>::try_from(pair).ignoring(Unlexed::OtherShape)?;
         Some(underscore).filter(|joint| **joint == Piece::Underscore).and_then(|_joint| word.worded())
     }
 }
@@ -75,6 +76,6 @@ impl FromStr for MigrationFile {
 
     fn from_str(text: &str) -> Result<MigrationFile, Unspelled> {
         let pieces: Result<Vec<Piece>, ()> = Piece::lexer(text).collect();
-        pieces.ok().and_then(|lexed| MigrationFile::read(&lexed)).ok_or(Unspelled)
+        pieces.ignoring(Unlexed::NotThisGrammar).and_then(|lexed| MigrationFile::read(&lexed)).ok_or(Unspelled)
     }
 }

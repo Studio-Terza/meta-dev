@@ -3,11 +3,12 @@ mod refusal;
 use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use port_core::{Pass, Release, ReleaseReceipt, Released, Resource};
 
 use crate::Busy;
+use invariants::Unpoisoned;
 use refusal::Refusal;
 
 #[derive(Debug, Resource)]
@@ -42,7 +43,7 @@ impl StoreLock {
     }
 
     pub fn claimed(claim: &Arc<Mutex<Claim>>) -> Result<StoreLock, Busy> {
-        let previous = std::mem::replace(&mut *claim.lock().unwrap_or_else(PoisonError::into_inner), Claim::Taken);
+        let previous = std::mem::replace(&mut *claim.lock().unpoisoned(), Claim::Taken);
         previous.taken(claim)
     }
 }
@@ -56,7 +57,7 @@ impl Claim {
     }
 
     fn freed(claim: &Mutex<Claim>, pass: Pass<'_, Released<StoreLock>>) -> ReleaseReceipt {
-        *claim.lock().unwrap_or_else(PoisonError::into_inner) = Claim::Free;
+        *claim.lock().unpoisoned() = Claim::Free;
         pass.released()
     }
 }

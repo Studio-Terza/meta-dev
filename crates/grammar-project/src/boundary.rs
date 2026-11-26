@@ -1,4 +1,5 @@
 use grammar::logos::Logos;
+use grammar::{Ignoring, Unlexed};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
@@ -14,6 +15,9 @@ impl Names {
     #[must_use]
     pub fn named(text: &str) -> Option<&str> {
         let spelled: Vec<Result<Spelling, ()>> = Spelling::lexer(text).collect();
-        <[Result<Spelling, ()>; 1]>::try_from(spelled).ok().and_then(|[only]| only.ok()).map(|_name| text)
+        <[Result<Spelling, ()>; 1]>::try_from(spelled)
+            .ignoring(Unlexed::OtherShape)
+            .and_then(|[only]| only.ignoring(Unlexed::NotThisGrammar))
+            .map(|_name| text)
     }
 }

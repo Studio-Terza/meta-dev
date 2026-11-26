@@ -15,6 +15,7 @@ name = "behaviour"
 path = "tests/behaviour.rs"
 
 [dependencies]
+invariants = { path = "../invariants" }
 console-ports = { path = "../console-ports" }
 file-ports = { path = "../file-ports" }
 newtype = { path = "../newtype" }

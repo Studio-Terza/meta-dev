@@ -1,3 +1,11 @@
+use invariants::{Ignoring, ignored};
+
+ignored! {
+    enum Ignored {
+        Unparsed => "an opening that does not lex or parse is None, which the comparison and count report",
+    }
+}
+
 const OPENINGS: [&str; 5] = [
     "#![allow(dead_code)]\n//! Inner docs.\nfn f() {}\n",
     "\u{feff}fn f() {}\n",
@@ -10,10 +18,12 @@ const OPENINGS: [&str; 5] = [
 fn lexing_once_parses_and_places_every_opening_as_parse_file_does() {
     let once: Vec<Option<syntax::File>> = OPENINGS
         .iter()
-        .map(|content| syntax_lexer::Lexed::parsed(content).map(syntax_lexer::Lexed::into_file).ok())
+        .map(|content| {
+            syntax_lexer::Lexed::parsed(content).map(syntax_lexer::Lexed::into_file).ignoring(Ignored::Unparsed)
+        })
         .collect();
     let direct: Vec<Option<syntax::File>> =
-        OPENINGS.iter().map(|content| syntax::parse::parse_file(content).ok()).collect();
+        OPENINGS.iter().map(|content| syntax::parse::parse_file(content).ignoring(Ignored::Unparsed)).collect();
     let lines = |files: &[Option<syntax::File>]| -> Vec<Vec<usize>> {
         files
             .iter()
@@ -29,10 +39,9 @@ fn lexing_once_parses_and_places_every_opening_as_parse_file_does() {
 #[test]
 fn every_literal_form_is_a_quoted_lexeme_and_words_and_marks_are_not() {
     let lexed = syntax_lexer::Lexed::parsed("const A: X = f(\"s\", 'c', b'x', b\"y\", r\"z\", 1.5, 7u8, -2);\n");
-    let kinds: Vec<syntax_lexer::LexemeKind> = lexed.map_or_else(
-        |_| Vec::new(),
-        |mut found| found.tokens_taken().lexemes().iter().map(|lexeme| lexeme.kind()).collect(),
-    );
+    let kinds: Vec<syntax_lexer::LexemeKind> = lexed
+        .ignoring(Ignored::Unparsed)
+        .map_or_default(|mut found| found.tokens_taken().lexemes().iter().map(|lexeme| lexeme.kind()).collect());
     let quoted = kinds.iter().filter(|kind| kind.quoted().is_some()).count();
     assert_eq!([quoted, kinds.len()], [8, 25]);
 }

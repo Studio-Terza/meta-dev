@@ -1,6 +1,8 @@
 use syntax::Punctuated;
 use syntax::{Applied, Attribute, Meta, Path, Token};
 
+use crate::ignored::Ignored;
+use invariants::Ignoring;
 use lint_layout::{Name, Whole, Word, words};
 
 #[derive(Debug)]
@@ -39,9 +41,11 @@ impl Attributes {
 
     fn nested(meta: &Meta, name: &[Word<'static>]) -> Vec<Element> {
         meta.require_list()
-            .ok()
+            .ignoring(Ignored::Unparsed)
             .and_then(|list| Element::named(&list.path, name).map(|()| list))
-            .and_then(|list| list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated).ok())
+            .and_then(|list| {
+                list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated).ignoring(Ignored::Unparsed)
+            })
             .map_or_default(|parsed| parsed.into_iter().map(Element).collect())
     }
 }

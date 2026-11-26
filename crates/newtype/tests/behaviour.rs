@@ -1,11 +1,19 @@
 use std::collections::BTreeSet;
 
+use invariants::{Ignoring, ignored};
 use laws::proptest::collection::vec;
 use laws::proptest::prelude::{any, prop_assert, prop_assert_eq};
 use laws::proptest::strategy::{Strategy, ValueTree};
 use laws::proptest::test_runner::{TestError, TestRunner};
 use newtype::{Checked, CheckedDeserialize, Counter, Deserialize, Display, Newtype, Serialize, Wrapping};
 use newtype_derive::Arbitrary;
+
+ignored! {
+    enum Ignored {
+        Unserialised => "a value that fails to write or read as JSON is None, which the law compares",
+        Refused => "a text the check or parse refuses is the None the law expects",
+    }
+}
 
 #[derive(Newtype, Arbitrary, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 struct Rounds(usize);
@@ -163,11 +171,11 @@ struct Json;
 
 impl Json {
     fn written<Written: newtype::serde::Serialize>(value: &Written) -> Option<String> {
-        serde_json::to_string(value).ok()
+        serde_json::to_string(value).ignoring(Ignored::Unserialised)
     }
 
     fn read<Read: newtype::serde::de::DeserializeOwned>(text: Option<&str>) -> Option<Read> {
-        text.and_then(|json| serde_json::from_str(json).ok())
+        text.and_then(|json| serde_json::from_str(json).ignoring(Ignored::Unserialised))
     }
 
     fn word(text: &String) -> Option<Word> {
@@ -241,11 +249,11 @@ laws::roundtrip!(
 );
 
 laws::law!(a_checked_newtype_reads_what_its_check_builds, any::<String>(), text, {
-    prop_assert_eq!(Json::word(&text), Word::try_new(text).ok());
+    prop_assert_eq!(Json::word(&text), Word::try_new(text).ignoring(Ignored::Refused));
 });
 
 laws::law!(a_checked_newtype_built_by_try_new_reads_back_through_serde, any::<String>(), text, {
-    let built = Word::try_new(text).ok();
+    let built = Word::try_new(text).ignoring(Ignored::Refused);
     prop_assert_eq!(built.as_ref().and_then(|word| Json::read::<Word>(Json::written(word).as_deref())), built);
 });
 
@@ -313,7 +321,7 @@ laws::roundtrip!(
     a_derived_display_prints_the_inner_value,
     any::<u32>(),
     |number: &u32| Shown::new(*number).to_string(),
-    |text: &String| text.parse::<u32>().ok(),
+    |text: &String| text.parse::<u32>().ignoring(Ignored::Refused),
     Some
 );
 

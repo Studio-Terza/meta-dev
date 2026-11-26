@@ -3,13 +3,14 @@
 #[path = "generated/laws.rs"]
 mod generated_laws;
 
+use grammar::{Ignoring, Unlexed};
 use grammar_spec_line::Attachment;
 use laws::proptest::prelude::{Just, Strategy, any, prop_assert_eq, prop_oneof};
 
 laws::roundtrip!(
     a_spec_line_without_trailing_space_is_parsed_and_shown_back_as_written,
     "repair: main|spec: ( ?[!-~]{1,8})( [!-~]{1,8}){0,3}",
-    |text: &String| text.parse::<grammar_spec_line::Line>().ok(),
+    |text: &String| text.parse::<grammar_spec_line::Line>().ignoring(Unlexed::NotThisGrammar),
     |line: &Option<grammar_spec_line::Line>| line.as_ref().map(ToString::to_string),
     Some
 );
@@ -21,7 +22,7 @@ laws::roundtrip!(
         any::<Attachment>().prop_map(|attachment| format!("spec: {attachment}")),
         "[!-~]([ -~]{0,20}[!-~])?".prop_map(|value| format!("spec: {value}")),
     ],
-    |text: &String| text.parse::<grammar_spec_line::Line>().ok(),
+    |text: &String| text.parse::<grammar_spec_line::Line>().ignoring(Unlexed::NotThisGrammar),
     |line: &Option<grammar_spec_line::Line>| line.as_ref().map(ToString::to_string),
     Some
 );
@@ -35,8 +36,10 @@ laws::law!(
     ],
     text,
     {
-        let line = text.parse::<grammar_spec_line::Line>().ok();
-        let again = line.as_ref().and_then(|read| read.to_string().parse::<grammar_spec_line::Line>().ok());
+        let line = text.parse::<grammar_spec_line::Line>().ignoring(Unlexed::NotThisGrammar);
+        let again = line
+            .as_ref()
+            .and_then(|read| read.to_string().parse::<grammar_spec_line::Line>().ignoring(Unlexed::NotThisGrammar));
         prop_assert_eq!(again, line);
     }
 );

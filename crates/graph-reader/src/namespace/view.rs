@@ -17,7 +17,7 @@ impl Semigroup for Found<'_> {
     fn combine(self, other: Self) -> Self {
         match self {
             Found::Nothing => other,
-            Found::One(left) => other.bindings().map_or(Found::Conflict, |right| Found::agreeing(left, right)),
+            Found::One(left) => other.joined(left),
             Found::Conflict => Found::Conflict,
         }
     }
@@ -33,11 +33,11 @@ impl<'rows> Found<'rows> {
         }
     }
 
-    fn bindings(self) -> Result<Option<&'rows Binding>, Conflicted> {
+    fn joined(self, left: &'rows Binding) -> Found<'rows> {
         match self {
-            Found::Nothing => Ok(None),
-            Found::One(binding) => Ok(Some(binding)),
-            Found::Conflict => Err(Conflicted),
+            Found::Nothing => Found::agreeing(left, None),
+            Found::One(right) => Found::agreeing(left, Some(right)),
+            Found::Conflict => Found::Conflict,
         }
     }
 
@@ -46,9 +46,6 @@ impl<'rows> Found<'rows> {
         agreed.map_or(Found::Conflict, Found::One)
     }
 }
-
-#[derive(Clone, Copy, Debug)]
-struct Conflicted;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 enum Determinacy {
@@ -107,7 +104,10 @@ impl<'rows> View<'rows> {
     }
 
     pub(super) fn dispute(self) -> Dispute {
-        self.found.bindings().map_or(Dispute::Contested, |_| Dispute::Clear)
+        match self.found {
+            Found::Conflict => Dispute::Contested,
+            Found::Nothing | Found::One(_) => Dispute::Clear,
+        }
     }
 
     pub(super) fn deference(self) -> Deference {

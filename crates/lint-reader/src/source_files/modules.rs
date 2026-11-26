@@ -52,7 +52,7 @@ impl Sought {
 
     pub(super) fn resolution(&self, survey: &Survey) -> Option<Resolution> {
         match self.walk {
-            Walk::Entered => Some(self.resolved(survey).map_or_else(Resolution::Failed, Resolution::Modules)),
+            Walk::Entered => Some(Resolution::from(self.resolved(survey))),
             Walk::Skipped => self.resolved(survey).ignoring(Ignored::Unresolved).map(Resolution::Tests),
         }
     }

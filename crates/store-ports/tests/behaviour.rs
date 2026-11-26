@@ -16,6 +16,7 @@ use design_store::{SessionCursors, ShownMessage, StreamSchema};
 use dispatch_ports::{Pid, Started, Tokens, Wall};
 use file_ports::{Bytes, Offset};
 use grammar_search::Term;
+use invariants::{Ignoring, ignored};
 use laws::proptest::option;
 use laws::proptest::prelude::{any, prop_assert, prop_oneof};
 use laws::proptest::sample::select;
@@ -32,6 +33,13 @@ use stream::{Relation, Shape};
 use strum::VariantArray;
 use tempfile::TempDir;
 use transcript_ports::{Authorship, Body, Cursor, Instant, SessionId, Uuid};
+
+ignored! {
+    enum Ignored {
+        Unread => "a raw value that does not read back is None, which the roundtrip reports",
+        Refused => "a generated text that does not parse is filtered out",
+    }
+}
 
 #[derive(Op)]
 struct Resumed;
@@ -183,7 +191,7 @@ impl Place {
         let older = run.port(place.opened_as::<Older>());
         older.write(Told::Stale)?;
         older.write(Remarked { remark, on: Uuid::try_new("o1".to_owned())? })?;
-        let failure = run.port(place.opened()).read(Applied).err().ok_or("the open was not refused")?;
+        let failure = Opening::refused(run.port(place.opened()).read(Applied))?;
         let refused = matches!(&failure, StoreFailure::Refused(_)).then(|| failure.to_string());
         Ok(Refusal { remark, refused, applied: place.applied()?, stored: place.shown("o1")? })
     }
@@ -884,7 +892,7 @@ fn a_rederivation_that_would_drop_an_annotated_segment_refuses_and_leaves_the_st
     let place = Place::new()?;
     let run = Run::root();
     run.port(place.opened_as::<Older>()).write(Annotated)?;
-    let refused = run.port(place.opened()).read(Applied).err().ok_or("the open was not refused")?;
+    let refused = Opening::refused(run.port(place.opened()).read(Applied))?;
     assert!(matches!(&refused, StoreFailure::Refused(_)));
     assert_eq!(
         refused.to_string(),
@@ -937,7 +945,7 @@ fn a_rederivation_that_would_renumber_a_cited_segment_refuses_and_leaves_the_lin
     let place = Place::new()?;
     let run = Run::root();
     run.port(place.opened_as::<Older>()).write(Cited)?;
-    let refused = run.port(place.opened()).read(Applied).err().ok_or("the open was not refused")?;
+    let refused = Opening::refused(run.port(place.opened()).read(Applied))?;
     assert!(matches!(&refused, StoreFailure::Refused(_)));
     assert_eq!(
         refused.to_string(),
@@ -958,7 +966,7 @@ fn a_rederivation_refuses_to_change_a_segment_that_a_table_added_later_refers_to
     let place = Place::new()?;
     let run = Run::root();
     run.port(place.opened_as::<Older>()).write(Told::Stale)?;
-    let refused = run.port(place.opened_as::<Glossed>()).read(Applied).err().ok_or("the open was not refused")?;
+    let refused = Opening::refused(run.port(place.opened_as::<Glossed>()).read(Applied))?;
     assert!(matches!(&refused, StoreFailure::Refused(_)));
     assert_eq!(refused.to_string(), Place::REFERENCED);
     assert_eq!(place.applied()?, Older::versions());
@@ -1003,11 +1011,22 @@ fn a_held_memory_lock_refuses_a_second_lock_until_it_is_dropped() -> Result<(), 
 #[newtype(strategy = -1.0e300_f64..1.0e300_f64)]
 struct Score(f64);
 
+struct Opening;
+
+impl Opening {
+    fn refused<Read>(read: Result<Read, StoreFailure>) -> Result<StoreFailure, &'static str> {
+        match read {
+            Ok(_read) => Err("the open was not refused"),
+            Err(failure) => Ok(failure),
+        }
+    }
+}
+
 struct Stored;
 
 impl Stored {
     fn back<Value: Column<Raw: Clone>>(raw: &Value::Raw) -> Option<Value> {
-        Value::from_raw(raw.clone()).ok()
+        Value::from_raw(raw.clone()).ignoring(Ignored::Unread)
     }
 
     fn unread<Named: Enumerated + Column<Raw: Clone> + PartialEq + Copy>() -> Vec<Named> {
@@ -1049,7 +1068,8 @@ laws::roundtrip!(
 
 laws::roundtrip!(
     a_project_column_reads_back,
-    "[A-Za-z0-9][A-Za-z0-9._-]{0,15}".prop_filter_map("a project name", |name| name.parse::<Project>().ok()),
+    "[A-Za-z0-9][A-Za-z0-9._-]{0,15}"
+        .prop_filter_map("a project name", |name| name.parse::<Project>().ignoring(Ignored::Refused)),
     Column::raw,
     Stored::back::<Project>,
     Some
@@ -1057,7 +1077,8 @@ laws::roundtrip!(
 
 laws::roundtrip!(
     a_condition_column_reads_back,
-    "[ -~]{0,4}[!-~][ -~]{0,20}".prop_filter_map("one line", |text| text.parse::<Condition>().ok()),
+    "[ -~]{0,4}[!-~][ -~]{0,20}"
+        .prop_filter_map("one line", |text| text.parse::<Condition>().ignoring(Ignored::Refused)),
     Column::raw,
     Stored::back::<Condition>,
     Some
@@ -1065,7 +1086,7 @@ laws::roundtrip!(
 
 laws::roundtrip!(
     a_reason_column_reads_back,
-    "[ -~]{0,4}[!-~][ -~]{0,20}".prop_filter_map("one line", |text| text.parse::<Reason>().ok()),
+    "[ -~]{0,4}[!-~][ -~]{0,20}".prop_filter_map("one line", |text| text.parse::<Reason>().ignoring(Ignored::Refused)),
     Column::raw,
     Stored::back::<Reason>,
     Some
@@ -1074,7 +1095,9 @@ laws::roundtrip!(
 laws::roundtrip!(
     an_artifact_column_reads_back,
     (select(ArtifactKind::VARIANTS), "[A-Za-z0-9_][A-Za-z0-9_.:/-]{0,12}")
-        .prop_filter_map("an artifact", |(kind, name)| format!("{kind}:{name}").parse::<Artifact>().ok()),
+        .prop_filter_map("an artifact", |(kind, name)| format!("{kind}:{name}")
+            .parse::<Artifact>()
+            .ignoring(Ignored::Refused)),
     Column::raw,
     Stored::back::<Artifact>,
     Some
@@ -1128,7 +1151,9 @@ laws::roundtrip!(
     a_start_time_column_reads_back,
     (select(vec!["Mon", "Sun"]), select(vec!["Jan", "Dec"]), 1..32_u8, 0..24_u8, 0..60_u8, 1970..2200_u16)
         .prop_filter_map("a start time", |(weekday, month, day, hour, minute, year)| {
-            format!("{weekday} {month} {day:>2} {hour:02}:{minute:02}:{minute:02} {year}").parse::<Started>().ok()
+            format!("{weekday} {month} {day:>2} {hour:02}:{minute:02}:{minute:02} {year}")
+                .parse::<Started>()
+                .ignoring(Ignored::Refused)
         }),
     Column::raw,
     Stored::back::<Started>,

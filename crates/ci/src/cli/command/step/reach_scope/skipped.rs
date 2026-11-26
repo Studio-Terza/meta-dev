@@ -1,7 +1,9 @@
 use std::fmt;
 use std::str::FromStr;
 
+use crate::cli::ignored::Ignored;
 use grammar_assignment::Emptied;
+use invariants::Ignoring;
 use text_lines::Lines;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -23,7 +25,14 @@ impl FromStr for Skipped {
 
 impl From<&str> for Skips {
     fn from(report: &str) -> Skips {
-        Skips(report.parse::<Lines>().into_iter().flatten().filter_map(|line| line.parse::<Skipped>().ok()).collect())
+        Skips(
+            report
+                .parse::<Lines>()
+                .into_iter()
+                .flatten()
+                .filter_map(|line| line.parse::<Skipped>().ignoring(Ignored::Unparsed))
+                .collect(),
+        )
     }
 }
 
