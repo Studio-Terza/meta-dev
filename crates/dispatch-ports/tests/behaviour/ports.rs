@@ -5,8 +5,8 @@ use std::process::Command;
 use std::time::{Duration, Instant};
 
 use dispatch_ports::{
-    Agent, AgentRun, Clock, Deadline, Dispatch, Ended, Finished, HeadlessClaude, Job, Pause, Pid, Prompt, Reply, Stall,
-    Started, SystemClock, Timeout, Tokens, Usage, Watch, Watched, Woke,
+    Agent, AgentRun, Clock, Deadline, Dispatch, Ended, Finished, HeadlessClaude, Job, Model, Pause, Pid, Prompt, Reply,
+    Stall, Started, SystemClock, Timeout, Tokens, Usage, Watch, Watched, Woke,
 };
 use invariants::Ignoring;
 use port_core::Run;
@@ -37,13 +37,51 @@ fn an_agent_that_prints_its_result_is_watched_to_that_reply_and_usage() -> Resul
             run.port(HeadlessClaude::new(PathBuf::from(env!("CARGO_MANIFEST_DIR")), Agent::new("sh", &["-c", "cat"])));
         let clock = run.port(SystemClock);
         let deadline = Deadline::after(clock.now(), Timeout::new(5));
-        let held = echo.dispatch(&Job::due_by(deadline), &Prompt::new(printed.to_owned()))?;
+        let held = echo.dispatch(&Job::due_by(deadline, Model::Haiku), &Prompt::new(printed.to_owned()))?;
         Watch::over(&echo, &clock).watched(held)?
     };
     run.finish().settled()?;
     let usage = Usage::new(Tokens::new(4), Tokens::new(9), Tokens::new(2), Tokens::new(7));
     assert_eq!(watched, Watched::Finished(Finished::new(Reply::new("conversational(a.0)".to_owned()), usage)));
     Ok(())
+}
+
+const MODELLED: [&str; 2] = [
+    "-c",
+    r#"cat >/dev/null; printf '{"subtype":"success","result":"%s %s","usage":{"input_tokens":1,"output_tokens":1}}' "$0" "$1""#,
+];
+
+struct Modelled;
+
+impl Modelled {
+    fn watched(model: Model) -> Option<Watched> {
+        let run = Run::root();
+        let watched = {
+            let echo =
+                run.port(HeadlessClaude::new(PathBuf::from(env!("CARGO_MANIFEST_DIR")), Agent::new("sh", &MODELLED)));
+            let clock = run.port(SystemClock);
+            let deadline = Deadline::after(clock.now(), Timeout::new(5));
+            let held = echo
+                .dispatch(&Job::due_by(deadline, model), &Prompt::new(String::new()))
+                .ignoring(Ignored::Unstalled)?;
+            Watch::over(&echo, &clock).watched(held).ignoring(Ignored::Unstalled)?
+        };
+        run.finish().settled().ignoring(Ignored::Unstalled)?;
+        Some(watched)
+    }
+
+    fn told(said: &str) -> Watched {
+        let usage = Usage::new(Tokens::new(1), Tokens::new(1), Tokens::new(0), Tokens::new(0));
+        Watched::Finished(Finished::new(Reply::new(said.to_owned()), usage))
+    }
+}
+
+#[test]
+fn an_agent_is_told_the_model_its_job_names() {
+    assert_eq!(
+        [Modelled::watched(Model::Haiku), Modelled::watched(Model::Sonnet)],
+        [Some(Modelled::told("--model haiku")), Some(Modelled::told("--model sonnet"))]
+    );
 }
 
 struct Stalling;
@@ -66,7 +104,7 @@ impl Stalling {
             let clock = run.port(FakeClock::new(Sleep::STILL, &waits));
             let deadline = Deadline::after(clock.now(), Timeout::new(1));
             let held = agent
-                .dispatch(&Job::due_by(deadline), &Prompt::new("x".repeat(Stalling::PROMPT)))
+                .dispatch(&Job::due_by(deadline, Model::Haiku), &Prompt::new("x".repeat(Stalling::PROMPT)))
                 .ignoring(Ignored::Unstalled)?;
             let pid = held.pid();
             let watched = Watch::over(&agent, &clock).watched(held).ignoring(Ignored::Unstalled)?;
@@ -97,8 +135,10 @@ fn a_wait_nobody_rings_lasts_its_full_pause() -> Result<(), Box<dyn Error>> {
             Agent::new("sh", &["-c", "exec sleep 30"]),
         ));
         let clock = run.port(FakeClock::new(Sleep::STILL, &waits));
-        let silent = agent
-            .dispatch(&Job::due_by(Deadline::after(clock.now(), Timeout::new(60))), &Prompt::new("x".to_owned()))?;
+        let silent = agent.dispatch(
+            &Job::due_by(Deadline::after(clock.now(), Timeout::new(60)), Model::Haiku),
+            &Prompt::new("x".to_owned()),
+        )?;
         let waited = clock.waited(pause, silent.bell());
         silent.end()?;
         waited
@@ -133,8 +173,10 @@ fn a_ring_wakes_one_wait_and_is_then_spent() -> Result<(), Box<dyn Error>> {
             Agent::new("sh", &["-c", "exec sleep 30"]),
         ));
         let clock = run.port(FakeClock::new(Sleep::STILL, &waits));
-        let held = agent
-            .dispatch(&Job::due_by(Deadline::after(clock.now(), Timeout::new(60))), &Prompt::new("x".to_owned()))?;
+        let held = agent.dispatch(
+            &Job::due_by(Deadline::after(clock.now(), Timeout::new(60)), Model::Haiku),
+            &Prompt::new("x".to_owned()),
+        )?;
         let before = held.bell().waited(Duration::ZERO);
         held.bell().ringer().ring();
         let rung = held.bell().waited(Duration::ZERO);
@@ -157,8 +199,10 @@ fn a_dispatched_agent_rings_its_own_bell_when_it_finishes() -> Result<(), Box<dy
             Agent::new("sh", &["-c", "echo spoken"]),
         ));
         let clock = run.port(FakeClock::new(Sleep::STILL, &waits));
-        let finished = agent
-            .dispatch(&Job::due_by(Deadline::after(clock.now(), Timeout::new(60))), &Prompt::new("x".to_owned()))?;
+        let finished = agent.dispatch(
+            &Job::due_by(Deadline::after(clock.now(), Timeout::new(60)), Model::Haiku),
+            &Prompt::new("x".to_owned()),
+        )?;
         let woke = finished.bell().waited(Duration::from_secs(20));
         finished.end()?;
         woke

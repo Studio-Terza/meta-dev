@@ -12,8 +12,8 @@ use design_runs::{
 };
 use design_store::{Asked, AskedEarlier, ContextNodes, Remit};
 use dispatch_ports::{
-    AgentRun, Clock, Deadline, Dispatch, DispatchFailure, Due, Ended, Fault, Finished, Job, Prompt, Stall, Timeout,
-    Watch, Watched, Watching,
+    AgentRun, Clock, Deadline, Dispatch, DispatchFailure, Due, Ended, Fault, Finished, Job, Model, Prompt, Reply,
+    Stall, Timeout, Watch, Watched, Watching,
 };
 use port_core::Held;
 use store_ports::{Store, StoreFailure};
@@ -21,6 +21,7 @@ use structurer::{Attempt, Directives, Lapse, Readings, Said, SegmentRef};
 use transcript_ports::{Body, SessionId};
 
 use super::apply::{Application, Parsed};
+use super::hook::answers::Reading;
 use crate::Outcome;
 use crate::cli::failure::{Failure, Flail, Flails};
 use crate::cli::output::{Attempted, Count, Flailing, Lapsed, Line};
@@ -136,6 +137,17 @@ impl<'ports, D: Dispatch, C: Clock> Crew<'ports, D, C> {
     pub fn new(dispatch: &'ports D, clock: &'ports C) -> Crew<'ports, D, C> {
         Crew { dispatch, clock }
     }
+
+    pub fn replied(&self, prompt: &Prompt, timeout: Timeout, model: Model) -> Result<Option<Reply>, Failure> {
+        let held = self.dispatch.dispatch(&Job::due_by(Deadline::after(self.clock.now(), timeout), model), prompt)?;
+        Ok(Watch::over(self.dispatch, self.clock).watched(held)?.visited(Replying))
+    }
+
+    pub fn fanned(&self, reading: &Reading<'_>, timeout: Timeout) -> Result<Vec<Option<Reply>>, Failure> {
+        let job = Job::due_by(Deadline::after(self.clock.now(), timeout), Model::Haiku);
+        let watched = Watch::over(self.dispatch, self.clock).fanned(&job, reading.prompts())?;
+        Ok(watched.iter().map(|each| each.visited(Replying)).collect())
+    }
 }
 
 impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
@@ -235,7 +247,8 @@ impl<S: Store, D: Dispatch, C: Clock> Attempts<'_, '_, S, D, C> {
         let run = store.read(NextRun)?;
         let deadline = Deadline::after(crew.clock.now(), Structure::<S, D, C>::TIMEOUT);
         let record = RunRecord { structure: self.structure, job: self.id, run };
-        let dispatched = crew.dispatch.dispatch(&Job::due_by(deadline), &Prompt::from(&self.job.briefing(&attempt)));
+        let dispatched =
+            crew.dispatch.dispatch(&Job::due_by(deadline, Model::Haiku), &Prompt::from(&self.job.briefing(&attempt)));
         let watched = record.spawned(dispatched, deadline)?;
         let retried = attempt.lapse().cloned();
         let step = watched.visited(Stepping { attempts: self, run, attempt })?;
@@ -296,6 +309,21 @@ impl Readings for Unapplied {
 
     fn flailed(self, lapse: Lapse) -> Step {
         Step::Ended(Ending::Halted(Halt::Flailed(lapse)))
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Replying;
+
+impl Watching for Replying {
+    type Output = Option<Reply>;
+
+    fn finished(self, finished: &Finished) -> Option<Reply> {
+        Some(finished.reply().clone())
+    }
+
+    fn stalled(self, _stall: &Stall) -> Option<Reply> {
+        None
     }
 }
 

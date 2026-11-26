@@ -1,5 +1,6 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
+mod answers;
 #[path = "../generated/laws.rs"]
 mod generated_laws;
 mod ignored;
@@ -19,8 +20,8 @@ use std::str::FromStr;
 use console_ports::{Heard, Shown, Variables};
 
 use design::{
-    Anchored, Attempted, Cli, Count, Failure, Flailing, Lapsed, Line, Miss, Noted, Outcome, Reconciliation, Reference,
-    RefusedLink, Remark, Summary, Unmatched, Unresolved, Viewed,
+    Agents, Anchored, Attempted, Cli, Count, Failure, Flailing, Lapsed, Line, Miss, Noted, Outcome, Reconciliation,
+    Reference, RefusedLink, Remark, Summary, Unmatched, Unresolved, Viewed,
 };
 use design_model::{
     AnyStage, Artifact, Basis, Casting, Condition, Confidence, Dropped, Entered, Entry, Explicitness, Facet, JobId,
@@ -30,7 +31,8 @@ use design_model::{
 };
 use design_runs::{Excerpt, FailuresReported, RunState};
 use design_store::{AppliedId, Linked, Planting, Resolved, Resolving, ShownMessage, ShownNode, Stored, StreamSchema};
-use dispatch_ports::{Reply, Tokens, Usage};
+use dispatch_fakes::{Scripted, Stepped};
+use dispatch_ports::{Finished, Output, Pause, Prompt, Reply, Tokens, Usage, Wall};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Offset, Size, Text};
 use grammar_notes::{Cite, Quote};
 use invariants::{Ignoring, Unpoisoned};
@@ -40,6 +42,7 @@ use laws::proptest::sample::select;
 use laws::proptest::strategy::{BoxedStrategy, Strategy};
 use newtype::Counter;
 use newtype::Enumerated;
+use newtype::Wrapping;
 use port_core::{Held, Op, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
 use sqlite_ports::SqliteOpener;
 use store_ports::{
@@ -2834,46 +2837,59 @@ impl<F: Fn(PathBuf) -> Sqlite> Opens for Opening<F> {
     }
 }
 
-struct Recalling;
+struct Recalling {
+    told: String,
+    prompts: Vec<String>,
+}
 
 impl Recalling {
-    fn prompted(applying: &Applying, prompt: &str) -> Result<String, Failure> {
-        let heard = Heard::new(format!("{{\"hook_event_name\":\"UserPromptSubmit\",\"prompt\":\"{prompt}\"}}"));
-        let environment = Invocation::at("/work").hearing(heard);
-        let run = Run::root();
+    const PROMPTED: &str = "{\"hook_event_name\":\"UserPromptSubmit\",\"prompt\":\"where do elephants roam\"}";
+
+    fn heard(applying: &Applying, heard: &str, arguments: &[&str], reply: &str) -> Result<Recalling, Failure> {
+        let finished = Finished::new(Reply::new(reply.to_owned()), Usage::default());
+        let script = Scripted::replying([Some(Output::Finished(finished))]);
         let uttered = Cli::new(
-            &environment,
+            &Invocation::at("/work").hearing(Heard::new(heard.to_owned())),
             FakeLent::new(&applying.files),
             Opening(|_path| applying.store.clone()),
-            Staff::idle(),
+            Agents::new(|_scratch| &script, Stepped::starting(Wall::new(1_800_000_000), Pause::new(0))),
         )
-        .report(&run, ["hook", "user-prompt-submit"].iter().map(OsString::from));
-        Answered::told(uttered)
+        .report(&Run::root(), arguments.iter().map(OsString::from));
+        let told = Answered::told(uttered)?;
+        Ok(Recalling { told, prompts: script.prompts().into_iter().map(Prompt::into_inner).collect() })
+    }
+
+    fn prompted(applying: &Applying, reply: &str) -> Result<Recalling, Failure> {
+        Recalling::heard(applying, Recalling::PROMPTED, &["hook", "user-prompt-submit"], reply)
     }
 }
 
 #[test]
-fn a_prompt_is_told_the_live_nodes_whose_placed_segments_hold_its_words() -> Result<(), Failure> {
+fn a_prompt_is_told_the_live_nodes_haiku_names_and_none_it_does_not_know() -> Result<(), Failure> {
     let session = Found::said(&[
         Said::by(Speaker::Owner, "aaaaaaaa-0000-4000-8000-000000000011", "elephants gather near rivers".to_owned()),
-        Said::by(Speaker::Owner, "aaaaaaaa-0000-4000-8000-000000000012", "tortoises sleep in winter".to_owned()),
         Said::by(Speaker::Owner, "aaaaaaaa-0000-4000-8000-000000000013", "elephants elephants".to_owned()),
     ]);
     let applying = Applying::over(&session)?;
     applying.applied(
         "propose(new, refines(n1), feature, \"Herds\")\nplace(aaaaaaaa-0000-4000-8000-000000000011.0, n2, mentions)\npropose(new, refines(n1), feature, \"Trunks\")\nplace(aaaaaaaa-0000-4000-8000-000000000013.0, n3, mentions)",
     )?;
-    let told = Recalling::prompted(&applying, "where do elephants roam")?;
-    assert!(told.contains("n2 vague: Herds"), "{told}");
-    let unmatched = Recalling::prompted(&applying, "tortoises")?;
-    assert_eq!(unmatched.matches("Herds").count(), 0, "{unmatched}");
-    let recalled = applying.run(&["recall", "elephants"])?;
-    let strongest = "n3 vague: Trunks";
-    assert_eq!(recalled.get(..strongest.len()), Some(strongest), "{recalled}");
-    let both = applying.run(&["recall", "elephants", "rivers"])?;
-    let summed = "n2 vague: Herds";
-    assert_eq!(both.get(..summed.len()), Some(summed), "{both}");
-    assert_eq!(Lines::missing(&recalled, &["n2 vague: Herds"]), Vec::<&&str>::new(), "{recalled}");
+    let named = Recalling::prompted(&applying, "[2]")?;
+    assert!(
+        named.told.contains("Design nodes bearing on this message (design show <id>):\\nn2 vague: Herds\"}"),
+        "{}",
+        named.told
+    );
+    assert_eq!(named.told.matches("Trunks").count(), 0, "{}", named.told);
+    let asked = named.prompts.first().cloned().unwrap_or_default();
+    assert!(asked.contains("where do elephants roam"), "{asked}");
+    assert!(asked.contains("n2 vague: Herds\nn3 vague: Trunks"), "{asked}");
+    let unknown = Recalling::prompted(&applying, "[99]")?;
+    let garbled = Recalling::prompted(&applying, "no nodes")?;
+    assert_eq!([unknown.told.as_str(), garbled.told.as_str()], ["", ""]);
+    let recalled = Recalling::heard(&applying, "", &["recall", "elephants", "trunks"], "[3, 2]")?;
+    assert_eq!(Lines::missing(&recalled.told, &["n2 vague: Herds", "n3 vague: Trunks"]), Vec::<&&str>::new());
+    assert!(recalled.told.contains("Herds\nn3"), "{}", recalled.told);
     Ok(())
 }
 
@@ -2928,11 +2944,13 @@ fn a_prompt_whose_bookkeeping_write_fails_is_still_told_its_nodes_and_the_hook_f
     )?;
     let heard =
         Heard::new("{\"hook_event_name\":\"UserPromptSubmit\",\"prompt\":\"where do elephants roam\"}".to_owned());
+    let finished = Finished::new(Reply::new("[2]".to_owned()), Usage::default());
+    let script = Scripted::replying([Some(Output::Finished(finished))]);
     let uttered = Cli::new(
         &Invocation::at("/work").hearing(heard),
         FakeLent::new(&applying.files),
         Unbooking(applying.store.clone()),
-        Staff::idle(),
+        Agents::new(|_scratch| &script, Stepped::starting(Wall::new(1_800_000_000), Pause::new(0))),
     )
     .report(&Run::root(), ["hook", "user-prompt-submit"].iter().map(OsString::from));
     let told = Answered::said(&uttered);

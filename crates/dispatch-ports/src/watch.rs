@@ -3,7 +3,8 @@ use std::iter;
 use port_core::Held;
 
 use crate::{
-    AgentRun, Bell, Clock, Deadline, Dispatch, DispatchFailure, Due, Errored, Fault, Finished, Pause, Unreadable, Usage,
+    AgentRun, Bell, Clock, Deadline, Dispatch, DispatchFailure, Due, Errored, Fault, Finished, Job, Pause, Prompt,
+    Unreadable, Usage,
 };
 
 #[derive(Debug)]
@@ -94,6 +95,14 @@ impl<'ports, D: Dispatch, C: Clock> Watch<'ports, D, C> {
             .unwrap_or(Ok(Watched::Stalled(Stall::Overdue)))?;
         run.end()?;
         Ok(watched)
+    }
+
+    pub fn fanned(&self, job: &Job, prompts: &[Prompt]) -> Result<Vec<Watched>, DispatchFailure> {
+        let running = prompts
+            .iter()
+            .map(|prompt| self.dispatch.dispatch(job, prompt))
+            .collect::<Result<Vec<Held<'_, AgentRun>>, DispatchFailure>>()?;
+        running.into_iter().map(|run| self.watched(run)).collect()
     }
 
     fn polled(&self, run: &mut AgentRun) -> Result<Option<Watched>, DispatchFailure> {

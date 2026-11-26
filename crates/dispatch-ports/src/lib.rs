@@ -25,7 +25,7 @@ pub use dispatch::{Dispatch, DispatchFiller, dispatch_ops};
 pub use dispatch_failure::{DispatchFailure, Fault};
 pub use finished::{Errored, Finished, Output, Reply, Tokens, Told, Unreadable, Usage};
 pub use headless_claude::HeadlessClaude;
-pub use job::Job;
+pub use job::{Job, Model};
 pub use pid::{Ended, Pid};
 pub use prompt::Prompt;
 pub use started::Started;

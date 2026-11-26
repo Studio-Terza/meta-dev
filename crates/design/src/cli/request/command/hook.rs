@@ -1,3 +1,4 @@
+pub(super) mod answers;
 mod boundary;
 
 use console_ports::Environment;
@@ -11,8 +12,8 @@ use super::ingest::Ingest;
 use super::structure::{Crew, Structure};
 use crate::cli::failure::Failure;
 use crate::{HookEvent, Uttered};
+use answers::Answering;
 use boundary::{Decision, Prompting, Settings, Stopping};
-use design_store::Recall;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Hook {
@@ -30,7 +31,7 @@ impl Hook {
         match self {
             Hook::Settings => Settings::listed(HookEvent::VARIANTS).written(),
             Hook::On(HookEvent::UserPromptSubmit) => {
-                Hook::prompted(&Prompting::heard(environment.input().map_err(Failure::Deaf)?)?, ground)
+                Hook::prompted(&Prompting::heard(environment.input().map_err(Failure::Deaf)?)?, ground, crew)
             }
             Hook::On(HookEvent::Stop) => {
                 Hook::stopped(&Stopping::heard(environment.input().map_err(Failure::Deaf)?)?, ground, crew)
@@ -38,12 +39,15 @@ impl Hook {
         }
     }
 
-    fn prompted<F: Files, S: Store>(prompting: &Prompting, ground: Ground<'_, F, S>) -> Result<Uttered, Failure> {
+    fn prompted<F: Files, S: Store, D: Dispatch, C: Clock>(
+        prompting: &Prompting,
+        ground: Ground<'_, F, S>,
+        crew: &Crew<'_, D, C>,
+    ) -> Result<Uttered, Failure> {
         let store = ground.store();
         Ingest::read(store, &ground.transcripts())?;
-        let recalled =
-            prompting.terms().map(|terms| store.read(Recall::telling(&terms))).transpose()?.unwrap_or_default();
-        Decision::told(store, HookEvent::UserPromptSubmit, &recalled)
+        let recalled = prompting.recalled(&Answering::new(store, crew));
+        Decision::told(store, HookEvent::UserPromptSubmit, recalled.as_ref(), None)
     }
 
     fn stopped<F: Files, S: Store, D: Dispatch, C: Clock>(
@@ -54,6 +58,6 @@ impl Hook {
         let store = ground.store();
         Ingest::read(store, &ground.transcripts())?;
         let concluded = Structure::new(store, crew).worked()?.concluded();
-        stopping.decided(concluded, store)
+        stopping.decided(concluded, store, &Answering::new(store, crew))
     }
 }

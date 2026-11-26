@@ -14,8 +14,8 @@ use store_ports::{Columns, Released, Statements, StoreFailure, Written};
 use stream::{Anchor, Anchors, MechanicalLink, Message, Relation, SegmentId, Shape};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Skipped, Uuid};
 
-use crate::Scope;
 use crate::boundary::ignored::Ignored;
+use crate::{Said, Scope};
 use design_closure::Keyed;
 use invariants::Ignoring;
 
@@ -105,6 +105,12 @@ impl From<MessageRow> for Record {
     }
 }
 
+impl From<MessageRow> for Said {
+    fn from(row: MessageRow) -> Said {
+        Said::new(row.uuid, row.at, row.body)
+    }
+}
+
 impl From<EdgeRow> for Skipped {
     fn from(row: EdgeRow) -> Skipped {
         Skipped::new(row.uuid, row.parent)
@@ -157,8 +163,51 @@ WHERE
         ))
     }
 
+    pub(crate) fn last_in(
+        session: &SessionId,
+        author: Authorship,
+        statements: &mut Statements<'_>,
+    ) -> Result<Vec<MessageRow>, StoreFailure> {
+        statements.rows(store_ports::query!(
+            MessageRow,
+            r#"
+SELECT
+  uuid,
+  session,
+  parent,
+  at,
+  author,
+  body
+FROM
+  messages
+WHERE
+  session = ?1
+  AND author = ?2
+ORDER BY
+  at DESC
+LIMIT
+  1
+"#,
+            session: SessionId,
+            author: Authorship
+        ))
+    }
+
+    pub(crate) fn owned(statements: &mut Statements<'_>) -> Result<Vec<Said>, StoreFailure> {
+        let owned: BTreeMap<(Instant, Uuid), MessageRow> = MessageRow::all(statements)?
+            .into_iter()
+            .filter(|row| row.author == Authorship::Owner)
+            .map(|row| ((row.at.clone(), row.uuid.clone()), row))
+            .collect();
+        Ok(owned.into_values().map(Said::from).collect())
+    }
+
     pub(crate) fn every(statements: &mut Statements<'_>) -> Result<Vec<Message>, StoreFailure> {
-        let rows = statements.rows(store_ports::query!(
+        Ok(MessageRow::all(statements)?.into_iter().map(Record::from).map(Message::from).collect())
+    }
+
+    fn all(statements: &mut Statements<'_>) -> Result<Vec<MessageRow>, StoreFailure> {
+        statements.rows(store_ports::query!(
             MessageRow,
             r#"
 SELECT
@@ -171,8 +220,7 @@ SELECT
 FROM
   messages
 "#
-        ))?;
-        Ok(rows.into_iter().map(Record::from).map(Message::from).collect())
+        ))
     }
 
     pub(crate) fn earlier(session: &SessionId, statements: &mut Statements<'_>) -> Result<Vec<Record>, StoreFailure> {

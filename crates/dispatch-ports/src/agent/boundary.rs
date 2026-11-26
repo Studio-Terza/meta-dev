@@ -7,18 +7,7 @@ pub struct Agent {
 impl Agent {
     pub const CLAUDE: Agent = Agent::new(
         "claude",
-        &[
-            "-p",
-            "--model",
-            "haiku",
-            "--output-format",
-            "json",
-            "--setting-sources",
-            "user",
-            "--strict-mcp-config",
-            "--tools",
-            "",
-        ],
+        &["-p", "--output-format", "json", "--setting-sources", "user", "--strict-mcp-config", "--tools", ""],
     );
 
     #[must_use]

@@ -8,6 +8,7 @@ pub enum Outcome {
     Ingested,
     Shown,
     Searched,
+    Answered,
     Recalled,
     Initialised,
     Applied,
