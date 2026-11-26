@@ -21,7 +21,6 @@ use structurer::{Attempt, Directives, Lapse, Readings, Said, SegmentRef};
 use transcript_ports::{Body, SessionId};
 
 use super::apply::{Application, Parsed};
-use super::eval::Called;
 use super::hook::answers::Reading;
 use crate::Outcome;
 use crate::cli::failure::{Failure, Flail, Flails};
@@ -139,23 +138,15 @@ impl<'ports, D: Dispatch, C: Clock> Crew<'ports, D, C> {
         Crew { dispatch, clock }
     }
 
-    pub fn replied(&self, prompt: &Prompt, timeout: Timeout) -> Result<Option<Reply>, Failure> {
-        Ok(self.called(prompt, timeout, Model::Haiku)?.reply().cloned())
+    pub fn replied(&self, prompt: &Prompt, timeout: Timeout, model: Model) -> Result<Option<Reply>, Failure> {
+        let held = self.dispatch.dispatch(&Job::due_by(Deadline::after(self.clock.now(), timeout), model), prompt)?;
+        Ok(Watch::over(self.dispatch, self.clock).watched(held)?.visited(Replying))
     }
 
-    pub fn called(&self, prompt: &Prompt, timeout: Timeout, model: Model) -> Result<Called, Failure> {
-        let start = self.clock.now();
-        let held = self.dispatch.dispatch(&Job::due_by(Deadline::after(start, timeout), model), prompt)?;
-        let watched = Watch::over(self.dispatch, self.clock).watched(held)?;
-        Ok(Called::new(&watched, [start, self.clock.now()]))
-    }
-
-    pub fn fanned(&self, reading: &Reading<'_>, timeout: Timeout) -> Result<Vec<Called>, Failure> {
-        let start = self.clock.now();
-        let job = Job::due_by(Deadline::after(start, timeout), Model::Haiku);
+    pub fn fanned(&self, reading: &Reading<'_>, timeout: Timeout) -> Result<Vec<Option<Reply>>, Failure> {
+        let job = Job::due_by(Deadline::after(self.clock.now(), timeout), Model::Haiku);
         let watched = Watch::over(self.dispatch, self.clock).fanned(&job, reading.prompts())?;
-        let spanned = [start, self.clock.now()];
-        Ok(watched.iter().map(|each| Called::new(each, spanned)).collect())
+        Ok(watched.iter().map(|each| each.visited(Replying)).collect())
     }
 }
 
@@ -318,6 +309,21 @@ impl Readings for Unapplied {
 
     fn flailed(self, lapse: Lapse) -> Step {
         Step::Ended(Ending::Halted(Halt::Flailed(lapse)))
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Replying;
+
+impl Watching for Replying {
+    type Output = Option<Reply>;
+
+    fn finished(self, finished: &Finished) -> Option<Reply> {
+        Some(finished.reply().clone())
+    }
+
+    fn stalled(self, _stall: &Stall) -> Option<Reply> {
+        None
     }
 }
 

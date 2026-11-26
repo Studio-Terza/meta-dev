@@ -1,10 +1,9 @@
-use std::collections::BTreeSet;
 use std::fmt;
 
 use store_ports::{Query, Statements, StoreFailure};
-use transcript_ports::{Authorship, Body, Instant, SessionId, Uuid};
+use transcript_ports::{Authorship, Body, Instant, Uuid};
 
-use super::{LastSaid, OwnerBefore, OwnerHistory, TurnEnds};
+use super::{LastSaid, OwnerHistory};
 use crate::boundary::MessageRow;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -21,12 +20,6 @@ pub struct Quote {
     excerpt: Body,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct TurnEnd {
-    asked: Said,
-    reply: Said,
-}
-
 #[derive(Clone, Copy, Debug)]
 pub struct Unabridged<'said>(&'said Said);
 
@@ -35,50 +28,6 @@ impl Query for OwnerHistory {
 
     fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Said>, StoreFailure> {
         MessageRow::owned(statements)
-    }
-}
-
-impl Query for OwnerBefore {
-    type Rows = Vec<Said>;
-
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Said>, StoreFailure> {
-        Ok(MessageRow::owner_before(&self.0, statements)?.into_iter().map(Said::from).collect())
-    }
-}
-
-impl Query for TurnEnds {
-    type Rows = Vec<TurnEnd>;
-
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<TurnEnd>, StoreFailure> {
-        let replies = MessageRow::owner_between(&self.session, &self.from, &self.until, statements)?;
-        let ends = replies
-            .into_iter()
-            .map(Said::from)
-            .map(|reply| TurnEnd::read(&self.session, reply, statements))
-            .collect::<Result<Vec<Option<TurnEnd>>, StoreFailure>>()?;
-        let mut seen = BTreeSet::new();
-        Ok(ends.into_iter().flatten().filter(|end| seen.insert(end.asked.uuid.clone())).collect())
-    }
-}
-
-impl TurnEnd {
-    fn read(
-        session: &SessionId,
-        reply: Said,
-        statements: &mut Statements<'_>,
-    ) -> Result<Option<TurnEnd>, StoreFailure> {
-        let asked = MessageRow::lead_before(session, &reply.at, statements)?;
-        Ok(asked.into_iter().next().map(|row| TurnEnd { asked: Said::from(row), reply }))
-    }
-
-    #[must_use]
-    pub fn asked(&self) -> &Said {
-        &self.asked
-    }
-
-    #[must_use]
-    pub fn replied(&self) -> Unabridged<'_> {
-        Unabridged(&self.reply)
     }
 }
 
@@ -98,8 +47,6 @@ impl Query for LastSaid {
 }
 
 impl Said {
-    const SHOWN: usize = 600;
-
     #[must_use]
     pub fn quoted(&self, uuid: &Uuid, quote: &Body) -> Option<Quote> {
         let body: &str = self.body.as_ref();
@@ -143,14 +90,6 @@ impl AsRef<Uuid> for Quote {
 impl fmt::Display for Unabridged<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "[{} {}] {}", self.0.uuid, self.0.at, self.0.body)
-    }
-}
-
-impl fmt::Display for Said {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let text: &str = self.body.as_ref();
-        let shown: String = text.chars().take(Said::SHOWN).collect();
-        write!(formatter, "[{} {}] {shown}", self.uuid, self.at)
     }
 }
 

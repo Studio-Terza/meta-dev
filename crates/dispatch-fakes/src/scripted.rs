@@ -2,6 +2,7 @@ mod boundary;
 
 use std::collections::{BTreeMap, VecDeque};
 use std::sync::Mutex;
+use std::time::Duration;
 
 use invariants::Unpoisoned;
 use port_core::Pass;
@@ -93,16 +94,28 @@ impl DispatchFiller for &Scripted {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Bells {
+    Ignored,
+    Heeded,
+}
+
 #[derive(Debug)]
 pub struct Stepped {
     now: Mutex<Wall>,
     sleep: Pause,
+    bells: Bells,
 }
 
 impl Stepped {
     #[must_use]
     pub fn starting(at: Wall, sleep: Pause) -> Stepped {
-        Stepped { now: Mutex::new(at), sleep }
+        Stepped { now: Mutex::new(at), sleep, bells: Bells::Ignored }
+    }
+
+    #[must_use]
+    pub fn heeding(at: Wall, sleep: Pause) -> Stepped {
+        Stepped { bells: Bells::Heeded, ..Stepped::starting(at, sleep) }
     }
 }
 
@@ -111,7 +124,8 @@ impl ClockFiller for Stepped {
         *self.now.lock().unpoisoned()
     }
 
-    fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause, _bell: &Bell) -> Wall {
+    fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause, bell: &Bell) -> Wall {
+        let _woke = (self.bells == Bells::Heeded).then(|| bell.waited(Duration::from(pause)));
         let mut now = self.now.lock().unpoisoned();
         *now = now.after(pause).after(self.sleep);
         *now

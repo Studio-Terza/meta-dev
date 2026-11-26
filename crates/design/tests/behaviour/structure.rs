@@ -573,8 +573,12 @@ fn an_agent_that_errs_writes_no_result_cannot_start_or_cannot_be_read_stalls_the
     let missing = Agent::new("/nonexistent/claude", &[]);
     let garbled = Agent::new("sh", &["-c", r"cat >/dev/null; printf '\377'"]);
     let reported = [errs, refuses, missing, garbled].map(|agent| {
+        let minute = Pause::new(60);
         let structured = structuring.structured_by(
-            Agents::new(|_scratch| HeadlessClaude::new(scratch.clone(), agent), SystemClock),
+            Agents::new(
+                |_scratch| HeadlessClaude::new(scratch.clone(), agent),
+                Stepped::heeding(Wall::new(1_800_000_000), minute),
+            ),
             &["structure"],
         );
         let failure = Refusal::said(&structured.outcome);

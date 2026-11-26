@@ -21,7 +21,7 @@ pub use boundary::{CursorRow, CursorRowNew, Hit, LinkRow};
 pub use cursors::Cursors;
 pub use earlier_lines::EarlierLines;
 pub use imported_notes::{ImportedEnding, ImportedNotes, Noted};
-pub use owner_said::{LastSaid, OwnerBefore, OwnerHistory, Quote, Said, TurnEnd, TurnEnds, Unabridged};
+pub use owner_said::{LastSaid, OwnerHistory, Quote, Said, Unabridged};
 pub use prefixes::{Prefixes, Shortest};
 pub use quoted::{Quoted, QuotedSegments};
 pub use scope::Scope;

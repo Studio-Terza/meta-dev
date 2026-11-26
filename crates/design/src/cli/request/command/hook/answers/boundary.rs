@@ -10,7 +10,6 @@ use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use transcript_ports::{Body, Uuid};
 
-use super::super::super::eval::Called;
 use crate::cli::request::ignored::Ignored;
 use invariants::Ignoring;
 
@@ -207,7 +206,7 @@ impl Asked {
         Replied(reply).object::<Asked>().ignoring(Ignored::Unclassified).filter(|asked| asked.kind == Kind::Question)
     }
 
-    pub fn selecting(&self, shown: &[impl fmt::Display]) -> Selecting<'_> {
+    fn selecting(&self, shown: &[impl fmt::Display]) -> Selecting<'_> {
         Selecting { question: &self.question, shown: shown.iter().map(ToString::to_string).collect() }
     }
 
@@ -231,22 +230,18 @@ impl Asked {
     }
 }
 
-impl<'history> Reading<'history> {
+impl Reading<'_> {
     const CHUNK: usize = 300;
 
     pub fn prompts(&self) -> &[Prompt] {
         &self.prompts
     }
 
-    pub fn chunks(&self) -> &[&'history [Said]] {
-        &self.chunks
-    }
-
-    pub fn quoted(&self, called: &[Called]) -> Vec<Vec<Quote>> {
+    pub fn quoted(&self, replies: &[Option<Reply>]) -> Vec<Vec<Quote>> {
         self.chunks
             .iter()
-            .zip(called)
-            .map(|(chunk, call)| call.reply().map_or_default(|reply| Answers::quoted(reply, chunk)))
+            .zip(replies)
+            .map(|(chunk, read)| read.as_ref().map_or_default(|reply| Answers::quoted(reply, chunk)))
             .collect()
     }
 }
@@ -254,12 +249,6 @@ impl<'history> Reading<'history> {
 impl AsRef<Body> for Asked {
     fn as_ref(&self) -> &Body {
         &self.question
-    }
-}
-
-impl<'reply> From<&'reply Reply> for Replied<'reply> {
-    fn from(reply: &'reply Reply) -> Replied<'reply> {
-        Replied(reply)
     }
 }
 

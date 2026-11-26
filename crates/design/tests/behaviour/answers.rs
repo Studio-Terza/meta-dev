@@ -101,43 +101,6 @@ impl Asking {
 }
 
 #[test]
-fn an_eval_scores_each_stage_of_a_turn_that_asked_against_the_owners_earlier_answer() -> Result<(), Failure> {
-    let session = Session::working(
-        [
-            Session::stamped(Speaker::Owner, "o1", "null", Asking::RULED, "2026-01-01"),
-            Session::stamped(Speaker::Lead, "l1", "\"o1\"", "should the lint limit change", "2026-01-02"),
-            Session::stamped(Speaker::Owner, "o2", "\"l1\"", "the lint limit stays", "2026-01-03"),
-        ]
-        .concat(),
-    );
-    let replies = [Asking::LINT, Asking::LINT, "[\"o1\",\"o9\"]", Asking::PICKED, Asking::PICKED, "[\"o1\"]", "[]"];
-    let asking = Asking {
-        store: Sqlite::in_memory::<StreamSchema>(),
-        files: session.files(),
-        script: Scripted::replying(replies.iter().map(|reply| Some(Output::Finished(Asking::finished(reply))))),
-    };
-    Invocation::within(&asking.store, FakeLent::new(&asking.files), &["ingest"])?;
-    let evaluated = asking.asked("", &["eval", "s", "2026-01-03T00:00:00Z", "2026-01-04T00:00:00Z"]);
-    let tallied = "judged=1 answered=1 truths=1 truth_tokens=37 base=[found_any=1 found=1 picks=1 verified=1 tokens=37 seconds=0] chunked=[found_any=1 found=1 picks=1 verified=0 tokens=37 seconds=0]";
-    assert_eq!(evaluated.outcome?, Outcome::Evaluated);
-    assert!(
-        evaluated.text.contains(&format!("turn l1 2026-01-02T00:00:00Z haiku=Asks sonnet=Asks truth=[o1] {tallied}")),
-        "{}",
-        evaluated.text
-    );
-    assert!(evaluated.text.contains("stage1 both=1 haiku_only=0 sonnet_only=0 neither=0"), "{}", evaluated.text);
-    assert!(evaluated.text.contains(&format!("total {tallied}")), "{}", evaluated.text);
-    assert_eq!(
-        asking.script.models(),
-        [Model::Haiku, Model::Sonnet, Model::Sonnet, Model::Haiku, Model::Haiku, Model::Sonnet, Model::Sonnet]
-    );
-    let grounding = evaluated.prompts.get(2).cloned().unwrap_or_default();
-    assert!(grounding.contains(&format!("[o1 2026-01-01T00:00:00Z] {}", Asking::RULED)), "{grounding}");
-    assert!(grounding.contains("[o2 2026-01-03T00:00:00Z] the lint limit stays"), "{grounding}");
-    Ok(())
-}
-
-#[test]
 fn haiku_reads_every_earlier_owner_message_under_its_header_and_sonnet_trims_the_quotes() -> Result<(), Failure> {
     let asking = Asking::over(&[Asking::LINT, Asking::PICKED, Asking::KEPT])?;
     let asked = asking.asked("", &["answer", "is the lint limit still three seconds"]);

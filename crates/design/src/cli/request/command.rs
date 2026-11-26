@@ -1,5 +1,4 @@
 mod apply;
-mod eval;
 mod hook;
 mod import;
 mod ingest;
@@ -30,7 +29,6 @@ use crate::cli::failure::Failure;
 use crate::{Outcome, Uttered};
 pub use apply::{Application, Unresolved};
 use console_ports::Shown;
-use eval::Eval;
 pub use hook::Hook;
 use hook::answers::Answering;
 use import::Import;
@@ -52,7 +50,6 @@ pub enum Command {
     Show(Subject),
     Search(Terms, Scope),
     Answer(Body),
-    Eval(Eval),
     Recall(Body),
     Init(Init),
     Apply(PathBuf),
@@ -71,7 +68,6 @@ pub enum Verb {
     Show,
     Search,
     Answer,
-    Eval,
     Recall,
     Init,
     Apply,
@@ -93,12 +89,11 @@ impl FromStr for Verb {
 }
 
 impl Verb {
-    const NAMED: [(&'static str, Verb); 18] = [
+    const NAMED: [(&'static str, Verb); 17] = [
         ("ingest", Verb::Ingest),
         ("show", Verb::Show),
         ("search", Verb::Search),
         ("answer", Verb::Answer),
-        ("eval", Verb::Eval),
         ("recall", Verb::Recall),
         ("init", Verb::Init),
         ("apply", Verb::Apply),
@@ -124,7 +119,6 @@ impl Verb {
             Verb::Hook => &[Flag::Settings],
             Verb::Show
             | Verb::Answer
-            | Verb::Eval
             | Verb::Recall
             | Verb::Apply
             | Verb::Move(Moving::Refine | Moving::Reopen)
@@ -154,7 +148,6 @@ impl Verb {
                 .ok_or(Failure::Usage)
                 .map(|terms| Command::Search(terms, scope)),
             Verb::Answer => Self::spoken(rest).map(Command::Answer),
-            Verb::Eval => Eval::try_from(rest).map(Command::Eval),
             Verb::Recall => Self::spoken(rest).map(Command::Recall),
             Verb::Init => Init::try_from(rest).map(Command::Init),
             Verb::Apply => Token::only(rest).map(PathBuf::from).map(Command::Apply),
@@ -185,7 +178,6 @@ impl Command {
             Command::Show(_)
             | Command::Search(..)
             | Command::Answer(_)
-            | Command::Eval(_)
             | Command::Recall(_)
             | Command::Init(_)
             | Command::Apply(_)
@@ -213,9 +205,6 @@ impl Command {
             }
             Command::Search(terms, scope) => Search::found(ground.store(), terms, scope)
                 .map(|lines| Uttered::new(Shown::said(Lines::from(&lines)), Ok(Outcome::Searched))),
-            Command::Eval(eval) => eval
-                .evaluated(ground.store(), crew)
-                .map(|evaluated| Uttered::new(Shown::said(evaluated), Ok(Outcome::Evaluated))),
             Command::Answer(said) => Answering::new(ground.store(), crew)
                 .traced(&said)
                 .map(|traced| Uttered::new(Shown::said(traced), Ok(Outcome::Answered))),
