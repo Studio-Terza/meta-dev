@@ -6,6 +6,6 @@ pub use design_graph::{
 };
 pub use design_messages::{
     Asked, AskedEarlier, Cursors, EarlierLines, Hit, Holding, ImportedEnding, ImportedNotes, LastSaid, LinkRow, Noted,
-    OwnerHistory, Prefixes, Quote, Quoted, QuotedSegments, Said, Scope, SearchSegments, SessionCursors,
-    SessionRecords, Shortest, ShownMessage, Stored, StreamSchema, Unabridged,
+    OwnerHistory, Prefixes, Quote, Quoted, QuotedSegments, Said, Scope, SearchSegments, SessionCursors, SessionRecords,
+    Shortest, ShownMessage, Stored, StreamSchema, Unabridged,
 };
