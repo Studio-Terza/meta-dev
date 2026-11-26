@@ -89,8 +89,8 @@ laws::law!(
 
 #[test]
 fn every_role_is_displayed_as_its_name_and_parsed_back_from_it() {
-    assert_eq!(Names::unparsed(Role::name), []);
-    assert_eq!(Names::undisplayed(Role::name), []);
+    assert_eq!(Names::unparsed(<Role as Into<&str>>::into), []);
+    assert_eq!(Names::undisplayed(<Role as Into<&str>>::into), []);
 }
 
 #[test]

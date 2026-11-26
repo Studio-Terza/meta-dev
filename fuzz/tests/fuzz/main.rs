@@ -11,6 +11,7 @@ use ports::campaign::Campaign;
 use proptest::collection::vec;
 use proptest::prelude::{Strategy, any};
 use proptest::sample::{Index, select};
+use strum::VariantArray;
 use syntax::Syntax;
 
 const MAX_BYTES: usize = 512;
@@ -49,7 +50,7 @@ impl Targets {
             |(role, text, place, byte, kind)| {
                 let bytes = text.into_bytes();
                 let at = place.index(bytes.len().saturating_add(1));
-                let mutated = Mutation::ALL
+                let mutated = Mutation::VARIANTS
                     .iter()
                     .skip(usize::from(kind))
                     .take(1)
@@ -90,7 +91,7 @@ fn long_chains_do_not_panic_the_runner() -> Result<(), Crash> {
     Campaign::run("chained", Targets::chained())
 }
 
-#[derive(Clone, Copy)]
+#[derive(VariantArray, Clone, Copy)]
 enum Mutation {
     Truncate,
     Flip,
@@ -98,8 +99,6 @@ enum Mutation {
 }
 
 impl Mutation {
-    const ALL: [Mutation; 3] = [Mutation::Truncate, Mutation::Flip, Mutation::Insert];
-
     fn applied(self, bytes: &[u8], at: usize, byte: u8) -> Vec<u8> {
         match self {
             Mutation::Truncate => bytes.iter().take(at).copied().collect(),

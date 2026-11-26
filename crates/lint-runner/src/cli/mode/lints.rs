@@ -29,6 +29,7 @@ use lint_arbitrary_newtypes::ArbitraryNewtypes;
 use lint_bool_methods::BoolMethods;
 use lint_const_shape::ConstShape;
 use lint_crate_graph::CrateGraph;
+use lint_derived_tables::DerivedTables;
 use lint_distinct_signatures::DistinctSignatures;
 use lint_effect_sites::EffectsInPorts;
 use lint_enum_predicates::EnumPredicates;
@@ -152,7 +153,7 @@ type Workspaced =
 type Extracting = for<'model> fn(&'model Model) -> Vec<Report<'model>>;
 
 impl Lints {
-    const LINTS: [Entry; 60] = [
+    const LINTS: [Entry; 61] = [
         <Filed<NoComments> as Registered>::ENTRY,
         <Swept<NoFreeFns> as Registered>::ENTRY,
         <Filed<ThinMain> as Registered>::ENTRY,
@@ -180,6 +181,7 @@ impl Lints {
         Entry::spelled::<RepeatedMethods>(Work::Modelled(<RepeatedMethods as ModelLint>::report)),
         <Primed<StateGraph> as Registered>::ENTRY,
         <Ruled<GuardMustUse> as Registered>::ENTRY,
+        <Ruled<DerivedTables> as Registered>::ENTRY,
         <Judged<PublicApiTests> as Registered>::ENTRY,
         <Grounded<NoTestOnlyApi> as Registered>::ENTRY,
         <Swept<NoIgnoredTests> as Registered>::ENTRY,

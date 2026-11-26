@@ -4,7 +4,8 @@ use lint_layout::Name;
 
 use crate::type_ref::TypeRef;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(strum::IntoStaticStr, strum::VariantArray, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[strum(serialize_all = "snake_case")]
 pub enum Property {
     Associative,
     Commutative,
@@ -14,6 +15,7 @@ pub enum Property {
     Absorbing,
     Distributive,
     Preserves,
+    #[strum(serialize = "action")]
     Acting,
 }
 
@@ -26,7 +28,7 @@ pub enum LawKind {
     Property(Property),
 }
 
-#[derive(strum::Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(strum::Display, strum::VariantArray, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Side {
     #[strum(serialize = "input side")]
     Input,
@@ -82,13 +84,12 @@ impl LawKind {
 }
 
 impl Side {
-    const PRESERVED: [Side; 3] = [Side::Input, Side::Output, Side::Edge];
     const SINGLE: [Side; 4] = [Side::Input; 4];
 
     #[must_use]
     pub fn checked_by(kind: LawKind) -> &'static [Side] {
         match kind.property() {
-            Some(Property::Preserves) => &Self::PRESERVED,
+            Some(Property::Preserves) => <Side as strum::VariantArray>::VARIANTS,
             Some(_) | None => &Self::SINGLE,
         }
     }

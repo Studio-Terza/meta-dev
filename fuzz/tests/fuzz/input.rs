@@ -1,4 +1,7 @@
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+use strum::IntoStaticStr;
+
+#[derive(IntoStaticStr, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
 pub enum Role {
     Library,
     Binary,
@@ -6,16 +9,26 @@ pub enum Role {
     Manifest,
 }
 
+#[derive(IntoStaticStr, Clone, Copy, Debug, PartialEq, Eq)]
+enum File {
+    #[strum(serialize = "src/lib.rs")]
+    Library,
+    #[strum(serialize = "src/main.rs")]
+    Binary,
+    #[strum(serialize = "tests/fuzzed.rs")]
+    Test,
+}
+
 impl Role {
     pub const SOURCES: [Role; 3] = [Role::Library, Role::Binary, Role::Test];
 
     const MANIFEST_TEXT: &'static str = "[package]\nname = \"fuzzed\"\nversion = \"0.1.0\"\nedition = \"2024\"\n";
 
-    fn file(self) -> &'static str {
+    fn file(self) -> File {
         match self {
-            Role::Library | Role::Manifest => "src/lib.rs",
-            Role::Binary => "src/main.rs",
-            Role::Test => "tests/fuzzed.rs",
+            Role::Library | Role::Manifest => File::Library,
+            Role::Binary => File::Binary,
+            Role::Test => File::Test,
         }
     }
 }
@@ -36,16 +49,11 @@ impl Input {
     }
 
     pub fn name(&self) -> &'static str {
-        match self.role {
-            Role::Library => "library",
-            Role::Binary => "binary",
-            Role::Test => "test",
-            Role::Manifest => "manifest",
-        }
+        self.role.into()
     }
 
     pub fn file(&self) -> &'static str {
-        self.role.file()
+        self.role.file().into()
     }
 
     pub fn manifest(&self) -> &[u8] {

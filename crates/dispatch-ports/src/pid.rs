@@ -1,12 +1,13 @@
 mod boundary;
 
-use named_derive::Named;
-use newtype::{Arbitrary, Display, Newtype};
+use newtype::{Arbitrary, Display, Listed, Newtype};
+use strum::{IntoStaticStr, VariantArray};
 
 #[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Pid(u32);
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(strum::Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
 pub enum Ended {
     Killed,
     Absent,

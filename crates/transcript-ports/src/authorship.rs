@@ -1,9 +1,8 @@
-use std::fmt;
-use std::str::FromStr;
-
 use newtype::Spelled;
+use strum::{Display, EnumString};
 
-#[derive(Spelled, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Spelled, Display, EnumString, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[strum(serialize_all = "snake_case", parse_err_ty = Unvoiced, parse_err_fn = Unvoiced::from)]
 pub enum Authorship {
     Owner,
     Lead,
@@ -13,23 +12,8 @@ pub enum Authorship {
 #[error("{0:?} names neither the owner nor the lead")]
 pub struct Unvoiced(String);
 
-impl fmt::Display for Authorship {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Authorship::Owner => formatter.write_str("owner"),
-            Authorship::Lead => formatter.write_str("lead"),
-        }
+impl From<&str> for Unvoiced {
+    fn from(text: &str) -> Unvoiced {
+        Unvoiced(text.to_owned())
     }
-}
-
-impl FromStr for Authorship {
-    type Err = Unvoiced;
-
-    fn from_str(text: &str) -> Result<Authorship, Unvoiced> {
-        Self::ALL.into_iter().find(|author| author.to_string() == text).ok_or_else(|| Unvoiced(text.to_owned()))
-    }
-}
-
-impl Authorship {
-    const ALL: [Authorship; 2] = [Authorship::Owner, Authorship::Lead];
 }

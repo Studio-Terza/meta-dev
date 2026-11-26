@@ -9,7 +9,7 @@ pub enum Derivation {
     OpsModule,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(strum::VariantArray, Clone, Copy, Debug)]
 pub enum Constant {
     Name,
     Release,

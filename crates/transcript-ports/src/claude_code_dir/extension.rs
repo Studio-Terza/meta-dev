@@ -1,22 +1,17 @@
-use std::str::FromStr;
+use strum::EnumString;
 
 #[derive(Debug, thiserror::Error)]
 #[error("not a transcript file extension")]
 pub struct Foreign;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Extension {
-    Jsonl,
-}
-
-impl FromStr for Extension {
-    type Err = Foreign;
-
-    fn from_str(name: &str) -> Result<Extension, Foreign> {
-        Self::NAMED.iter().find(|(known, _)| *known == name).map(|(_, extension)| *extension).ok_or(Foreign)
+impl From<&str> for Foreign {
+    fn from(_name: &str) -> Foreign {
+        Foreign
     }
 }
 
-impl Extension {
-    const NAMED: [(&'static str, Extension); 1] = [("jsonl", Extension::Jsonl)];
+#[derive(EnumString, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case", parse_err_ty = Foreign, parse_err_fn = Foreign::from)]
+pub enum Extension {
+    Jsonl,
 }
