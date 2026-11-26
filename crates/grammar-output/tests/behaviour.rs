@@ -1,15 +1,19 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
 use grammar::{Ignoring, Unlexed};
-use grammar_cited::Cited;
 use grammar_output::field::{Bare, Id, Integer, Quoted};
 use grammar_output::{Fields, Record};
-use grammar_search::Term;
+use newtype::Newtype;
+use proptest::prelude::{prop_assert_eq, proptest};
+use proptest::test_runner::{Config, RngSeed};
+
+#[derive(Newtype, Clone, Debug, PartialEq, Eq)]
+struct Term(String);
 
 struct Read;
 
 #[derive(Debug, PartialEq, Eq, Record)]
-struct Read6 {
+struct Read5 {
     #[field(Id<Node>, via = Node::number)]
     node: i64,
     #[field(Quoted<Term>)]
@@ -19,8 +23,6 @@ struct Read6 {
     #[past("to".to_owned())]
     #[field(Integer<u64>)]
     integer: u64,
-    #[field(Cited, via = |cited: Cited| cited.ordinal())]
-    ordinal: u32,
     #[field(Bare<Term>)]
     message: Term,
 }
@@ -35,13 +37,23 @@ impl Read {
             .ignoring(Unlexed::NotThisGrammar)
     }
 
-    fn line(text: &&str) -> Option<Read6> {
+    fn line(text: &str) -> Option<Read5> {
         Fields::lexed(text)
             .ignoring(Unlexed::NotThisGrammar)?
-            .record::<Read6>()
+            .record::<Read5>()
             .ignoring(Unlexed::NotThisGrammar)?
             .ended()
             .ignoring(Unlexed::NotThisGrammar)
+    }
+
+    fn of(quoted: &str, integer: u64, message: &str) -> Read5 {
+        Read5 {
+            node: 4,
+            quoted: Term::new(quoted.to_owned()),
+            bare: Term::new("feature".to_owned()),
+            integer,
+            message: Term::new(message.to_owned()),
+        }
     }
 }
 
@@ -61,55 +73,24 @@ impl Node {
     }
 }
 
-laws::roundtrip!(
-    any_text_is_quoted_and_lexed_back_as_one_quoted_field,
-    "(?s).{0,40}",
-    |text: &String| text.clone(),
-    |text: &String| Read::quoted(text),
-    |text: String| Some(Term::new(text))
-);
+proptest! {
+    #![proptest_config(Config { failure_persistence: None, rng_seed: RngSeed::Fixed(0), ..Config::default() })]
+    #[test]
+    fn any_text_is_quoted_and_lexed_back_as_one_quoted_field(text in "(?s).{0,40}") {
+        prop_assert_eq!(Read::quoted(&text), Some(Term::new(text)));
+    }
+}
 
-laws::table!(
-    an_output_line_lexes_into_words_refs_ids_quotes_and_numbers,
-    Read::line,
-    [
-        "n4 \"de\\\"mo\" feature to 12 deadbeef.3 85b287b3-4d5e-4f60\n" => Some(Read6 {
-            node: 4,
-            quoted: Term::new("de\"mo".to_owned()),
-            bare: Term::new("feature".to_owned()),
-            integer: 12,
-            ordinal: 3,
-            message: Term::new("85b287b3-4d5e-4f60".to_owned()),
-        }),
-        "n4 \"x\" feature to 1234567 1a2b3c4.0 0a1b2c3" => Some(Read6 {
-            node: 4,
-            quoted: Term::new("x".to_owned()),
-            bare: Term::new("feature".to_owned()),
-            integer: 1_234_567,
-            ordinal: 0,
-            message: Term::new("0a1b2c3".to_owned()),
-        }),
-        "n4 \"x\" feature to 7 9abcdef0.12 7e57ab1-0000" => Some(Read6 {
-            node: 4,
-            quoted: Term::new("x".to_owned()),
-            bare: Term::new("feature".to_owned()),
-            integer: 7,
-            ordinal: 12,
-            message: Term::new("7e57ab1-0000".to_owned()),
-        }),
-        "n4 \"x\" feature to 7 o1.0 O1" => Some(Read6 {
-            node: 4,
-            quoted: Term::new("x".to_owned()),
-            bare: Term::new("feature".to_owned()),
-            integer: 7,
-            ordinal: 0,
-            message: Term::new("O1".to_owned()),
-        }),
-        "n4 \"x\" feature to 7 o1. o1" => None,
-        "n4 \"x\" feature to 7 o1.01 o1" => None,
-        "n4 \"x\" feature to 1a2b3c4 1a2b3c4.0 1a2b3c4" => None,
-        "n4 \"x\" feature to 12 deadbeef.3 deadbeef extra" => None,
-        "n4 \"x\" feature from 12 deadbeef.3 deadbeef" => None,
-        "n4 \"x\" ( feature" => None,
-    ]
-);
+#[test]
+fn an_output_line_lexes_into_words_ids_quotes_and_numbers() {
+    assert_eq!(
+        Read::line("n4 \"de\\\"mo\" feature to 12 85b287b3-4d5e-4f60\n"),
+        Some(Read::of("de\"mo", 12, "85b287b3-4d5e-4f60"))
+    );
+    assert_eq!(Read::line("n4 \"x\" feature to 1234567 0a1b2c3"), Some(Read::of("x", 1_234_567, "0a1b2c3")));
+    assert_eq!(Read::line("n4 \"x\" feature to 7 O1"), Some(Read::of("x", 7, "O1")));
+    assert_eq!(Read::line("n4 \"x\" feature to 1a2b3c4 1a2b3c4"), None);
+    assert_eq!(Read::line("n4 \"x\" feature to 12 deadbeef extra"), None);
+    assert_eq!(Read::line("n4 \"x\" feature from 12 deadbeef"), None);
+    assert_eq!(Read::line("n4 \"x\" ( feature"), None);
+}

@@ -17,6 +17,7 @@ grammar = { path = "../grammar" }
 newtype = { path = "../newtype" }
 
 [dev-dependencies]
+proptest.workspace = true
 
 [lints]
 workspace = true

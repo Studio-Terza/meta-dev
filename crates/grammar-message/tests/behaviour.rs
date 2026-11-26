@@ -1,10 +1,8 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
-#[path = "generated/laws.rs"]
-mod generated_laws;
-
 use grammar_message::{Depth, Lexeme, Lexemes, Mark, Number};
-use laws::proptest::prelude::prop_assert_eq;
+use proptest::prelude::{prop_assert_eq, proptest};
+use proptest::test_runner::{Config, RngSeed};
 
 struct Marks;
 
@@ -14,44 +12,34 @@ impl Marks {
     }
 }
 
-laws::table!(
-    markers_are_recognised_at_line_starts,
-    Marks::of,
-    [
-        "1. one\n2) two" => vec![Mark::Numbered(Number::new(1), Depth::Top), Mark::Numbered(Number::new(2), Depth::Top)],
-        "1. one\n  2. sub" => vec![Mark::Numbered(Number::new(1), Depth::Top), Mark::Numbered(Number::new(2), Depth::Nested)],
-        "**1. one**\n**2.** two" => vec![Mark::Numbered(Number::new(1), Depth::Top), Mark::Numbered(Number::new(2), Depth::Top)],
-        "- a\n* b\n> c" => vec![Mark::Bulleted, Mark::Bulleted, Mark::Quoted],
-        "yes. no? ok" => vec![Mark::Stop, Mark::Stop],
-        "v0.2.1 is fine" => Vec::<Mark>::new(),
-        "see 85b287b3-4d5e-4f60-8a9b-0c1d2e3f4a5b now" => vec![Mark::Uuid],
-        "line\nnext" => vec![Mark::Break],
-    ]
-);
-
-laws::law!(lexemes_tile_the_text_without_gaps, "[ -~\n\t•é]{0,60}", text, {
-    let rebuilt: String = Lexemes::scanned(&text).iter().map(|lexeme| lexeme.span().slice(&text)).collect();
-    prop_assert_eq!(rebuilt, text);
-});
+#[test]
+fn markers_are_recognised_at_line_starts() {
+    let top = |number| Mark::Numbered(Number::new(number), Depth::Top);
+    assert_eq!(Marks::of("1. one\n2) two"), vec![top(1), top(2)]);
+    assert_eq!(Marks::of("1. one\n  2. sub"), vec![top(1), Mark::Numbered(Number::new(2), Depth::Nested)]);
+    assert_eq!(Marks::of("**1. one**\n**2.** two"), vec![top(1), top(2)]);
+    assert_eq!(Marks::of("- a\n* b\n> c"), vec![Mark::Bulleted, Mark::Bulleted, Mark::Quoted]);
+    assert_eq!(Marks::of("yes. no? ok"), vec![Mark::Stop, Mark::Stop]);
+    assert_eq!(Marks::of("v0.2.1 is fine"), Vec::<Mark>::new());
+    assert_eq!(Marks::of("see 85b287b3-4d5e-4f60-8a9b-0c1d2e3f4a5b now"), vec![Mark::Uuid]);
+    assert_eq!(Marks::of("line\nnext"), vec![Mark::Break]);
+}
 
 struct Inks;
 
 impl Inks {
-    fn of(text: &&str) -> String {
-        Lexemes::scanned(text).iter().filter_map(Lexeme::ink).map(|ink| ink.slice(text)).collect()
+    fn of(text: &str) -> String {
+        Lexemes::scanned(&text).iter().filter_map(Lexeme::ink).map(|ink| ink.slice(text)).collect()
     }
 }
 
-laws::table!(
-    review_a_lexeme_ink_sheds_unicode_whitespace,
-    Inks::of,
-    [
-        "agreed.\u{a0}" => "agreed.".to_owned(),
-        "\u{3000}fine" => "fine".to_owned(),
-        "\u{2003}one\u{85}two\u{2029}" => "onetwo".to_owned(),
-        "\u{200b}kept" => "\u{200b}kept".to_owned(),
-    ]
-);
+#[test]
+fn review_a_lexeme_ink_sheds_unicode_whitespace() {
+    assert_eq!(Inks::of("agreed.\u{a0}"), "agreed.");
+    assert_eq!(Inks::of("\u{3000}fine"), "fine");
+    assert_eq!(Inks::of("\u{2003}one\u{85}two\u{2029}"), "onetwo");
+    assert_eq!(Inks::of("\u{200b}kept"), "\u{200b}kept");
+}
 
 struct Inked;
 
@@ -65,11 +53,18 @@ impl Inked {
     }
 }
 
-laws::law!(
-    only_breaks_lack_ink_among_marks,
-    "(\n- |\n> |\n1\\. |\n  2\\) |\n\\*\\*3\\.\\*\\* |[.?!] |85b287b3-4d5e-4f60-8a9b-0c1d2e3f4a5b|[ a-z]|\n){0,24}",
-    text,
-    {
+proptest! {
+    #![proptest_config(Config { failure_persistence: None, rng_seed: RngSeed::Fixed(0), ..Config::default() })]
+    #[test]
+    fn lexemes_tile_the_text_without_gaps(text in "[ -~\n\t•é]{0,60}") {
+        let rebuilt: String = Lexemes::scanned(&text).iter().map(|lexeme| lexeme.span().slice(&text)).collect();
+        prop_assert_eq!(rebuilt, text);
+    }
+
+    #[test]
+    fn only_breaks_lack_ink_among_marks(
+        text in "(\n- |\n> |\n1\\. |\n  2\\) |\n\\*\\*3\\.\\*\\* |[.?!] |85b287b3-4d5e-4f60-8a9b-0c1d2e3f4a5b|[ a-z]|\n){0,24}"
+    ) {
         let unexpected: Vec<Mark> = Lexemes::scanned(&text)
             .into_iter()
             .filter(|lexeme| Inked::expected(lexeme.mark()).is_some_and(|inked| inked != lexeme.ink().is_some()))
@@ -77,4 +72,4 @@ laws::law!(
             .collect();
         prop_assert_eq!(unexpected, Vec::<Mark>::new());
     }
-);
+}
