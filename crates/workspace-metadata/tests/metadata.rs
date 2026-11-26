@@ -1,10 +1,9 @@
-use std::error::Error;
-
+use test_failure::Failed;
 use workspace_metadata::{CrateName, Library, Metadata};
 
 #[test]
 fn real_cargo_metadata_lists_each_dependency_library_with_its_root_form_and_renamed_normal_dependencies()
--> Result<(), Box<dyn Error>> {
+-> Result<(), Failed> {
     let metadata: Metadata = serde_json::from_str(include_str!("fixtures/metadata.json"))?;
     let listed: Vec<String> = metadata
         .libraries()

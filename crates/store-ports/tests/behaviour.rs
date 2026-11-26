@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
-use std::error::Error;
 use std::path::PathBuf;
 use std::sync::LazyLock;
+use test_failure::Failed;
 
 use design_messages::{Fate, Halt, SessionCursors, StreamSchema};
 use dispatch_ports::{Pid, Tokens, Wall};
@@ -124,7 +124,7 @@ impl Place {
         Ok(Run::root().port(self.opened_as::<Untouched>()).read(Applied)?.into_iter().collect())
     }
 
-    fn cursor(store: &impl Store) -> Result<Cursor, Box<dyn Error>> {
+    fn cursor(store: &impl Store) -> Result<Cursor, Failed> {
         Ok(store.read(SessionCursors)?.resuming(&SessionId::try_new("s".to_owned())?))
     }
 }
@@ -206,7 +206,7 @@ impl Schema for Broken {
 }
 
 #[test]
-fn a_store_opens_lazily_and_creates_its_directory_on_the_first_op() -> Result<(), Box<dyn Error>> {
+fn a_store_opens_lazily_and_creates_its_directory_on_the_first_op() -> Result<(), Failed> {
     let place = Place::new()?;
     let run = Run::root();
     let store = run.port(place.opened());
@@ -217,7 +217,7 @@ fn a_store_opens_lazily_and_creates_its_directory_on_the_first_op() -> Result<()
 }
 
 #[test]
-fn reopening_a_store_keeps_its_rows_and_runs_no_migration_again() -> Result<(), Box<dyn Error>> {
+fn reopening_a_store_keeps_its_rows_and_runs_no_migration_again() -> Result<(), Failed> {
     let place = Place::new()?;
     let run = Run::root();
     run.port(place.opened()).write(Resumed)?;
@@ -228,7 +228,7 @@ fn reopening_a_store_keeps_its_rows_and_runs_no_migration_again() -> Result<(), 
 }
 
 #[test]
-fn an_older_store_takes_the_migrations_it_lacks_and_keeps_its_rows() -> Result<(), Box<dyn Error>> {
+fn an_older_store_takes_the_migrations_it_lacks_and_keeps_its_rows() -> Result<(), Failed> {
     let place = Place::new()?;
     let run = Run::root();
     run.port(place.opened_as::<Older>()).write(Resumed)?;
@@ -239,7 +239,7 @@ fn an_older_store_takes_the_migrations_it_lacks_and_keeps_its_rows() -> Result<(
 }
 
 #[test]
-fn a_failing_statement_rolls_back_the_whole_batch() -> Result<(), Box<dyn Error>> {
+fn a_failing_statement_rolls_back_the_whole_batch() -> Result<(), Failed> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     assert!(store.write(HalfWritten).is_err());
@@ -248,7 +248,7 @@ fn a_failing_statement_rolls_back_the_whole_batch() -> Result<(), Box<dyn Error>
 }
 
 #[test]
-fn a_store_migrated_past_what_the_code_declares_is_refused_and_left_as_it_was() -> Result<(), Box<dyn Error>> {
+fn a_store_migrated_past_what_the_code_declares_is_refused_and_left_as_it_was() -> Result<(), Failed> {
     let place = Place::new()?;
     let run = Run::root();
     run.port(place.opened()).read(Applied)?;
@@ -259,7 +259,7 @@ fn a_store_migrated_past_what_the_code_declares_is_refused_and_left_as_it_was() 
 }
 
 #[test]
-fn a_failing_migration_leaves_the_store_as_it_was() -> Result<(), Box<dyn Error>> {
+fn a_failing_migration_leaves_the_store_as_it_was() -> Result<(), Failed> {
     let place = Place::new()?;
     let run = Run::root();
     run.port(place.opened()).write(Resumed)?;
@@ -271,7 +271,7 @@ fn a_failing_migration_leaves_the_store_as_it_was() -> Result<(), Box<dyn Error>
 }
 
 #[test]
-fn a_held_file_lock_refuses_every_other_handle_until_it_ends() -> Result<(), Box<dyn Error>> {
+fn a_held_file_lock_refuses_every_other_handle_until_it_ends() -> Result<(), Failed> {
     let place = Place::new()?;
     let run = Run::root();
     let (first, second) = (run.port(place.opened()), run.port(place.opened()));

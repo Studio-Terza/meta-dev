@@ -1,6 +1,5 @@
 use std::any::TypeId;
 use std::collections::BTreeMap;
-use std::fmt;
 use std::io::Write;
 use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
@@ -10,11 +9,9 @@ use cargo_ports::Cargo;
 
 use file_ports::Files;
 use lint_core::{Headline, Readout, SourceFile, Violation};
-use lint_file::{
-    FileLint, Filed, Judged, Lead, Leader, Reads, Ruled, RuledLint, Start, Swept, SweptLint, WatchingLint,
-};
+use lint_file::{FileLint, Filed, Judged, Leader, Led, Reads, Ruled, RuledLint, Swept, SweptLint, WatchingLint};
 use lint_reader::{Described, Unlocated};
-use lint_sweep::{Finds, Found, Gathers};
+use lint_sweep::{Found, Founds, Gathers, Joined, Joint, Unjoined};
 use timer_ports::Timer;
 
 use lint_bool_methods::BoolMethods;
@@ -27,6 +24,7 @@ use lint_manual_iteration::ManualIteration;
 use lint_named_lifetimes::NamedLifetimes;
 use lint_named_numbers::NamedNumbers;
 use lint_no_comments::NoComments;
+use lint_no_dyn::NoDyn;
 use lint_no_forwarders::NoForwarders;
 use lint_no_free_fns::NoFreeFns;
 use lint_no_ignored_tests::NoIgnoredTests;
@@ -72,63 +70,47 @@ impl Crew<'_> {
     }
 }
 
-type Pend = for<'file> fn(&'file SourceFile) -> Box<dyn Awaits<'file> + 'file>;
-
-#[derive(Clone, Copy, Debug)]
-struct Judging {
-    headline: Headline,
-    reads: Reads,
-    pend: Pend,
+macro_rules! registry {
+    () => { Ended };
+    ($head:ty $(, $tail:ty)* $(,)?) => { Listed<$head, registry!($($tail),*)> };
 }
 
-type Conclude = for<'file> fn(&'file SourceFile) -> Box<dyn Concludes<'file> + 'file>;
+#[derive(Debug)]
+struct Ended;
 
-#[derive(Clone, Copy, Debug)]
-struct Rules {
-    headline: Headline,
-    reads: Reads,
-    conclude: Conclude,
+#[derive(Debug)]
+struct Listed<Head, Tail> {
+    head: PhantomData<Head>,
+    tail: PhantomData<Tail>,
 }
 
-#[derive(Clone, Copy, Debug)]
-struct Filing {
-    headline: Headline,
-    reads: Reads,
-    source: Source,
-}
-
-#[derive(Clone, Copy, Debug)]
-struct Source {
-    key: fn() -> TypeId,
-    lead: Lead,
-}
+type Registry = registry![
+    Filed<NoComments>,
+    Swept<NoFreeFns>,
+    Filed<ThinMain>,
+    Swept<VecOutParams>,
+    Swept<NamedLifetimes>,
+    Judged<EnumPredicates>,
+    Swept<ConstShape>,
+    Swept<TypeShape>,
+    Swept<ExpressionFlow>,
+    Swept<FnShape>,
+    Swept<LiteralNames>,
+    Swept<ManualIteration>,
+    Judged<NamedNumbers>,
+    Judged<NoForwarders>,
+    Swept<NoNumbersInBinaries>,
+    Swept<PrivateFns>,
+    Filed<ProcessStarters>,
+    Ruled<PublicSurface>,
+    Judged<PublicApiTests>,
+    Judged<NoTestOnlyApi>,
+    Swept<NoIgnoredTests>,
+    Swept<BoolMethods>,
+    Filed<NoDyn>,
+];
 
 impl Lints {
-    const LINTS: [Entry; 22] = [
-        <Filed<NoComments> as Registered>::ENTRY,
-        <Swept<NoFreeFns> as Registered>::ENTRY,
-        <Filed<ThinMain> as Registered>::ENTRY,
-        <Swept<VecOutParams> as Registered>::ENTRY,
-        <Swept<NamedLifetimes> as Registered>::ENTRY,
-        <Judged<EnumPredicates> as Registered>::ENTRY,
-        <Swept<ConstShape> as Registered>::ENTRY,
-        <Swept<TypeShape> as Registered>::ENTRY,
-        <Swept<ExpressionFlow> as Registered>::ENTRY,
-        <Swept<FnShape> as Registered>::ENTRY,
-        <Swept<LiteralNames> as Registered>::ENTRY,
-        <Swept<ManualIteration> as Registered>::ENTRY,
-        <Judged<NamedNumbers> as Registered>::ENTRY,
-        <Judged<NoForwarders> as Registered>::ENTRY,
-        <Swept<NoNumbersInBinaries> as Registered>::ENTRY,
-        <Swept<PrivateFns> as Registered>::ENTRY,
-        <Filed<ProcessStarters> as Registered>::ENTRY,
-        <Ruled<PublicSurface> as Registered>::ENTRY,
-        <Judged<PublicApiTests> as Registered>::ENTRY,
-        <Judged<NoTestOnlyApi> as Registered>::ENTRY,
-        <Swept<NoIgnoredTests> as Registered>::ENTRY,
-        <Swept<BoolMethods> as Registered>::ENTRY,
-    ];
-
     pub(crate) fn started<'scope, 'run: 'scope, F: Files + Sync, C: Cargo + Sync, T: Timer + Sync>(
         scope: &'scope Scope<'scope, '_>,
         sources: &'scope Sources<F, C, T>,
@@ -147,7 +129,8 @@ impl Lints {
         located: &'run Result<Described, Unlocated>,
         worked: Worked,
     ) -> Outcome<'run> {
-        let rendered = worked.into_rendered(|slot| slot.picked(&Self::LINTS).map(Entry::headline));
+        let headlines = Registry::headlines(Vec::new());
+        let rendered = worked.into_rendered(|slot| slot.picked(&headlines).copied());
         Outcome::located(located, rendered, readout.failures())
     }
 
@@ -183,67 +166,11 @@ impl Lints {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-struct Entry {
-    work: Work,
-}
-
-#[derive(Clone, Copy, Debug)]
-enum Work {
-    Filed(Filing),
-    Judged(Judging),
-    Ruled(Rules),
-}
-
-impl Entry {
-    fn filing(self) -> Option<Filing> {
-        match self.work {
-            Work::Filed(filing) => Some(filing),
-            Work::Judged(_) | Work::Ruled(_) => None,
-        }
-    }
-
-    fn judging(self) -> Option<Judging> {
-        match self.work {
-            Work::Judged(judging) => Some(judging),
-            Work::Filed(_) | Work::Ruled(_) => None,
-        }
-    }
-
-    fn ruling(self) -> Option<Rules> {
-        match self.work {
-            Work::Ruled(rules) => Some(rules),
-            Work::Filed(_) | Work::Judged(_) => None,
-        }
-    }
-
-    fn headline(&self) -> Headline {
-        match self.work {
-            Work::Filed(filing) => filing.headline,
-            Work::Judged(judging) => judging.headline,
-            Work::Ruled(rules) => rules.headline,
-        }
-    }
-}
-
-#[derive(Debug)]
-struct Ruling<'file> {
-    slot: Slot,
-    pending: Box<dyn Awaits<'file> + 'file>,
-}
-
-#[derive(Debug)]
-struct Concluding<'file> {
-    slot: Slot,
-    pending: Box<dyn Concludes<'file> + 'file>,
-}
-
 #[derive(Debug)]
 pub(crate) struct FileWork<'file> {
     order: FileOrder,
     worked: Worked,
-    rulings: Vec<Ruling<'file>>,
-    concluding: Vec<Concluding<'file>>,
+    file: &'file SourceFile,
 }
 
 impl<'file> FileWork<'file> {
@@ -252,187 +179,213 @@ impl<'file> FileWork<'file> {
     }
 
     fn judged<'run: 'file>(self, settled: Settled<'_, 'run>) -> Worked {
-        let order = self.order;
-        let watched = self.rulings.into_iter().map(|ruling| (ruling.slot, ruling.pending.judged(settled)));
-        let ruled =
-            self.concluding.into_iter().map(|concluding| (concluding.slot, concluding.pending.concluded(settled)));
-        let judged = watched.chain(ruled);
-        judged.map(|(slot, violations)| Worked::filing(slot, order, &violations)).collect()
+        let judging =
+            Judging { file: self.file, order: self.order, slot: Slot::FIRST, settled, worked: Worked::default() };
+        Registry::judged(judging).worked
     }
 }
 
 trait Registered {
-    const ENTRY: Entry;
+    const HEADLINE: Headline;
+
+    fn filed(filing: Filing<'_>) -> Filing<'_> {
+        filing
+    }
+
+    fn judged<'file, 'settled, 'run: 'file>(judging: Judging<'file, 'settled, 'run>) -> Judging<'file, 'settled, 'run> {
+        judging
+    }
+
+    fn joined<'file>(
+        _: &'file SourceFile,
+        tail: impl Joint<Tallied: Founds<'file>> + 'file,
+    ) -> impl Joint<Tallied: Founds<'file>> + 'file {
+        tail
+    }
 }
 
-impl<Lint: FileLint + 'static> Registered for Filed<Lint> {
-    const ENTRY: Entry = Entry {
-        work: Work::Filed(Filing {
-            headline: Lint::HEADLINE,
-            reads: Lint::READS,
-            source: Source { key: TypeId::of::<Filed<Lint>>, lead: <Filed<Lint> as Leader>::LEAD },
-        }),
-    };
+trait Walk {
+    fn headlines(headlines: Vec<Headline>) -> Vec<Headline>;
+
+    fn watching(file: &SourceFile) -> impl Joint<Tallied: Founds<'_>> + '_;
+
+    fn filed(filing: Filing<'_>) -> Filing<'_>;
+
+    fn judged<'file, 'settled, 'run: 'file>(judging: Judging<'file, 'settled, 'run>) -> Judging<'file, 'settled, 'run>;
 }
 
-impl<Lint: SweptLint + 'static> Registered for Swept<Lint> {
-    const ENTRY: Entry = Entry {
-        work: Work::Filed(Filing {
-            headline: Lint::HEADLINE,
-            reads: Lint::READS,
-            source: Source { key: TypeId::of::<Swept<Lint>>, lead: <Swept<Lint> as Leader>::LEAD },
-        }),
-    };
+impl Walk for Ended {
+    fn headlines(headlines: Vec<Headline>) -> Vec<Headline> {
+        headlines
+    }
+
+    fn watching(_: &SourceFile) -> impl Joint<Tallied: Founds<'_>> + '_ {
+        Unjoined
+    }
+
+    fn filed(filing: Filing<'_>) -> Filing<'_> {
+        filing
+    }
+
+    fn judged<'file, 'settled, 'run: 'file>(judging: Judging<'file, 'settled, 'run>) -> Judging<'file, 'settled, 'run> {
+        judging
+    }
+}
+
+impl<Head: Registered, Tail: Walk> Walk for Listed<Head, Tail> {
+    fn headlines(headlines: Vec<Headline>) -> Vec<Headline> {
+        Tail::headlines(headlines.into_iter().chain([Head::HEADLINE]).collect())
+    }
+
+    fn watching(file: &SourceFile) -> impl Joint<Tallied: Founds<'_>> + '_ {
+        Head::joined(file, Tail::watching(file))
+    }
+
+    fn filed(filing: Filing<'_>) -> Filing<'_> {
+        Tail::filed(Head::filed(filing).advanced())
+    }
+
+    fn judged<'file, 'settled, 'run: 'file>(judging: Judging<'file, 'settled, 'run>) -> Judging<'file, 'settled, 'run> {
+        Tail::judged(Head::judged(judging).advanced())
+    }
+}
+
+#[derive(Debug)]
+struct Judging<'file, 'settled, 'run> {
+    file: &'file SourceFile,
+    order: FileOrder,
+    slot: Slot,
+    settled: Settled<'settled, 'run>,
+    worked: Worked,
+}
+
+impl<'file, 'settled, 'run> Judging<'file, 'settled, 'run> {
+    fn found(self, violations: Option<Vec<Violation<'file>>>) -> Judging<'file, 'settled, 'run> {
+        let found = violations.map(|listed| Worked::filing(self.slot, self.order, &listed));
+        Judging { worked: [self.worked].into_iter().chain(found).collect(), ..self }
+    }
+
+    fn advanced(self) -> Judging<'file, 'settled, 'run> {
+        Judging { slot: self.slot.next(), ..self }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
 struct Admitted {
     slot: Slot,
-    source: Source,
+    key: TypeId,
+}
+
+#[derive(Debug)]
+struct Filing<'file> {
+    file: &'file SourceFile,
+    slot: Slot,
+    leds: BTreeMap<TypeId, Led<'file>>,
+    admitted: Vec<Admitted>,
+    swept: std::vec::IntoIter<Option<Found<'file>>>,
+}
+
+impl<'file> Filing<'file> {
+    fn led<Leading: Leader>(self, reads: Reads) -> Filing<'file> {
+        let Filing { file, slot, leds: earlier, admitted, swept } = self;
+        let found = reads.admits(file).map(|_| Admitted { slot, key: TypeId::of::<Leading>() });
+        let leds = earlier.into_iter().chain(found.map(|admit| (admit.key, Leading::led(file)))).collect();
+        Filing { file, slot, leds, admitted: admitted.into_iter().chain(found).collect(), swept }
+    }
+
+    fn swept<Sweeping: 'static>(self) -> Filing<'file> {
+        let Filing { file, slot, leds: earlier, admitted, mut swept } = self;
+        let found = swept.next().flatten().map(|sweep| (Admitted { slot, key: TypeId::of::<Sweeping>() }, sweep));
+        let kept = found.as_ref().map(|(admit, _)| *admit);
+        let leds = earlier.into_iter().chain(found.map(|(admit, sweep)| (admit.key, Led::from(sweep)))).collect();
+        Filing { file, slot, leds, admitted: admitted.into_iter().chain(kept).collect(), swept }
+    }
+
+    fn advanced(self) -> Filing<'file> {
+        Filing { slot: self.slot.next(), ..self }
+    }
+
+    fn worked(self, order: FileOrder) -> Worked {
+        let Filing { mut leds, admitted, .. } = self;
+        let visited: Worked = leds.values().filter_map(Led::visited).map(Worked::visiting).collect();
+        let filed: Vec<Worked> = admitted
+            .into_iter()
+            .map(|admit| {
+                let violations = leds.get_mut(&admit.key).map_or_default(Led::taken);
+                Worked::filing(admit.slot, order, &violations)
+            })
+            .collect();
+        filed.into_iter().chain([visited]).collect()
+    }
 }
 
 #[derive(Debug)]
 pub(crate) struct Filer<'file> {
     claimed: Claimed<'file>,
-    rulings: Vec<Ruling<'file>>,
-    concluding: Vec<Concluding<'file>>,
-    admitted: Vec<Admitted>,
-    leads: BTreeMap<TypeId, Lead>,
-    starts: Vec<TypeId>,
-    finds: Vec<Box<dyn Finds<'file> + 'file>>,
 }
 
 impl<'file> Filer<'file> {
     pub(crate) fn started(claimed: Claimed<'file>) -> Filer<'file> {
-        let file = <&SourceFile>::from(claimed);
-        let admitted: Vec<Admitted> = Lints::LINTS
-            .iter()
-            .enumerate()
-            .filter_map(|(index, entry)| Some((Slot::from(index), entry.filing()?)))
-            .filter_map(|(slot, filing)| {
-                Some(Admitted { slot, source: filing.reads.admits(file).map(|_| filing.source)? })
-            })
-            .collect();
-        let leads: BTreeMap<TypeId, Lead> =
-            admitted.iter().map(|found| ((found.source.key)(), found.source.lead)).collect();
-        let started: Vec<(TypeId, Start)> =
-            leads.iter().filter_map(|(key, lead)| Some((*key, lead.swept()?))).collect();
-        let finds = started.iter().map(|(_, start)| start(file)).collect();
-        let starts = started.into_iter().map(|(key, _)| key).collect();
-        let rulings = Lints::LINTS
-            .iter()
-            .enumerate()
-            .filter_map(|(index, entry)| Some((Slot::from(index), entry.judging()?)))
-            .filter_map(|(slot, judging)| Some(Ruling { slot, pending: (judging.pend)(judging.reads.admits(file)?) }))
-            .collect();
-        let concluding = Lints::LINTS
-            .iter()
-            .enumerate()
-            .filter_map(|(index, entry)| Some((Slot::from(index), entry.ruling()?)))
-            .filter_map(|(slot, rules)| Some(Concluding { slot, pending: (rules.conclude)(rules.reads.admits(file)?) }))
-            .collect();
-        Filer { claimed, rulings, concluding, admitted, leads, starts, finds }
-    }
-
-    fn taken<'found>(sorted: &mut BTreeMap<TypeId, Vec<Violation<'found>>>, source: Source) -> Vec<Violation<'found>> {
-        sorted.remove(&(source.key)()).unwrap_or_default()
+        Filer { claimed }
     }
 }
 
 impl<'file> Gathers<FileWork<'file>> for Filer<'file> {
     fn gathered(self, _: &SourceFile) -> FileWork<'file> {
-        let Filer { claimed, rulings, concluding, admitted, leads, starts, finds } = self;
-        let file = <&SourceFile>::from(claimed);
-        let swept: Vec<(TypeId, Found<'_>)> =
-            starts.into_iter().zip(finds).map(|(key, watcher)| (key, watcher.found(file))).collect();
-        let visited: Worked = swept.iter().map(|(_, sweep)| Worked::visiting(sweep.visited())).collect();
-        let listed = swept.into_iter().map(|(key, sweep)| (key, sweep.into_iter().collect()));
-        let scanned = leads.iter().filter_map(|(key, lead)| lead.scanned(file).map(|found| (*key, found)));
-        let mut sorted: BTreeMap<TypeId, Vec<Violation<'_>>> = listed.chain(scanned).collect();
-        let found = admitted.into_iter().map(|found| (found.slot, Self::taken(&mut sorted, found.source)));
-        let filed = found.map(|(slot, violations)| Worked::filing(slot, claimed.order(), &violations));
-        let worked = filed.chain([visited]).collect();
-        FileWork { order: claimed.order(), worked, rulings, concluding }
+        let file = <&SourceFile>::from(self.claimed);
+        let order = self.claimed.order();
+        let joint = Registry::watching(file);
+        let swept = joint.swept(file).founds(Vec::new()).into_iter();
+        let filing = Filing { file, slot: Slot::FIRST, leds: BTreeMap::new(), admitted: Vec::new(), swept };
+        FileWork { order, worked: Registry::filed(filing).worked(order), file }
     }
 }
 
-impl<Lint: WatchingLint + 'static> Registered for Judged<Lint>
-where
-    Judged<Lint>: Judges,
-{
-    const ENTRY: Entry =
-        Entry { work: Work::Judged(Judging { headline: Lint::HEADLINE, reads: Lint::READS, pend: Self::pending }) };
+impl<Lint: FileLint + 'static> Registered for Filed<Lint> {
+    const HEADLINE: Headline = Lint::HEADLINE;
+
+    fn filed(filing: Filing<'_>) -> Filing<'_> {
+        filing.led::<Filed<Lint>>(Lint::READS)
+    }
 }
 
-impl<Lint: RuledLint + 'static> Registered for Ruled<Lint>
-where
-    Ruled<Lint>: Concluded,
-{
-    const ENTRY: Entry =
-        Entry { work: Work::Ruled(Rules { headline: Lint::HEADLINE, reads: Lint::READS, conclude: Self::concluding }) };
+impl<Lint: SweptLint + 'static> Registered for Swept<Lint> {
+    const HEADLINE: Headline = Lint::HEADLINE;
+
+    fn filed(filing: Filing<'_>) -> Filing<'_> {
+        filing.swept::<Swept<Lint>>()
+    }
+
+    fn joined<'file>(
+        file: &'file SourceFile,
+        tail: impl Joint<Tallied: Founds<'file>> + 'file,
+    ) -> impl Joint<Tallied: Founds<'file>> + 'file {
+        Joined::new(Lint::READS.admits(file).map(Lint::watcher), tail)
+    }
 }
 
-trait Concluded {
-    fn concluding(file: &SourceFile) -> Box<dyn Concludes<'_> + '_>;
-}
-
-pub(crate) trait Concludes<'file>: fmt::Debug {
-    fn concluded<'run: 'file>(self: Box<Self>, settled: Settled<'_, 'run>) -> Vec<Violation<'file>>;
-}
-
-#[derive(Debug)]
-struct RuledConclusion<'file, Lint> {
-    file: &'file SourceFile,
-    lint: PhantomData<Lint>,
-}
-
-impl<'file, Lint: RuledLint + fmt::Debug> Concludes<'file> for RuledConclusion<'file, Lint>
+impl<Lint: WatchingLint> Registered for Judged<Lint>
 where
     for<'settled, 'run> Settled<'settled, 'run>: Holding<'run, Lint>,
 {
-    fn concluded<'run: 'file>(self: Box<Self>, settled: Settled<'_, 'run>) -> Vec<Violation<'file>> {
-        Lint::ruled(self.file, settled.held())
+    const HEADLINE: Headline = Lint::HEADLINE;
+
+    fn judged<'file, 'settled, 'run: 'file>(judging: Judging<'file, 'settled, 'run>) -> Judging<'file, 'settled, 'run> {
+        let settled = judging.settled;
+        let read = Lint::READS.admits(judging.file);
+        judging.found(read.map(|file| Lint::judged(file, Lint::watched(file).gathered(file), settled.held())))
     }
 }
 
-impl<Lint: RuledLint + fmt::Debug + 'static> Concluded for Ruled<Lint>
-where
-    for<'file> RuledConclusion<'file, Lint>: Concludes<'file>,
-{
-    fn concluding(file: &SourceFile) -> Box<dyn Concludes<'_> + '_> {
-        Box::new(RuledConclusion::<Lint> { file, lint: PhantomData })
-    }
-}
-
-trait Judges {
-    fn pending(file: &SourceFile) -> Box<dyn Awaits<'_> + '_>;
-}
-
-pub(crate) trait Awaits<'file>: fmt::Debug {
-    fn judged<'run: 'file>(self: Box<Self>, settled: Settled<'_, 'run>) -> Vec<Violation<'file>>;
-}
-
-#[derive(Debug)]
-struct Waiting<'file, Lint: WatchingLint> {
-    file: &'file SourceFile,
-    watched: Lint::Watched<'file>,
-}
-
-impl<'file, Lint: WatchingLint + fmt::Debug> Awaits<'file> for Waiting<'file, Lint>
+impl<Lint: RuledLint> Registered for Ruled<Lint>
 where
     for<'settled, 'run> Settled<'settled, 'run>: Holding<'run, Lint>,
 {
-    fn judged<'run: 'file>(self: Box<Self>, settled: Settled<'_, 'run>) -> Vec<Violation<'file>> {
-        let Waiting { file, watched } = *self;
-        Lint::judged(file, watched.gathered(file), settled.held())
-    }
-}
+    const HEADLINE: Headline = Lint::HEADLINE;
 
-impl<Lint: WatchingLint + fmt::Debug + 'static> Judges for Judged<Lint>
-where
-    for<'settled, 'run> Settled<'settled, 'run>: Holding<'run, Lint>,
-{
-    fn pending(file: &SourceFile) -> Box<dyn Awaits<'_> + '_> {
-        Box::new(Waiting::<Lint> { file, watched: Lint::watched(file) })
+    fn judged<'file, 'settled, 'run: 'file>(judging: Judging<'file, 'settled, 'run>) -> Judging<'file, 'settled, 'run> {
+        let settled = judging.settled;
+        let read = Lint::READS.admits(judging.file);
+        judging.found(read.map(|file| Lint::ruled(file, settled.held())))
     }
 }

@@ -80,6 +80,7 @@ dependencies = [
  "serde",
  "serde_json",
  "strum",
+ "test-failure",
  "text-lines",
  "thiserror",
  "toml",
@@ -146,6 +147,7 @@ dependencies = [
  "store-ports",
  "strum",
  "tempfile",
+ "test-failure",
  "thiserror",
  "transcript-ports",
 ]
@@ -161,6 +163,7 @@ dependencies = [
  "serde_json",
  "sqlite-ports",
  "tempfile",
+ "test-failure",
 ]
 
 [[package]]
@@ -201,6 +204,7 @@ dependencies = [
  "serde",
  "serde_json",
  "strum",
+ "test-failure",
  "thiserror",
 ]
 
@@ -245,6 +249,7 @@ dependencies = [
  "invariants",
  "newtype",
  "tempfile",
+ "test-failure",
  "thiserror",
 ]
 
@@ -577,6 +582,7 @@ dependencies = [
  "strum",
  "syntax",
  "syntax-lexer",
+ "test-failure",
 ]
 
 [[package]]
@@ -711,6 +717,17 @@ dependencies = [
  "lint-layout",
  "ra-ap-rustc_lexer",
  "syntax",
+]
+
+[[package]]
+name = "lint-no-dyn"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-file",
+ "lint-fixtures",
+ "lint-layout",
+ "syntax-lexer",
 ]
 
 [[package]]
@@ -889,6 +906,7 @@ dependencies = [
  "lint-named-lifetimes",
  "lint-named-numbers",
  "lint-no-comments",
+ "lint-no-dyn",
  "lint-no-forwarders",
  "lint-no-free-fns",
  "lint-no-ignored-tests",
@@ -905,6 +923,7 @@ dependencies = [
  "lint-type-shape",
  "lint-vec-out-params",
  "port-core",
+ "test-failure",
  "text-lines",
  "thiserror",
  "timer-ports",
@@ -1037,6 +1056,7 @@ dependencies = [
  "serde",
  "serde_json",
  "strum",
+ "test-failure",
  "text-lines",
  "thiserror",
 ]
@@ -1050,6 +1070,7 @@ dependencies = [
  "invariants",
  "serde",
  "serde_json",
+ "test-failure",
  "test-log",
  "text-lines",
  "thiserror",
@@ -1353,6 +1374,7 @@ dependencies = [
  "sqlite-ports",
  "store-ports-macros",
  "tempfile",
+ "test-failure",
  "thiserror",
  "transcript-ports",
 ]
@@ -1445,6 +1467,10 @@ dependencies = [
  "rustix",
  "windows-sys",
 ]
+
+[[package]]
+name = "test-failure"
+version = "0.1.0"
 
 [[package]]
 name = "test-log"
@@ -1549,6 +1575,7 @@ dependencies = [
  "serde",
  "serde_json",
  "strum",
+ "test-failure",
  "text-lines",
  "thiserror",
 ]
@@ -1617,6 +1644,7 @@ dependencies = [
  "newtype",
  "serde",
  "serde_json",
+ "test-failure",
  "text-lines",
 ]
 

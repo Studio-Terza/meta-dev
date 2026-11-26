@@ -2,7 +2,7 @@
 
 mod ports;
 
-use std::error::Error;
+use test_failure::Failed;
 
 use design::Failure;
 use ports::Design;
@@ -10,7 +10,7 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 #[test]
-fn an_unknown_command_exits_with_failure_and_prints_the_usage() -> Result<(), Box<dyn Error>> {
+fn an_unknown_command_exits_with_failure_and_prints_the_usage() -> Result<(), Failed> {
     let home = TempDir::new()?;
     let output = Design::run(home.path(), &["frobnicate"])?;
     assert_eq!(
@@ -21,7 +21,7 @@ fn an_unknown_command_exits_with_failure_and_prints_the_usage() -> Result<(), Bo
 }
 
 #[test]
-fn the_hook_settings_are_printed_as_json_at_exit_zero() -> Result<(), Box<dyn Error>> {
+fn the_hook_settings_are_printed_as_json_at_exit_zero() -> Result<(), Failed> {
     let home = TempDir::new()?;
     let output = Design::run(home.path(), &["hook", "--settings"])?;
     let settings: Value = serde_json::from_slice(&output.stdout)?;
@@ -31,7 +31,7 @@ fn the_hook_settings_are_printed_as_json_at_exit_zero() -> Result<(), Box<dyn Er
 }
 
 #[test]
-fn ingest_of_a_workspace_without_transcripts_fails_naming_the_transcripts() -> Result<(), Box<dyn Error>> {
+fn ingest_of_a_workspace_without_transcripts_fails_naming_the_transcripts() -> Result<(), Failed> {
     let home = TempDir::new()?;
     let workspace = home.path().join("work");
     std::fs::create_dir_all(&workspace)?;

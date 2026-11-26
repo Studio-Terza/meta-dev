@@ -2,7 +2,7 @@ use std::path::Path;
 
 use lint_core::{Headline, Violation};
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Finds, Kind};
+use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Kind};
 use syntax::{ItemMod, LitFloat, LitInt};
 
 use lint_core::Fix;
@@ -26,9 +26,9 @@ impl SweptLint for NoNumbersInBinaries {
     const HEADLINE: Headline = Headline::new("a binary is wiring: a number it needs is a setting in its config file");
     const READS: Reads = Reads::Every;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
+    fn watcher(file: &SourceFile) -> Contributing<impl Concludes<'_>> {
         let kinds = file.head().binary().map_or(&[][..], |_| &[Kind::ItemMod, Kind::LitInt, Kind::LitFloat][..]);
-        Box::new(Contributing::new(Numbers { path: AsRef::<Path>::as_ref(file.head()), kinds }))
+        Contributing::new(Numbers { path: AsRef::<Path>::as_ref(file.head()), kinds })
     }
 }
 

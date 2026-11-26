@@ -1,11 +1,11 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
-use std::error::Error;
 use std::ffi::OsString;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
+use test_failure::Failed;
 
 use console_ports::{Heard, Shown, Variables};
 use design::{Agents, Cli, Failure, HookEvent, Outcome};
@@ -95,7 +95,7 @@ struct Said {
 }
 
 impl Said {
-    fn reason(&self) -> Result<Option<String>, Box<dyn Error>> {
+    fn reason(&self) -> Result<Option<String>, Failed> {
         let decision: Value = serde_json::from_str(&self.shown)?;
         Ok(decision.get("reason").and_then(Value::as_str).map(str::to_owned))
     }
@@ -107,13 +107,13 @@ struct Home {
 }
 
 impl Home {
-    fn new() -> Result<Home, Box<dyn Error>> {
+    fn new() -> Result<Home, Failed> {
         let home = Home { directory: TempDir::new()? };
         fs::create_dir_all(home.workspace())?;
         Ok(home)
     }
 
-    fn holding(lines: &[String]) -> Result<Home, Box<dyn Error>> {
+    fn holding(lines: &[String]) -> Result<Home, Failed> {
         let home = Home::new()?;
         let transcript = home.transcript();
         fs::create_dir_all(transcript.parent().unwrap_or(home.path()))?;
@@ -148,7 +148,7 @@ impl Home {
         [Home::line("user", "o1", OWNER), Home::line("assistant", "l1", "Understood.")]
     }
 
-    fn answered() -> Result<Home, Box<dyn Error>> {
+    fn answered() -> Result<Home, Failed> {
         Home::holding(&Home::conversation())
     }
 
@@ -179,7 +179,7 @@ impl Home {
         self.stop(&format!(",\"last_assistant_message\":\"{QUESTION}\""))
     }
 
-    fn agent_task(&self, name: &str, touched: SystemTime) -> Result<(), Box<dyn Error>> {
+    fn agent_task(&self, name: &str, touched: SystemTime) -> Result<(), Failed> {
         let folder = self.transcript().with_extension("").join("subagents");
         fs::create_dir_all(&folder)?;
         let task = folder.join(format!("{name}.jsonl"));
@@ -191,7 +191,7 @@ impl Home {
 
 #[test]
 fn ingest_reports_each_session_read_the_authors_and_the_rows_written_and_a_second_ingest_writes_none()
--> Result<(), Box<dyn Error>> {
+-> Result<(), Failed> {
     let home = Home::answered()?;
     let replies = Replies::default();
     let first = home.said(&["ingest"], "", &replies);
@@ -209,7 +209,7 @@ fn ingest_reports_each_session_read_the_authors_and_the_rows_written_and_a_secon
 }
 
 #[test]
-fn a_dry_run_ingest_reports_the_same_rows_but_keeps_none() -> Result<(), Box<dyn Error>> {
+fn a_dry_run_ingest_reports_the_same_rows_but_keeps_none() -> Result<(), Failed> {
     let home = Home::answered()?;
     let replies = Replies::default();
     let dry = home.said(&["ingest", "--dry-run"], "", &replies);
@@ -220,7 +220,7 @@ fn a_dry_run_ingest_reports_the_same_rows_but_keeps_none() -> Result<(), Box<dyn
 }
 
 #[test]
-fn an_unrecognised_line_is_counted_by_its_kind() -> Result<(), Box<dyn Error>> {
+fn an_unrecognised_line_is_counted_by_its_kind() -> Result<(), Failed> {
     let home = Home::holding(&[Home::line("user", "o1", OWNER), Home::line("brand-new-kind", "x1", "odd")])?;
     let said = home.said(&["ingest"], "", &Replies::default());
     assert!(said.shown.contains("unrecognised brand-new-kind 1\n"), "{}", said.shown);
@@ -228,7 +228,7 @@ fn an_unrecognised_line_is_counted_by_its_kind() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn the_hook_settings_name_a_command_running_each_hook_in_the_project() -> Result<(), Box<dyn Error>> {
+fn the_hook_settings_name_a_command_running_each_hook_in_the_project() -> Result<(), Failed> {
     let said = Home::new()?.said(&["hook", "--settings"], "", &Replies::default());
     let settings: Value = serde_json::from_str(&said.shown)?;
     let handler = settings.pointer("/hooks/Stop/0/hooks/0").cloned().unwrap_or_default();
@@ -244,7 +244,7 @@ fn the_hook_settings_name_a_command_running_each_hook_in_the_project() -> Result
 }
 
 #[test]
-fn a_continuing_stop_passes_silently() -> Result<(), Box<dyn Error>> {
+fn a_continuing_stop_passes_silently() -> Result<(), Failed> {
     let home = Home::answered()?;
     let replies = Replies::default();
     let said = home.said(&["hook", "stop"], "{\"stop_hook_active\":true,\"session_id\":\"s\"}", &replies);
@@ -254,7 +254,7 @@ fn a_continuing_stop_passes_silently() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_stop_with_nothing_running_is_blocked_as_stalled() -> Result<(), Box<dyn Error>> {
+fn a_stop_with_nothing_running_is_blocked_as_stalled() -> Result<(), Failed> {
     let home = Home::answered()?;
     let said = home.said(&["hook", "stop"], &home.stop(""), &Replies::default());
     let decision: Value = serde_json::from_str(&said.shown)?;
@@ -265,7 +265,7 @@ fn a_stop_with_nothing_running_is_blocked_as_stalled() -> Result<(), Box<dyn Err
 }
 
 #[test]
-fn a_stop_with_an_agent_still_writing_passes() -> Result<(), Box<dyn Error>> {
+fn a_stop_with_an_agent_still_writing_passes() -> Result<(), Failed> {
     let home = Home::answered()?;
     home.agent_task("agent-busy", SystemTime::now())?;
     let said = home.said(&["hook", "stop"], &home.stop(""), &Replies::default());
@@ -274,7 +274,7 @@ fn a_stop_with_an_agent_still_writing_passes() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_stop_without_a_transcript_sees_no_tasks_and_passes() -> Result<(), Box<dyn Error>> {
+fn a_stop_without_a_transcript_sees_no_tasks_and_passes() -> Result<(), Failed> {
     let home = Home::answered()?;
     let said = home.said(&["hook", "stop"], "{\"stop_hook_active\":false}", &Replies::default());
     assert_eq!((said.shown.as_str(), said.ended), ("", Ok(Outcome::Hooked(HookEvent::Stop))));
@@ -282,7 +282,7 @@ fn a_stop_without_a_transcript_sees_no_tasks_and_passes() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn an_agent_quiet_for_twenty_minutes_is_reported_once_as_an_overrun() -> Result<(), Box<dyn Error>> {
+fn an_agent_quiet_for_twenty_minutes_is_reported_once_as_an_overrun() -> Result<(), Failed> {
     let home = Home::answered()?;
     home.agent_task("agent-hung", SystemTime::now() - LONG_AGO)?;
     let replies = Replies::default();
@@ -294,7 +294,7 @@ fn an_agent_quiet_for_twenty_minutes_is_reported_once_as_an_overrun() -> Result<
 }
 
 #[test]
-fn a_stop_quotes_the_earlier_owner_words_the_reading_agents_keep() -> Result<(), Box<dyn Error>> {
+fn a_stop_quotes_the_earlier_owner_words_the_reading_agents_keep() -> Result<(), Failed> {
     let home = Home::answered()?;
     let replies = Replies::quoting(&format!("[{{\"uuid\": \"o1\", \"quote\": \"{OWNER}\"}}]"), "[1]");
     let said = home.said(&["hook", "stop"], &home.asking(), &replies);
@@ -309,7 +309,7 @@ fn a_stop_quotes_the_earlier_owner_words_the_reading_agents_keep() -> Result<(),
 }
 
 #[test]
-fn a_quote_the_owner_never_wrote_is_dropped_and_no_trimming_is_asked() -> Result<(), Box<dyn Error>> {
+fn a_quote_the_owner_never_wrote_is_dropped_and_no_trimming_is_asked() -> Result<(), Failed> {
     let home = Home::answered()?;
     let replies = Replies::quoting("[{\"uuid\": \"o1\", \"quote\": \"Never said this.\"}]", "[1]");
     let said = home.said(&["hook", "stop"], &home.asking(), &replies);
@@ -319,7 +319,7 @@ fn a_quote_the_owner_never_wrote_is_dropped_and_no_trimming_is_asked() -> Result
 }
 
 #[test]
-fn the_stops_trail_lists_each_stop_with_its_reading() -> Result<(), Box<dyn Error>> {
+fn the_stops_trail_lists_each_stop_with_its_reading() -> Result<(), Failed> {
     let home = Home::answered()?;
     let replies = Replies::quoting(&format!("[{{\"uuid\": \"o1\", \"quote\": \"{OWNER}\"}}]"), "[1]");
     home.said(&["hook", "stop"], &home.asking(), &replies);
@@ -335,7 +335,7 @@ fn the_stops_trail_lists_each_stop_with_its_reading() -> Result<(), Box<dyn Erro
 }
 
 #[test]
-fn words_the_cli_does_not_know_are_refused_with_the_usage() -> Result<(), Box<dyn Error>> {
+fn words_the_cli_does_not_know_are_refused_with_the_usage() -> Result<(), Failed> {
     let home = Home::new()?;
     let usage = Failure::Usage.to_string();
     for words in
@@ -348,7 +348,7 @@ fn words_the_cli_does_not_know_are_refused_with_the_usage() -> Result<(), Box<dy
 }
 
 #[test]
-fn a_stop_hook_that_cannot_read_its_input_fails() -> Result<(), Box<dyn Error>> {
+fn a_stop_hook_that_cannot_read_its_input_fails() -> Result<(), Failed> {
     let said = Home::answered()?.said(&["hook", "stop"], "not json", &Replies::default());
     assert!(said.ended.is_err_and(|failure| failure.0.contains("cannot read the hook input: ")));
     Ok(())

@@ -1,34 +1,36 @@
 use lint_core::{SourceFile, Violation};
-use lint_sweep::Finds;
+use lint_sweep::{Found, Visited};
 
-pub type Start = for<'file> fn(&'file SourceFile) -> Box<dyn Finds<'file> + 'file>;
-
-pub type Scan = for<'file> fn(&'file SourceFile) -> Vec<Violation<'file>>;
-
-#[derive(Clone, Copy, Debug)]
-pub enum Lead {
-    Swept(Start),
-    Filed(Scan),
+#[derive(Debug)]
+pub struct Led<'file> {
+    violations: Vec<Violation<'file>>,
+    visited: Option<Visited>,
 }
 
-impl Lead {
+impl<'file> Led<'file> {
     #[must_use]
-    pub fn swept(self) -> Option<Start> {
-        match self {
-            Lead::Swept(start) => Some(start),
-            Lead::Filed(_) => None,
-        }
+    pub fn visited(&self) -> Option<Visited> {
+        self.visited
     }
 
-    #[must_use]
-    pub fn scanned(self, file: &SourceFile) -> Option<Vec<Violation<'_>>> {
-        match self {
-            Lead::Filed(scan) => Some(scan(file)),
-            Lead::Swept(_) => None,
-        }
+    pub fn taken(&mut self) -> Vec<Violation<'file>> {
+        std::mem::take(&mut self.violations)
+    }
+}
+
+impl<'file> From<Found<'file>> for Led<'file> {
+    fn from(found: Found<'file>) -> Led<'file> {
+        let visited = Some(found.visited());
+        Led { violations: found.into_iter().collect(), visited }
+    }
+}
+
+impl<'file> From<Vec<Violation<'file>>> for Led<'file> {
+    fn from(violations: Vec<Violation<'file>>) -> Led<'file> {
+        Led { violations, visited: None }
     }
 }
 
 pub trait Leader: 'static {
-    const LEAD: Lead;
+    fn led(file: &SourceFile) -> Led<'_>;
 }

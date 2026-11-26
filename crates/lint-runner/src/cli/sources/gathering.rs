@@ -6,6 +6,7 @@ use lint_core::{FileHead, Parsed, Readout, SourceFile, Unwalked};
 use lint_sweep::Gathers;
 
 use super::super::timings::{Measured, Timing};
+use super::Lowering;
 use super::contexts::{Contexts, Contributed};
 use crate::cli::ignored::Ignored;
 use invariants::{Ignoring, Unpoisoned};
@@ -61,12 +62,13 @@ pub(crate) struct Share<'run, Part> {
 }
 
 impl<'run, Part> Share<'run, Part> {
-    pub(crate) fn filed(&mut self) -> Vec<Part> {
-        mem::take(&mut self.filed)
-    }
-
-    pub(crate) fn into_merging(self) -> Option<Merging<'run>> {
-        self.merging
+    pub(crate) fn lowered(
+        self,
+        lowered: Timing,
+        mut settle: impl FnMut(Merging<'run>, Lowering<Part>) -> Lowering<Part>,
+    ) -> Lowering<Part> {
+        let lowering = Lowering { timings: vec![lowered], filed: self.filed };
+        self.merging.into_iter().fold(lowering, |done, complete| settle(complete, done))
     }
 }
 
@@ -74,14 +76,15 @@ impl<'run, Part> Share<'run, Part> {
 pub(crate) struct Merging<'run>(Vec<Gathered<'run>>);
 
 impl<'run> Merging<'run> {
-    pub(crate) fn settled(
+    pub(crate) fn settled<Part>(
         self,
         gathering: &Gathering<'run>,
+        lowering: Lowering<Part>,
         contexts: impl FnOnce(Vec<Contributed<'run>>) -> Measured<Contexts<'run>>,
-    ) -> Timing {
+    ) -> Lowering<Part> {
         let mut sorted = self.0;
         sorted.sort_by(|earlier, later| AsRef::<Path>::as_ref(earlier.head).cmp(AsRef::<Path>::as_ref(later.head)));
-        contexts(sorted.into_iter().map(|part| part.contexts).collect()).kept(&gathering.contexts)
+        lowering.timed(contexts(sorted.into_iter().map(|part| part.contexts).collect()).kept(&gathering.contexts))
     }
 }
 
@@ -118,18 +121,14 @@ impl<'run> Gathering<'run> {
         let joined: Vec<Joined<'run, Part>> = claims.into_iter().map(|claim| claim.gathered(&starting)).collect();
         let (gathered, filed): (Vec<Gathered<'run>>, Vec<Part>) =
             joined.into_iter().map(|found| (found.gathered, found.filed)).unzip();
-        Share { merging: self.deposited(gathered, heads), filed }
+        let mut held = self.deposited.lock().unpoisoned();
+        held.extend(gathered);
+        let complete = Some(held.len()).filter(|count| *count == heads.len()).map(|_| mem::take(&mut *held));
+        Share { merging: complete.map(Merging), filed }
     }
 
     pub(crate) fn contexts(&self) -> &Contexts<'run> {
         self.contexts.wait()
-    }
-
-    fn deposited(&self, parts: Vec<Gathered<'run>>, heads: &[FileHead]) -> Option<Merging<'run>> {
-        let mut held = self.deposited.lock().unpoisoned();
-        held.extend(parts);
-        let complete = Some(held.len()).filter(|count| *count == heads.len()).map(|_| mem::take(&mut *held));
-        complete.map(Merging)
     }
 }
 

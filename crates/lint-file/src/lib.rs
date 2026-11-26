@@ -4,9 +4,9 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use lint_core::{Headline, Lint, Parsed, Report, SourceFile, Violation};
-use lint_sweep::{Finds, Gathers, Sweep};
+use lint_sweep::{Concludes, Contributing, Gathers, Sweep};
 
-pub use lead::{Lead, Leader, Start};
+pub use lead::{Leader, Led};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Reads {
@@ -35,7 +35,7 @@ pub trait SweptLint {
     const HEADLINE: Headline;
     const READS: Reads;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_>;
+    fn watcher(file: &SourceFile) -> Contributing<impl Concludes<'_>>;
 }
 
 pub trait ContextLint {
@@ -80,11 +80,15 @@ pub struct Judged<Checked>(PhantomData<Checked>);
 pub struct Ruled<Checked>(PhantomData<Checked>);
 
 impl<Checked: FileLint + 'static> Leader for Filed<Checked> {
-    const LEAD: Lead = Lead::Filed(Checked::violations);
+    fn led(file: &SourceFile) -> Led<'_> {
+        Led::from(Checked::violations(file))
+    }
 }
 
 impl<Checked: SweptLint + 'static> Leader for Swept<Checked> {
-    const LEAD: Lead = Lead::Swept(Checked::watcher);
+    fn led(file: &SourceFile) -> Led<'_> {
+        Led::from(Sweep::found(file, Checked::watcher(file)))
+    }
 }
 
 impl<Checked: FileLint> Lint for Filed<Checked> {

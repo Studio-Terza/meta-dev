@@ -20,6 +20,7 @@ syntax-lexer = { path = "../syntax-lexer" }
 lint-layout = { path = "../lint-layout" }
 
 [dev-dependencies]
+test-failure = { path = "../test-failure" }
 
 [lints]
 workspace = true

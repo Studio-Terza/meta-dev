@@ -3,7 +3,7 @@ mod ignored;
 use lint_core::Headline;
 use lint_core::Joins;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Contribution, Descend, Facts, Finds, Kind, Scope};
+use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Contribution, Descend, Facts, Kind, Scope};
 use std::collections::{BTreeMap, BTreeSet};
 
 use std::path::Path;
@@ -81,8 +81,8 @@ impl SweptLint for ExpressionFlow {
         Headline::new("control flow is an expression; every branch yields the value the function returns");
     const READS: Reads = Reads::Shipped;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Contributing::new(Flows { path: AsRef::<Path>::as_ref(file.head()) }))
+    fn watcher(file: &SourceFile) -> Contributing<impl Concludes<'_>> {
+        Contributing::new(Flows { path: AsRef::<Path>::as_ref(file.head()) })
     }
 }
 

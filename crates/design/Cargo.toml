@@ -27,6 +27,7 @@ thiserror.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 
 [dev-dependencies]
+test-failure = { path = "../test-failure" }
 sqlite-ports = { path = "../sqlite-ports" }
 tempfile.workspace = true
 

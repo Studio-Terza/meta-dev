@@ -29,6 +29,7 @@ lint-manual-iteration = { path = "../lint-manual-iteration" }
 lint-named-lifetimes = { path = "../lint-named-lifetimes" }
 lint-named-numbers = { path = "../lint-named-numbers" }
 lint-no-comments = { path = "../lint-no-comments" }
+lint-no-dyn = { path = "../lint-no-dyn" }
 lint-no-forwarders = { path = "../lint-no-forwarders" }
 lint-no-free-fns = { path = "../lint-no-free-fns" }
 lint-no-numbers-in-binaries = { path = "../lint-no-numbers-in-binaries" }
@@ -52,6 +53,7 @@ name = "behaviour"
 path = "tests/behaviour.rs"
 
 [dev-dependencies]
+test-failure = { path = "../test-failure" }
 cargo-ports = { path = "../cargo-ports" }
 lint-fixtures = { path = "../lint-fixtures" }
 text-lines = { path = "../text-lines" }

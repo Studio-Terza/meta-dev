@@ -1,8 +1,7 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-
-use std::error::Error;
+use test_failure::Failed;
 
 use cargo_ports::Recorded;
 use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Memory};
@@ -24,15 +23,14 @@ const FIX_START: &str = "; ";
 const NO_DEPENDENCIES: &str = "{\"workspace_root\": \"/\", \"packages\": []}";
 
 #[test]
-fn every_lint_prints_its_expected_output_over_its_fixture_and_every_violation_names_its_fix()
--> Result<(), Box<dyn Error>> {
+fn every_lint_prints_its_expected_output_over_its_fixture_and_every_violation_names_its_fix() -> Result<(), Failed> {
     let corpus = Disk;
     let fixtures = corpus.entries(&Path::new(env!("CARGO_MANIFEST_DIR")).join(FIXTURES))?;
     assert_eq!(fixtures.len(), Corpus::lints());
     let outputs = fixtures
         .iter()
         .map(|fixture| Ok((fixture.as_path(), Corpus::output(&corpus, fixture)?)))
-        .collect::<Result<Vec<(&Path, String)>, Box<dyn Error>>>()?;
+        .collect::<Result<Vec<(&Path, String)>, Failed>>()?;
     let drifted: Vec<String> = outputs.iter().flat_map(|(fixture, output)| Corpus::verify(fixture, output)).collect();
     assert_eq!(drifted, Vec::<String>::new());
     let lines: Vec<String> =
@@ -48,7 +46,7 @@ fn every_lint_prints_its_expected_output_over_its_fixture_and_every_violation_na
     Ok(())
 }
 
-struct Corpus;
+pub(crate) struct Corpus;
 
 struct Copied {
     path: PathBuf,
@@ -85,7 +83,7 @@ impl Corpus {
         Ok(inside.into_iter().flatten().collect())
     }
 
-    fn output(corpus: &impl Files, fixture: &Path) -> Result<String, Box<dyn Error>> {
+    fn output(corpus: &impl Files, fixture: &Path) -> Result<String, Failed> {
         let root: Memory = corpus
             .entries(fixture)?
             .iter()
@@ -107,8 +105,11 @@ impl Corpus {
         Ok(format!("{}{}{verdict}", String::from_utf8(printed)?, String::from_utf8(failed)?))
     }
 
+    const REGISTERED: [&str; 4] = ["    Filed<", "    Swept<", "    Judged<", "    Ruled<"];
+
     fn lints() -> usize {
-        include_str!("../src/cli/mode/lints.rs").matches("as Registered>::ENTRY,").count()
+        let runner = include_str!("../src/cli/mode/lints.rs");
+        Self::REGISTERED.iter().map(|call| runner.matches(call).count()).sum::<usize>()
     }
 
     fn violation(line: &str) -> Option<Violation<'_>> {

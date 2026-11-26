@@ -25,6 +25,7 @@ strum.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+test-failure = { path = "../test-failure" }
 proptest.workspace = true
 
 [lints]

@@ -1,6 +1,6 @@
-use std::error::Error;
 use std::path::Path;
 use std::rc::Rc;
+use test_failure::Failed;
 
 use lint_core::{Macros, Parsed, SourceFile, SourceText};
 use syntax::{Expr, Item, Macro, Stmt};
@@ -41,7 +41,7 @@ impl Walked {
 }
 
 #[test]
-fn a_macro_body_walks_to_the_same_statements_each_time_from_any_copy_and_when_nested() -> Result<(), Box<dyn Error>> {
+fn a_macro_body_walks_to_the_same_statements_each_time_from_any_copy_and_when_nested() -> Result<(), Failed> {
     let file = SourceFile::parse("crates/x/src/lib.rs", SourceText::new(NESTED.to_owned()))?;
     let outer = file.syntax().items.iter().find_map(Invocations::in_item).ok_or("no macro in the file")?;
     Macros::pin(&file, outer);
@@ -60,7 +60,7 @@ fn a_macro_body_walks_to_the_same_statements_each_time_from_any_copy_and_when_ne
 }
 
 #[test]
-fn a_macro_outside_the_file_is_expanded_afresh_each_time() -> Result<(), Box<dyn Error>> {
+fn a_macro_outside_the_file_is_expanded_afresh_each_time() -> Result<(), Failed> {
     let file = SourceFile::parse("crates/x/src/lib.rs", SourceText::new(NESTED.to_owned()))?;
     let lengths = ["m!(a)", "m!(a; b)", "m!(a; b; c)"]
         .iter()
@@ -73,7 +73,7 @@ fn a_macro_outside_the_file_is_expanded_afresh_each_time() -> Result<(), Box<dyn
 }
 
 #[test]
-fn a_parsed_file_pairs_each_test_module_with_its_own_head() -> Result<(), Box<dyn Error>> {
+fn a_parsed_file_pairs_each_test_module_with_its_own_head() -> Result<(), Failed> {
     let module = SourceFile::parse("crates/x/src/tests.rs", SourceText::new("fn checked() {}\n".to_owned()))?;
     let file = SourceFile::parse("crates/x/src/lib.rs", SourceText::new("mod tests;\n".to_owned()))?
         .with_test_modules(vec![module]);
@@ -87,7 +87,7 @@ fn a_parsed_file_pairs_each_test_module_with_its_own_head() -> Result<(), Box<dy
 }
 
 #[test]
-fn a_pinned_macro_reads_its_nested_calls_once_and_a_copy_reads_them_afresh() -> Result<(), Box<dyn Error>> {
+fn a_pinned_macro_reads_its_nested_calls_once_and_a_copy_reads_them_afresh() -> Result<(), Failed> {
     let file = SourceFile::parse("crates/x/src/lib.rs", SourceText::new(NESTED.to_owned()))?;
     let outer = file.syntax().items.iter().find_map(Invocations::in_item).ok_or("no macro in the file")?;
     let copied = outer.clone();
@@ -106,7 +106,7 @@ const RULES: &str = "macro_rules! made {\n    ($($name:ident),*) => {\n        $
 const NOT_RULES: &str = "other! {\n    fn f() -> a::B {}\n}";
 
 #[test]
-fn a_macro_rules_transcriber_mentions_its_paths_with_each_metavariable_as_its_name() -> Result<(), Box<dyn Error>> {
+fn a_macro_rules_transcriber_mentions_its_paths_with_each_metavariable_as_its_name() -> Result<(), Failed> {
     let rules: syntax::ItemMacro = syntax::parse::parse_str(RULES)?;
     let other: syntax::ItemMacro = syntax::parse::parse_str(NOT_RULES)?;
     let mentioned: Vec<String> = Macros::mentioned(&rules.mac)

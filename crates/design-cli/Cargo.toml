@@ -17,6 +17,7 @@ file-ports = { path = "../file-ports" }
 sqlite-ports = { path = "../sqlite-ports" }
 
 [dev-dependencies]
+test-failure = { path = "../test-failure" }
 serde_json.workspace = true
 tempfile.workspace = true
 

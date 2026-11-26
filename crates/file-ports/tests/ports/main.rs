@@ -1,8 +1,8 @@
 mod ignored;
 
-use std::error::Error;
 use std::io;
 use std::path::{Path, PathBuf};
+use test_failure::Failed;
 
 use file_ports::{
     Absent, Bytes, Cached, Disk, FileFailure, Files, Kind, Memory, Offset, Size, Stamp, Stamps, Tail, Text,
@@ -329,7 +329,7 @@ impl Tails {
 }
 
 #[test]
-fn read_from_agrees_between_disk_and_memory() -> Result<(), Box<dyn Error>> {
+fn read_from_agrees_between_disk_and_memory() -> Result<(), Failed> {
     let scratch = tempfile::tempdir()?;
     let memory = Memory::default();
     memory.create_directories(Path::new("/scratch"))?;
@@ -343,7 +343,7 @@ fn read_from_agrees_between_disk_and_memory() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn read_from_returns_the_bytes_after_the_offset() -> Result<(), Box<dyn Error>> {
+fn read_from_returns_the_bytes_after_the_offset() -> Result<(), Failed> {
     let memory = Memory::default();
     memory.create_directories(Path::new("/scratch"))?;
     assert_eq!(Tails::of(&memory, Path::new("/scratch"), Offset::try_new(7)?)?, Bytes::from("789"));

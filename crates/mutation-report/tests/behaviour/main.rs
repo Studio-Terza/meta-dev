@@ -1,9 +1,9 @@
 mod ignored;
 
-use std::error::Error;
 use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use test_failure::Failed;
 
 use console_ports::Complaint;
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
@@ -61,7 +61,7 @@ impl Shards {
 }
 
 #[test]
-fn the_report_lists_survivors_timeouts_and_idle_tests() -> Result<(), Box<dyn Error>> {
+fn the_report_lists_survivors_timeouts_and_idle_tests() -> Result<(), Failed> {
     let checkout = Checkout::new()?;
     Shards::two(&checkout)?;
     assert_eq!(checkout.report(), Answer { exit: ExitCode::SUCCESS, err: String::new() });
@@ -86,7 +86,7 @@ fn the_report_lists_survivors_timeouts_and_idle_tests() -> Result<(), Box<dyn Er
 }
 
 #[test]
-fn no_shards_gives_an_empty_report() -> Result<(), Box<dyn Error>> {
+fn no_shards_gives_an_empty_report() -> Result<(), Failed> {
     let checkout = Checkout::new()?;
     checkout.write("shards/not-a-shard/readme.txt", "x")?;
     checkout.write("shards/loose-file.json", "{}")?;
@@ -102,7 +102,7 @@ fn no_shards_gives_an_empty_report() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_section_shows_300_bullets_and_counts_the_rest() -> Result<(), Box<dyn Error>> {
+fn a_section_shows_300_bullets_and_counts_the_rest() -> Result<(), Failed> {
     let checkout = Checkout::new()?;
     let missed: Vec<Value> =
         (0..OVERFLOWING_SECTION).map(|index| Shards::mutant(&format!("m{index:03}"), "MissedMutant", &[])).collect();
@@ -117,7 +117,7 @@ fn a_section_shows_300_bullets_and_counts_the_rest() -> Result<(), Box<dyn Error
 }
 
 #[test]
-fn exactly_300_items_are_all_shown_with_no_remainder() -> Result<(), Box<dyn Error>> {
+fn exactly_300_items_are_all_shown_with_no_remainder() -> Result<(), Failed> {
     let checkout = Checkout::new()?;
     let missed: Vec<Value> =
         (0..FULL_SECTION).map(|index| Shards::mutant(&format!("m{index:03}"), "MissedMutant", &[])).collect();
@@ -130,7 +130,7 @@ fn exactly_300_items_are_all_shown_with_no_remainder() -> Result<(), Box<dyn Err
 }
 
 #[test]
-fn a_shard_matrix_that_cannot_be_parsed_is_refused_by_name() -> Result<(), Box<dyn Error>> {
+fn a_shard_matrix_that_cannot_be_parsed_is_refused_by_name() -> Result<(), Failed> {
     let checkout = Checkout::new()?;
     checkout.write("shards/shard-0/matrix.json", "not json")?;
     let answer = checkout.report();
@@ -142,7 +142,7 @@ fn a_shard_matrix_that_cannot_be_parsed_is_refused_by_name() -> Result<(), Box<d
 }
 
 #[test]
-fn shards_that_cannot_be_read_are_refused() -> Result<(), Box<dyn Error>> {
+fn shards_that_cannot_be_read_are_refused() -> Result<(), Failed> {
     let checkout = Checkout::new()?;
     let absent = checkout.report_of("absent");
     assert_eq!(absent.exit, ExitCode::FAILURE);
@@ -152,7 +152,7 @@ fn shards_that_cannot_be_read_are_refused() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_report_that_cannot_be_written_is_refused() -> Result<(), Box<dyn Error>> {
+fn a_report_that_cannot_be_written_is_refused() -> Result<(), Failed> {
     let checkout = Checkout::new()?;
     let unwritable_markdown = Answer::to(
         &checkout.files,
@@ -248,7 +248,7 @@ impl Checkout {
 }
 
 #[test]
-fn unviable_mutants_are_counted_for_all_crates_and_for_each_crate() -> Result<(), Box<dyn Error>> {
+fn unviable_mutants_are_counted_for_all_crates_and_for_each_crate() -> Result<(), Failed> {
     let checkout = Checkout::new()?;
     checkout.shard(
         "shard-0",

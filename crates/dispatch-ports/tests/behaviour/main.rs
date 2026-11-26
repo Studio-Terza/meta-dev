@@ -3,7 +3,8 @@
 mod ignored;
 mod ports;
 
-use std::error::Error;
+use test_failure::Failed;
+
 use std::iter;
 use std::ops::Range;
 use std::sync::Mutex;
@@ -230,7 +231,7 @@ impl Watching {
     const LAPSED: Wait = Wait { pause: Watching::PAUSE, woke: Woke::Lapsed };
     const RUNG: Wait = Wait { pause: Watching::PAUSE, woke: Woke::Rung };
 
-    fn watched(self) -> Result<Observed, Box<dyn Error>> {
+    fn watched(self) -> Result<Observed, Failed> {
         let waits = Waits::default();
         let run = Run::root();
         let watched = {
@@ -258,7 +259,7 @@ impl Watching {
 }
 
 #[test]
-fn a_deadline_that_passes_during_a_sleep_kills_the_run_on_the_next_check() -> Result<(), Box<dyn Error>> {
+fn a_deadline_that_passes_during_a_sleep_kills_the_run_on_the_next_check() -> Result<(), Failed> {
     Watching::drawn(0..9).try_for_each(|Drawn { timeout, count: sleeping_after }| {
         let watching = Watching { timeout, sleeping_after, finishing: None };
         let checks = Calls::new(sleeping_after.saturating_add(1));
@@ -275,7 +276,7 @@ fn a_deadline_that_passes_during_a_sleep_kills_the_run_on_the_next_check() -> Re
 }
 
 #[test]
-fn a_run_that_replies_before_its_deadline_is_finished_and_released_once() -> Result<(), Box<dyn Error>> {
+fn a_run_that_replies_before_its_deadline_is_finished_and_released_once() -> Result<(), Failed> {
     Watching::drawn(1..9).try_for_each(|Drawn { timeout, count: finishing }| {
         let watching = Watching { timeout, sleeping_after: 9, finishing: Some(finishing) };
         assert_eq!(
@@ -293,7 +294,7 @@ fn a_run_that_replies_before_its_deadline_is_finished_and_released_once() -> Res
 struct Lingering;
 
 impl Lingering {
-    fn watched(timeout: Timeout) -> Result<Observed, Box<dyn Error>> {
+    fn watched(timeout: Timeout) -> Result<Observed, Failed> {
         let waits = Waits::default();
         let run = Run::root();
         let watched = {
@@ -327,7 +328,7 @@ impl Lingering {
 }
 
 #[test]
-fn a_ring_left_on_the_bell_neither_cuts_a_run_short_nor_carries_it_past_its_deadline() -> Result<(), Box<dyn Error>> {
+fn a_ring_left_on_the_bell_neither_cuts_a_run_short_nor_carries_it_past_its_deadline() -> Result<(), Failed> {
     (1..200_u32).step_by(7).map(Timeout::new).try_for_each(|timeout| {
         assert_eq!(Lingering::watched(timeout)?, Lingering::observed(timeout));
         Ok(())
@@ -387,7 +388,7 @@ impl Stalled for Cause {
 }
 
 #[test]
-fn each_stall_names_its_own_cause() -> Result<(), Box<dyn Error>> {
+fn each_stall_names_its_own_cause() -> Result<(), Failed> {
     let fault = || Fault::from(DispatchFailure::Spawn(std::io::Error::from_raw_os_error(2)));
     let stalls = [
         Stall::Errored(Errored::new(Told::try_new("refused".to_owned())?, Usage::default())),

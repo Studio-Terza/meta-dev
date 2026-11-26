@@ -4,7 +4,7 @@ mod finding;
 use lint_core::Headline;
 use lint_core::Joins;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Finds, Kind};
+use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Kind};
 use std::collections::BTreeMap;
 
 use finding::Finding;
@@ -26,8 +26,8 @@ impl SweptLint for PrivateFns {
         Headline::new("too many private fns; a type's logic belongs in its interface or in more types");
     const READS: Reads = Reads::Shipped;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Contributing::new(PrivateFnCounter { file }))
+    fn watcher(file: &SourceFile) -> Contributing<impl Concludes<'_>> {
+        Contributing::new(PrivateFnCounter { file })
     }
 }
 

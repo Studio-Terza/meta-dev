@@ -3,7 +3,7 @@ mod finding;
 use finding::Finding;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Finds, Kind};
+use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Kind};
 use std::path::Path as StdPath;
 
 use syntax::{Ident, ItemFn, Path};
@@ -39,8 +39,8 @@ impl SweptLint for NoFreeFns {
         Headline::new("free functions are not allowed; make them associated functions or methods");
     const READS: Reads = Reads::Every;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Contributing::new(FreeFns { path: AsRef::<StdPath>::as_ref(file.head()) }))
+    fn watcher(file: &SourceFile) -> Contributing<impl Concludes<'_>> {
+        Contributing::new(FreeFns { path: AsRef::<StdPath>::as_ref(file.head()) })
     }
 }
 

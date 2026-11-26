@@ -2,7 +2,7 @@ mod returns;
 
 use lint_core::{Headline, SourceFile};
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Contributing, Finds};
+use lint_sweep::{Concludes, Contributing};
 use returns::Returns;
 
 #[derive(Debug)]
@@ -13,7 +13,7 @@ impl SweptLint for BoolMethods {
         Headline::new("a function returning bool forgets what it found and makes the caller branch on a flag");
     const READS: Reads = Reads::Shipped;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Contributing::new(Returns::from(file)))
+    fn watcher(file: &SourceFile) -> Contributing<impl Concludes<'_>> {
+        Contributing::new(Returns::from(file))
     }
 }

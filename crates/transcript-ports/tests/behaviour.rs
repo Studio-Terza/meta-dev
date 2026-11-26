@@ -1,7 +1,7 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
-use std::error::Error;
 use std::path::{Path, PathBuf};
+use test_failure::Failed;
 
 use file_ports::{Bytes, Files, Memory};
 use invariants::{Ignoring, ignored};
@@ -98,7 +98,7 @@ impl Transcript {
         ClaudeCodeDir::new(memory, PathBuf::from(DIRECTORY))
     }
 
-    fn read(&self, cursor: Cursor) -> Result<Read, Box<dyn Error>> {
+    fn read(&self, cursor: Cursor) -> Result<Read, Failed> {
         let run = Run::root();
         let port = run.port(self.directory());
         let sessions = Transcripts::sessions(&port)?;
@@ -240,7 +240,7 @@ impl Views {
 }
 
 #[test]
-fn each_line_is_classified_by_who_wrote_it() -> Result<(), Box<dyn Error>> {
+fn each_line_is_classified_by_who_wrote_it() -> Result<(), Failed> {
     let text =
         [Lines::typed("1"), Lines::answer("2"), Lines::tool_result("3"), Lines::notice("4"), Lines::skipped()].concat();
     let read = Transcript::holding(&text).read(Cursor::default())?;
@@ -249,7 +249,7 @@ fn each_line_is_classified_by_who_wrote_it() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_line_that_is_not_a_message_yields_its_parent_edge() -> Result<(), Box<dyn Error>> {
+fn a_line_that_is_not_a_message_yields_its_parent_edge() -> Result<(), Failed> {
     let text = [Lines::answer("2"), Lines::system("5", "2"), Lines::skipped()].concat();
     let read = Transcript::holding(&text).read(Cursor::default())?;
     assert_eq!(Views::edges(read), ["5 after 2"]);
@@ -257,14 +257,14 @@ fn a_line_that_is_not_a_message_yields_its_parent_edge() -> Result<(), Box<dyn E
 }
 
 #[test]
-fn a_lead_record_keeps_only_its_text_blocks() -> Result<(), Box<dyn Error>> {
+fn a_lead_record_keeps_only_its_text_blocks() -> Result<(), Failed> {
     let read = Transcript::holding(&Lines::answer("2")).read(Cursor::default())?;
     assert_eq!(Views::texts(read), ["first second"]);
     Ok(())
 }
 
 #[test]
-fn a_record_carries_the_timestamp_of_its_line() -> Result<(), Box<dyn Error>> {
+fn a_record_carries_the_timestamp_of_its_line() -> Result<(), Failed> {
     let read = Transcript::holding(&Lines::typed("1")).read(Cursor::default())?;
     let stamps: Vec<Instant> = Views::records(read).into_iter().map(|record| record.stamp().clone()).collect();
     assert_eq!(stamps, [Instant::try_new("2026-01-01T00:00:01Z".to_owned())?]);
@@ -272,7 +272,7 @@ fn a_record_carries_the_timestamp_of_its_line() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_record_carries_its_session_and_parent() -> Result<(), Box<dyn Error>> {
+fn a_record_carries_its_session_and_parent() -> Result<(), Failed> {
     let read = Transcript::holding(&Lines::shaped(
         "assistant",
         r#""message":{"model":"claude","content":[{"type":"text","text":"a"}]}"#,
@@ -287,7 +287,7 @@ fn a_record_carries_its_session_and_parent() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_partial_last_line_is_not_yielded() -> Result<(), Box<dyn Error>> {
+fn a_partial_last_line_is_not_yielded() -> Result<(), Failed> {
     let whole = Lines::typed("1");
     let partial = Lines::answer("2");
     let cut = partial.chars().take(partial.len() / 2).collect::<String>();
@@ -298,7 +298,7 @@ fn a_partial_last_line_is_not_yielded() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_record_uuid_reads_as_its_text() -> Result<(), Box<dyn Error>> {
+fn a_record_uuid_reads_as_its_text() -> Result<(), Failed> {
     let read = Transcript::holding(&Lines::typed("abc")).read(Cursor::default())?;
     let texts: Vec<String> = Views::records(read).into_iter().map(|record| record.uuid().to_string()).collect();
     assert_eq!(texts, ["abc"]);
@@ -348,7 +348,7 @@ fn reading_all_sessions_counts_one_listing_and_one_read_per_session() {
 }
 
 #[test]
-fn resuming_from_the_cursor_yields_every_record_exactly_once() -> Result<(), Box<dyn Error>> {
+fn resuming_from_the_cursor_yields_every_record_exactly_once() -> Result<(), Failed> {
     let lines = [Lines::typed("1"), Lines::answer("2"), Lines::tool_result("3"), Lines::notice("4")];
     let text = lines.concat();
     (0..=text.len()).try_for_each(|cut| {

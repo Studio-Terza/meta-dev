@@ -18,6 +18,12 @@ use invariants::{Ignoring, Rejoined};
 pub(crate) struct Slot(usize);
 
 impl Slot {
+    pub(crate) const FIRST: Slot = Slot(0);
+
+    pub(crate) fn next(self) -> Slot {
+        Slot(self.0.saturating_add(1))
+    }
+
     pub(crate) fn picked<Item>(self, items: &[Item]) -> Option<&Item> {
         items.get(self.0)
     }

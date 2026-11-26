@@ -1,6 +1,5 @@
 use console_ports::{Tale, Teller};
 use std::cell::RefCell;
-use std::error::Error;
 use std::ffi::OsString;
 use std::io::{self, Write};
 use std::iter;
@@ -8,6 +7,7 @@ use std::num::NonZeroU8;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::Duration;
+use test_failure::Failed;
 
 use ci::Cli;
 use ci::ports::{Exit, Invocation, Ports, Run, Tee};
@@ -431,7 +431,7 @@ fn clippy_never_names_a_kind_flag_that_puts_libraries_in_test_mode_and_names_eac
 }
 
 #[test]
-fn clippy_is_timed_under_its_stage_and_fails_with_its_code() -> Result<(), Box<dyn Error>> {
+fn clippy_is_timed_under_its_stage_and_fails_with_its_code() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let fake = Script { metadata: CLIPPY_FIXTURE.to_owned(), exit: Exit::Failure(FAILED_WITH), ..Script::new() };
     let answer = scratch.answer(&fake, &["clippy-targets", &scratch.file("m.toml"), "clippy", "-p", "binonly"]);
@@ -448,7 +448,7 @@ fn clippy_is_timed_under_its_stage_and_fails_with_its_code() -> Result<(), Box<d
 }
 
 #[test]
-fn metadata_that_cannot_be_read_stops_clippy_before_it_runs() -> Result<(), Box<dyn Error>> {
+fn metadata_that_cannot_be_read_stops_clippy_before_it_runs() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let fake = Script { metadata: "not json".to_owned(), ..Script::new() };
     let answer = scratch.answer(&fake, &["clippy-targets", &scratch.file("m.toml"), "clippy", "--workspace"]);
@@ -460,7 +460,7 @@ fn metadata_that_cannot_be_read_stops_clippy_before_it_runs() -> Result<(), Box<
 }
 
 #[test]
-fn metadata_that_cannot_be_asked_for_stops_clippy_before_it_runs() -> Result<(), Box<dyn Error>> {
+fn metadata_that_cannot_be_asked_for_stops_clippy_before_it_runs() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let answer = scratch.answer(&Script::refusing("cargo"), &["clippy-targets", &scratch.file("m.toml"), "clippy"]);
     assert_eq!(answer.exit, ExitCode::FAILURE);
@@ -476,7 +476,7 @@ fn clippy_targets_needs_a_measured_file_and_a_stage() {
 }
 
 #[test]
-fn a_timed_stage_runs_the_program_with_its_arguments() -> Result<(), Box<dyn Error>> {
+fn a_timed_stage_runs_the_program_with_its_arguments() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let fake = Script::new();
     let answer =
@@ -496,7 +496,7 @@ fn a_timed_stage_runs_the_program_with_its_arguments() -> Result<(), Box<dyn Err
 }
 
 #[test]
-fn a_timed_stage_is_appended_to_what_is_measured() -> Result<(), Box<dyn Error>> {
+fn a_timed_stage_is_appended_to_what_is_measured() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     scratch.write("m.toml", "fmt = 0.10\n")?;
     scratch.answer(&Script::new(), &["timed", &scratch.file("m.toml"), "clippy", "cargo"]);
@@ -506,7 +506,7 @@ fn a_timed_stage_is_appended_to_what_is_measured() -> Result<(), Box<dyn Error>>
 }
 
 #[test]
-fn a_failing_program_fails_the_step_with_its_code_and_is_still_measured() -> Result<(), Box<dyn Error>> {
+fn a_failing_program_fails_the_step_with_its_code_and_is_still_measured() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let fake = Script { exit: Exit::Failure(FAILED_WITH), ..Script::new() };
     let answer = scratch.answer(&fake, &["timed", &scratch.file("m.toml"), "clippy", "cargo"]);
@@ -516,7 +516,7 @@ fn a_failing_program_fails_the_step_with_its_code_and_is_still_measured() -> Res
 }
 
 #[test]
-fn a_program_that_cannot_start_is_reported_and_not_measured() -> Result<(), Box<dyn Error>> {
+fn a_program_that_cannot_start_is_reported_and_not_measured() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let answer = scratch.answer(&Script::refusing("cargo"), &["timed", &scratch.file("m.toml"), "clippy", "cargo"]);
     assert_eq!(answer.exit, ExitCode::FAILURE);
@@ -526,7 +526,7 @@ fn a_program_that_cannot_start_is_reported_and_not_measured() -> Result<(), Box<
 }
 
 #[test]
-fn a_measured_file_that_cannot_be_written_is_reported() -> Result<(), Box<dyn Error>> {
+fn a_measured_file_that_cannot_be_written_is_reported() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     scratch.write("blocker", "")?;
     let answer = scratch.answer(&Script::new(), &["timed", &scratch.file("blocker/m.toml"), "clippy", "cargo"]);
@@ -537,7 +537,7 @@ fn a_measured_file_that_cannot_be_written_is_reported() -> Result<(), Box<dyn Er
 }
 
 #[test]
-fn libtest_seconds_are_appended_under_the_stage_name() -> Result<(), Box<dyn Error>> {
+fn libtest_seconds_are_appended_under_the_stage_name() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     scratch.write("m.toml", "clippy = 1.00\n")?;
     scratch.write("out.txt", "test result: ok. finished in 0.25s\n")?;
@@ -552,7 +552,7 @@ fn libtest_seconds_are_appended_under_the_stage_name() -> Result<(), Box<dyn Err
 }
 
 #[test]
-fn test_output_that_cannot_be_read_is_reported_and_nothing_is_measured() -> Result<(), Box<dyn Error>> {
+fn test_output_that_cannot_be_read_is_reported_and_nothing_is_measured() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let answer = scratch
         .answer(&Script::new(), &["libtest-seconds", &scratch.file("m.toml"), "test-run", &scratch.file("absent.txt")]);
@@ -563,7 +563,7 @@ fn test_output_that_cannot_be_read_is_reported_and_nothing_is_measured() -> Resu
 }
 
 #[test]
-fn test_output_without_a_result_line_is_a_failure_and_nothing_is_measured() -> Result<(), Box<dyn Error>> {
+fn test_output_without_a_result_line_is_a_failure_and_nothing_is_measured() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     scratch.write("out.txt", "no result lines here\n")?;
     let answer = scratch
@@ -575,7 +575,7 @@ fn test_output_without_a_result_line_is_a_failure_and_nothing_is_measured() -> R
 }
 
 #[test]
-fn a_result_line_libtest_could_not_have_written_is_a_failure_and_nothing_is_measured() -> Result<(), Box<dyn Error>> {
+fn a_result_line_libtest_could_not_have_written_is_a_failure_and_nothing_is_measured() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     scratch.write(
         "out.txt",
@@ -592,7 +592,7 @@ fn a_result_line_libtest_could_not_have_written_is_a_failure_and_nothing_is_meas
 }
 
 #[test]
-fn a_measured_history_line_names_the_revision_and_every_stage_and_is_appended() -> Result<(), Box<dyn Error>> {
+fn a_measured_history_line_names_the_revision_and_every_stage_and_is_appended() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     scratch.write("m.toml", "cold-clippy = 52.3\ncold-test-compile = 80\n")?;
     scratch.write("history.tsv", "older\n")?;
@@ -607,7 +607,7 @@ fn a_measured_history_line_names_the_revision_and_every_stage_and_is_appended() 
 }
 
 #[test]
-fn a_cold_size_sums_every_nested_file_and_rounds_up_to_kibibytes() -> Result<(), Box<dyn Error>> {
+fn a_cold_size_sums_every_nested_file_and_rounds_up_to_kibibytes() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     scratch.placed(&scratch.path().join("cold/a.bin"), &"a".repeat(1000))?;
     scratch.placed(&scratch.path().join("cold/deep/er/b.bin"), &"b".repeat(1500))?;
@@ -619,7 +619,7 @@ fn a_cold_size_sums_every_nested_file_and_rounds_up_to_kibibytes() -> Result<(),
 }
 
 #[test]
-fn a_cold_size_of_an_exact_kibibyte_is_not_rounded_up() -> Result<(), Box<dyn Error>> {
+fn a_cold_size_of_an_exact_kibibyte_is_not_rounded_up() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     scratch.placed(&scratch.path().join("cold/a.bin"), &"a".repeat(2048))?;
     let arguments = ["cold-size", &scratch.file("cold"), &scratch.file("size.json")];
@@ -629,7 +629,7 @@ fn a_cold_size_of_an_exact_kibibyte_is_not_rounded_up() -> Result<(), Box<dyn Er
 }
 
 #[test]
-fn an_empty_cold_directory_is_zero_kilobytes() -> Result<(), Box<dyn Error>> {
+fn an_empty_cold_directory_is_zero_kilobytes() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     scratch.directory("cold")?;
     let arguments = ["cold-size", &scratch.file("cold"), &scratch.file("size.json")];
@@ -639,7 +639,7 @@ fn an_empty_cold_directory_is_zero_kilobytes() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn an_unreadable_cold_directory_is_reported_and_nothing_is_written() -> Result<(), Box<dyn Error>> {
+fn an_unreadable_cold_directory_is_reported_and_nothing_is_written() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let arguments = ["cold-size", &scratch.file("none"), &scratch.file("size.json")];
     let answer = scratch.answer(&Script::new(), &arguments);
@@ -652,7 +652,7 @@ fn an_unreadable_cold_directory_is_reported_and_nothing_is_written() -> Result<(
 const LOWERED_RECORD: [&str; 2] = ["cold-clippy = 48.5", "cold-test-compile = 80"];
 
 #[test]
-fn a_ratchet_record_is_lowered_to_a_run_at_or_below_it_and_never_raised() -> Result<(), Box<dyn Error>> {
+fn a_ratchet_record_is_lowered_to_a_run_at_or_below_it_and_never_raised() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     scratch.write("record.toml", "cold-clippy = 50\ncold-test-compile = 80\n")?;
     scratch.write("lower.toml", "cold-clippy = 48.5\ncold-test-compile = 80\n")?;
@@ -671,7 +671,7 @@ fn a_ratchet_record_is_lowered_to_a_run_at_or_below_it_and_never_raised() -> Res
 }
 
 #[test]
-fn a_report_is_appended_to_the_summary_under_its_name_or_said_to_be_missing() -> Result<(), Box<dyn Error>> {
+fn a_report_is_appended_to_the_summary_under_its_name_or_said_to_be_missing() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     scratch.write("report.txt", "found\n")?;
     scratch.write("summary.md", "# Summary\n")?;
@@ -710,7 +710,7 @@ impl Page {
         )
     }
 
-    fn timed(page: &str) -> Result<Timings, Box<dyn Error>> {
+    fn timed(page: &str) -> Result<Timings, Failed> {
         let scratch = Scratch::new()?;
         scratch.write("page.html", page)?;
         let answer =
@@ -720,7 +720,7 @@ impl Page {
 }
 
 #[test]
-fn compile_time_is_summed_per_crate_longest_first_and_stored() -> Result<(), Box<dyn Error>> {
+fn compile_time_is_summed_per_crate_longest_first_and_stored() -> Result<(), Failed> {
     let page = Page::with(&[Page::unit("aaa", "0.25"), Page::unit("zzz", "1.5"), Page::unit("zzz", "0.5")].join(","));
     let Timings { answer, stored } = Page::timed(&page)?;
     let expected = vec!["compile time per crate, seconds, longest first, 2.25 in all:", "2.00 zzz", "0.25 aaa"];
@@ -733,7 +733,7 @@ fn compile_time_is_summed_per_crate_longest_first_and_stored() -> Result<(), Box
 }
 
 #[test]
-fn only_the_thirty_longest_crates_are_listed_but_all_are_counted() -> Result<(), Box<dyn Error>> {
+fn only_the_thirty_longest_crates_are_listed_but_all_are_counted() -> Result<(), Failed> {
     let units: Vec<String> = (0..CRATES_GENERATED).map(|at| Page::unit(&format!("crate{at:02}"), "1.0")).collect();
     let answer = Page::timed(&Page::with(&units.join(",")))?.answer;
     assert_eq!(answer.out.matches(char::from(10)).count(), LINES_PRINTED);
@@ -742,7 +742,7 @@ fn only_the_thirty_longest_crates_are_listed_but_all_are_counted() -> Result<(),
 }
 
 #[test]
-fn a_page_without_readable_unit_data_is_refused() -> Result<(), Box<dyn Error>> {
+fn a_page_without_readable_unit_data_is_refused() -> Result<(), Failed> {
     let pages = ["<html></html>", "const UNIT_DATA = nope;", "const UNIT_DATA = [{\"name\": 3}];"];
     let refused = pages
         .iter()
@@ -777,11 +777,11 @@ impl Graph {
         Script { answers, ..script }
     }
 
-    fn measured(page: &str, metadata: &str) -> Result<Graph, Box<dyn Error>> {
+    fn measured(page: &str, metadata: &str) -> Result<Graph, Failed> {
         Graph::answered(page, &Graph::hosted(Script { metadata: metadata.to_owned(), ..Script::new() }))
     }
 
-    fn answered(page: &str, fake: &Script) -> Result<Graph, Box<dyn Error>> {
+    fn answered(page: &str, fake: &Script) -> Result<Graph, Failed> {
         let scratch = Scratch::new()?;
         scratch.write("page.html", page)?;
         scratch.write("m.toml", "clippy = 50.80\n")?;
@@ -793,8 +793,7 @@ impl Graph {
 }
 
 #[test]
-fn the_graph_path_is_the_longest_chain_of_uncacheable_units_and_is_measured_beside_the_wall()
--> Result<(), Box<dyn Error>> {
+fn the_graph_path_is_the_longest_chain_of_uncacheable_units_and_is_measured_beside_the_wall() -> Result<(), Failed> {
     let Graph { answer, measured, report, asked } = Graph::measured(&Page::listing(TIMINGS_UNITS), TIMINGS_METADATA)?;
     assert_eq!(asked, [Invocation::new("rustc", ["--print", "host-tuple"]), Graph::metadata_for(HOST)]);
     assert_eq!(
@@ -807,7 +806,7 @@ fn the_graph_path_is_the_longest_chain_of_uncacheable_units_and_is_measured_besi
 }
 
 #[test]
-fn cacheable_external_units_weigh_nothing_however_long_they_took() -> Result<(), Box<dyn Error>> {
+fn cacheable_external_units_weigh_nothing_however_long_they_took() -> Result<(), Failed> {
     let page = Page::with(
         &[
             Page::of("heavy", "1.0.0", " (check)", "9.0"),
@@ -827,7 +826,7 @@ fn cacheable_external_units_weigh_nothing_however_long_they_took() -> Result<(),
 }
 
 #[test]
-fn a_proc_macro_host_build_and_a_build_script_count_even_outside_the_workspace() -> Result<(), Box<dyn Error>> {
+fn a_proc_macro_host_build_and_a_build_script_count_even_outside_the_workspace() -> Result<(), Failed> {
     let page = Page::with(
         &[
             Page::of("ext-macro", "2.0.0", "", "0.4"),
@@ -853,7 +852,7 @@ fn a_proc_macro_host_build_and_a_build_script_count_even_outside_the_workspace()
 }
 
 #[test]
-fn a_unit_the_page_does_not_time_weighs_nothing_but_still_links_its_neighbours() -> Result<(), Box<dyn Error>> {
+fn a_unit_the_page_does_not_time_weighs_nothing_but_still_links_its_neighbours() -> Result<(), Failed> {
     let page = Page::with(
         &[
             Page::of("derive-macro", "0.1.0", "", "0.3"),
@@ -878,7 +877,7 @@ fn a_unit_the_page_does_not_time_weighs_nothing_but_still_links_its_neighbours()
 }
 
 #[test]
-fn a_unit_label_cargo_never_writes_refuses_the_page_and_nothing_is_measured() -> Result<(), Box<dyn Error>> {
+fn a_unit_label_cargo_never_writes_refuses_the_page_and_nothing_is_measured() -> Result<(), Failed> {
     let labels = [" app bin (check)", " (check) ", " (build)", " app \"bin\"", " build-script (check)"];
     let refused = labels
         .iter()
@@ -892,7 +891,7 @@ fn a_unit_label_cargo_never_writes_refuses_the_page_and_nothing_is_measured() ->
 }
 
 #[test]
-fn two_check_variants_of_one_crate_count_the_longer_on_the_path_and_both_in_the_work() -> Result<(), Box<dyn Error>> {
+fn two_check_variants_of_one_crate_count_the_longer_on_the_path_and_both_in_the_work() -> Result<(), Failed> {
     let page = Page::with(
         &[Page::of("core", "0.1.0", " (check)", "0.5"), Page::of("core", "0.1.0", " (check)", "0.7")].join(","),
     );
@@ -907,7 +906,7 @@ fn two_check_variants_of_one_crate_count_the_longer_on_the_path_and_both_in_the_
 }
 
 #[test]
-fn a_graph_path_needs_unit_timings_and_metadata_cargo_can_give() -> Result<(), Box<dyn Error>> {
+fn a_graph_path_needs_unit_timings_and_metadata_cargo_can_give() -> Result<(), Failed> {
     let unreadable = Graph::measured(&Page::listing(TIMINGS_UNITS), "not json")?;
     assert_eq!(unreadable.answer.exit, ExitCode::FAILURE);
     assert!(unreadable.answer.err.contains("cannot read the cargo metadata: "));
@@ -932,7 +931,7 @@ fn a_graph_path_needs_unit_timings_and_metadata_cargo_can_give() -> Result<(), B
 }
 
 #[test]
-fn the_graph_follows_only_the_dependencies_cargo_resolves_for_the_host_platform() -> Result<(), Box<dyn Error>> {
+fn the_graph_follows_only_the_dependencies_cargo_resolves_for_the_host_platform() -> Result<(), Failed> {
     let page = Page::with(
         &[
             Page::of("slowmacro", "0.1.0", "", "1.0"),
@@ -967,7 +966,7 @@ fn the_graph_follows_only_the_dependencies_cargo_resolves_for_the_host_platform(
 }
 
 #[test]
-fn a_page_that_records_a_failed_build_is_skipped_and_nothing_is_measured() -> Result<(), Box<dyn Error>> {
+fn a_page_that_records_a_failed_build_is_skipped_and_nothing_is_measured() -> Result<(), Failed> {
     let failed = format!(
         "<table>\n<tr><td class=\"error-text\">Error:</td><td>1 job failed</td></tr>\n</table>\n{}",
         Page::listing(TIMINGS_UNITS)
@@ -985,7 +984,7 @@ fn a_page_that_records_a_failed_build_is_skipped_and_nothing_is_measured() -> Re
 }
 
 #[test]
-fn a_graph_path_needs_rustc_to_name_exactly_one_host() -> Result<(), Box<dyn Error>> {
+fn a_graph_path_needs_rustc_to_name_exactly_one_host() -> Result<(), Failed> {
     let named = ["", "x86_64-unknown-linux-gnu\naarch64-apple-darwin\n"].map(|host| {
         let fake = Script::answering(vec![Reply::to("rustc --print", host)]);
         Graph::answered(&Page::listing(TIMINGS_UNITS), &fake).map(|graph| {
@@ -1069,7 +1068,7 @@ fn unusable_input_is_refused_with_the_usage() {
 }
 
 #[test]
-fn the_tools_are_built_and_copied_to_the_tools_directory() -> Result<(), Box<dyn Error>> {
+fn the_tools_are_built_and_copied_to_the_tools_directory() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     scratch.directory("built")?;
     ["lint", "ci"].iter().try_for_each(|name| scratch.write(&format!("built/{name}"), name))?;
@@ -1085,7 +1084,7 @@ fn the_tools_are_built_and_copied_to_the_tools_directory() -> Result<(), Box<dyn
 }
 
 #[test]
-fn tools_that_failed_to_build_are_not_copied() -> Result<(), Box<dyn Error>> {
+fn tools_that_failed_to_build_are_not_copied() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let answer = scratch.answer(&Script::exiting(101), &["tools", &scratch.file("built"), &scratch.file("tools")]);
     assert_eq!(answer.exit, ExitCode::from(101));
@@ -1094,7 +1093,7 @@ fn tools_that_failed_to_build_are_not_copied() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn tools_that_were_not_built_are_reported() -> Result<(), Box<dyn Error>> {
+fn tools_that_were_not_built_are_reported() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let answer = scratch.answer(&Script::new(), &["tools", &scratch.file("built"), &scratch.file("tools")]);
     assert_eq!(answer.exit, ExitCode::FAILURE);
@@ -1103,7 +1102,7 @@ fn tools_that_were_not_built_are_reported() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn tools_cannot_go_where_a_file_is_and_cargo_must_start() -> Result<(), Box<dyn Error>> {
+fn tools_cannot_go_where_a_file_is_and_cargo_must_start() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     scratch.write("blocker", "")?;
     let blocked = scratch.answer(&Script::new(), &["tools", &scratch.file("built"), &scratch.file("blocker/tools")]);
@@ -1115,7 +1114,7 @@ fn tools_cannot_go_where_a_file_is_and_cargo_must_start() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn a_logged_program_is_run_with_its_log_and_its_exit() -> Result<(), Box<dyn Error>> {
+fn a_logged_program_is_run_with_its_log_and_its_exit() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let fake = Script { logged_text: "seen\n".to_owned(), exit: Exit::Failure(FAILED_WITH), ..Script::new() };
     let answer = scratch.answer(&fake, &["logged", &scratch.file("logs/test.txt"), "cargo", "test", "-p", "leaf"]);
@@ -1219,7 +1218,7 @@ fn a_shard_runs_cargo_mutants_for_its_slice() {
 }
 
 #[test]
-fn changed_lines_are_tested_first_against_their_own_crate() -> Result<(), Box<dyn Error>> {
+fn changed_lines_are_tested_first_against_their_own_crate() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let fake = Script { changed: "+a line\n".to_owned(), ..Script::new() };
     let answer = scratch.answer(
@@ -1275,7 +1274,7 @@ fn changed_lines_are_tested_first_against_their_own_crate() -> Result<(), Box<dy
 }
 
 #[test]
-fn a_plan_mutates_the_whole_source_of_crates_whose_tests_changed() -> Result<(), Box<dyn Error>> {
+fn a_plan_mutates_the_whole_source_of_crates_whose_tests_changed() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let named = Invocation::new(
         "git",
@@ -1327,7 +1326,7 @@ fn a_plan_mutates_the_whole_source_of_crates_whose_tests_changed() -> Result<(),
 }
 
 #[test]
-fn a_plan_with_no_changed_tests_keeps_only_the_changed_lines() -> Result<(), Box<dyn Error>> {
+fn a_plan_with_no_changed_tests_keeps_only_the_changed_lines() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let named = Invocation::new(
         "git",
@@ -1390,7 +1389,7 @@ fn shards_grow_with_the_mutants_up_to_a_ceiling() {
 }
 
 #[test]
-fn a_plan_for_a_change_that_reaches_no_crate_runs_one_shard_and_nothing_else() -> Result<(), Box<dyn Error>> {
+fn a_plan_for_a_change_that_reaches_no_crate_runs_one_shard_and_nothing_else() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let fake = Script::new();
     let answer = scratch.answer(&fake, &["mutants-plan", &scratch.file("c.diff"), &scratch.file("plan.txt")]);
@@ -1401,8 +1400,7 @@ fn a_plan_for_a_change_that_reaches_no_crate_runs_one_shard_and_nothing_else() -
 }
 
 #[test]
-fn mutants_missed_by_their_own_crate_are_rerun_by_name_in_the_scope_and_fail_if_still_missed()
--> Result<(), Box<dyn Error>> {
+fn mutants_missed_by_their_own_crate_are_rerun_by_name_in_the_scope_and_fail_if_still_missed() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     scratch.survived(&[
         Missed { name: "src/a.rs:1:5: replace f -> bool with true", file: "src/a.rs", line: 1 },
@@ -1470,7 +1468,7 @@ fn mutants_missed_by_their_own_crate_are_rerun_by_name_in_the_scope_and_fail_if_
 }
 
 #[test]
-fn the_scoped_rerun_diff_touches_only_the_lines_of_the_survivors() -> Result<(), Box<dyn Error>> {
+fn the_scoped_rerun_diff_touches_only_the_lines_of_the_survivors() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     scratch.survived(&[
         Missed { name: "src/a.rs:3:5: replace f -> bool with true", file: "src/a.rs", line: 3 },
@@ -1508,7 +1506,7 @@ fn the_scoped_rerun_diff_touches_only_the_lines_of_the_survivors() -> Result<(),
 }
 
 #[test]
-fn an_empty_missed_list_passes() -> Result<(), Box<dyn Error>> {
+fn an_empty_missed_list_passes() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     scratch.directory("out/mutants.out")?;
     scratch.write("out/mutants.out/missed.txt", "")?;
@@ -1540,7 +1538,7 @@ fn a_change_that_reaches_no_crate_says_the_mutants_were_skipped() {
 }
 
 #[test]
-fn a_failed_start_while_testing_changed_lines_is_reported() -> Result<(), Box<dyn Error>> {
+fn a_failed_start_while_testing_changed_lines_is_reported() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let arguments = ["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "0/8", "-p"];
     let planning = ["mutants-plan", &scratch.file("c.diff"), &scratch.file("plan.txt"), "-p"];
@@ -1618,7 +1616,7 @@ impl Gh {
 }
 
 #[test]
-fn a_stage_past_its_warn_line_opens_an_issue_titled_with_its_name() -> Result<(), Box<dyn Error>> {
+fn a_stage_past_its_warn_line_opens_an_issue_titled_with_its_name() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let arguments = Gh::stage_issues(&scratch, "clippy = 12\nlint = 1\ntest-run = 4\n")?;
     let fake = Script::answering(vec![Reply::to("gh issue", "[]")]);
@@ -1637,7 +1635,7 @@ fn a_stage_past_its_warn_line_opens_an_issue_titled_with_its_name() -> Result<()
 }
 
 #[test]
-fn a_stage_that_already_has_an_open_issue_updates_that_issue_and_not_a_look_alike() -> Result<(), Box<dyn Error>> {
+fn a_stage_that_already_has_an_open_issue_updates_that_issue_and_not_a_look_alike() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let arguments = Gh::stage_issues(&scratch, "clippy = 12\nlint = 1\ntest-run = 1\n")?;
     let listed = r#"[{"number":3,"title":"clippy fixes"},{"number":7,"title":"clippy"}]"#;
@@ -1648,7 +1646,7 @@ fn a_stage_that_already_has_an_open_issue_updates_that_issue_and_not_a_look_alik
 }
 
 #[test]
-fn stages_named_after_the_files_are_the_only_ones_judged() -> Result<(), Box<dyn Error>> {
+fn stages_named_after_the_files_are_the_only_ones_judged() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let mut arguments = Gh::stage_issues(&scratch, "clippy = 12\n")?;
     arguments.push("clippy".to_owned());
@@ -1659,7 +1657,7 @@ fn stages_named_after_the_files_are_the_only_ones_judged() -> Result<(), Box<dyn
 }
 
 #[test]
-fn stages_within_their_warn_line_open_nothing() -> Result<(), Box<dyn Error>> {
+fn stages_within_their_warn_line_open_nothing() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let arguments = Gh::stage_issues(&scratch, "clippy = 11\nlint = 1\ntest-run = 1\n")?;
     let fake = Script::new();
@@ -1669,7 +1667,7 @@ fn stages_within_their_warn_line_open_nothing() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn limits_that_cannot_be_judged_and_issues_that_cannot_be_handled_are_reported() -> Result<(), Box<dyn Error>> {
+fn limits_that_cannot_be_judged_and_issues_that_cannot_be_handled_are_reported() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let arguments = Gh::stage_issues(&scratch, "clippy = 12\nlint = 1\ntest-run = 1\n")?;
     assert_eq!(Text::lines(&scratch.answer(&Script::refusing("gh"), &arguments).err), ["cannot run gh: boom"]);
@@ -1776,8 +1774,7 @@ impl Cold {
 }
 
 #[test]
-fn a_cold_build_slower_than_every_run_of_the_fortnight_opens_one_trend_issue_with_its_context()
--> Result<(), Box<dyn Error>> {
+fn a_cold_build_slower_than_every_run_of_the_fortnight_opens_one_trend_issue_with_its_context() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let arguments = Cold::fortnight(&scratch, "45")?;
     let fake = Script::answering(Cold::answers("[11, 12]", "[]"));
@@ -1807,7 +1804,7 @@ fn a_cold_build_slower_than_every_run_of_the_fortnight_opens_one_trend_issue_wit
 }
 
 #[test]
-fn a_cold_build_within_the_fortnight_or_without_one_opens_nothing() -> Result<(), Box<dyn Error>> {
+fn a_cold_build_within_the_fortnight_or_without_one_opens_nothing() -> Result<(), Failed> {
     let cases = [
         ("39", "[11, 12]", "; the 2 runs of the previous 14 days took 50.00s to 54.00s, so no trend issue."),
         ("41", "[12, 11]", "; the 2 runs of the previous 14 days took 50.00s to 54.00s, so no trend issue."),
@@ -1815,7 +1812,7 @@ fn a_cold_build_within_the_fortnight_or_without_one_opens_nothing() -> Result<()
     ];
     let concluded = cases
         .iter()
-        .map(|(today, runs, said)| -> Result<(ExitCode, usize, bool), Box<dyn Error>> {
+        .map(|(today, runs, said)| -> Result<(ExitCode, usize, bool), Failed> {
             let scratch = Scratch::new()?;
             let fake = Script::answering(Cold::answers(runs, "[]"));
             let answer = scratch.answer(&fake, &Cold::fortnight(&scratch, today)?);
@@ -1829,7 +1826,7 @@ fn a_cold_build_within_the_fortnight_or_without_one_opens_nothing() -> Result<()
 }
 
 #[test]
-fn cold_builds_that_cannot_be_listed_downloaded_or_read_are_reported() -> Result<(), Box<dyn Error>> {
+fn cold_builds_that_cannot_be_listed_downloaded_or_read_are_reported() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let arguments = Cold::fortnight(&scratch, "45")?;
     let undownloaded = Script::answering(Cold::answers("[13]", "[]"));
@@ -1845,7 +1842,7 @@ fn cold_builds_that_cannot_be_listed_downloaded_or_read_are_reported() -> Result
 }
 
 #[test]
-fn a_cold_build_that_cannot_be_read_is_reported_by_the_path_of_its_file() -> Result<(), Box<dyn Error>> {
+fn a_cold_build_that_cannot_be_read_is_reported_by_the_path_of_its_file() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let arguments = Cold::fortnight(&scratch, "45")?;
     let undownloaded = Script::answering(Cold::answers("[13]", "[]"));
@@ -1856,7 +1853,7 @@ fn a_cold_build_that_cannot_be_read_is_reported_by_the_path_of_its_file() -> Res
 }
 
 #[test]
-fn files_are_shown_under_their_names_and_absent_ones_are_said_to_be_absent() -> Result<(), Box<dyn Error>> {
+fn files_are_shown_under_their_names_and_absent_ones_are_said_to_be_absent() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     scratch.write("a.txt", "one\n")?;
     let answer = scratch.answer(&Script::new(), &["show", &scratch.file("a.txt"), &scratch.file("b.txt")]);
@@ -1972,7 +1969,7 @@ fn the_spec_line_is_read_from_the_body_of_the_pull_request() {
 }
 
 #[test]
-fn shard_results_are_counted_and_the_missed_and_timed_out_are_listed() -> Result<(), Box<dyn Error>> {
+fn shard_results_are_counted_and_the_missed_and_timed_out_are_listed() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     scratch.directory("shards/shard-0")?;
     scratch.directory("shards/shard-1")?;
@@ -1993,7 +1990,7 @@ fn shard_results_are_counted_and_the_missed_and_timed_out_are_listed() -> Result
 }
 
 #[test]
-fn a_shard_summary_without_shards_is_reported() -> Result<(), Box<dyn Error>> {
+fn a_shard_summary_without_shards_is_reported() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let answer = scratch.answer(&Script::new(), &["shard-summary", &scratch.file("absent"), &scratch.file("sum")]);
     assert_eq!(answer.exit, ExitCode::FAILURE);
@@ -2003,7 +2000,7 @@ fn a_shard_summary_without_shards_is_reported() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn the_matrix_is_written_shown_and_added_to_the_summary() -> Result<(), Box<dyn Error>> {
+fn the_matrix_is_written_shown_and_added_to_the_summary() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     scratch.directory("shards/shard-0")?;
     scratch.write(
@@ -2021,7 +2018,7 @@ fn the_matrix_is_written_shown_and_added_to_the_summary() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn a_matrix_that_cannot_be_made_is_reported_with_its_reason() -> Result<(), Box<dyn Error>> {
+fn a_matrix_that_cannot_be_made_is_reported_with_its_reason() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let arguments = ["matrix", &scratch.file("shards"), &scratch.file("out"), &scratch.file("sum")];
     let answer = scratch.answer(&Script::new(), &arguments);
@@ -2034,7 +2031,7 @@ fn a_matrix_that_cannot_be_made_is_reported_with_its_reason() -> Result<(), Box<
 }
 
 #[test]
-fn a_tee_writes_to_both_and_stops_at_the_first_failure() -> Result<(), Box<dyn Error>> {
+fn a_tee_writes_to_both_and_stops_at_the_first_failure() -> Result<(), Failed> {
     let (mut first, mut second) = (Vec::new(), Vec::new());
     {
         let mut tee = Tee::new(&mut first, &mut second);
@@ -2241,7 +2238,7 @@ impl Sqlite {
         "-c",
     ];
 
-    fn built(metadata: &str, exit: u8) -> Result<Built, Box<dyn Error>> {
+    fn built(metadata: &str, exit: u8) -> Result<Built, Failed> {
         let scratch = Scratch::new()?;
         let script = Script { metadata: metadata.to_owned(), ..Script::exiting(exit) };
         let library = scratch.file("sqlite");
@@ -2264,7 +2261,7 @@ impl Sqlite {
 
 #[test]
 fn sqlite_is_compiled_from_the_source_cargo_metadata_names_and_archived_into_the_library_directory()
--> Result<(), Box<dyn Error>> {
+-> Result<(), Failed> {
     let Built { answer, calls, library } = Sqlite::built(Sqlite::LISTED, 0)?;
     let object = format!("{library}/sqlite3.o");
     let compiled = Sqlite::owned(&Sqlite::COMPILED)
@@ -2278,7 +2275,7 @@ fn sqlite_is_compiled_from_the_source_cargo_metadata_names_and_archived_into_the
 }
 
 #[test]
-fn sqlite_without_libsqlite3_sys_in_the_metadata_is_refused_and_compiles_nothing() -> Result<(), Box<dyn Error>> {
+fn sqlite_without_libsqlite3_sys_in_the_metadata_is_refused_and_compiles_nothing() -> Result<(), Failed> {
     let Built { answer, calls, .. } = Sqlite::built(Sqlite::UNLISTED, 0)?;
     assert_eq!(answer.exit, ExitCode::FAILURE);
     assert!(answer.err.contains("no libsqlite3-sys package"));
@@ -2287,7 +2284,7 @@ fn sqlite_without_libsqlite3_sys_in_the_metadata_is_refused_and_compiles_nothing
 }
 
 #[test]
-fn sqlite_whose_compile_fails_is_not_archived() -> Result<(), Box<dyn Error>> {
+fn sqlite_whose_compile_fails_is_not_archived() -> Result<(), Failed> {
     let Built { answer, calls, .. } = Sqlite::built(Sqlite::LISTED, 1)?;
     assert_eq!(answer.exit, ExitCode::FAILURE);
     assert_eq!(
@@ -2298,7 +2295,7 @@ fn sqlite_whose_compile_fails_is_not_archived() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_build_script_waits_for_the_host_build_of_its_build_dependencies() -> Result<(), Box<dyn Error>> {
+fn a_build_script_waits_for_the_host_build_of_its_build_dependencies() -> Result<(), Failed> {
     let page = Page::with(
         &[
             Page::of("heavy", "1.0.0", "", "0.5"),
@@ -2321,7 +2318,7 @@ fn a_build_script_waits_for_the_host_build_of_its_build_dependencies() -> Result
 }
 
 #[test]
-fn a_scoped_rerun_that_tests_fewer_mutants_than_were_missed_fails() -> Result<(), Box<dyn Error>> {
+fn a_scoped_rerun_that_tests_fewer_mutants_than_were_missed_fails() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     scratch.survived(&[Missed { name: "src/a.rs:1:5: replace f -> bool with true", file: "src/a.rs", line: 1 }])?;
     let arguments = ["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "0/8", "-p"];
@@ -2338,7 +2335,7 @@ fn a_scoped_rerun_that_tests_fewer_mutants_than_were_missed_fails() -> Result<()
 }
 
 #[test]
-fn a_plan_for_a_pull_request_reaches_only_the_crates_whose_tests_changed() -> Result<(), Box<dyn Error>> {
+fn a_plan_for_a_pull_request_reaches_only_the_crates_whose_tests_changed() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     let named = Invocation::new(
         "git",
@@ -2376,7 +2373,7 @@ fn a_plan_for_a_pull_request_reaches_only_the_crates_whose_tests_changed() -> Re
 }
 
 #[test]
-fn the_timed_out_count_is_told_before_the_scoped_rerun_runs() -> Result<(), Box<dyn Error>> {
+fn the_timed_out_count_is_told_before_the_scoped_rerun_runs() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     scratch.survived(&[Missed { name: "src/a.rs:1:5: replace f -> bool with true", file: "src/a.rs", line: 1 }])?;
     scratch.directory("out/scoped/mutants.out")?;
@@ -2402,7 +2399,7 @@ fn the_timed_out_count_is_told_before_the_scoped_rerun_runs() -> Result<(), Box<
 }
 
 #[test]
-fn a_mutant_its_own_crate_missed_that_times_out_in_the_scope_is_still_a_survivor() -> Result<(), Box<dyn Error>> {
+fn a_mutant_its_own_crate_missed_that_times_out_in_the_scope_is_still_a_survivor() -> Result<(), Failed> {
     let scratch = Scratch::new()?;
     scratch.survived(&[Missed { name: "src/a.rs:1:5: replace f -> bool with true", file: "src/a.rs", line: 1 }])?;
     scratch.directory("out/scoped/mutants.out")?;

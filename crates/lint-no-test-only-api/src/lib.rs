@@ -17,7 +17,7 @@ use lint_core::Violation;
 use lint_core::{Headline, Parsed};
 use lint_file::{ContextLint, Reads, WatchingLint};
 use lint_placement::PackageRoot;
-use lint_sweep::{Contributing, Finds, Gathers, Watchers};
+use lint_sweep::{Contributing, Finds, Gathers};
 use test_features::TestFeatures;
 
 #[derive(Debug)]
@@ -102,11 +102,8 @@ impl WatchingLint for NoTestOnlyApi {
     fn watched(file: &SourceFile) -> Offering<'_> {
         let path = AsRef::<Path>::as_ref(file.head());
         let shipped = file.head().shipped().map(|_| ());
-        let gated =
-            shipped.map(|()| -> Box<dyn Finds<'_> + '_> { Box::new(Contributing::new(GatedItems::from(path))) });
-        let features: Box<dyn Finds<'_> + '_> = Box::new(Contributing::new(TestFeatures::from(path)));
-        let watchers = gated.into_iter().chain([features]).collect();
-        Offering { watchers }
+        let gated = shipped.map(|()| Contributing::new(GatedItems::from(path)));
+        Offering { gated, features: Contributing::new(TestFeatures::from(path)) }
     }
 
     fn judged<'file, 'head: 'file>(
@@ -124,7 +121,8 @@ impl WatchingLint for NoTestOnlyApi {
 
 #[derive(Debug)]
 pub struct Offering<'file> {
-    watchers: Watchers<'file>,
+    gated: Option<Contributing<GatedItems<'file>>>,
+    features: Contributing<TestFeatures<'file>>,
 }
 
 #[derive(Debug)]
@@ -134,6 +132,7 @@ pub struct Offered<'file> {
 
 impl<'file> Gathers<Offered<'file>> for Offering<'file> {
     fn gathered(self, file: &SourceFile) -> Offered<'file> {
-        Offered { found: self.watchers.gathered(file) }
+        let gated = self.gated.into_iter().flat_map(|watcher| watcher.found(file));
+        Offered { found: gated.chain(self.features.found(file)).collect() }
     }
 }

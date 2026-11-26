@@ -2,7 +2,7 @@ use lint_core::Headline;
 use lint_core::Joins;
 use lint_file::{Reads, SweptLint};
 use lint_sweep::{
-    Address, Concludes, Contribute, Contributed, Contributing, Contribution, Descend, Facts, Finds, Kind, Scope,
+    Address, Concludes, Contribute, Contributed, Contributing, Contribution, Descend, Facts, Kind, Scope,
 };
 use std::path::Path;
 use syntax::Span;
@@ -56,8 +56,8 @@ impl SweptLint for TypeShape {
         Headline::new("types carry their meaning: no bool fields, no tuples in signatures, no String errors");
     const READS: Reads = Reads::Every;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Contributing::new(TypeShapes { path: AsRef::<Path>::as_ref(file.head()) }))
+    fn watcher(file: &SourceFile) -> Contributing<impl Concludes<'_>> {
+        Contributing::new(TypeShapes { path: AsRef::<Path>::as_ref(file.head()) })
     }
 }
 

@@ -5,7 +5,7 @@ use crate::joins::Joins;
 use crate::watch::Kind;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) struct Kinds(u128);
+pub struct Kinds(u128);
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 struct Offset(usize);
@@ -14,7 +14,7 @@ struct Offset(usize);
 struct Depth(usize);
 
 #[derive(Clone, Copy, Debug)]
-struct Subtree {
+pub struct Subtree {
     descendants: Offset,
     kinds: Kinds,
 }
@@ -23,7 +23,7 @@ struct Subtree {
 pub(crate) struct KindIndex(Vec<Subtree>);
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct Indexed<'index> {
+pub struct Indexed<'index> {
     from: &'index [Subtree],
 }
 

@@ -1,9 +1,9 @@
 mod ignored;
 
-use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use test_failure::Failed;
 
 use console_ports::Complaint;
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
@@ -49,7 +49,7 @@ impl Outcome {
 }
 
 #[test]
-fn a_shard_lists_the_baseline_tests_and_the_tests_that_failed_per_mutant() -> Result<(), Box<dyn Error>> {
+fn a_shard_lists_the_baseline_tests_and_the_tests_that_failed_per_mutant() -> Result<(), Failed> {
     let mutants = Mutants::new()?;
     mutants.log("baseline.log", BASELINE_LOG)?;
     mutants.log("one.log", KILLING_LOG)?;
@@ -84,7 +84,7 @@ fn a_shard_lists_the_baseline_tests_and_the_tests_that_failed_per_mutant() -> Re
 }
 
 #[test]
-fn a_log_with_a_byte_that_is_not_utf8_is_still_read() -> Result<(), Box<dyn Error>> {
+fn a_log_with_a_byte_that_is_not_utf8_is_still_read() -> Result<(), Failed> {
     let mutants = Mutants::new()?;
     mutants.log("baseline.log", [BASELINE_LOG.as_bytes(), b"\xff\n"].concat())?;
     mutants.log("one.log", [KILLING_LOG.as_bytes(), b"\xff\n"].concat())?;
@@ -99,7 +99,7 @@ fn a_log_with_a_byte_that_is_not_utf8_is_still_read() -> Result<(), Box<dyn Erro
 }
 
 #[test]
-fn a_mutant_without_a_name_is_titled_by_its_file_and_replacement() -> Result<(), Box<dyn Error>> {
+fn a_mutant_without_a_name_is_titled_by_its_file_and_replacement() -> Result<(), Failed> {
     let mutants = Mutants::new()?;
     mutants.outcomes(&json!([
         Outcome::baseline(),
@@ -121,7 +121,7 @@ fn a_mutant_without_a_name_is_titled_by_its_file_and_replacement() -> Result<(),
 }
 
 #[test]
-fn the_log_is_the_first_one_that_exists_the_mutant_log_before_its_phases() -> Result<(), Box<dyn Error>> {
+fn the_log_is_the_first_one_that_exists_the_mutant_log_before_its_phases() -> Result<(), Failed> {
     let mutants = Mutants::new()?;
     mutants.log("baseline.log", BASELINE_LOG)?;
     mutants.log("main.log", KILLING_LOG)?;
@@ -147,7 +147,7 @@ fn the_log_is_the_first_one_that_exists_the_mutant_log_before_its_phases() -> Re
 }
 
 #[test]
-fn a_directory_in_place_of_a_log_is_no_log() -> Result<(), Box<dyn Error>> {
+fn a_directory_in_place_of_a_log_is_no_log() -> Result<(), Failed> {
     let mutants = Mutants::new()?;
     mutants.log_directory("dir.log")?;
     mutants.log("baseline.log", BASELINE_LOG)?;
@@ -161,7 +161,7 @@ fn a_directory_in_place_of_a_log_is_no_log() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn only_the_baseline_scenario_gives_baseline_tests() -> Result<(), Box<dyn Error>> {
+fn only_the_baseline_scenario_gives_baseline_tests() -> Result<(), Failed> {
     let mutants = Mutants::new()?;
     mutants.log("baseline.log", BASELINE_LOG)?;
     mutants.log("one.log", KILLING_LOG)?;
@@ -176,7 +176,7 @@ fn only_the_baseline_scenario_gives_baseline_tests() -> Result<(), Box<dyn Error
 }
 
 #[test]
-fn outcomes_that_are_missing_or_broken_are_refused() -> Result<(), Box<dyn Error>> {
+fn outcomes_that_are_missing_or_broken_are_refused() -> Result<(), Failed> {
     let mutants = Mutants::new()?;
     let missing = mutants.shard();
     assert_eq!(missing.exit, ExitCode::FAILURE);
@@ -192,7 +192,7 @@ fn outcomes_that_are_missing_or_broken_are_refused() -> Result<(), Box<dyn Error
 }
 
 #[test]
-fn a_matrix_that_cannot_be_written_is_refused() -> Result<(), Box<dyn Error>> {
+fn a_matrix_that_cannot_be_written_is_refused() -> Result<(), Failed> {
     let mutants = Mutants::new()?;
     mutants.outcomes(&json!([Outcome::baseline()]))?;
     let answer = Answer::to(&mutants.files, &[mutants.path().as_os_str(), "/no/such/dir/matrix.json".as_ref()]);
