@@ -25,10 +25,6 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Answering<'ports, S, D, C> {
         Answering { store, crew, role: Role::LEAD }
     }
 
-    pub fn answered(&self, said: &Body) -> Result<Option<Answers>, Failure> {
-        self.traced(said).map(Traced::answers)
-    }
-
     pub fn recalled(&self, said: &Body) -> Result<Recollection, Failure> {
         let nodes = self.store.read(ContextNodes)?;
         let replied = self.crew.replied(&Prompt::from(&Recalling::new(said, &nodes)), Self::RECALLING, Model::Haiku)?;

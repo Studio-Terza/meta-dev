@@ -14,6 +14,7 @@ mod session_cursors;
 mod session_events;
 mod session_records;
 mod shown_message;
+mod stop_trail;
 mod stored;
 mod stream_schema;
 
@@ -31,5 +32,6 @@ pub use session_cursors::SessionCursors;
 pub use session_events::SessionEvents;
 pub use session_records::{Holding, SessionRecords};
 pub use shown_message::ShownMessage;
+pub use stop_trail::{StopRow, StopTrail, Stopped, Tally};
 pub use stored::Stored;
 pub use stream_schema::StreamSchema;

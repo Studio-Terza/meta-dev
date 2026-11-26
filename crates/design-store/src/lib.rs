@@ -7,5 +7,6 @@ pub use design_graph::{
 pub use design_messages::{
     Asked, AskedEarlier, Cursors, EarlierLines, HeardEvent, Hit, Holding, ImportedEnding, ImportedNotes, LastSaid,
     LinkRow, Noted, OwnerHistory, Prefixes, Quote, Quoted, QuotedSegments, Said, Scope, SearchSegments, SessionCursors,
-    SessionEvents, SessionRecords, Shortest, ShownMessage, Stored, StreamSchema, Unabridged,
+    SessionEvents, SessionRecords, Shortest, ShownMessage, StopRow, StopTrail, Stopped, Stored, StreamSchema, Tally,
+    Unabridged,
 };

@@ -1,6 +1,7 @@
 use std::fmt;
 use std::ops::Not;
 
+use design_model::{Awaited, Halt};
 use design_store::HeardEvent;
 use dispatch_ports::{Reply, Wall};
 use invariants::Ignoring;
@@ -52,6 +53,12 @@ pub struct Waiting {
     deadlock: Lock,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Wait {
+    awaited: Awaited,
+    stall: Option<Stall>,
+}
+
 #[derive(Debug)]
 pub struct Asking<'snapshot> {
     snapshot: &'snapshot Snapshot,
@@ -74,6 +81,62 @@ impl From<Vec<HeardEvent>> for Snapshot {
 impl From<bool> for Lock {
     fn from(deadlocked: bool) -> Lock {
         Lock(deadlocked.then_some(Deadlocked))
+    }
+}
+
+impl From<On> for Awaited {
+    fn from(on: On) -> Awaited {
+        match on {
+            On::Owner => Awaited::Owner,
+            On::Shell => Awaited::Shell,
+            On::Agent => Awaited::Agent,
+            On::Nothing => Awaited::Nothing,
+        }
+    }
+}
+
+impl From<Waiting> for Wait {
+    fn from(waiting: Waiting) -> Wait {
+        let stall = waiting.deadlock.0.map(|Deadlocked| Stall::Deadlock(waiting.on));
+        Wait { awaited: Awaited::from(waiting.on), stall }
+    }
+}
+
+impl From<Overrun> for Wait {
+    fn from(overrun: Overrun) -> Wait {
+        Wait { awaited: Awaited::Unchecked, stall: Some(Stall::Overrun(overrun)) }
+    }
+}
+
+impl From<Awaited> for Wait {
+    fn from(awaited: Awaited) -> Wait {
+        Wait { awaited, stall: None }
+    }
+}
+
+impl Wait {
+    #[must_use]
+    pub fn awaited(&self) -> Awaited {
+        self.awaited
+    }
+
+    #[must_use]
+    pub fn stall(&self) -> Option<&Stall> {
+        self.stall.as_ref()
+    }
+
+    #[must_use]
+    pub fn halt(&self) -> Halt {
+        self.stall.as_ref().map_or(Halt::Live, Halt::from)
+    }
+}
+
+impl From<&Stall> for Halt {
+    fn from(stall: &Stall) -> Halt {
+        match stall {
+            Stall::Deadlock(_) => Halt::Deadlock,
+            Stall::Overrun(_) => Halt::Overrun,
+        }
     }
 }
 
@@ -117,10 +180,10 @@ impl Snapshot {
     }
 
     #[must_use]
-    pub fn overrun(&self, now: Wall) -> Option<Stall> {
+    pub fn overrun(&self, now: Wall) -> Option<Overrun> {
         self.running(now).into_iter().find_map(|aged| {
             let minutes = aged.minutes.filter(|minutes| *minutes > Self::LIMIT_MINUTES)?;
-            Some(Stall::Overrun(Overrun { tool: AsRef::<Body>::as_ref(aged.event).clone(), minutes }))
+            Some(Overrun { tool: AsRef::<Body>::as_ref(aged.event).clone(), minutes })
         })
     }
 
@@ -133,10 +196,6 @@ impl Snapshot {
 impl Waiting {
     pub fn read(reply: &Reply) -> Option<Waiting> {
         Replied::from(reply).object::<Waiting>().ignoring(Ignored::Unclassified)
-    }
-
-    pub fn deadlocked(self) -> Option<Stall> {
-        self.deadlock.0.map(|Deadlocked| Stall::Deadlock(self.on))
     }
 }
 

@@ -1,3 +1,6 @@
+#[path = "generated/laws.rs"]
+mod generated_laws;
+
 use design_messages::{CursorRow, CursorRowNew, StreamSchema};
 use laws::proptest::prelude::{Strategy, any};
 use sqlite_ports::SqliteOpener;
