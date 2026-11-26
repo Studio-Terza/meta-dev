@@ -193,6 +193,92 @@ LIMIT
         ))
     }
 
+    pub(crate) fn owner_between(
+        session: &SessionId,
+        from: &Instant,
+        until: &Instant,
+        statements: &mut Statements<'_>,
+    ) -> Result<Vec<MessageRow>, StoreFailure> {
+        statements.rows(store_ports::query!(
+            MessageRow,
+            r#"
+SELECT
+  uuid,
+  session,
+  parent,
+  at,
+  author,
+  body
+FROM
+  messages
+WHERE
+  session = ?1
+  AND author = 'owner'
+  AND at >= ?2
+  AND at < ?3
+ORDER BY
+  at
+"#,
+            session: SessionId,
+            from: Instant,
+            until: Instant
+        ))
+    }
+
+    pub(crate) fn lead_before(
+        session: &SessionId,
+        at: &Instant,
+        statements: &mut Statements<'_>,
+    ) -> Result<Vec<MessageRow>, StoreFailure> {
+        statements.rows(store_ports::query!(
+            MessageRow,
+            r#"
+SELECT
+  uuid,
+  session,
+  parent,
+  at,
+  author,
+  body
+FROM
+  messages
+WHERE
+  session = ?1
+  AND author = 'lead'
+  AND at < ?2
+ORDER BY
+  at DESC
+LIMIT
+  1
+"#,
+            session: SessionId,
+            at: Instant
+        ))
+    }
+
+    pub(crate) fn owner_before(at: &Instant, statements: &mut Statements<'_>) -> Result<Vec<MessageRow>, StoreFailure> {
+        statements.rows(store_ports::query!(
+            MessageRow,
+            r#"
+SELECT
+  uuid,
+  session,
+  parent,
+  at,
+  author,
+  body
+FROM
+  messages
+WHERE
+  author = 'owner'
+  AND at < ?1
+ORDER BY
+  at
+"#,
+            at: Instant
+        ))
+    }
+
     pub(crate) fn answering(self, statements: &mut Statements<'_>) -> Result<Vec<MessageRow>, StoreFailure> {
         let answers = [&self]
             .into_iter()
@@ -463,12 +549,15 @@ WHERE
         self.rank.ordered(other.rank).then(self.id.cmp(&other.id))
     }
 
-    pub(crate) fn best_per_message(hits: Vec<Hit>) -> BTreeMap<Uuid, f64> {
-        hits.into_iter().fold(BTreeMap::new(), |mut best: BTreeMap<Uuid, f64>, hit| {
-            let rank = hit.rank.0;
-            best.entry(hit.uuid).and_modify(|held| *held = held.min(rank)).or_insert(rank);
-            best
-        })
+    pub(crate) fn best_per_message(hits: Vec<Hit>, before: Option<&Instant>) -> BTreeMap<Uuid, f64> {
+        hits.into_iter().filter(|hit| before.is_none_or(|bound| hit.at < *bound)).fold(
+            BTreeMap::new(),
+            |mut best: BTreeMap<Uuid, f64>, hit| {
+                let rank = hit.rank.0;
+                best.entry(hit.uuid).and_modify(|held| *held = held.min(rank)).or_insert(rank);
+                best
+            },
+        )
     }
 }
 

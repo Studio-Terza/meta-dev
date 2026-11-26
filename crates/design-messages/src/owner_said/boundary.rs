@@ -3,9 +3,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::{fmt, slice};
 
 use store_ports::{Query, Statements, StoreFailure};
-use transcript_ports::{Authorship, Body, Instant, Uuid};
+use transcript_ports::{Authorship, Body, Instant, SessionId, Uuid};
 
-use super::{LastSaid, OwnerSaid};
+use super::{LastSaid, OwnerBefore, OwnerSaid, TurnEnds};
 use crate::Scope;
 use crate::boundary::{Hit, MessageRow};
 
@@ -22,6 +22,15 @@ pub struct Quote {
     at: Instant,
     excerpt: Body,
 }
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TurnEnd {
+    asked: Said,
+    reply: Said,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Unabridged<'said>(&'said Said);
 
 #[derive(Clone, Debug)]
 struct Matched {
@@ -53,9 +62,60 @@ impl Query for OwnerSaid {
             .into_iter()
             .flatten()
             .map(Said::from)
+            .filter(|said| self.before.as_ref().is_none_or(|bound| said.at < *bound))
             .filter(|said| seen.insert(said.uuid.clone()))
             .take(OwnerSaid::MOST)
             .collect())
+    }
+}
+
+impl Query for OwnerBefore {
+    type Rows = Vec<Said>;
+
+    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Said>, StoreFailure> {
+        Ok(MessageRow::owner_before(&self.0, statements)?.into_iter().map(Said::from).collect())
+    }
+}
+
+impl Query for TurnEnds {
+    type Rows = Vec<TurnEnd>;
+
+    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<TurnEnd>, StoreFailure> {
+        let replies = MessageRow::owner_between(&self.session, &self.from, &self.until, statements)?;
+        let ends = replies
+            .into_iter()
+            .map(Said::from)
+            .map(|reply| TurnEnd::read(&self.session, reply, statements))
+            .collect::<Result<Vec<Option<TurnEnd>>, StoreFailure>>()?;
+        let mut seen = BTreeSet::new();
+        Ok(ends.into_iter().flatten().filter(|end| seen.insert(end.asked.uuid.clone())).collect())
+    }
+}
+
+impl TurnEnd {
+    fn read(
+        session: &SessionId,
+        reply: Said,
+        statements: &mut Statements<'_>,
+    ) -> Result<Option<TurnEnd>, StoreFailure> {
+        let asked = MessageRow::lead_before(session, &reply.at, statements)?;
+        Ok(asked.into_iter().next().map(|row| TurnEnd { asked: Said::from(row), reply }))
+    }
+
+    #[must_use]
+    pub fn asked(&self) -> &Said {
+        &self.asked
+    }
+
+    #[must_use]
+    pub fn replied(&self) -> Unabridged<'_> {
+        Unabridged(&self.reply)
+    }
+}
+
+impl<'said> From<&'said Said> for Unabridged<'said> {
+    fn from(said: &'said Said) -> Unabridged<'said> {
+        Unabridged(said)
     }
 }
 
@@ -70,10 +130,12 @@ impl Query for LastSaid {
 
 impl OwnerSaid {
     fn best(&self, scope: Scope, statements: &mut Statements<'_>) -> Result<Vec<BTreeMap<Uuid, f64>>, StoreFailure> {
-        [self.0.first()]
+        [self.terms.first()]
             .into_iter()
-            .chain(self.0.rest())
-            .map(|term| Hit::matching(term, scope, statements).map(Hit::best_per_message))
+            .chain(self.terms.rest())
+            .map(|term| {
+                Hit::matching(term, scope, statements).map(|hits| Hit::best_per_message(hits, self.before.as_ref()))
+            })
             .collect()
     }
 }
@@ -130,6 +192,30 @@ impl Said {
 impl AsRef<Uuid> for Said {
     fn as_ref(&self) -> &Uuid {
         &self.uuid
+    }
+}
+
+impl AsRef<Instant> for Said {
+    fn as_ref(&self) -> &Instant {
+        &self.at
+    }
+}
+
+impl AsRef<Body> for Said {
+    fn as_ref(&self) -> &Body {
+        &self.body
+    }
+}
+
+impl AsRef<Uuid> for Quote {
+    fn as_ref(&self) -> &Uuid {
+        &self.uuid
+    }
+}
+
+impl fmt::Display for Unabridged<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "[{} {}] {}", self.0.uuid, self.0.at, self.0.body)
     }
 }
 

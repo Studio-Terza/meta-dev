@@ -1,6 +1,6 @@
 mod boundary;
 
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
 use std::sync::Mutex;
 
 use invariants::Unpoisoned;
@@ -8,8 +8,8 @@ use port_core::Pass;
 
 use boundary::Spawns;
 use dispatch_ports::{
-    AgentRun, Bell, ClockFiller, DispatchFailure, DispatchFiller, Ended, Job, Output, Pause, Pid, Prompt, Started,
-    Wall, clock_ops, dispatch_ops,
+    AgentRun, Bell, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Ended, Job, Model, Output, Pause, Pid,
+    Prompt, Started, Wall, clock_ops, dispatch_ops,
 };
 
 #[derive(Clone, Debug)]
@@ -21,8 +21,9 @@ struct Living {
 #[derive(Debug, Default)]
 pub struct Scripted {
     replies: Mutex<VecDeque<Option<Output>>>,
-    current: Mutex<Option<Output>>,
+    pending: Mutex<BTreeMap<Pid, Output>>,
     prompts: Mutex<Vec<Prompt>>,
+    models: Mutex<Vec<Model>>,
     living: Vec<Living>,
     kills: Mutex<Vec<Pid>>,
 }
@@ -44,6 +45,11 @@ impl Scripted {
     }
 
     #[must_use]
+    pub fn models(&self) -> Vec<Model> {
+        self.models.lock().unpoisoned().clone()
+    }
+
+    #[must_use]
     pub fn kills(&self) -> Vec<Pid> {
         self.kills.lock().unpoisoned().clone()
     }
@@ -62,17 +68,19 @@ impl DispatchFiller for &Scripted {
     ) -> Result<AgentRun, DispatchFailure> {
         let mut prompts = self.prompts.lock().unpoisoned();
         prompts.push(prompt.clone());
+        self.models.lock().unpoisoned().push(*AsRef::<Model>::as_ref(job));
+        let pid = Spawns::pid(prompts.len());
         let reply = self.replies.lock().unpoisoned().pop_front().flatten();
-        *self.current.lock().unpoisoned() = reply;
-        Ok(AgentRun::new(Spawns::pid(prompts.len()), *job.as_ref()))
+        self.pending.lock().unpoisoned().extend(reply.map(|output| (pid, output)));
+        Ok(AgentRun::new(pid, *AsRef::<Deadline>::as_ref(job)))
     }
 
     fn output(
         &self,
         _pass: Pass<'_, dispatch_ops::Output>,
-        _run: &mut AgentRun,
+        run: &mut AgentRun,
     ) -> Result<Option<Output>, DispatchFailure> {
-        Ok(self.current.lock().unpoisoned().take())
+        Ok(self.pending.lock().unpoisoned().remove(&run.pid()))
     }
 
     fn started(&self, _pass: Pass<'_, dispatch_ops::Started>, pid: Pid) -> Result<Option<Started>, DispatchFailure> {

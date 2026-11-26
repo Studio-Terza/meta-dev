@@ -9,6 +9,7 @@ pub enum Outcome {
     Shown,
     Searched,
     Answered,
+    Evaluated,
     Recalled,
     Initialised,
     Applied,

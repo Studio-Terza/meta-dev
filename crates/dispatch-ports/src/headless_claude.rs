@@ -9,7 +9,7 @@ use port_core::Pass;
 
 use crate::agent_run::Exchange;
 use crate::{
-    Agent, AgentRun, Bell, DispatchFailure, DispatchFiller, Ended, Ignored, Job, Output, Pid, Prompt, Started,
+    Agent, AgentRun, Bell, DispatchFailure, DispatchFiller, Ended, Ignored, Job, Model, Output, Pid, Prompt, Started,
     dispatch_ops,
 };
 
@@ -45,6 +45,7 @@ impl DispatchFiller for HeadlessClaude {
         let exchange = Exchange::begun(prompt, prompting, [replies, complaints], bell.ringer());
         Command::new(self.agent.program())
             .args(self.agent.arguments())
+            .args(AsRef::<Model>::as_ref(job).spelled())
             .current_dir(&self.scratch)
             .process_group(0)
             .stdin(agent_in)

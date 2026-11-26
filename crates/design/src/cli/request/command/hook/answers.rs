@@ -7,8 +7,8 @@ use transcript_ports::Body;
 
 use super::super::structure::Crew;
 use crate::cli::failure::Failure;
-pub use boundary::{Answers, Traced};
-use boundary::{Asked, Question, Role};
+use boundary::Question;
+pub use boundary::{Answers, Asked, Replied, Role, Traced};
 
 #[derive(Debug)]
 pub struct Answering<'ports, S: Store, D: Dispatch, C: Clock> {
@@ -30,7 +30,7 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Answering<'ports, S, D, C> {
 
     pub fn traced(&self, said: &Body) -> Result<Traced, Failure> {
         let classified = self.crew.replied(&Prompt::from(&self.role.classifying(said)), Self::TIMEOUT)?;
-        classified.and_then(Asked::read).map_or(Ok(Traced::Statement), |asked| self.selected(asked))
+        classified.as_ref().and_then(Asked::read).map_or(Ok(Traced::Statement), |asked| self.selected(asked))
     }
 
     fn selected(&self, asked: Asked) -> Result<Traced, Failure> {

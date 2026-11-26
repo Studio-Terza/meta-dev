@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use dispatch_ports::{
     AgentRun, Bell, ClockFiller, Deadline, Dispatch, DispatchFailure, DispatchFiller, Due, Ended, Errored, Fault,
-    Finished, Job, Output, Pause, Pid, Prompt, Reply, Stall, Stalled, Started, Stderr, Timeout, Tokens, Told,
+    Finished, Job, Model, Output, Pause, Pid, Prompt, Reply, Stall, Stalled, Started, Stderr, Timeout, Tokens, Told,
     Unreadable, Usage, Wall, Watch, Watched, Woke, clock_ops, dispatch_ops,
 };
 use invariants::{Ignoring, Unpoisoned};
@@ -219,7 +219,7 @@ impl Watching {
             let clock = run.port(FakeClock::new(Sleep { after: self.sleeping_after, slept }, &waits));
             let dispatch = run.port(FakeDispatch { finishing: self.finishing, polls: Mutex::new(0) });
             let deadline = Deadline::after(Watching::START, Timeout::new(self.timeout));
-            let held = dispatch.dispatch(&Job::due_by(deadline), &Prompt::new(String::new()))?;
+            let held = dispatch.dispatch(&Job::due_by(deadline, Model::Haiku), &Prompt::new(String::new()))?;
             Watch::over(&dispatch, &clock).watched(held)?
         };
         Ok(Observed::read(watched, run.finish().snapshot(), waits))
@@ -266,7 +266,7 @@ impl Lingering {
             let replying = Lingering::pauses(timeout).saturating_add(2);
             let dispatch = run.port(FakeDispatch { finishing: Some(replying), polls: Mutex::new(0) });
             let deadline = Deadline::after(Watching::START, timeout);
-            let held = dispatch.dispatch(&Job::due_by(deadline), &Prompt::new(String::new()))?;
+            let held = dispatch.dispatch(&Job::due_by(deadline, Model::Haiku), &Prompt::new(String::new()))?;
             held.bell().ringer().ring();
             Watch::over(&dispatch, &clock).watched(held)?
         };

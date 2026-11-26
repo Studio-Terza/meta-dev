@@ -4,8 +4,8 @@ use std::ops::Not;
 use design_store::{Quote, Said};
 use dispatch_ports::Reply;
 use grammar_search::Terms;
-use newtype::Wrapping;
 use serde::Deserialize;
+use serde::de::DeserializeOwned;
 use transcript_ports::{Body, Uuid};
 
 use crate::cli::request::ignored::Ignored;
@@ -60,8 +60,11 @@ pub struct Classifying {
 #[derive(Debug)]
 pub struct Selecting<'asked> {
     question: &'asked Body,
-    candidates: &'asked [Said],
+    shown: Vec<String>,
 }
+
+#[derive(Clone, Copy, Debug)]
+pub struct Replied<'reply>(&'reply Reply);
 
 impl Traced {
     pub fn answers(self) -> Option<Answers> {
@@ -113,23 +116,42 @@ impl Role {
 }
 
 impl Asked {
-    pub fn read(reply: Reply) -> Option<Asked> {
-        let json = Self::braced(&reply.into_inner(), '{', '}');
-        serde_json::from_str::<Asked>(&json)
-            .ignoring(Ignored::Unclassified)
-            .filter(|asked| asked.kind == Kind::Question)
+    pub fn read(reply: &Reply) -> Option<Asked> {
+        Replied(reply).object::<Asked>().ignoring(Ignored::Unclassified).filter(|asked| asked.kind == Kind::Question)
     }
 
     pub fn terms(&self) -> Option<Terms> {
         Terms::lexed(self.terms.iter().map(AsRef::as_ref))
     }
 
-    pub fn selecting<'asked>(&'asked self, candidates: &'asked [Said]) -> Selecting<'asked> {
-        Selecting { question: &self.question, candidates }
+    pub fn selecting(&self, shown: &[impl fmt::Display]) -> Selecting<'_> {
+        Selecting { question: &self.question, shown: shown.iter().map(ToString::to_string).collect() }
+    }
+}
+
+impl AsRef<Body> for Asked {
+    fn as_ref(&self) -> &Body {
+        &self.question
+    }
+}
+
+impl<'reply> From<&'reply Reply> for Replied<'reply> {
+    fn from(reply: &'reply Reply) -> Replied<'reply> {
+        Replied(reply)
+    }
+}
+
+impl Replied<'_> {
+    pub fn object<T: DeserializeOwned>(self) -> Result<T, serde_json::Error> {
+        serde_json::from_str(&self.braced('{', '}'))
     }
 
-    fn braced(text: &str, open: char, close: char) -> String {
-        let letters: Vec<char> = text.chars().collect();
+    pub fn listed<T: DeserializeOwned>(self) -> Vec<T> {
+        serde_json::from_str(&self.braced('[', ']')).ignoring(Ignored::Unpicked).unwrap_or_default()
+    }
+
+    fn braced(self, open: char, close: char) -> String {
+        let letters: Vec<char> = self.0.to_string().chars().collect();
         let start = letters.iter().position(|letter| *letter == open).unwrap_or(letters.len());
         let end = letters.iter().rposition(|letter| *letter == close).map_or(start, |last| last + 1);
         letters.get(start..end).unwrap_or_default().iter().collect()
@@ -138,13 +160,16 @@ impl Asked {
 
 impl Answers {
     pub fn verified(reply: &Reply, candidates: &[Said]) -> Option<Answers> {
-        let json = Asked::braced(&reply.to_string(), '[', ']');
-        let picked: Vec<Picked> = serde_json::from_str(&json).ignoring(Ignored::Unpicked).unwrap_or_default();
-        let quotes: Vec<Quote> = picked
+        let quotes = Answers::quoted(reply, candidates);
+        quotes.is_empty().not().then_some(Answers(quotes))
+    }
+
+    pub fn quoted(reply: &Reply, candidates: &[Said]) -> Vec<Quote> {
+        let picked: Vec<Picked> = Replied(reply).listed();
+        picked
             .iter()
             .filter_map(|pick| candidates.iter().find_map(|said| said.quoted(&pick.uuid, &pick.quote)))
-            .collect();
-        quotes.is_empty().not().then_some(Answers(quotes))
+            .collect()
     }
 }
 
@@ -164,7 +189,6 @@ impl fmt::Display for Classifying {
 
 impl fmt::Display for Selecting<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let candidates: Vec<String> = self.candidates.iter().map(ToString::to_string).collect();
         write!(
             formatter,
             "An AI agent is about to ask its owner this question:\n{}\n\n\
@@ -172,7 +196,7 @@ impl fmt::Display for Selecting<'_> {
              List every passage that answers the question or bears on it: a missed answer costs far more than an extra passage, so when unsure, include it.\n\
              Reply with JSON only, no prose and no code fence: a list of {{\"uuid\": the full uuid from the header, \"quote\": an excerpt of that message copied exactly, character for character, one or two sentences}}. Reply [] if none bear on it.\n\n{}",
             self.question,
-            candidates.join("\n\n")
+            self.shown.join("\n\n")
         )
     }
 }
