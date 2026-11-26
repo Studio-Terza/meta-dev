@@ -821,12 +821,7 @@ fn a_directory_that_cannot_be_listed_fails_closed_wherever_it_is_reached() -> Re
     scratch.write("workspace/one/src/lib.rs", CLEAN)?;
     scratch.write("package/Cargo.toml", MANIFEST)?;
     scratch.write("package/src/lib.rs", CLEAN)?;
-    let cases = [
-        ("workspace", "one/src/inner", "one"),
-        ("workspace", "one/.hidden", "one"),
-        ("workspace", "two", "one"),
-        ("package", "tests", "src"),
-    ];
+    let cases = [("workspace", "one/src/inner", "one"), ("workspace", "two", "one"), ("package", "tests", "src")];
     cases.iter().try_for_each(|(root, directory, given)| {
         scratch.write(&format!("{root}/{directory}/kept.txt"), "x")?;
         let unlistable = scratch.files.canonical(&scratch.at(&format!("{root}/{directory}")))?;

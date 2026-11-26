@@ -12,18 +12,15 @@ use crate::survey::Survey;
 #[derive(Clone, Copy, Debug)]
 pub enum Ignored {
     Hidden,
-    VersionControl,
     BuildOutput,
 }
 
 impl Ignored {
     pub const FOR_PACKAGES: [Ignored; 2] = [Ignored::Hidden, Ignored::BuildOutput];
-    pub const FOR_FILES: [Ignored; 2] = [Ignored::VersionControl, Ignored::BuildOutput];
 
     const BUILD_DIRECTORY: &'static str = "target";
     const MANIFEST: &'static str = "Cargo.toml";
     const HIDDEN: Word<'static> = Word::new(".");
-    const VERSION_CONTROL: &'static str = ".git";
 
     pub fn manifests(directories: &[PathBuf]) -> Vec<PathBuf> {
         directories.iter().map(|directory| directory.join(Self::MANIFEST)).collect()
@@ -38,7 +35,6 @@ impl Ignored {
             Ignored::Hidden => {
                 path.file_name().filter(|name| Name::from(*name).matches::<Prefix>(&[Self::HIDDEN]).is_some())
             }
-            Ignored::VersionControl => path.file_name().filter(|name| *name == Self::VERSION_CONTROL),
             Ignored::BuildOutput => path
                 .file_name()
                 .filter(|name| *name == Self::BUILD_DIRECTORY)

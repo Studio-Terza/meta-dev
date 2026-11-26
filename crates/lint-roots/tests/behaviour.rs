@@ -9,13 +9,8 @@ fn a_listing_failure_is_reported_once_to_the_first_walk_that_reaches_it() {
     let given = [PathBuf::from("/p/lib.rs"), PathBuf::from("/p/lib.rs")];
     let opened = Tree::open_many(&files, &given);
     let trees: Vec<&Tree<'_>> = opened.iter().flatten().collect();
-    let reported = Roots::surveyed(&files, &trees).parted(|below, listing| {
-        [
-            below.trees().iter().filter(|walked| walked.is_err()).count(),
-            listing.files().iter().filter(|listed| listed.is_err()).count(),
-        ]
-    });
-    assert_eq!(reported, [2, 0]);
+    let reported = Roots::surveyed(&files, &trees).trees().iter().filter(|walked| walked.is_err()).count();
+    assert_eq!(reported, 2);
 }
 
 #[test]

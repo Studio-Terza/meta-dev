@@ -1,63 +1,13 @@
 use syntax::{
-    AngleBracketedGenericArguments, Expr, ExprCall, ExprClosure, ExprLit, ExprPath, Field, Fields, FnArg,
-    GenericArgument, GenericParam, Ident, ImplItem, ImplItemFn, ImplItemType, Item, ItemImpl, ItemMod, ItemUse, Lit,
-    LitStr, Member, Pat, PatIdent, PatType, PathArguments, ReturnType, Stmt, TraitItem, TraitItemFn, TraitItemType,
-    Type, TypeParam, TypePath,
+    AngleBracketedGenericArguments, Expr, ExprLit, ExprPath, FnArg, GenericArgument, Item, ItemImpl, ItemMod, ItemUse,
+    Lit, LitStr, PatType, PathArguments, ReturnType, Type, TypePath,
 };
-use syntax::{Group, Literal, Punct, TokenTree};
+use syntax::{Group, Ident, Literal, Punct, TokenTree};
 
 #[derive(Debug)]
 pub struct Syntax;
 
 impl Syntax {
-    #[must_use]
-    pub fn impl_fn(member: &ImplItem) -> Option<&ImplItemFn> {
-        match member {
-            ImplItem::Fn(function) => Some(function),
-            _ => None,
-        }
-    }
-
-    #[must_use]
-    pub fn impl_type(member: &ImplItem) -> Option<&ImplItemType> {
-        match member {
-            ImplItem::Type(associated) => Some(associated),
-            _ => None,
-        }
-    }
-
-    #[must_use]
-    pub fn stmt_item(statement: &Stmt) -> Option<&Item> {
-        match statement {
-            Stmt::Item(item) => Some(item),
-            _ => None,
-        }
-    }
-
-    #[must_use]
-    pub fn closure(expr: &Expr) -> Option<&ExprClosure> {
-        match expr {
-            Expr::Closure(closure) => Some(closure),
-            _ => None,
-        }
-    }
-
-    #[must_use]
-    pub fn trait_fn(member: &TraitItem) -> Option<&TraitItemFn> {
-        match member {
-            TraitItem::Fn(function) => Some(function),
-            _ => None,
-        }
-    }
-
-    #[must_use]
-    pub fn trait_type(member: &TraitItem) -> Option<&TraitItemType> {
-        match member {
-            TraitItem::Type(declared) => Some(declared),
-            _ => None,
-        }
-    }
-
     #[must_use]
     pub fn typed(argument: &FnArg) -> Option<&PatType> {
         match argument {
@@ -115,33 +65,9 @@ impl Syntax {
     }
 
     #[must_use]
-    pub fn named_member(member: &Member) -> Option<&Ident> {
-        match member {
-            Member::Named(named) => Some(named),
-            Member::Unnamed(_) => None,
-        }
-    }
-
-    #[must_use]
-    pub fn expr_call(expr: &Expr) -> Option<&ExprCall> {
-        match expr {
-            Expr::Call(call) => Some(call),
-            _ => None,
-        }
-    }
-
-    #[must_use]
     pub fn expr_path(expr: &Expr) -> Option<&ExprPath> {
         match expr {
             Expr::Path(path) => Some(path),
-            _ => None,
-        }
-    }
-
-    #[must_use]
-    pub fn literal(expr: &Expr) -> Option<&Lit> {
-        match expr {
-            Expr::Lit(literal) => Some(&literal.lit),
             _ => None,
         }
     }
@@ -151,40 +77,6 @@ impl Syntax {
         match value {
             Expr::Lit(ExprLit { lit: Lit::Str(text), .. }) => Some(text),
             _ => None,
-        }
-    }
-
-    #[must_use]
-    pub fn tail(statement: &Stmt) -> Option<&Expr> {
-        match statement {
-            Stmt::Expr(expr, None) => Some(expr),
-            _ => None,
-        }
-    }
-
-    #[must_use]
-    pub fn pat_ident(pattern: &Pat) -> Option<&PatIdent> {
-        match pattern {
-            Pat::Ident(binding) => Some(binding),
-            _ => None,
-        }
-    }
-
-    #[must_use]
-    pub fn type_param(param: &GenericParam) -> Option<&TypeParam> {
-        match param {
-            GenericParam::Type(parameter) => Some(parameter),
-            _ => None,
-        }
-    }
-
-    #[must_use]
-    pub fn newtype_field(fields: &Fields) -> Option<&Field> {
-        match fields {
-            Fields::Unnamed(tuple) => {
-                Some(tuple).filter(|candidate| candidate.unnamed.len() == 1).and_then(|single| single.unnamed.first())
-            }
-            Fields::Named(_) | Fields::Unit => None,
         }
     }
 

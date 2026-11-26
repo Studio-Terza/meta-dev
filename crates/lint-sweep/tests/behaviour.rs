@@ -118,29 +118,29 @@ impl Contribute for Positions {
         &Positions::SCOPES
     }
 
-    fn on_ident(&self, _: &Ident, name: &Name, around: &Around<'_, ()>) -> Contributed<(), Vec<String>> {
-        Contributed::parted(vec![format!("{name} at {:?}", around.position())])
+    fn on_ident(&self, _: &Ident, name: &Name, _: &Around<'_, ()>) -> Contributed<(), Vec<String>> {
+        Contributed::parted(vec![format!("entered {name}")])
     }
 
     fn off_ident(&self, found: &Ident, inner: Contribution<(), Vec<String>>) -> Vec<String> {
         inner.concluded(|(), heard| heard.into_iter().chain([format!("left {found}")]).collect())
     }
 
-    fn on_block(&self, _: &Block, _: &Facts<'_, Block>, around: &Around<'_, ()>) -> Contributed<(), Vec<String>> {
-        Contributed::parted(vec![format!("block at {:?}", around.position())])
+    fn on_block(&self, _: &Block, _: &Facts<'_, Block>, _: &Around<'_, ()>) -> Contributed<(), Vec<String>> {
+        Contributed::parted(vec!["block".to_owned()])
     }
 
     fn on_expr_binary(
         &self,
         _: &ExprBinary,
         _: &Facts<'_, ExprBinary>,
-        around: &Around<'_, ()>,
+        _: &Around<'_, ()>,
     ) -> Contributed<(), Vec<String>> {
-        Contributed::parted(vec![format!("sum at {:?}", around.position())])
+        Contributed::parted(vec!["sum".to_owned()])
     }
 
-    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>, around: &Around<'_, ()>) -> Contributed<(), Vec<String>> {
-        Contributed::new((), vec![format!("macro at {:?}", around.position())], Descend::Expand)
+    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>, _: &Around<'_, ()>) -> Contributed<(), Vec<String>> {
+        Contributed::new((), vec!["macro".to_owned()], Descend::Expand)
     }
 
     fn off_macro(&self, _: &Macro, _: &Facts<'_, Macro>, inner: Contribution<(), Vec<String>>) -> Vec<String> {

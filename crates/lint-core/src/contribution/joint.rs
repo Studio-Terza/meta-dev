@@ -4,7 +4,7 @@ use std::mem;
 use lint_layout::Name;
 use syntax::{Ident, Macro, Node};
 
-use super::{Around, Contributed, Contributing, Contribution, Scoping, Tallied, Visit, Visits, WalkPosition, Walked};
+use super::{Around, Contributed, Contributing, Contribution, Scoping, Tallied, Visit, Visits, Walked};
 use crate::joins::Joins;
 use crate::kind_index::{Cursors, Indexed, Kinds};
 use crate::macros::Macros;
@@ -60,7 +60,6 @@ struct Entry<Open, Part> {
     part: Part,
     open: Option<Open>,
     scoping: Scoping,
-    inner: WalkPosition,
     below: Walked<Open, Part>,
 }
 
@@ -191,10 +190,6 @@ impl<Open: Joins, Part: Joins> Entries<Open, Part> {
     fn sink(&mut self) -> &mut Walked<Open, Part> {
         self.open.last_mut().map_or(&mut self.root, |entry| &mut entry.below)
     }
-
-    fn position(&self) -> WalkPosition {
-        self.open.last().map_or(self.root.entered, |entry| entry.inner.combine(entry.below.entered))
-    }
 }
 
 impl<Open> Opens<Open> {
@@ -238,26 +233,22 @@ impl<Contributor: Contribute> Lane<Contributor> {
 
     fn entered<Hooked: Hook>(&mut self, node: &Hooked, facts: &Hooked::Facts<'_>) -> Option<Descend> {
         let kind = self.contributing.watches(Kind::of(node.node()))?;
-        let position = self.entries.position();
-        let around = Around { frame: None, stacked: &self.opens.0, position };
+        let around = Around { frame: None, stacked: &self.opens.0 };
         let Contributed { within, descend } = node.opened(&self.contributing.contributor, facts, &around);
         let scoping = Scoping::among(self.contributing.contributor.scopes(), kind);
         let Contribution { open, part } = within;
         let kept = self.opens.kept(scoping, open);
-        let inner = position.combine(WalkPosition::ONE);
-        self.entries.open.push(Entry { part, open: kept, scoping, inner, below: Walked::default() });
+        self.entries.open.push(Entry { part, open: kept, scoping, below: Walked::default() });
         Some(descend)
     }
 
     fn exited<Hooked: Hook>(&mut self, node: &Hooked, facts: &Hooked::Facts<'_>) {
         let closed = self.entries.open.pop().map(|done| {
             let open = self.opens.reopened(done.open);
-            let Walked { contribution, entered, visits } = done.below;
+            let Walked { contribution, visits } = done.below;
             let merged = Contribution { open, part: done.part }.combine(contribution);
             let contributor = &self.contributing.contributor;
-            let walked = done
-                .scoping
-                .walked(merged, entered.combine(WalkPosition::ONE), |inside| node.closed(contributor, facts, inside));
+            let walked = done.scoping.walked(merged, |inside| node.closed(contributor, facts, inside));
             walked.combine(Walked::from(visits))
         });
         closed.map_or_default(|walked| self.entries.sink().absorbed(walked));

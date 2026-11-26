@@ -1,9 +1,9 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use file_ports::Files;
 use lint_core::Joins;
-use lint_core::{Readout, RepoFile, SourceFile};
+use lint_core::{Readout, SourceFile};
 use lint_layout::Failure;
 use lint_placement::{CrateFile, Packages};
 use lint_roots::{Fact, Survey};
@@ -80,13 +80,12 @@ impl<'tree> AsRef<Located<'tree>> for Main<'tree> {
 #[derive(Debug)]
 pub(super) struct Assignment<'tree> {
     mains: Vec<Main<'tree>>,
-    repo_files: Vec<RepoFile>,
     failures: Vec<Failure>,
 }
 
 impl<'tree> Assignment<'tree> {
-    pub(super) fn new(mains: Vec<Main<'tree>>, repo_files: Vec<RepoFile>, failures: Vec<Failure>) -> Assignment<'tree> {
-        Assignment { mains, repo_files, failures }
+    pub(super) fn new(mains: Vec<Main<'tree>>, failures: Vec<Failure>) -> Assignment<'tree> {
+        Assignment { mains, failures }
     }
 
     pub(super) fn readout(self, kept: BTreeMap<Located<'tree>, SourceFile>) -> Readout {
@@ -102,9 +101,8 @@ impl<'tree> Assignment<'tree> {
             .collect();
         let mut ordered = files;
         ordered.sort_by(|left, right| AsRef::<Path>::as_ref(left.head()).cmp(AsRef::<Path>::as_ref(right.head())));
-        let found: Readout = self.repo_files.into_iter().collect::<BTreeSet<RepoFile>>().into_iter().collect();
         let failed: Readout = self.failures.into_iter().collect();
-        found.combine(ordered.into_iter().collect()).combine(failed)
+        ordered.into_iter().collect::<Readout>().combine(failed)
     }
 }
 

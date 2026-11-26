@@ -2,7 +2,6 @@ use std::mem;
 use std::sync::Mutex;
 
 use crate::joins::Joins;
-use crate::repo_file::RepoFile;
 use crate::source_file::SourceFile;
 use invariants::Unpoisoned;
 use lint_layout::Failure;
@@ -14,7 +13,6 @@ pub struct Unwalked(());
 pub struct Readout {
     files: Vec<SourceFile>,
     unwalked: Mutex<Vec<Unwalked>>,
-    repo_files: Vec<RepoFile>,
     failures: Vec<Failure>,
 }
 
@@ -25,7 +23,6 @@ impl Joins for Readout {
             unwalked: Mutex::new(
                 self.unwalked.into_inner().unpoisoned().combine(other.unwalked.into_inner().unpoisoned()),
             ),
-            repo_files: self.repo_files.combine(other.repo_files),
             failures: self.failures.combine(other.failures),
         }
     }
@@ -39,12 +36,6 @@ impl FromIterator<SourceFile> for Readout {
     }
 }
 
-impl FromIterator<RepoFile> for Readout {
-    fn from_iter<Found: IntoIterator<Item = RepoFile>>(found: Found) -> Readout {
-        Readout { repo_files: found.into_iter().collect(), ..Readout::default() }
-    }
-}
-
 impl FromIterator<Failure> for Readout {
     fn from_iter<Failures: IntoIterator<Item = Failure>>(failures: Failures) -> Readout {
         Readout { failures: failures.into_iter().collect(), ..Readout::default() }
@@ -55,11 +46,6 @@ impl Readout {
     #[must_use]
     pub fn files(&self) -> &[SourceFile] {
         &self.files
-    }
-
-    #[must_use]
-    pub fn repo_files(&self) -> &[RepoFile] {
-        &self.repo_files
     }
 
     #[must_use]

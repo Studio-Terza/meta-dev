@@ -15,7 +15,6 @@ macro_rules! node_kinds {
             Block on_block off_block visit_block Block;
             ExprAssign on_expr_assign off_expr_assign visit_expr_assign ExprAssign;
             ExprBinary on_expr_binary off_expr_binary visit_expr_binary ExprBinary;
-            ExprCall on_expr_call off_expr_call visit_expr_call ExprCall;
             ExprMacro on_expr_macro off_expr_macro visit_expr_macro ExprMacro;
             ForeignItemFn on_foreign_item_fn off_foreign_item_fn visit_foreign_item_fn ForeignItemFn;
             ExprClosure on_expr_closure off_expr_closure visit_expr_closure ExprClosure;
@@ -43,8 +42,6 @@ macro_rules! node_kinds {
             ItemUnion on_item_union off_item_union visit_item_union ItemUnion;
             ItemUse on_item_use off_item_use visit_item_use ItemUse;
             LifetimeParam on_lifetime_param off_lifetime_param visit_lifetime_param LifetimeParam;
-            LitFloat on_lit_float off_lit_float visit_lit_float LitFloat;
-            LitInt on_lit_int off_lit_int visit_lit_int LitInt;
             Local on_local off_local visit_local Local;
             PatIdent on_pat_ident off_pat_ident visit_pat_ident PatIdent;
             Path on_path off_path visit_path Path;

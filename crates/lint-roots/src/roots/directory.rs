@@ -1,4 +1,3 @@
-mod gathered;
 mod ignored;
 mod kept;
 
@@ -10,7 +9,6 @@ use lint_layout::Failure;
 use newtype::{Arbitrary, Newtype, Wrapping};
 
 use crate::survey::{Fact, Failed, Survey};
-use gathered::Gathered;
 use ignored::Ignored;
 use kept::Kept;
 
@@ -28,28 +26,6 @@ impl Below {
 }
 
 #[derive(Debug)]
-pub struct Listing(Vec<Result<Vec<PathBuf>, Failure>>);
-
-impl Listing {
-    #[must_use]
-    pub fn files(self) -> Vec<Result<Vec<PathBuf>, Failure>> {
-        self.0
-    }
-}
-
-#[derive(Debug)]
-pub struct Surveyed {
-    below: Below,
-    listing: Listing,
-}
-
-impl Surveyed {
-    pub fn parted<Made>(self, part: impl FnOnce(Below, Listing) -> Made) -> Made {
-        part(self.below, self.listing)
-    }
-}
-
-#[derive(Debug)]
 struct Walk<'root> {
     root: &'root Path,
     below: Vec<Directory>,
@@ -60,8 +36,8 @@ impl Directory {
         Self::surveyed(files, roots, &Ignored::FOR_PACKAGES).settling(|known, failed| Walk::trees(known, failed, roots))
     }
 
-    pub fn shared(files: &impl Files, roots: &[PathBuf]) -> Surveyed {
-        Self::surveyed(files, roots, &Ignored::FOR_FILES).settling(|known, failed| Walk::shared(known, failed, roots))
+    pub fn below(files: &impl Files, roots: &[PathBuf]) -> Below {
+        Below(Self::trees(files, roots))
     }
 
     fn surveyed(files: &impl Files, level: &[PathBuf], ignored: &[Ignored]) -> Survey {
@@ -103,26 +79,6 @@ impl<'root> Walk<'root> {
         let orders: Vec<Vec<&Path>> = walks.iter().map(Walk::order).collect();
         let outcomes = failed.settled(known, &orders);
         outcomes.into_iter().zip(walks).map(|(outcome, walk)| outcome.map(|_| walk.below)).collect()
-    }
-
-    fn shared(known: &Survey, failed: Failed, roots: &'root [PathBuf]) -> Surveyed {
-        let packages = Walk::all(known, roots, &Ignored::FOR_PACKAGES);
-        let listed = Walk::all(known, roots, &Ignored::FOR_FILES);
-        let orders: Vec<Vec<&Path>> = packages.iter().chain(&listed).map(Walk::order).collect();
-        let mut below = failed.settled(known, &orders);
-        let listing = below.split_off(packages.len());
-        Surveyed {
-            below: Below(below.into_iter().zip(packages).map(|(outcome, walk)| outcome.map(|_| walk.below)).collect()),
-            listing: Listing(
-                listing
-                    .into_iter()
-                    .zip(listed)
-                    .map(|(outcome, walk)| {
-                        outcome.map(|settled| Gathered::new(settled, &Ignored::FOR_FILES).files(walk.root))
-                    })
-                    .collect(),
-            ),
-        }
     }
 }
 
