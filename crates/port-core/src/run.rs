@@ -13,8 +13,7 @@ use super::snapshot::Snapshot;
 #[error("releasing {resource} failed: {failure}")]
 pub struct ReleaseFailure {
     resource: OpName,
-    #[source]
-    failure: Box<dyn Error + Send + Sync>,
+    failure: String,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -88,7 +87,7 @@ impl Run {
         *entry = entry.incremented();
     }
 
-    pub(crate) fn fail(&self, resource: OpName, failure: Box<dyn Error + Send + Sync>) {
-        self.ledger.failures.lock().unpoisoned().push(ReleaseFailure { resource, failure });
+    pub(crate) fn fail(&self, resource: OpName, failure: &impl Error) {
+        self.ledger.failures.lock().unpoisoned().push(ReleaseFailure { resource, failure: failure.to_string() });
     }
 }

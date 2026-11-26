@@ -26,7 +26,7 @@ impl Keeping {
         ports: &impl Ports,
         verdict: Verdict<'_>,
     ) -> Result<Telling<'step>, Failure<'step>> {
-        self.kept(ports, None).map(|()| Telling::lazy(verdict.told().into_iter()))
+        self.kept(ports, None).map(|()| Telling::listed(verdict.told()))
     }
 
     pub(super) fn kept(&self, ports: &impl Ports, outcomes: Option<&Path>) -> Result<(), Failure<'static>> {

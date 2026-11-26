@@ -30,7 +30,7 @@ pub use released::Released;
 pub use schema::Schema;
 pub use statements::Statements;
 pub use store::{Store, StoreFiller, store_ops};
-pub use store_failure::StoreFailure;
+pub use store_failure::{Cause, StoreFailure};
 pub use store_lock::{Claim, StoreLock, Unlock};
 pub use store_ports_macros::{Columns, Record, migrate, query};
 pub use value::{Argument, Bind, FromValue, IntoArgument, Value};

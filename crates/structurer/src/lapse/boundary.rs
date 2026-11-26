@@ -6,7 +6,7 @@ use newtype::{Arbitrary, Display, Newtype};
 pub struct Reason(String);
 
 impl Reason {
-    pub(super) fn told(failure: &dyn Error) -> Reason {
+    pub(super) fn told(failure: &impl Error) -> Reason {
         Reason(failure.to_string())
     }
 }

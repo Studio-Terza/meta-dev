@@ -82,8 +82,8 @@ impl MutantsChanged {
                 .transpose()?
                 .map_or(Ok(()), |narrowed| self.narrowed.replace(ports.files(), &narrowed))?;
             let reruns = Reruns::new(&self.narrowed, &self.scoped, &self.scope, &self.keeping);
-            let rest = iter::once_with(move || reruns.after(ports, survivors.as_ref())).flatten();
-            Ok(Telling::lazy(iter::once(Told::Said(timed_out)).chain(rest)))
+            let rest = reruns.after(ports, survivors.as_ref());
+            Ok(Telling::listed(iter::once(Told::Said(timed_out)).chain(rest).collect()))
         })
     }
 

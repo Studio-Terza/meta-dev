@@ -321,8 +321,8 @@ impl Around {
     }
 
     fn stored(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let uuid = self.uuid().map_err(|failed| StoreFailure::Refused(Box::new(failed)))?;
-        let body = self.kept().map_err(|failed| StoreFailure::Refused(Box::new(failed)))?;
+        let uuid = self.uuid().map_err(|failed| StoreFailure::Refused(store_ports::Cause::told(&failed)))?;
+        let body = self.kept().map_err(|failed| StoreFailure::Refused(store_ports::Cause::told(&failed)))?;
         let message = statements.written(store_ports::query!(
             r#"
 INSERT INTO

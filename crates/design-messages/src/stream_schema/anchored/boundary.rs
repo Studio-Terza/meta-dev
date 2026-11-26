@@ -2,7 +2,7 @@ use std::error::Error;
 use std::fmt;
 
 use newtype::Counter;
-use store_ports::{Batch, Statements, StoreFailure, Written};
+use store_ports::{Batch, Cause, Statements, StoreFailure, Written};
 
 use super::Anchored;
 use crate::boundary::LinkRow;
@@ -26,6 +26,6 @@ impl Batch for Anchored {
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let links = LinkRow::unchecked(statements)?;
-        links.is_empty().then(Written::zero).ok_or_else(|| StoreFailure::Refused(Box::new(Unanchored { links })))
+        links.is_empty().then(Written::zero).ok_or_else(|| StoreFailure::Refused(Cause::told(&Unanchored { links })))
     }
 }

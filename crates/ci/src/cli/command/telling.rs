@@ -1,5 +1,5 @@
 use std::fmt::{self, Debug, Display};
-use std::iter;
+use std::{iter, vec};
 use std::process::ExitCode;
 
 use console_ports::{Answer, Shown, Tale};
@@ -13,13 +13,9 @@ pub(crate) enum Told<'step> {
     Ended(Result<Exit, Failure<'step>>),
 }
 
-pub(crate) trait Source<'step>: Iterator<Item = Told<'step>> + Debug {}
-
-impl<'step, Telling: Iterator<Item = Told<'step>> + Debug> Source<'step> for Telling {}
-
 #[derive(Debug)]
 pub struct Telling<'step> {
-    told: Box<dyn Source<'step> + 'step>,
+    told: vec::IntoIter<Told<'step>>,
     ended: Option<Answer>,
 }
 
@@ -27,12 +23,12 @@ pub struct Telling<'step> {
 struct Lined<'said, Said>(&'said Said);
 
 impl<'step> Telling<'step> {
-    pub(crate) fn lazy(told: impl Source<'step> + 'step) -> Telling<'step> {
-        Telling { told: Box::new(told), ended: None }
+    pub(crate) fn listed(told: Vec<Told<'step>>) -> Telling<'step> {
+        Telling { told: told.into_iter(), ended: None }
     }
 
     pub(crate) fn reported(said: Vec<Shown>, ended: Result<Exit, Failure<'step>>) -> Telling<'step> {
-        Telling::lazy(said.into_iter().map(Told::Said).chain(iter::once(Told::Ended(ended))))
+        Telling::listed(said.into_iter().map(Told::Said).chain(iter::once(Told::Ended(ended))).collect())
     }
 
     pub(crate) fn ended(ended: Result<Exit, Failure<'step>>) -> Telling<'step> {
@@ -40,7 +36,7 @@ impl<'step> Telling<'step> {
     }
 
     pub(crate) fn refused(refusal: &Failure<'_>) -> Telling<'step> {
-        Telling { told: Box::new(iter::empty()), ended: Some(Answer::complained(ExitCode::FAILURE, Lined(refusal))) }
+        Telling { told: Vec::new().into_iter(), ended: Some(Answer::complained(ExitCode::FAILURE, Lined(refusal))) }
     }
 
     fn answered(ended: Result<Exit, Failure<'_>>) -> Answer {

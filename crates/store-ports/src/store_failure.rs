@@ -1,7 +1,11 @@
-use std::error::Error;
+use std::fmt;
 use std::io;
 
 use crate::{ColumnFailure, Released};
+
+#[derive(Debug, thiserror::Error)]
+#[error("{0}")]
+pub struct Cause(String);
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreFailure {
@@ -10,19 +14,19 @@ pub enum StoreFailure {
     #[error("cannot create the store's directory: {0}")]
     Directory(#[source] io::Error),
     #[error("cannot open the store: {0}")]
-    Open(#[source] Box<dyn Error + Send + Sync>),
+    Open(#[source] Cause),
     #[error("cannot bring the store's schema up to date: {0}")]
-    Migrate(#[source] Box<dyn Error + Send + Sync>),
+    Migrate(#[source] Cause),
     #[error("a store statement failed: {0}")]
-    Statement(#[source] Box<dyn Error + Send + Sync>),
+    Statement(#[source] Cause),
     #[error("a store statement broke a foreign key: {0}")]
-    Referenced(#[source] Box<dyn Error + Send + Sync>),
+    Referenced(#[source] Cause),
     #[error("a stored column does not read back as its type: {0}")]
     Column(#[from] ColumnFailure),
     #[error("a statement that reads one row found none")]
     Missing,
     #[error("the store's rewrite refuses to open it: {0}")]
-    Refused(#[source] Box<dyn Error + Send + Sync>),
+    Refused(#[source] Cause),
     #[error("a lifecycle move was refused: {0}")]
     Unmoved(#[from] Unmoved),
 }
@@ -33,6 +37,13 @@ pub enum Unmoved {
     Unlisted,
     #[error("the row is not in the state the move starts from")]
     Elsewhere,
+}
+
+impl Cause {
+    #[must_use]
+    pub fn told(failure: &impl fmt::Display) -> Cause {
+        Cause(failure.to_string())
+    }
 }
 
 impl StoreFailure {

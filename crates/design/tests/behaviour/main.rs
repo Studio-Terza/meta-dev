@@ -2903,7 +2903,7 @@ impl StoreFiller for Unbooked {
     fn write<Q: Batch>(&self, pass: Pass<'_, Q>, batch: Q) -> Result<Written, Q::Failure> {
         (Q::NAME == FailuresReported::NAME).then_some(()).map_or_else(
             || StoreFiller::write(&self.0, pass, batch),
-            |()| Err(Q::Failure::from(StoreFailure::Statement(Box::from("the bookkeeping write was refused")))),
+            |()| Err(Q::Failure::from(StoreFailure::Statement(store_ports::Cause::told(&"the bookkeeping write was refused")))),
         )
     }
 

@@ -9,18 +9,20 @@ use std::str::FromStr;
 
 use newtype::{Enumerated, Guarded, Inner, Listed, Newtype, Optional, Spelled, Stored, Validated};
 
+use crate::Cause;
+
 #[derive(Debug, thiserror::Error)]
 pub enum ColumnFailure {
     #[error("a stored number does not fit its column's type: {0}")]
     Unfit(#[source] TryFromIntError),
     #[error("a stored spelling names nothing of its column's type: {0}")]
-    Misspelled(#[source] Box<dyn Error + Send + Sync>),
+    Misspelled(#[source] Cause),
     #[error("a stored column its row needs is null")]
     Absent,
     #[error("a stored value is not of its column's storage type")]
     Mistyped,
     #[error("a stored value fails its column type's check: {0}")]
-    Refused(#[source] Box<dyn Error + Send + Sync>),
+    Refused(#[source] Cause),
 }
 
 pub trait Encoding<Value> {
@@ -73,7 +75,7 @@ where
 
     fn from_raw(raw: Self::Raw) -> Result<Value, ColumnFailure> {
         Value::Inner::from_raw(raw)
-            .and_then(|inner| Value::try_new(inner).map_err(|refused| ColumnFailure::Refused(Box::new(refused))))
+            .and_then(|inner| Value::try_new(inner).map_err(|refused| ColumnFailure::Refused(Cause::told(&refused))))
     }
 
     fn check(_column: &str) -> Option<Clause> {
@@ -89,7 +91,7 @@ impl<Value: Display + FromStr<Err: Error + Send + Sync + 'static>> Encoding<Valu
     }
 
     fn from_raw(raw: String) -> Result<Value, ColumnFailure> {
-        raw.parse().map_err(|unknown| ColumnFailure::Misspelled(Box::new(unknown)))
+        raw.parse().map_err(|unknown| ColumnFailure::Misspelled(Cause::told(&unknown)))
     }
 
     fn check(_column: &str) -> Option<Clause> {

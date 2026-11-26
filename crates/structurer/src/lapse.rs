@@ -40,7 +40,7 @@ pub struct Retried<'lapse>(&'lapse Lapse);
 
 impl Lapse {
     #[must_use]
-    pub fn refused(refusal: &dyn Error) -> Lapse {
+    pub fn refused(refusal: &impl Error) -> Lapse {
         Lapse(Lapsed::Refused(Reason::told(refusal)))
     }
 }
