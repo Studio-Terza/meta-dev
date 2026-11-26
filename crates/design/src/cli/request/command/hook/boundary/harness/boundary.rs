@@ -82,8 +82,32 @@ struct Last {
     message: Closing,
 }
 
-impl Runner {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Written {
+    Output,
+    Transcript,
+}
+
+impl Written {
     const OUTPUT: &'static str = "output";
+    const TRANSCRIPT: &'static str = "jsonl";
+
+    fn read(path: &Path) -> Option<Written> {
+        let extension = path.extension()?;
+        (extension == Self::OUTPUT)
+            .then_some(Written::Output)
+            .or_else(|| (extension == Self::TRANSCRIPT).then_some(Written::Transcript))
+    }
+
+    fn kept_by(self, runner: Runner) -> Option<Runner> {
+        match self {
+            Written::Output => Some(runner),
+            Written::Transcript => (runner == Runner::Agent).then_some(runner),
+        }
+    }
+}
+
+impl Runner {
     const SHELL: u8 = b'b';
     const AGENT: u8 = b'a';
 
@@ -91,8 +115,8 @@ impl Runner {
         let named = path.file_name().map(OsStr::as_encoded_bytes).and_then(<[u8]>::first).copied();
         let runner = named.and_then(|first| {
             (first == Self::SHELL).then_some(Runner::Shell).or_else(|| (first == Self::AGENT).then_some(Runner::Agent))
-        });
-        runner.filter(|_| path.extension() == Some(OsStr::new(Self::OUTPUT)))
+        })?;
+        Written::read(path)?.kept_by(runner)
     }
 
     const fn tail(self) -> u64 {

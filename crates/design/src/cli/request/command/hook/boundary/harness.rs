@@ -18,6 +18,7 @@ pub struct Harness<'files, F: Files> {
 impl<'files, F: Files> Harness<'files, F> {
     const TEMPORARY: &'static str = "/private/tmp";
     const TASKS: &'static str = "tasks";
+    const SUBAGENTS: &'static str = "subagents";
 
     pub fn new(files: &'files F, now: Epoch) -> Harness<'files, F> {
         Harness { files, now }
@@ -57,9 +58,11 @@ impl<'files, F: Files> Harness<'files, F> {
         let stem = transcript.file_stem();
         let slug = transcript.parent().and_then(Path::file_name);
         let roots = self.files.entries(Path::new(Self::TEMPORARY)).ignoring(Ignored::Untasked).unwrap_or_default();
-        let candidates: Vec<PathBuf> = slug.zip(stem).map_or_default(|(project, session)| {
+        let tasks: Vec<PathBuf> = slug.zip(stem).map_or_default(|(project, session)| {
             roots.iter().map(|root| root.join(project).join(session).join(Self::TASKS)).collect()
         });
+        let subagents = transcript.with_extension("").join(Self::SUBAGENTS);
+        let candidates: Vec<PathBuf> = tasks.into_iter().chain([subagents]).collect();
         let kinds = self.files.kinds(&candidates);
         candidates
             .into_iter()
