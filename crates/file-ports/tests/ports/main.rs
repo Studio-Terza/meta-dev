@@ -1,5 +1,6 @@
 mod ignored;
 
+use std::error::Error;
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -327,26 +328,22 @@ impl Tails {
     }
 }
 
-laws::law!(
-    read_from_agrees_between_disk_and_memory,
-    laws::proptest::strategy::Strategy::prop_filter_map(0i64..16, "an offset", |at| Offset::try_new(at)
-        .ignoring(Ignored::Negative)),
-    at,
-    {
-        let scratch = tempfile::tempdir()
-            .map_err(|failure| laws::proptest::test_runner::TestCaseError::fail(failure.to_string()))?;
-        let memory = Memory::default();
-        memory
-            .create_directories(Path::new("/scratch"))
-            .map_err(|failure| laws::proptest::test_runner::TestCaseError::fail(failure.to_string()))?;
+#[test]
+fn read_from_agrees_between_disk_and_memory() -> Result<(), Box<dyn Error>> {
+    let scratch = tempfile::tempdir()?;
+    let memory = Memory::default();
+    memory.create_directories(Path::new("/scratch"))?;
+    let offsets = (0..16).map(Offset::try_new).collect::<Result<Vec<Offset>, _>>()?;
+    offsets.into_iter().for_each(|at| {
         let on_disk = Tails::of(&Disk, scratch.path(), at);
         let in_memory = Tails::of(&memory, Path::new("/scratch"), at);
-        laws::proptest::prop_assert_eq!(on_disk.ignoring(Ignored::Failing), in_memory.ignoring(Ignored::Failing));
-    }
-);
+        assert_eq!(on_disk.ignoring(Ignored::Failing), in_memory.ignoring(Ignored::Failing), "{at:?}");
+    });
+    Ok(())
+}
 
 #[test]
-fn read_from_returns_the_bytes_after_the_offset() -> Result<(), laws::Unmet> {
+fn read_from_returns_the_bytes_after_the_offset() -> Result<(), Box<dyn Error>> {
     let memory = Memory::default();
     memory.create_directories(Path::new("/scratch"))?;
     assert_eq!(Tails::of(&memory, Path::new("/scratch"), Offset::try_new(7)?)?, Bytes::from("789"));

@@ -1,8 +1,6 @@
 use std::sync::Mutex;
 
 use invariants::{Ignoring, Unpoisoned, ignored};
-use laws::proptest::prelude::{any, prop_assert, prop_assert_eq};
-use laws::proptest::sample::select;
 use newtype::Counter;
 use port_core::{
     Calls, Counted, Held, Measured, Metered, Op, Pass, Port, Release, ReleaseReceipt, Released, Resource, Run,
@@ -201,71 +199,86 @@ impl Tally {
     }
 }
 
-laws::law!(an_op_is_counted_once_per_call_of_its_own, 0usize..24, calls, {
-    let run = Run::root();
-    let port = run.port(Memory::holding(&["a"]));
-    (0..calls).for_each(|_| {
-        let _ = Transcripts::sessions(&port);
-    });
-    drop(port);
-    let measured = run.finish();
-    prop_assert_eq!(measured.snapshot().calls::<transcripts_ops::Sessions>(), Calls::new(calls));
-    prop_assert_eq!(measured.snapshot().calls::<transcripts_ops::ReadFrom>(), Calls::zero());
-    prop_assert_eq!(measured.snapshot().iter().map(Tally::counts).sum::<usize>(), calls);
-});
-
-laws::law!(a_provided_method_counts_the_required_calls_it_makes, 0usize..8, sessions, {
-    let names: Vec<String> = (0..sessions).map(|number| number.to_string()).collect();
-    let run = Run::root();
-    let port = run.port(Memory::holding(&names.iter().map(String::as_str).collect::<Vec<_>>()));
-    prop_assert_eq!(Transcripts::read_all(Tally::metered(&port)).len(), sessions);
-    drop(port);
-    let measured = run.finish();
-    prop_assert_eq!(measured.snapshot().calls::<transcripts_ops::Sessions>(), Calls::new(1));
-    prop_assert_eq!(measured.snapshot().calls::<transcripts_ops::ReadFrom>(), Calls::new(sessions));
-});
-
-laws::law!(calls_on_scoped_threads_are_all_counted, 1usize..6, threads, {
-    let run = Run::root();
-    let port = run.port(Memory::holding(&["a"]));
-    std::thread::scope(|scope| {
-        (0..threads).for_each(|_| {
-            scope.spawn(|| Transcripts::sessions(&port));
+#[test]
+fn an_op_is_counted_once_per_call_of_its_own() {
+    (0usize..24).for_each(|calls| {
+        let run = Run::root();
+        let port = run.port(Memory::holding(&["a"]));
+        (0..calls).for_each(|_| {
+            let _ = Transcripts::sessions(&port);
         });
+        drop(port);
+        let measured = run.finish();
+        assert_eq!(measured.snapshot().calls::<transcripts_ops::Sessions>(), Calls::new(calls));
+        assert_eq!(measured.snapshot().calls::<transcripts_ops::ReadFrom>(), Calls::zero());
+        assert_eq!(measured.snapshot().iter().map(Tally::counts).sum::<usize>(), calls);
     });
-    drop(port);
-    let measured = Tally::finished(run);
-    prop_assert_eq!(measured.snapshot().calls::<transcripts_ops::Sessions>(), Calls::new(threads));
-});
+}
 
-laws::law!(runs_never_share_their_counts, (0usize..8, 0usize..8), pair, {
-    let (first, second) = (Run::root(), Run::root());
-    let (left, right) = (first.port(Memory::default()), second.port(Memory::default()));
-    (0..pair.0).for_each(|_| {
-        let _ = Transcripts::sessions(&left);
+#[test]
+fn a_provided_method_counts_the_required_calls_it_makes() {
+    (0usize..8).for_each(|sessions| {
+        let names: Vec<String> = (0..sessions).map(|number| number.to_string()).collect();
+        let run = Run::root();
+        let port = run.port(Memory::holding(&names.iter().map(String::as_str).collect::<Vec<_>>()));
+        assert_eq!(Transcripts::read_all(Tally::metered(&port)).len(), sessions);
+        drop(port);
+        let measured = run.finish();
+        assert_eq!(measured.snapshot().calls::<transcripts_ops::Sessions>(), Calls::new(1));
+        assert_eq!(measured.snapshot().calls::<transcripts_ops::ReadFrom>(), Calls::new(sessions));
     });
-    (0..pair.1).for_each(|_| {
-        let _ = Transcripts::sessions(&right);
-    });
-    drop((left, right));
-    let (counted, other) = (first.finish(), second.finish());
-    prop_assert_eq!(counted.snapshot().calls::<transcripts_ops::Sessions>(), Calls::new(pair.0));
-    prop_assert_eq!(other.snapshot().calls::<transcripts_ops::Sessions>(), Calls::new(pair.1));
-});
+}
 
-laws::law!(a_snapshot_lists_ops_in_name_order, any::<(bool, bool, bool)>(), which, {
-    let run = Run::root();
-    let port = Tally::over(&run, Memory::holding(&["a"]));
-    let session = Session("a".to_owned());
-    let _ = which.0.then(|| Transcripts::read_from(&port, &session, 0));
-    let _ = which.1.then(|| Transcripts::sessions(&port));
-    let _ = which.2.then(|| Transcripts::lock(&port, &session));
-    drop(port);
-    let names = Tally::names(run.finish().snapshot());
-    let mut sorted = names.clone();
-    sorted.sort();
-    prop_assert_eq!(names, sorted);
-});
+#[test]
+fn calls_on_scoped_threads_are_all_counted() {
+    (1usize..6).for_each(|threads| {
+        let run = Run::root();
+        let port = run.port(Memory::holding(&["a"]));
+        std::thread::scope(|scope| {
+            (0..threads).for_each(|_| {
+                scope.spawn(|| Transcripts::sessions(&port));
+            });
+        });
+        drop(port);
+        let measured = Tally::finished(run);
+        assert_eq!(measured.snapshot().calls::<transcripts_ops::Sessions>(), Calls::new(threads));
+    });
+}
+
+#[test]
+fn runs_never_share_their_counts() {
+    (0usize..8).flat_map(|left| (0usize..8).map(move |right| (left, right))).for_each(|pair| {
+        let (first, second) = (Run::root(), Run::root());
+        let (left, right) = (first.port(Memory::default()), second.port(Memory::default()));
+        (0..pair.0).for_each(|_| {
+            let _ = Transcripts::sessions(&left);
+        });
+        (0..pair.1).for_each(|_| {
+            let _ = Transcripts::sessions(&right);
+        });
+        drop((left, right));
+        let (counted, other) = (first.finish(), second.finish());
+        assert_eq!(counted.snapshot().calls::<transcripts_ops::Sessions>(), Calls::new(pair.0));
+        assert_eq!(other.snapshot().calls::<transcripts_ops::Sessions>(), Calls::new(pair.1));
+    });
+}
+
+#[test]
+fn a_snapshot_lists_ops_in_name_order() {
+    (0_u8..8).map(|bits| (bits & 1 == 1, bits & 2 == 2, bits & 4 == 4)).for_each(|which| {
+        let run = Run::root();
+        let port = Tally::over(&run, Memory::holding(&["a"]));
+        let session = Session("a".to_owned());
+        let _ = which.0.then(|| Transcripts::read_from(&port, &session, 0));
+        let _ = which.1.then(|| Transcripts::sessions(&port));
+        let _ = which.2.then(|| Transcripts::lock(&port, &session));
+        drop(port);
+        let names = Tally::names(run.finish().snapshot());
+        let mut sorted = names.clone();
+        sorted.sort();
+        assert_eq!(names, sorted);
+    });
+}
 
 #[test]
 fn op_names_are_the_module_path_then_the_trait_and_method() {
@@ -282,21 +295,24 @@ fn a_resource_and_a_derived_op_are_named_by_module_path() {
     assert_eq!(Tally::named::<Count>(), "laws::Count");
 }
 
-laws::law!(per_type_ops_count_each_query_type_apart, (0usize..6, 0usize..6), asked, {
-    let run = Run::root();
-    let port = run.port(Memory::holding(&["a", "b"]));
-    (0..asked.0).for_each(|_| {
-        let _ = Queries::ask(&port, &Count);
+#[test]
+fn per_type_ops_count_each_query_type_apart() {
+    (0usize..6).flat_map(|first| (0usize..6).map(move |second| (first, second))).for_each(|asked| {
+        let run = Run::root();
+        let port = run.port(Memory::holding(&["a", "b"]));
+        (0..asked.0).for_each(|_| {
+            let _ = Queries::ask(&port, &Count);
+        });
+        (0..asked.1).for_each(|_| {
+            let _ = Queries::ask(&port, &Names);
+        });
+        assert_eq!(Queries::ask(&port, &Names), ["a", "b"]);
+        drop(port);
+        let measured = run.finish();
+        assert_eq!(measured.snapshot().calls::<Count>(), Calls::new(asked.0));
+        assert_eq!(measured.snapshot().calls::<Names>(), Calls::new(asked.1.saturating_add(1)));
     });
-    (0..asked.1).for_each(|_| {
-        let _ = Queries::ask(&port, &Names);
-    });
-    prop_assert_eq!(Queries::ask(&port, &Names), ["a", "b"]);
-    drop(port);
-    let measured = run.finish();
-    prop_assert_eq!(measured.snapshot().calls::<Count>(), Calls::new(asked.0));
-    prop_assert_eq!(measured.snapshot().calls::<Names>(), Calls::new(asked.1.saturating_add(1)));
-});
+}
 
 #[derive(VariantArray, Clone, Copy, Debug)]
 enum Acquisition {
@@ -315,64 +331,75 @@ impl Acquisition {
     }
 }
 
-laws::law!(acquiring_counts_the_op_and_dropping_counts_one_release, 0usize..3, shape, {
-    let acquisition = Acquisition::VARIANTS.get(shape).copied().unwrap_or(Acquisition::Bare);
-    let run = Run::root();
-    let port = run.port(Memory::holding(&["a"]));
-    let held = acquisition.held(&port, &Session("a".to_owned()));
-    prop_assert!(held.is_some());
-    drop(held);
-    drop(port);
-    let measured = run.finish();
-    let acquired: usize = [
-        measured.snapshot().calls::<transcripts_ops::Lock>(),
-        measured.snapshot().calls::<transcripts_ops::TryLock>(),
-        measured.snapshot().calls::<transcripts_ops::LockBare>(),
-    ]
-    .into_iter()
-    .map(Calls::count)
-    .sum();
-    prop_assert_eq!(acquired, 1);
-    prop_assert_eq!(measured.snapshot().calls::<Released<SessionLock>>(), Calls::new(1));
-    prop_assert!(measured.settled().is_ok());
-});
+#[test]
+fn acquiring_counts_the_op_and_dropping_counts_one_release() {
+    Acquisition::VARIANTS.iter().copied().for_each(|acquisition| {
+        let run = Run::root();
+        let port = run.port(Memory::holding(&["a"]));
+        let held = acquisition.held(&port, &Session("a".to_owned()));
+        assert!(held.is_some());
+        drop(held);
+        drop(port);
+        let measured = run.finish();
+        let acquired: usize = [
+            measured.snapshot().calls::<transcripts_ops::Lock>(),
+            measured.snapshot().calls::<transcripts_ops::TryLock>(),
+            measured.snapshot().calls::<transcripts_ops::LockBare>(),
+        ]
+        .into_iter()
+        .map(Calls::count)
+        .sum();
+        assert_eq!(acquired, 1);
+        assert_eq!(measured.snapshot().calls::<Released<SessionLock>>(), Calls::new(1));
+        assert!(measured.settled().is_ok());
+    });
+}
 
-laws::law!(ending_a_held_resource_releases_once_and_returns_its_failure, select(Lockable::VARIANTS), lockable, {
-    let run = Run::root();
-    let port = run.port(Memory::default());
-    let ended = Transcripts::lock(&port, &lockable.session()).map(Held::end);
-    drop(port);
-    let measured = run.finish();
-    prop_assert_eq!(ended, Ok(lockable.ended()));
-    prop_assert_eq!(measured.snapshot().calls::<Released<SessionLock>>(), Calls::new(1));
-    prop_assert!(measured.settled().is_ok());
-});
+#[test]
+fn ending_a_held_resource_releases_once_and_returns_its_failure() {
+    Lockable::VARIANTS.iter().copied().for_each(|lockable| {
+        let run = Run::root();
+        let port = run.port(Memory::default());
+        let ended = Transcripts::lock(&port, &lockable.session()).map(Held::end);
+        drop(port);
+        let measured = run.finish();
+        assert_eq!(ended, Ok(lockable.ended()));
+        assert_eq!(measured.snapshot().calls::<Released<SessionLock>>(), Calls::new(1));
+        assert!(measured.settled().is_ok());
+    });
+}
 
-laws::law!(a_failed_release_on_drop_shows_in_the_measured_failures, select(Lockable::VARIANTS), lockable, {
-    let run = Run::root();
-    let port = run.port(Memory::default());
-    drop(Transcripts::lock(&port, &lockable.session()));
-    drop(port);
-    let measured = run.finish();
-    prop_assert_eq!(measured.snapshot().calls::<Released<SessionLock>>(), Calls::new(1));
-    let said = match measured.settled() {
-        Ok(_snapshot) => None,
-        Err(failures) => Some(failures.to_string()),
-    };
-    prop_assert_eq!(said, lockable.failure());
-});
+#[test]
+fn a_failed_release_on_drop_shows_in_the_measured_failures() {
+    Lockable::VARIANTS.iter().copied().for_each(|lockable| {
+        let run = Run::root();
+        let port = run.port(Memory::default());
+        drop(Transcripts::lock(&port, &lockable.session()));
+        drop(port);
+        let measured = run.finish();
+        assert_eq!(measured.snapshot().calls::<Released<SessionLock>>(), Calls::new(1));
+        let said = match measured.settled() {
+            Ok(_snapshot) => None,
+            Err(failures) => Some(failures.to_string()),
+        };
+        assert_eq!(said, lockable.failure());
+    });
+}
 
-laws::law!(a_resource_is_released_exactly_once_whether_ended_or_dropped, any::<bool>(), ending, {
-    let run = Run::root();
-    let port = run.port(Memory::holding(&["a"]));
-    let held = Transcripts::lock(&port, &Session("a".to_owned()));
-    let ended = ending.then_some(held).map(|lock| lock.map(Held::end));
-    prop_assert!(ended.iter().all(|result| matches!(result, Ok(Ok(())))));
-    drop(port);
-    let measured = run.finish();
-    prop_assert_eq!(measured.snapshot().calls::<Released<SessionLock>>(), Calls::new(1));
-    prop_assert!(measured.settled().is_ok());
-});
+#[test]
+fn a_resource_is_released_exactly_once_whether_ended_or_dropped() {
+    [false, true].into_iter().for_each(|ending| {
+        let run = Run::root();
+        let port = run.port(Memory::holding(&["a"]));
+        let held = Transcripts::lock(&port, &Session("a".to_owned()));
+        let ended = ending.then_some(held).map(|lock| lock.map(Held::end));
+        assert!(ended.iter().all(|result| matches!(result, Ok(Ok(())))));
+        drop(port);
+        let measured = run.finish();
+        assert_eq!(measured.snapshot().calls::<Released<SessionLock>>(), Calls::new(1));
+        assert!(measured.settled().is_ok());
+    });
+}
 
 #[test]
 fn a_two_word_trait_names_its_ops_module_in_snake_case() {
