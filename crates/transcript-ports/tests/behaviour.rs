@@ -1,13 +1,13 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
+use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, Files, Memory};
 use invariants::{Ignoring, ignored};
-use laws::proptest::prelude::{any, prop_assert_eq};
-use laws::proptest::sample::select;
-use laws::proptest::test_runner::TestCaseError;
 use port_core::{Calls, Run};
+use proptest::prelude::{any, prop_assert_eq, proptest};
+use proptest::test_runner::{Config, RngSeed};
 use transcript_ports::transcripts_ops::{ReadFrom, Sessions};
 use transcript_ports::{
     Authorship, ClaudeCodeDir, Cursor, Instant, Kind, Read, Record, Session, SessionId, Skipped, Transcripts,
@@ -98,7 +98,7 @@ impl Transcript {
         ClaudeCodeDir::new(memory, PathBuf::from(DIRECTORY))
     }
 
-    fn read(&self, cursor: Cursor) -> Result<Read, laws::Unmet> {
+    fn read(&self, cursor: Cursor) -> Result<Read, Box<dyn Error>> {
         let run = Run::root();
         let port = run.port(self.directory());
         let sessions = Transcripts::sessions(&port)?;
@@ -240,7 +240,7 @@ impl Views {
 }
 
 #[test]
-fn each_line_is_classified_by_who_wrote_it() -> Result<(), laws::Unmet> {
+fn each_line_is_classified_by_who_wrote_it() -> Result<(), Box<dyn Error>> {
     let text =
         [Lines::typed("1"), Lines::answer("2"), Lines::tool_result("3"), Lines::notice("4"), Lines::skipped()].concat();
     let read = Transcript::holding(&text).read(Cursor::default())?;
@@ -249,7 +249,7 @@ fn each_line_is_classified_by_who_wrote_it() -> Result<(), laws::Unmet> {
 }
 
 #[test]
-fn a_line_that_is_not_a_message_yields_its_parent_edge() -> Result<(), laws::Unmet> {
+fn a_line_that_is_not_a_message_yields_its_parent_edge() -> Result<(), Box<dyn Error>> {
     let text = [Lines::answer("2"), Lines::system("5", "2"), Lines::skipped()].concat();
     let read = Transcript::holding(&text).read(Cursor::default())?;
     assert_eq!(Views::edges(read), ["5 after 2"]);
@@ -257,14 +257,14 @@ fn a_line_that_is_not_a_message_yields_its_parent_edge() -> Result<(), laws::Unm
 }
 
 #[test]
-fn a_lead_record_keeps_only_its_text_blocks() -> Result<(), laws::Unmet> {
+fn a_lead_record_keeps_only_its_text_blocks() -> Result<(), Box<dyn Error>> {
     let read = Transcript::holding(&Lines::answer("2")).read(Cursor::default())?;
     assert_eq!(Views::texts(read), ["first second"]);
     Ok(())
 }
 
 #[test]
-fn a_record_carries_the_timestamp_of_its_line() -> Result<(), laws::Unmet> {
+fn a_record_carries_the_timestamp_of_its_line() -> Result<(), Box<dyn Error>> {
     let read = Transcript::holding(&Lines::typed("1")).read(Cursor::default())?;
     let stamps: Vec<Instant> = Views::records(read).into_iter().map(|record| record.stamp().clone()).collect();
     assert_eq!(stamps, [Instant::try_new("2026-01-01T00:00:01Z".to_owned())?]);
@@ -272,7 +272,7 @@ fn a_record_carries_the_timestamp_of_its_line() -> Result<(), laws::Unmet> {
 }
 
 #[test]
-fn a_record_carries_its_session_and_parent() -> Result<(), laws::Unmet> {
+fn a_record_carries_its_session_and_parent() -> Result<(), Box<dyn Error>> {
     let read = Transcript::holding(&Lines::shaped(
         "assistant",
         r#""message":{"model":"claude","content":[{"type":"text","text":"a"}]}"#,
@@ -287,7 +287,7 @@ fn a_record_carries_its_session_and_parent() -> Result<(), laws::Unmet> {
 }
 
 #[test]
-fn a_partial_last_line_is_not_yielded() -> Result<(), laws::Unmet> {
+fn a_partial_last_line_is_not_yielded() -> Result<(), Box<dyn Error>> {
     let whole = Lines::typed("1");
     let partial = Lines::answer("2");
     let cut = partial.chars().take(partial.len() / 2).collect::<String>();
@@ -298,43 +298,42 @@ fn a_partial_last_line_is_not_yielded() -> Result<(), laws::Unmet> {
 }
 
 #[test]
-fn a_record_uuid_reads_as_its_text() -> Result<(), laws::Unmet> {
+fn a_record_uuid_reads_as_its_text() -> Result<(), Box<dyn Error>> {
     let read = Transcript::holding(&Lines::typed("abc")).read(Cursor::default())?;
     let texts: Vec<String> = Views::records(read).into_iter().map(|record| record.uuid().to_string()).collect();
     assert_eq!(texts, ["abc"]);
     Ok(())
 }
 
-laws::table!(
-    a_message_uuid_is_read_only_when_it_is_one_bare_word,
-    |uuid: &&str| {
+impl Views {
+    fn uuids_of(uuid: &str) -> Option<Vec<String>> {
         Transcript::holding(&Lines::typed(uuid)).read(Cursor::default()).ignoring(Ignored::Unread).map(|read| {
             Views::records(read).into_iter().map(|record| record.uuid().to_string()).collect::<Vec<String>>()
         })
-    },
-    [
-        "abc" => Some(vec![String::from("abc")]),
-        "_a-9" => Some(vec![String::from("_a-9")]),
-        "msg:1" => Some(Vec::new()),
-        "a b" => Some(Vec::new()),
-        "-a" => Some(Vec::new()),
-        "" => Some(Vec::new()),
-    ]
-);
+    }
 
-laws::table!(
-    a_line_whose_session_is_blank_yields_no_record,
-    |session: &&str| {
+    fn sessions_of(session: &str) -> Option<Vec<String>> {
         Transcript::holding(&Lines::in_session(session)).read(Cursor::default()).ignoring(Ignored::Unread).map(|read| {
             Views::records(read).into_iter().map(|record| record.session().to_string()).collect::<Vec<String>>()
         })
-    },
-    [
-        "s1" => Some(vec![String::from("s1")]),
-        "a b" => Some(vec![String::from("a b")]),
-        "" => Some(Vec::new()),
-    ]
-);
+    }
+}
+
+#[test]
+fn a_message_uuid_is_read_only_when_it_is_one_bare_word() {
+    assert_eq!(Views::uuids_of("abc"), Some(vec![String::from("abc")]));
+    assert_eq!(Views::uuids_of("_a-9"), Some(vec![String::from("_a-9")]));
+    ["msg:1", "a b", "-a", ""]
+        .into_iter()
+        .for_each(|uuid| assert_eq!(Views::uuids_of(uuid), Some(Vec::new()), "{uuid}"));
+}
+
+#[test]
+fn a_line_whose_session_is_blank_yields_no_record() {
+    assert_eq!(Views::sessions_of("s1"), Some(vec![String::from("s1")]));
+    assert_eq!(Views::sessions_of("a b"), Some(vec![String::from("a b")]));
+    assert_eq!(Views::sessions_of(""), Some(Vec::new()));
+}
 
 #[test]
 fn a_session_is_listed_by_its_file_stem() {
@@ -348,230 +347,270 @@ fn reading_all_sessions_counts_one_listing_and_one_read_per_session() {
     assert_eq!(counted, Some(Counted { sessions: Calls::new(1), reads: Calls::new(1) }));
 }
 
-laws::law!(resuming_from_the_cursor_yields_every_record_exactly_once, 0usize..400, split, {
+#[test]
+fn resuming_from_the_cursor_yields_every_record_exactly_once() -> Result<(), Box<dyn Error>> {
     let lines = [Lines::typed("1"), Lines::answer("2"), Lines::tool_result("3"), Lines::notice("4")];
     let text = lines.concat();
-    let cut = split.min(text.len());
-    let first = Transcript::holding(&text.chars().take(cut).collect::<String>())
-        .read(Cursor::default())
-        .map_err(|failure| TestCaseError::fail(format!("{failure:?}")))?;
-    let second = Transcript::holding(&text)
-        .read(first.cursor())
-        .map_err(|failure| TestCaseError::fail(format!("{failure:?}")))?;
-    let together: Vec<Record> = Views::records(first).into_iter().chain(Views::records(second)).collect();
-    prop_assert_eq!(Views::uuids(&together), ["1", "2"]);
-});
+    (0..=text.len()).try_for_each(|cut| {
+        let first = Transcript::holding(&text.chars().take(cut).collect::<String>()).read(Cursor::default())?;
+        let second = Transcript::holding(&text).read(first.cursor())?;
+        let together: Vec<Record> = Views::records(first).into_iter().chain(Views::records(second)).collect();
+        assert_eq!(Views::uuids(&together), ["1", "2"], "cut at {cut}");
+        Ok(())
+    })
+}
 
-laws::law!(an_unknown_record_kind_is_unrecognised_and_never_a_message, "[a-z]{1,8}-unheard", kind, {
-    let line = Lines::shaped(&kind, r#""origin":{"kind":"human"},"message":{"model":"claude","content":"hi"}"#);
-    prop_assert_eq!(Cases::classified(&line), [format!("unrecognised {kind}"), "8 after 1".to_owned()]);
-});
+proptest! {
+    #![proptest_config(Config { failure_persistence: None, rng_seed: RngSeed::Fixed(0), ..Config::default() })]
+    #[test]
+    fn an_unknown_record_kind_is_unrecognised_and_never_a_message(kind in "[a-z]{1,8}-unheard") {
+        let line = Lines::shaped(&kind, r#""origin":{"kind":"human"},"message":{"model":"claude","content":"hi"}"#);
+        prop_assert_eq!(Cases::classified(&line), [format!("unrecognised {kind}"), "8 after 1".to_owned()]);
+    }
 
-laws::law!(an_unknown_block_in_a_lead_record_is_unrecognised, "[a-z]{1,8}_unheard", block, {
-    let fields =
-        format!(r#""message":{{"model":"claude","content":[{{"type":"text","text":"said"}},{{"type":"{block}"}}]}}"#);
-    prop_assert_eq!(Cases::assistant(&fields.as_str()), [format!("unrecognised {block}"), "8 after 1".to_owned()]);
-});
+    #[test]
+    fn an_unknown_block_in_a_lead_record_is_unrecognised(block in "[a-z]{1,8}_unheard") {
+        let fields =
+            format!(r#""message":{{"model":"claude","content":[{{"type":"text","text":"said"}},{{"type":"{block}"}}]}}"#);
+        prop_assert_eq!(Cases::assistant(&fields.as_str()), [format!("unrecognised {block}"), "8 after 1".to_owned()]);
+    }
 
-laws::table!(
-    every_surveyed_record_kind_without_a_voice_is_only_a_parent_edge,
-    Cases::kind,
-    [
-        "ai-title" => ["8 after 1"],
-        "api-request" => ["8 after 1"],
-        "api-request-blob" => ["8 after 1"],
-        "api-request-shape" => ["8 after 1"],
-        "artifact-autoreact-ledger" => ["8 after 1"],
-        "artifact-comment-monitor" => ["8 after 1"],
-        "atis-latch" => ["8 after 1"],
-        "cost-state" => ["8 after 1"],
-        "file-history-delta" => ["8 after 1"],
-        "file-history-snapshot" => ["8 after 1"],
-        "frame-link" => ["8 after 1"],
-        "last-prompt" => ["8 after 1"],
-        "launched" => ["8 after 1"],
-        "mode" => ["8 after 1"],
-        "permission-mode" => ["8 after 1"],
-        "pr-link" => ["8 after 1"],
-        "queue-operation" => ["8 after 1"],
-        "result" => ["8 after 1"],
-        "started" => ["8 after 1"],
-        "summary" => ["8 after 1"],
-        "system" => ["8 after 1"],
-        "tools-used" => ["8 after 1"],
-        "brand-new-kind" => ["unrecognised brand-new-kind", "8 after 1"],
-    ]
-);
+    #[test]
+    fn an_instant_is_rebuilt_from_its_display(instant in any::<Instant>()) {
+        prop_assert_eq!(Instant::try_new(instant.to_string()).ignoring(Ignored::Refused), Some(instant));
+    }
 
-laws::table!(
-    a_user_record_is_the_owner_only_when_a_human_typed_text_in_the_main_chain,
-    Cases::user,
-    [
-        r#""origin":{"kind":"human"},"message":{"content":"typed"}"# => ["Owner typed"],
-        r#""origin":{"kind":"human"},"message":{"content":[{"type":"image","source":{}},{"type":"text","text":"look"}]}"# => ["Owner look"],
-        r#""origin":{"kind":"human"},"message":{"content":[{"type":"tool_result","content":"out"}]}"# => ["8 after 1"],
-        r#""origin":{"kind":"human"},"isSidechain":true,"isMeta":true,"message":{"content":"relayed"}"# => ["8 after 1"],
-        r#""origin":{"kind":"task-notification"},"message":{"content":"finished"}"# => ["8 after 1"],
-        r#""origin":{"kind":"task-notification"},"isSidechain":true,"isMeta":true,"message":{"content":"finished"}"# => ["8 after 1"],
-        r#""origin":{"kind":"coordinator"},"isSidechain":true,"isMeta":true,"message":{"content":"go"}"# => ["8 after 1"],
-        r#""origin":{"kind":"peer"},"isMeta":true,"message":{"content":"hello"}"# => ["8 after 1"],
-        r#""origin":{"kind":"peer"},"isSidechain":true,"isMeta":true,"message":{"content":"hello"}"# => ["8 after 1"],
-        r#""origin":{"kind":"unclassified"},"isSidechain":true,"message":{"content":[{"type":"tool_result","content":"out"}]}"# => ["8 after 1"],
-        r#""origin":{"kind":"unclassified"},"isSidechain":true,"message":{"content":"brief"}"# => ["8 after 1"],
-        r#""origin":{"kind":"auto-continuation"},"isMeta":true,"message":{"content":"continue"}"# => ["8 after 1"],
-        r#""origin":null,"message":{"content":[{"type":"tool_result","content":"out"}]}"# => ["8 after 1"],
-        r#""isSidechain":true,"message":{"content":[{"type":"tool_result","content":"out"}]}"# => ["8 after 1"],
-        r#""message":{"content":"<command-name>/compact</command-name>"}"# => ["8 after 1"],
-        r#""isMeta":true,"message":{"content":"caveat"}"# => ["8 after 1"],
-        r#""isSidechain":true,"message":{"content":"brief"}"# => ["8 after 1"],
-        r#""isSidechain":true,"isMeta":true,"message":{"content":"brief"}"# => ["8 after 1"],
-        r#""message":{"content":[{"type":"text","text":"[Request interrupted by user]"}]}"# => ["8 after 1"],
-        r#""isMeta":true,"message":{"content":[{"type":"text","text":"skill"}]}"# => ["8 after 1"],
-        r#""isSidechain":true,"message":{"content":[{"type":"text","text":"a"},{"type":"tool_result","content":"b"}]}"# => ["8 after 1"],
-        r#""isCompactSummary":true,"isVisibleInTranscriptOnly":true,"message":{"content":"summary"}"# => ["8 after 1"],
-        r#""origin":{"kind":"brand-new-kind"},"message":{"content":"hello"}"# => ["unrecognised brand-new-kind", "8 after 1"],
-        r#""origin":{"kind":"brand-new-kind"},"message":{"content":[{"type":"tool_result","content":"out"}]}"# => ["unrecognised brand-new-kind", "8 after 1"],
-        r#""origin":{"kind":"human"},"message":{"content":[{"type":"document"},{"type":"text","text":"a"}]}"# => ["unrecognised document", "8 after 1"],
-    ]
-);
+    #[test]
+    fn a_kind_is_rebuilt_from_its_display(kind in any::<Kind>()) {
+        prop_assert_eq!(Kind::try_new(kind.to_string()).ignoring(Ignored::Refused), Some(kind));
+    }
 
-laws::table!(
-    an_assistant_record_is_the_lead_only_when_it_answered_with_text_in_the_main_chain,
-    Cases::assistant,
-    [
-        r#""message":{"model":"claude","content":[{"type":"text","text":"said"}]}"# => ["Lead said"],
-        r#""message":{"model":"claude","content":[{"type":"thinking","thinking":"hmm"}]}"# => ["8 after 1"],
-        r#""message":{"model":"claude","content":[{"type":"tool_use","name":"Bash"}]}"# => ["8 after 1"],
-        r#""isSidechain":true,"message":{"model":"claude","content":[{"type":"text","text":"subagent words"}]}"# => ["8 after 1"],
-        r#""isSidechain":true,"message":{"model":"claude","content":[{"type":"thinking","thinking":"hmm"}]}"# => ["8 after 1"],
-        r#""isSidechain":true,"message":{"model":"claude","content":[{"type":"tool_use","name":"Bash"}]}"# => ["8 after 1"],
-        r#""isApiErrorMessage":true,"message":{"model":"<synthetic>","content":[{"type":"text","text":"API Error"}]}"# => ["8 after 1"],
-        r#""isApiErrorMessage":true,"message":{"model":"claude","content":[{"type":"text","text":"API Error"}]}"# => ["8 after 1"],
-        r#""isSidechain":true,"isApiErrorMessage":true,"message":{"model":"<synthetic>","content":[{"type":"text","text":"API Error"}]}"# => ["8 after 1"],
-        r#""message":{"model":"<synthetic>","content":[{"type":"text","text":"No response requested."}]}"# => ["8 after 1"],
-        r#""message":{"model":"claude","content":[{"type":"server_tool_use"}]}"# => ["unrecognised server_tool_use", "8 after 1"],
-    ]
-);
+    #[test]
+    fn a_session_id_is_rebuilt_from_its_display(session in any::<SessionId>()) {
+        prop_assert_eq!(SessionId::try_new(session.to_string()).ignoring(Ignored::Refused), Some(session));
+    }
+}
 
-laws::table!(
-    a_queued_command_is_the_owner_only_when_a_human_queued_it,
-    Cases::attached,
-    [
-        r#"{"type":"queued_command","prompt":"typed while busy","origin":{"kind":"human"}}"# => ["Owner typed while busy"],
-        r#"{"type":"queued_command","prompt":[{"type":"text","text":"see"},{"type":"image"}],"origin":{"kind":"human"}}"# => ["Owner see"],
-        r#"{"type":"queued_command","prompt":"finished","origin":{"kind":"task-notification"}}"# => ["8 after 1"],
-        r#"{"type":"queued_command","prompt":"go","origin":{"kind":"coordinator"}}"# => ["8 after 1"],
-        r#"{"type":"queued_command","prompt":"hello","origin":{"kind":"peer"}}"# => ["8 after 1"],
-        r#"{"type":"queued_command","prompt":"finished"}"# => ["8 after 1"],
-        r#"{"type":"queued_command","prompt":"hello","origin":{"kind":"brand-new-kind"}}"# => ["unrecognised brand-new-kind", "8 after 1"],
-        r#"{"type":"brand_new_attachment"}"# => ["unrecognised brand_new_attachment", "8 after 1"],
-    ]
-);
+impl Cases {
+    fn parents(texts: &[&str], read: fn(&&str) -> Vec<String>) {
+        texts.iter().for_each(|text| assert_eq!(read(text), ["8 after 1"], "{text}"));
+    }
+}
 
-laws::table!(
-    every_surveyed_attachment_other_than_a_queued_command_is_only_a_parent_edge,
-    Cases::carried,
-    [
-        "agent_listing_delta" => ["8 after 1"],
-        "auto_mode" => ["8 after 1"],
-        "bash_output_audience_note" => ["8 after 1"],
-        "batching_reminder_sent" => ["8 after 1"],
-        "command_permissions" => ["8 after 1"],
-        "compact_file_reference" => ["8 after 1"],
-        "credential_org" => ["8 after 1"],
-        "date" => ["8 after 1"],
-        "deferred_tools_delta" => ["8 after 1"],
-        "deferred_tools_record" => ["8 after 1"],
-        "edited_text_file" => ["8 after 1"],
-        "environment" => ["8 after 1"],
-        "file" => ["8 after 1"],
-        "hook_additional_context" => ["8 after 1"],
-        "hook_blocking_error" => ["8 after 1"],
-        "hook_non_blocking_error" => ["8 after 1"],
-        "hook_permission_decision" => ["8 after 1"],
-        "hook_success" => ["8 after 1"],
-        "hook_system_message" => ["8 after 1"],
-        "instructions" => ["8 after 1"],
-        "invoked_skills" => ["8 after 1"],
-        "mcp_instructions_delta" => ["8 after 1"],
-        "model" => ["8 after 1"],
-        "nested_memory" => ["8 after 1"],
-        "prompt_snapshot" => ["8 after 1"],
-        "read_truncation_notice" => ["8 after 1"],
-        "remote_session_change" => ["8 after 1"],
-        "session_context" => ["8 after 1"],
-        "session_cron_carry" => ["8 after 1"],
-        "silent_turn_reminder" => ["8 after 1"],
-        "skill_listing" => ["8 after 1"],
-        "task_reminder" => ["8 after 1"],
-        "task_status" => ["8 after 1"],
-        "thinking_drop" => ["8 after 1"],
-        "total_tokens_reminder" => ["8 after 1"],
-        "ultrathink_effort" => ["8 after 1"],
-    ]
-);
+#[test]
+fn every_surveyed_record_kind_without_a_voice_is_only_a_parent_edge() {
+    assert_eq!(Cases::kind(&"brand-new-kind"), ["unrecognised brand-new-kind", "8 after 1"]);
+    Cases::parents(
+        &[
+            "ai-title",
+            "api-request",
+            "api-request-blob",
+            "api-request-shape",
+            "artifact-autoreact-ledger",
+            "artifact-comment-monitor",
+            "atis-latch",
+            "cost-state",
+            "file-history-delta",
+            "file-history-snapshot",
+            "frame-link",
+            "last-prompt",
+            "launched",
+            "mode",
+            "permission-mode",
+            "pr-link",
+            "queue-operation",
+            "result",
+            "started",
+            "summary",
+            "system",
+            "tools-used",
+        ],
+        Cases::kind,
+    );
+}
 
-laws::roundtrip!(
-    an_authorship_is_read_back_from_its_display,
-    select(vec![Authorship::Owner, Authorship::Lead]),
-    |author: &Authorship| author.to_string(),
-    |name: &String| name.parse::<Authorship>().ignoring(Ignored::Refused),
-    Some,
-);
+#[test]
+fn a_user_record_is_the_owner_only_when_a_human_typed_text_in_the_main_chain() {
+    assert_eq!(Cases::user(&r#""origin":{"kind":"human"},"message":{"content":"typed"}"#), ["Owner typed"]);
+    assert_eq!(
+        Cases::user(
+            &r#""origin":{"kind":"human"},"message":{"content":[{"type":"image","source":{}},{"type":"text","text":"look"}]}"#
+        ),
+        ["Owner look"]
+    );
+    assert_eq!(
+        Cases::user(&r#""origin":{"kind":"brand-new-kind"},"message":{"content":"hello"}"#),
+        ["unrecognised brand-new-kind", "8 after 1"]
+    );
+    assert_eq!(
+        Cases::user(
+            &r#""origin":{"kind":"brand-new-kind"},"message":{"content":[{"type":"tool_result","content":"out"}]}"#
+        ),
+        ["unrecognised brand-new-kind", "8 after 1"]
+    );
+    assert_eq!(
+        Cases::user(
+            &r#""origin":{"kind":"human"},"message":{"content":[{"type":"document"},{"type":"text","text":"a"}]}"#
+        ),
+        ["unrecognised document", "8 after 1"]
+    );
+    Cases::parents(
+        &[
+            r#""origin":{"kind":"human"},"message":{"content":[{"type":"tool_result","content":"out"}]}"#,
+            r#""origin":{"kind":"human"},"isSidechain":true,"isMeta":true,"message":{"content":"relayed"}"#,
+            r#""origin":{"kind":"task-notification"},"message":{"content":"finished"}"#,
+            r#""origin":{"kind":"task-notification"},"isSidechain":true,"isMeta":true,"message":{"content":"finished"}"#,
+            r#""origin":{"kind":"coordinator"},"isSidechain":true,"isMeta":true,"message":{"content":"go"}"#,
+            r#""origin":{"kind":"peer"},"isMeta":true,"message":{"content":"hello"}"#,
+            r#""origin":{"kind":"peer"},"isSidechain":true,"isMeta":true,"message":{"content":"hello"}"#,
+            r#""origin":{"kind":"unclassified"},"isSidechain":true,"message":{"content":[{"type":"tool_result","content":"out"}]}"#,
+            r#""origin":{"kind":"unclassified"},"isSidechain":true,"message":{"content":"brief"}"#,
+            r#""origin":{"kind":"auto-continuation"},"isMeta":true,"message":{"content":"continue"}"#,
+            r#""origin":null,"message":{"content":[{"type":"tool_result","content":"out"}]}"#,
+            r#""isSidechain":true,"message":{"content":[{"type":"tool_result","content":"out"}]}"#,
+            r#""message":{"content":"<command-name>/compact</command-name>"}"#,
+            r#""isMeta":true,"message":{"content":"caveat"}"#,
+            r#""isSidechain":true,"message":{"content":"brief"}"#,
+            r#""isSidechain":true,"isMeta":true,"message":{"content":"brief"}"#,
+            r#""message":{"content":[{"type":"text","text":"[Request interrupted by user]"}]}"#,
+            r#""isMeta":true,"message":{"content":[{"type":"text","text":"skill"}]}"#,
+            r#""isSidechain":true,"message":{"content":[{"type":"text","text":"a"},{"type":"tool_result","content":"b"}]}"#,
+            r#""isCompactSummary":true,"isVisibleInTranscriptOnly":true,"message":{"content":"summary"}"#,
+        ],
+        Cases::user,
+    );
+}
 
-laws::table!(
-    a_name_of_neither_party_is_no_authorship,
-    |name: &&str| name.parse::<Authorship>().ignoring(Ignored::Refused),
-    ["human" => None, "" => None],
-);
+#[test]
+fn an_assistant_record_is_the_lead_only_when_it_answered_with_text_in_the_main_chain() {
+    assert_eq!(
+        Cases::assistant(&r#""message":{"model":"claude","content":[{"type":"text","text":"said"}]}"#),
+        ["Lead said"]
+    );
+    assert_eq!(
+        Cases::assistant(&r#""message":{"model":"claude","content":[{"type":"server_tool_use"}]}"#),
+        ["unrecognised server_tool_use", "8 after 1"]
+    );
+    Cases::parents(
+        &[
+            r#""message":{"model":"claude","content":[{"type":"thinking","thinking":"hmm"}]}"#,
+            r#""message":{"model":"claude","content":[{"type":"tool_use","name":"Bash"}]}"#,
+            r#""isSidechain":true,"message":{"model":"claude","content":[{"type":"text","text":"subagent words"}]}"#,
+            r#""isSidechain":true,"message":{"model":"claude","content":[{"type":"thinking","thinking":"hmm"}]}"#,
+            r#""isSidechain":true,"message":{"model":"claude","content":[{"type":"tool_use","name":"Bash"}]}"#,
+            r#""isApiErrorMessage":true,"message":{"model":"<synthetic>","content":[{"type":"text","text":"API Error"}]}"#,
+            r#""isApiErrorMessage":true,"message":{"model":"claude","content":[{"type":"text","text":"API Error"}]}"#,
+            r#""isSidechain":true,"isApiErrorMessage":true,"message":{"model":"<synthetic>","content":[{"type":"text","text":"API Error"}]}"#,
+            r#""message":{"model":"<synthetic>","content":[{"type":"text","text":"No response requested."}]}"#,
+        ],
+        Cases::assistant,
+    );
+}
 
-laws::table!(
-    an_instant_is_made_only_from_non_blank_text,
-    |text: &&str| Instant::try_new((*text).to_owned()).ignoring(Ignored::Refused).map(|instant| instant.to_string()),
-    ["" => None, "2026-01-01T00:00:01Z" => Some(String::from("2026-01-01T00:00:01Z"))],
-);
+#[test]
+fn a_queued_command_is_the_owner_only_when_a_human_queued_it() {
+    assert_eq!(
+        Cases::attached(&r#"{"type":"queued_command","prompt":"typed while busy","origin":{"kind":"human"}}"#),
+        ["Owner typed while busy"]
+    );
+    assert_eq!(
+        Cases::attached(
+            &r#"{"type":"queued_command","prompt":[{"type":"text","text":"see"},{"type":"image"}],"origin":{"kind":"human"}}"#
+        ),
+        ["Owner see"]
+    );
+    assert_eq!(
+        Cases::attached(&r#"{"type":"queued_command","prompt":"hello","origin":{"kind":"brand-new-kind"}}"#),
+        ["unrecognised brand-new-kind", "8 after 1"]
+    );
+    assert_eq!(
+        Cases::attached(&r#"{"type":"brand_new_attachment"}"#),
+        ["unrecognised brand_new_attachment", "8 after 1"]
+    );
+    Cases::parents(
+        &[
+            r#"{"type":"queued_command","prompt":"finished","origin":{"kind":"task-notification"}}"#,
+            r#"{"type":"queued_command","prompt":"go","origin":{"kind":"coordinator"}}"#,
+            r#"{"type":"queued_command","prompt":"hello","origin":{"kind":"peer"}}"#,
+            r#"{"type":"queued_command","prompt":"finished"}"#,
+        ],
+        Cases::attached,
+    );
+}
 
-laws::table!(
-    a_kind_is_made_only_from_non_blank_text,
-    |text: &&str| Kind::try_new((*text).to_owned()).ignoring(Ignored::Refused).map(|kind| kind.to_string()),
-    ["" => None, "summary" => Some(String::from("summary"))],
-);
+#[test]
+fn every_surveyed_attachment_other_than_a_queued_command_is_only_a_parent_edge() {
+    Cases::parents(
+        &[
+            "agent_listing_delta",
+            "auto_mode",
+            "bash_output_audience_note",
+            "batching_reminder_sent",
+            "command_permissions",
+            "compact_file_reference",
+            "credential_org",
+            "date",
+            "deferred_tools_delta",
+            "deferred_tools_record",
+            "edited_text_file",
+            "environment",
+            "file",
+            "hook_additional_context",
+            "hook_blocking_error",
+            "hook_non_blocking_error",
+            "hook_permission_decision",
+            "hook_success",
+            "hook_system_message",
+            "instructions",
+            "invoked_skills",
+            "mcp_instructions_delta",
+            "model",
+            "nested_memory",
+            "prompt_snapshot",
+            "read_truncation_notice",
+            "remote_session_change",
+            "session_context",
+            "session_cron_carry",
+            "silent_turn_reminder",
+            "skill_listing",
+            "task_reminder",
+            "task_status",
+            "thinking_drop",
+            "total_tokens_reminder",
+            "ultrathink_effort",
+        ],
+        Cases::carried,
+    );
+}
 
-laws::table!(
-    a_session_id_is_made_only_from_non_blank_text,
-    |text: &&str| SessionId::try_new((*text).to_owned()).ignoring(Ignored::Refused).map(|session| session.to_string()),
-    ["" => None, "s1" => Some(String::from("s1"))],
-);
+#[test]
+fn an_authorship_is_read_back_from_its_display() {
+    [Authorship::Owner, Authorship::Lead].into_iter().for_each(|author| {
+        assert_eq!(author.to_string().parse::<Authorship>().ignoring(Ignored::Refused), Some(author));
+    });
+}
 
-laws::roundtrip!(
-    an_instant_is_rebuilt_from_its_display,
-    any::<Instant>(),
-    |instant: &Instant| instant.to_string(),
-    |text: &String| Instant::try_new(text.clone()).ignoring(Ignored::Refused),
-    Some,
-);
+#[test]
+fn a_name_of_neither_party_is_no_authorship() {
+    ["human", ""].into_iter().for_each(|name| assert_eq!(name.parse::<Authorship>().ignoring(Ignored::Refused), None));
+}
 
-laws::roundtrip!(
-    a_kind_is_rebuilt_from_its_display,
-    any::<Kind>(),
-    |kind: &Kind| kind.to_string(),
-    |text: &String| Kind::try_new(text.clone()).ignoring(Ignored::Refused),
-    Some,
-);
+#[test]
+fn blank_text_makes_no_instant_kind_or_session_id() {
+    assert_eq!(Instant::try_new(String::new()).ignoring(Ignored::Refused), None);
+    assert_eq!(Kind::try_new(String::new()).ignoring(Ignored::Refused), None);
+    assert_eq!(SessionId::try_new(String::new()).ignoring(Ignored::Refused), None);
+    let instant = Instant::try_new(String::from("2026-01-01T00:00:01Z")).ignoring(Ignored::Refused);
+    assert_eq!(instant.map(|made| made.to_string()).as_deref(), Some("2026-01-01T00:00:01Z"));
+    let kind = Kind::try_new(String::from("summary")).ignoring(Ignored::Refused);
+    assert_eq!(kind.map(|made| made.to_string()).as_deref(), Some("summary"));
+    let session = SessionId::try_new(String::from("s1")).ignoring(Ignored::Refused);
+    assert_eq!(session.map(|made| made.to_string()).as_deref(), Some("s1"));
+}
 
-laws::roundtrip!(
-    a_session_id_is_rebuilt_from_its_display,
-    any::<SessionId>(),
-    |session: &SessionId| session.to_string(),
-    |text: &String| SessionId::try_new(text.clone()).ignoring(Ignored::Refused),
-    Some,
-);
-
-laws::table!(
-    a_body_holding_a_nul_is_refused_and_any_other_text_is_kept_whole,
-    |text: &&str| transcript_ports::Body::try_new((*text).to_owned()).ignoring(Ignored::Refused).map(|body| body.to_string()),
-    [
-        "said\0plainly" => None,
-        "said plainly" => Some("said plainly".to_owned()),
-    ]
-);
+#[test]
+fn a_body_holding_a_nul_is_refused_and_any_other_text_is_kept_whole() {
+    let read = |text: &str| transcript_ports::Body::try_new(text.to_owned()).ignoring(Ignored::Refused);
+    assert_eq!(read("said\0plainly"), None);
+    assert_eq!(read("said plainly").map(|body| body.to_string()).as_deref(), Some("said plainly"));
+}
