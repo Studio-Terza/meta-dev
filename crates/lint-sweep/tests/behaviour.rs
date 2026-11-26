@@ -1,5 +1,5 @@
-use lint_core::Joins;
 use invariants::{invariant, invariants};
+use lint_core::Joins;
 use lint_core::{SourceFile, SourceText};
 use lint_sweep::{Around, Contribute, Contributed, Contributing, Contribution, Descend, Facts, Kind, Scope};
 use syntax::{Block, ExprBinary, Macro};
@@ -20,7 +20,6 @@ impl Joins for Depth {
         Depth(self.0.or(other.0))
     }
 }
-
 
 #[derive(Debug)]
 struct Recorder {

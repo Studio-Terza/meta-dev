@@ -81,9 +81,7 @@ impl fmt::Display for Tally {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.ends.iter().try_for_each(|end| writeln!(formatter, "session {} read to {}", end.session, end.cursor))?;
         self.authorship.counted().try_for_each(|(author, count)| writeln!(formatter, "authorship {author} {count}"))?;
-        self.unrecognised
-            .counted()
-            .try_for_each(|(kind, count)| writeln!(formatter, "unrecognised {kind} {count}"))?;
+        self.unrecognised.counted().try_for_each(|(kind, count)| writeln!(formatter, "unrecognised {kind} {count}"))?;
         writeln!(formatter, "written {}", Count::new(self.written.count()))
     }
 }

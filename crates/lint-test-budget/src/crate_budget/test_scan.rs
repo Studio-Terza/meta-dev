@@ -60,7 +60,6 @@ impl Joins for Tally {
     }
 }
 
-
 impl Contribute for TestScan<'_> {
     type Open = ();
     type Part = Tally;

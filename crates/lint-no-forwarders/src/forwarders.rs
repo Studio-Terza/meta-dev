@@ -7,8 +7,8 @@ mod struct_fields;
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use lint_core::Joins;
 use impl_target::ImplTarget;
+use lint_core::Joins;
 use parameter::Parameter;
 use struct_fields::StructFields;
 use syntax::{Expr, Ident, ImplItemFn, ItemImpl, ItemMod, ItemStruct, Stmt};
@@ -157,7 +157,6 @@ impl Joins for Gleaned {
         Gleaned { methods: self.methods.combine(other.methods), ..self }
     }
 }
-
 
 impl Contribute for Forwarders<'_> {
     type Open = Unplaced;

@@ -1,8 +1,8 @@
 use std::path::Path;
 mod finding;
 
-use lint_core::Joins;
 use lint_core::Headline;
+use lint_core::Joins;
 use lint_file::{Reads, SweptLint};
 use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Finds, Kind};
 use std::collections::BTreeMap;
@@ -63,7 +63,6 @@ impl Joins for PrivateNames {
         self
     }
 }
-
 
 impl PrivateFnCounter<'_> {
     fn private_names(item: &ItemImpl) -> impl Iterator<Item = Name> {

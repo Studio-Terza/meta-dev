@@ -11,9 +11,8 @@ struct Edges;
 
 impl Edges {
     fn of(text: &str) -> Vec<String> {
-        let edges = syntax::parse::parse_str::<syntax::ItemUse>(text).map(|item| {
-            UseEdges::of_tree(&item.tree).iter().map(ToString::to_string).collect::<Vec<String>>()
-        });
+        let edges = syntax::parse::parse_str::<syntax::ItemUse>(text)
+            .map(|item| UseEdges::of_tree(&item.tree).iter().map(ToString::to_string).collect::<Vec<String>>());
         edges.ignoring(Ignored::Unparsed).unwrap_or_default()
     }
 }

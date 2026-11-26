@@ -19,10 +19,10 @@ impl TestBudget {
         TestBudget(files.iter().fold(BTreeMap::new(), |mut crates, file| {
             let name = CrateName::from(file.head().placement().package().root());
             let budget: CrateBudget = crates.remove(&name).unwrap_or_default();
-            let starts = CommandPaths::found(file, Scope::Everywhere).iter().map(|_| CrateBudget::start()).fold(
-                Sweep::gathered(file, BudgetGathering::from(file)),
-                |gathered, start| gathered + start,
-            );
+            let starts = CommandPaths::found(file, Scope::Everywhere)
+                .iter()
+                .map(|_| CrateBudget::start())
+                .fold(Sweep::gathered(file, BudgetGathering::from(file)), |gathered, start| gathered + start);
             crates.insert(name, budget + starts);
             crates
         }))

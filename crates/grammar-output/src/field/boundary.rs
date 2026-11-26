@@ -85,4 +85,3 @@ impl<T: TryFrom<u64>> Field for Integer<T> {
             .and_then(|number| T::try_from(number).map_err(|_large| kept))
     }
 }
-

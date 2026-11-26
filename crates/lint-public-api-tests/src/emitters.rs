@@ -40,7 +40,6 @@ impl Joins for Emitters {
     }
 }
 
-
 impl AsRef<BTreeSet<Name>> for Emitters {
     fn as_ref(&self) -> &BTreeSet<Name> {
         &self.names

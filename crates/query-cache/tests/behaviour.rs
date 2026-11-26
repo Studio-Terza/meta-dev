@@ -32,7 +32,10 @@ fn a_cached_query_binds_only_as_many_values_as_it_takes() {
 
 #[test]
 fn a_record_table_spells_its_four_statements() {
-    let full = Table::named("r").column("id", Origin::GeneratedKey).column("body", Origin::Given).column("at", Origin::Generated);
+    let full = Table::named("r")
+        .column("id", Origin::GeneratedKey)
+        .column("body", Origin::Given)
+        .column("at", Origin::Generated);
     assert_eq!(
         full.statements(),
         [

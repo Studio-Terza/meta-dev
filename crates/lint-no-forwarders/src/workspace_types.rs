@@ -35,7 +35,6 @@ impl Joins for WorkspaceTypes {
     }
 }
 
-
 impl WorkspaceTypes {
     pub fn declares(&self, name: &Name) -> Option<&Name> {
         self.0.get(name)

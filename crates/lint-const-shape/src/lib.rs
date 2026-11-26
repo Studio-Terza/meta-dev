@@ -1,5 +1,5 @@
-use lint_core::Joins;
 use lint_core::Headline;
+use lint_core::Joins;
 use lint_file::{Reads, SweptLint};
 use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Contribution, Descend, Facts, Finds, Kind, Scope};
 use std::path::Path;

@@ -124,7 +124,6 @@ impl Joins for Tested<'_> {
     }
 }
 
-
 #[derive(Clone, Copy, Debug)]
 struct TestMarks<'up, 'tree> {
     tested: &'up Tested<'tree>,

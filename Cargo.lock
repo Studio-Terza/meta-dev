@@ -142,8 +142,10 @@ dependencies = [
  "port-core",
  "serde",
  "serde_json",
+ "sqlite-ports",
  "store-ports",
  "strum",
+ "tempfile",
  "thiserror",
  "transcript-ports",
 ]
@@ -156,12 +158,9 @@ dependencies = [
  "design",
  "dispatch-ports",
  "file-ports",
- "grammar-slug",
- "invariants",
- "newtype",
  "serde_json",
  "sqlite-ports",
- "text-lines",
+ "tempfile",
 ]
 
 [[package]]

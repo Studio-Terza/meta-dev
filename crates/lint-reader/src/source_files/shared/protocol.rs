@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use lint_core::Joins;
 use file_ports::Files;
+use lint_core::Joins;
 use lint_core::{Readout, RepoFile, SourceFile};
 use lint_layout::Failure;
 use lint_placement::{CrateFile, Packages};

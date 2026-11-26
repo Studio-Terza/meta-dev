@@ -5,8 +5,8 @@ use std::iter;
 use std::path::Path;
 use std::sync::OnceLock;
 
-use lint_core::Joins;
 use file_ports::Files;
+use lint_core::Joins;
 use lint_core::{FileHead, Readout, RepoFile, SourceFile};
 use lint_roots::Survey;
 

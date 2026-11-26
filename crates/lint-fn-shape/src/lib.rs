@@ -1,9 +1,9 @@
 mod finding;
 mod nesting_depth;
 
-use lint_core::Joins;
 use finding::Finding;
 use lint_core::Headline;
+use lint_core::Joins;
 use lint_file::{Reads, SweptLint};
 use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Contribution, Descend, Facts, Finds, Kind, Scope};
 use std::path::Path;
@@ -124,7 +124,6 @@ impl Joins for Shaped<'_> {
         Shaped { found: self.found.combine(other.found), nests: self.nests.combine(other.nests) }
     }
 }
-
 
 impl<'scan> Shaped<'scan> {
     fn nested(self, bodies: impl IntoIterator<Item = Option<Span>>, own: Span) -> Shaped<'scan> {

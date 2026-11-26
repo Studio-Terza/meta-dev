@@ -47,10 +47,8 @@ impl Batch for SessionRecords {
 
 impl Counts for SessionRecords {
     fn counted<D: Done>(self, statements: &mut impl Execute) -> Result<D, StoreFailure> {
-        let written: [D; 2] = [
-            statements.counted_all(self.messages.iter().map(MessageRow::inserted))?,
-            self.cursor.written(statements)?,
-        ];
+        let written: [D; 2] =
+            [statements.counted_all(self.messages.iter().map(MessageRow::inserted))?, self.cursor.written(statements)?];
         Ok(D::total(written.into_iter()))
     }
 }

@@ -45,10 +45,7 @@ fn a_case_mismatches_only_when_its_lines_differ() {
     let wanted = [Case::new(Title::new("wanted"), SOURCES, Flagged::new(&["a.rs:1"]))];
     let unwanted = [Case::new(Title::new("unwanted"), SOURCES, Flagged::new(&[]))];
     assert_eq!(Sources::mismatches::<EveryFile>(&wanted), Lines::default());
-    assert_eq!(
-        Sources::mismatches::<EveryFile>(&unwanted),
-        Lines::from(["unwanted (a.rs ) flagged [\"a.rs:1\"]"])
-    );
+    assert_eq!(Sources::mismatches::<EveryFile>(&unwanted), Lines::from(["unwanted (a.rs ) flagged [\"a.rs:1\"]"]));
 }
 
 #[test]
@@ -58,9 +55,6 @@ fn lines_are_not_equal_to_other_lines() {
 
 #[test]
 fn placed_sources_read_their_package_manifest() {
-    assert_eq!(
-        Sources::placed_flagged::<EveryDependency>(MANIFESTS, PLACED),
-        Lines::from(["crates/a/Cargo.toml:5"])
-    );
+    assert_eq!(Sources::placed_flagged::<EveryDependency>(MANIFESTS, PLACED), Lines::from(["crates/a/Cargo.toml:5"]));
     assert_eq!(Sources::placed_flagged::<EveryDependency>(&[], PLACED), Lines::default());
 }

@@ -1,8 +1,8 @@
 mod finding;
 
-use lint_core::Joins;
 use finding::Finding;
 use lint_core::Headline;
+use lint_core::Joins;
 use lint_file::{Reads, SweptLint};
 use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Finds, Kind};
 use std::path::Path;

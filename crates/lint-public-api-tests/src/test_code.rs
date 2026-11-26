@@ -30,7 +30,6 @@ impl Joins for InSource {
     }
 }
 
-
 impl InSource {
     fn lines(lines: impl IntoIterator<Item = LineNumber>) -> InSource {
         InSource { lines: lines.into_iter().collect(), invoked: Vec::new() }

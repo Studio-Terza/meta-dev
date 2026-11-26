@@ -1,5 +1,5 @@
-use lint_core::Joins;
 use lint_core::Bound;
+use lint_core::Joins;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NestingDepth(usize);
@@ -18,4 +18,3 @@ impl Joins for NestingDepth {
         NestingDepth(self.0 + other.0)
     }
 }
-

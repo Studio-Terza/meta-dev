@@ -26,5 +26,9 @@ strum.workspace = true
 thiserror.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 
+[dev-dependencies]
+sqlite-ports = { path = "../sqlite-ports" }
+tempfile.workspace = true
+
 [lints]
 workspace = true

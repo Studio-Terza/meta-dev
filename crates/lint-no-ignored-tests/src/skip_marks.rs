@@ -7,8 +7,8 @@ mod ignored;
 use syntax::{Attribute, ItemFn, ItemMod, Macro, MetaList};
 use syntax::{Ident, TokenTree};
 
-use lint_core::Joins;
 use gate::Gate;
+use lint_core::Joins;
 use lint_core::{Macros, Walk};
 use lint_core::{Site, SourceFile, Violation};
 use lint_sweep::{Concludes, Contribute, Contributed, Contribution, Descend, Facts, Kind, Scope};
@@ -44,7 +44,6 @@ impl Joins for Marks {
         }
     }
 }
-
 
 impl Marks {
     fn gated(self, gates: Vec<LineNumber>) -> Marks {
