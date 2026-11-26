@@ -18,6 +18,22 @@ pub(super) struct Reruns<'step> {
     keeping: &'step Keeping,
 }
 
+#[derive(Debug)]
+pub(crate) struct Deferred<'step> {
+    reruns: Reruns<'step>,
+    survivors: Option<Survivors>,
+}
+
+impl<'step> Deferred<'step> {
+    pub(super) fn new(reruns: Reruns<'step>, survivors: Option<Survivors>) -> Deferred<'step> {
+        Deferred { reruns, survivors }
+    }
+
+    pub(crate) fn unfolded(&self, ports: &impl Ports) -> Vec<Told<'step>> {
+        self.reruns.after(ports, self.survivors.as_ref())
+    }
+}
+
 impl<'step> Reruns<'step> {
     const IN_DIFF: &'static str = "--in-diff";
 

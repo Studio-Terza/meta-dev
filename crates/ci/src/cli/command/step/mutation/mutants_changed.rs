@@ -6,7 +6,6 @@ mod selected;
 mod verdict;
 
 use std::ffi::{OsStr, OsString};
-use std::iter;
 use std::path::{Path, PathBuf};
 
 use super::super::journal::Journal;
@@ -19,6 +18,7 @@ use crate::cli::ports::{Exit, Ports, Text};
 use grammar_output::Record;
 use keeping::Keeping;
 use pass::Pass;
+pub(crate) use reruns::Deferred;
 use reruns::Reruns;
 use selected::Selected;
 use verdict::Verdict;
@@ -82,8 +82,7 @@ impl MutantsChanged {
                 .transpose()?
                 .map_or(Ok(()), |narrowed| self.narrowed.replace(ports.files(), &narrowed))?;
             let reruns = Reruns::new(&self.narrowed, &self.scoped, &self.scope, &self.keeping);
-            let rest = reruns.after(ports, survivors.as_ref());
-            Ok(Telling::listed(iter::once(Told::Said(timed_out)).chain(rest).collect()))
+            Ok(Telling::deferring(vec![Told::Said(timed_out)], Deferred::new(reruns, survivors)))
         })
     }
 

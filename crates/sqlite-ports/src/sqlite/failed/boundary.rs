@@ -20,10 +20,10 @@ pub(in super::super) enum Unmigrated {
 }
 
 impl Unexecuted {
-    fn kinded(extended: Option<i32>, failed: rusqlite::Error) -> StoreFailure {
+    fn kinded(extended: Option<i32>, failed: &rusqlite::Error) -> StoreFailure {
         match extended {
-            Some(ffi::SQLITE_CONSTRAINT_FOREIGNKEY) => StoreFailure::Referenced(Cause::told(&failed)),
-            Some(_) | None => StoreFailure::Statement(Cause::told(&failed)),
+            Some(ffi::SQLITE_CONSTRAINT_FOREIGNKEY) => StoreFailure::Referenced(Cause::told(failed)),
+            Some(_) | None => StoreFailure::Statement(Cause::told(failed)),
         }
     }
 }
@@ -55,7 +55,7 @@ impl From<Unopened> for StoreFailure {
 impl From<Unexecuted> for StoreFailure {
     fn from(failed: Unexecuted) -> StoreFailure {
         let extended = failed.0.sqlite_error().map(|error| error.extended_code);
-        Unexecuted::kinded(extended, failed.0)
+        Unexecuted::kinded(extended, &failed.0)
     }
 }
 

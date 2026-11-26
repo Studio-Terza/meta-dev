@@ -17,7 +17,7 @@ use super::ports::Ports;
 use crate::cli::ignored::Ignored;
 pub(crate) use failure::Failure;
 use invariants::Ignoring;
-pub use telling::Telling;
+pub use telling::{Telling, Unfolding};
 pub(crate) use telling::Told;
 
 #[derive(Debug)]

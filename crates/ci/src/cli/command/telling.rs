@@ -1,11 +1,12 @@
 use std::fmt::{self, Debug, Display};
-use std::{iter, vec};
 use std::process::ExitCode;
+use std::{iter, vec};
 
 use console_ports::{Answer, Shown, Tale};
 
 use super::Failure;
-use crate::cli::ports::Exit;
+use super::step::mutation::Deferred;
+use crate::cli::ports::{Exit, Ports};
 
 #[derive(Debug)]
 pub(crate) enum Told<'step> {
@@ -16,7 +17,14 @@ pub(crate) enum Told<'step> {
 #[derive(Debug)]
 pub struct Telling<'step> {
     told: vec::IntoIter<Told<'step>>,
+    deferred: Option<Deferred<'step>>,
     ended: Option<Answer>,
+}
+
+#[derive(Debug)]
+pub struct Unfolding<'step, P: Ports> {
+    telling: Telling<'step>,
+    ports: &'step P,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -24,7 +32,11 @@ struct Lined<'said, Said>(&'said Said);
 
 impl<'step> Telling<'step> {
     pub(crate) fn listed(told: Vec<Told<'step>>) -> Telling<'step> {
-        Telling { told: told.into_iter(), ended: None }
+        Telling { told: told.into_iter(), deferred: None, ended: None }
+    }
+
+    pub(crate) fn deferring(told: Vec<Told<'step>>, deferred: Deferred<'step>) -> Telling<'step> {
+        Telling { deferred: Some(deferred), ..Telling::listed(told) }
     }
 
     pub(crate) fn reported(said: Vec<Shown>, ended: Result<Exit, Failure<'step>>) -> Telling<'step> {
@@ -36,7 +48,8 @@ impl<'step> Telling<'step> {
     }
 
     pub(crate) fn refused(refusal: &Failure<'_>) -> Telling<'step> {
-        Telling { told: Vec::new().into_iter(), ended: Some(Answer::complained(ExitCode::FAILURE, Lined(refusal))) }
+        let ended = Some(Answer::complained(ExitCode::FAILURE, Lined(refusal)));
+        Telling { ended, ..Telling::listed(Vec::new()) }
     }
 
     fn answered(ended: Result<Exit, Failure<'_>>) -> Answer {
@@ -44,6 +57,25 @@ impl<'step> Telling<'step> {
             Ok(exit) => Answer::new(ExitCode::from(exit)),
             Err(failure) => Answer::complained(ExitCode::FAILURE, Lined(&failure)),
         }
+    }
+
+    fn heard(&mut self, told: Told<'_>) -> Option<Shown> {
+        match told {
+            Told::Said(shown) => Some(shown),
+            Told::Ended(ended) => self.ended.replace(Telling::answered(ended)).and(None),
+        }
+    }
+}
+
+impl<'step, P: Ports> Unfolding<'step, P> {
+    pub(crate) fn new(telling: Telling<'step>, ports: &'step P) -> Unfolding<'step, P> {
+        Unfolding { telling, ports }
+    }
+
+    fn unfolded(&mut self) -> Option<Shown> {
+        let deferred = self.telling.deferred.take()?;
+        self.telling.told = deferred.unfolded(self.ports).into_iter();
+        self.next()
     }
 }
 
@@ -62,20 +94,22 @@ impl<'step> Told<'step> {
     }
 }
 
-impl Iterator for Telling<'_> {
+impl<P: Ports> Iterator for Unfolding<'_, P> {
     type Item = Shown;
 
     fn next(&mut self) -> Option<Shown> {
-        match self.told.next()? {
-            Told::Said(shown) => Some(shown),
-            Told::Ended(ended) => self.ended.replace(Telling::answered(ended)).and(None),
+        match self.telling.told.next() {
+            Some(told) => self.telling.heard(told),
+            None => self.unfolded(),
         }
     }
 }
 
-impl Tale for Telling<'_> {
+impl<P: Ports> Tale for Unfolding<'_, P> {
     fn ended(self) -> Answer {
-        self.ended.unwrap_or_else(|| Answer::complained(ExitCode::FAILURE, "the step ended without saying how\n"))
+        self.telling
+            .ended
+            .unwrap_or_else(|| Answer::complained(ExitCode::FAILURE, "the step ended without saying how\n"))
     }
 }
 

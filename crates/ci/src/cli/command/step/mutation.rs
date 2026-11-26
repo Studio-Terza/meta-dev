@@ -11,6 +11,7 @@ mod shard_summary;
 use super::Step;
 
 pub use matrix::Matrix;
+pub(crate) use mutants_changed::Deferred;
 pub use mutants_changed::MutantsChanged;
 pub use mutants_plan::MutantsPlan;
 pub use mutants_prior::MutantsPrior;
