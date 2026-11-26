@@ -3,8 +3,6 @@
 mod ignored;
 mod ports;
 
-use std::error::Error;
-
 use design::{Failure, Flail, Flails, HookEvent, Line, Sequel, Unmatched};
 use design_model::{JobId, Prefix};
 use invariants::Ignoring;
@@ -17,7 +15,7 @@ use text_lines::Lines;
 use ignored::Ignored;
 
 #[test]
-fn an_unknown_command_exits_with_failure_and_prints_the_usage() -> Result<(), Box<dyn Error>> {
+fn an_unknown_command_exits_with_failure_and_prints_the_usage() -> Result<(), laws::Unmet> {
     let output = Design::with_a_session_in_work()?.run(&["frobnicate"])?;
     assert_ne!(output.status.code(), Some(0_i32));
     assert!(String::from_utf8(output.stderr)?.contains("usage: design"));
@@ -25,7 +23,7 @@ fn an_unknown_command_exits_with_failure_and_prints_the_usage() -> Result<(), Bo
 }
 
 #[test]
-fn ingest_of_a_workspace_exits_successfully_with_its_report() -> Result<(), Box<dyn Error>> {
+fn ingest_of_a_workspace_exits_successfully_with_its_report() -> Result<(), laws::Unmet> {
     let output = Design::with_a_session_in_work()?.in_work(&["ingest"], "")?;
     assert_eq!(output.status.code(), Some(0_i32));
     assert!(String::from_utf8(output.stdout)?.contains("authorship owner 1\n"));
@@ -33,7 +31,7 @@ fn ingest_of_a_workspace_exits_successfully_with_its_report() -> Result<(), Box<
 }
 
 #[test]
-fn a_store_kept_on_disk_answers_show_and_a_second_ingest_writes_nothing() -> Result<(), Box<dyn Error>> {
+fn a_store_kept_on_disk_answers_show_and_a_second_ingest_writes_nothing() -> Result<(), laws::Unmet> {
     let design = Design::with_a_session_in_work()?;
     let first = design.in_work(&["ingest"], "")?;
     let second = design.in_work(&["ingest"], "")?;
@@ -45,7 +43,7 @@ fn a_store_kept_on_disk_answers_show_and_a_second_ingest_writes_nothing() -> Res
 }
 
 #[test]
-fn the_hook_settings_are_json_naming_for_every_event_a_command_that_runs_its_hook() -> Result<(), Box<dyn Error>> {
+fn the_hook_settings_are_json_naming_for_every_event_a_command_that_runs_its_hook() -> Result<(), laws::Unmet> {
     let output = Design::with_a_session_in_work()?.run(&["hook", "--settings"])?;
     let settings: Value = serde_json::from_slice(&output.stdout)?;
     let commanded = HookEvent::VARIANTS
@@ -62,7 +60,7 @@ fn the_hook_settings_are_json_naming_for_every_event_a_command_that_runs_its_hoo
 }
 
 #[test]
-fn a_prompt_hook_ingests_and_prints_nothing_into_the_conversation() -> Result<(), Box<dyn Error>> {
+fn a_prompt_hook_ingests_and_prints_nothing_into_the_conversation() -> Result<(), laws::Unmet> {
     let design = Design::with_a_session_in_work()?;
     let hooked = design.in_work(&["hook", "user-prompt-submit"], "")?;
     let shown = design.in_work(&["show", "o1"], "")?;
@@ -73,7 +71,7 @@ fn a_prompt_hook_ingests_and_prints_nothing_into_the_conversation() -> Result<()
 
 #[test]
 fn a_stop_whose_agent_flails_blocks_once_with_a_json_decision_at_exit_zero_and_a_stop_already_continuing_only_notices()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let stopping = "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":false}";
     let continuing = "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":true}";
     let design = Design::with_a_session_in_work()?;
@@ -96,7 +94,7 @@ fn a_stop_whose_agent_flails_blocks_once_with_a_json_decision_at_exit_zero_and_a
 
 #[test]
 fn a_flail_first_met_by_a_continuing_stop_reaches_the_lead_once_through_the_next_prompt_or_the_next_stop()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let stopping = "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":false}";
     let continuing = "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":true}";
     let prompted = Design::with_a_session_in_work()?;
@@ -128,7 +126,7 @@ fn a_flail_first_met_by_a_continuing_stop_reaches_the_lead_once_through_the_next
 
 #[test]
 fn a_run_killed_during_its_second_job_leaves_the_first_job_s_flail_told_and_the_next_run_sends_only_the_second_job_s_segment_again()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let stopping = "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":false}";
     let design = Design::with_two_jobs_whose_agent_dies_on_the_second()?;
     let killed = design.in_work(&["hook", "stop"], stopping)?;

@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::ffi::OsString;
 
 use console_ports::{Heard, Variables};
@@ -192,7 +191,7 @@ fn a_statement_reads_no_owner_messages() -> Result<(), Failure> {
 }
 
 #[test]
-fn a_stop_that_asks_the_owner_blocks_with_the_quotes_that_answer_it() -> Result<(), Box<dyn Error>> {
+fn a_stop_that_asks_the_owner_blocks_with_the_quotes_that_answer_it() -> Result<(), laws::Unmet> {
     let asking = Asking::over(&[Asking::COVERED, Asking::LINT, Asking::PICKED, Asking::KEPT])?;
     let stopped = asking.asked(Asking::STOPPING, &["hook", "stop"]);
     let decision: Value = serde_json::from_str(&stopped.text)?;

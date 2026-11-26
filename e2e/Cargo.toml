@@ -23,6 +23,7 @@ tempfile.workspace = true
 
 [dev-dependencies]
 ci = { path = "../crates/ci" }
+laws = { path = "../crates/laws" }
 serde_json.workspace = true
 toml.workspace = true
 

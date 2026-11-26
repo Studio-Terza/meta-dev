@@ -68,7 +68,7 @@ pub struct Desk {
 }
 
 impl Desk {
-    pub fn scope(&self, fake: &Fake, event: &str, base: &str) -> Result<Scope, Box<dyn Error>> {
+    pub fn scope(&self, fake: &Fake, event: &str, base: &str) -> Result<Scope, laws::Unmet> {
         let answer = self.answer(
             fake,
             &["reach", &self.file("metadata.json"), event, base, &self.file("env"), &self.file("summary")],

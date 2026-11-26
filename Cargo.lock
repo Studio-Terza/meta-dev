@@ -476,6 +476,7 @@ version = "0.1.0"
 dependencies = [
  "dispatch-ports",
  "invariants",
+ "laws",
  "port-core",
 ]
 
@@ -519,6 +520,7 @@ dependencies = [
  "ci",
  "console-ports",
  "file-ports",
+ "laws",
  "serde_json",
  "tempfile",
  "toml",
@@ -1758,6 +1760,7 @@ name = "lint-narrowed-returns"
 version = "0.1.0"
 dependencies = [
  "graph",
+ "laws",
  "lint-core",
  "lint-file",
  "lint-fixtures",
@@ -2690,6 +2693,7 @@ dependencies = [
  "graph-reader",
  "hex",
  "invariants",
+ "laws",
  "libsqlite3-sys",
  "lint-layout",
  "lint-reader",

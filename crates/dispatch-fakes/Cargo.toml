@@ -14,5 +14,8 @@ invariants = { path = "../invariants" }
 dispatch-ports = { path = "../dispatch-ports" }
 port-core = { path = "../port-core" }
 
+[dev-dependencies]
+laws = { path = "../laws" }
+
 [lints]
 workspace = true

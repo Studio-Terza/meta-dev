@@ -1,5 +1,3 @@
-use std::error::Error;
-
 use crate::Sqlite;
 use design::{Failure, Line, Unresolved, Viewed};
 use design_model::{Ending, NodeId, Segment};
@@ -577,8 +575,8 @@ laws::table!(
 );
 
 #[test]
-fn each_view_renders_the_live_tree_its_standing_decisions_open_questions_and_unplaced_words()
--> Result<(), Box<dyn Error>> {
+fn each_view_renders_the_live_tree_its_standing_decisions_open_questions_and_unplaced_words() -> Result<(), laws::Unmet>
+{
     let applying = Applying::ready()?;
     applying.applied(
         &[

@@ -5,7 +5,6 @@ mod generated_laws;
 mod ignored;
 mod ports;
 
-use std::error::Error;
 use std::iter;
 use std::sync::Mutex;
 use std::time::Duration;
@@ -211,7 +210,7 @@ impl Watching {
     const LAPSED: Wait = Wait { pause: Watching::PAUSE, woke: Woke::Lapsed };
     const RUNG: Wait = Wait { pause: Watching::PAUSE, woke: Woke::Rung };
 
-    fn watched(self) -> Result<Observed, Box<dyn Error>> {
+    fn watched(self) -> Result<Observed, laws::Unmet> {
         let waits = Waits::default();
         let run = Run::root();
         let watched = {
@@ -230,7 +229,7 @@ laws::law!(a_deadline_that_passes_during_a_sleep_kills_the_run_on_the_next_check
     let (timeout, sleeping_after) = drawn;
     let watching = Watching { timeout, sleeping_after, finishing: None };
     let checks = Calls::new(sleeping_after.saturating_add(1));
-    let watched = watching.watched().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    let watched = watching.watched().map_err(|failure| TestCaseError::fail(format!("{failure:?}")))?;
     prop_assert_eq!(
         watched,
         Observed {
@@ -244,7 +243,7 @@ laws::law!(a_deadline_that_passes_during_a_sleep_kills_the_run_on_the_next_check
 laws::law!(a_run_that_replies_before_its_deadline_is_finished_and_released_once, (20..200_u32, 1..9_usize), drawn, {
     let (timeout, finishing) = drawn;
     let watching = Watching { timeout, sleeping_after: 9, finishing: Some(finishing) };
-    let watched = watching.watched().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    let watched = watching.watched().map_err(|failure| TestCaseError::fail(format!("{failure:?}")))?;
     prop_assert_eq!(
         watched,
         Observed {
@@ -258,7 +257,7 @@ laws::law!(a_run_that_replies_before_its_deadline_is_finished_and_released_once,
 struct Lingering;
 
 impl Lingering {
-    fn watched(timeout: Timeout) -> Result<Observed, Box<dyn Error>> {
+    fn watched(timeout: Timeout) -> Result<Observed, laws::Unmet> {
         let waits = Waits::default();
         let run = Run::root();
         let watched = {
@@ -293,7 +292,7 @@ impl Lingering {
 
 laws::law!(a_ring_left_on_the_bell_neither_cuts_a_run_short_nor_carries_it_past_its_deadline, 1..200_u32, drawn, {
     let timeout = Timeout::new(drawn);
-    let watched = Lingering::watched(timeout).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    let watched = Lingering::watched(timeout).map_err(|failure| TestCaseError::fail(format!("{failure:?}")))?;
     prop_assert_eq!(watched, Lingering::observed(timeout));
 });
 
@@ -353,7 +352,7 @@ impl Stalled for Cause {
 }
 
 #[test]
-fn each_stall_names_its_own_cause() -> Result<(), Box<dyn Error>> {
+fn each_stall_names_its_own_cause() -> Result<(), laws::Unmet> {
     let fault = || Fault::from(DispatchFailure::Spawn(std::io::Error::from_raw_os_error(2)));
     let stalls = [
         Stall::Errored(Errored::new(Told::try_new("refused".to_owned())?, Usage::default())),

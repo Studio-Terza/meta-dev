@@ -1,5 +1,4 @@
 use std::collections::BTreeSet;
-use std::error::Error;
 use std::ffi::OsString;
 use std::fs;
 use std::path::Path;
@@ -35,9 +34,9 @@ const MACROS: &str =
 struct Workspace(TempDir);
 
 impl Workspace {
-    fn laid() -> Result<Workspace, Box<dyn Error>> {
+    fn laid() -> Result<Workspace, laws::Unmet> {
         let root = TempDir::new()?;
-        let written = |relative: &str, text: &str| -> Result<(), Box<dyn Error>> {
+        let written = |relative: &str, text: &str| -> Result<(), laws::Unmet> {
             let path = root.path().join(relative);
             fs::create_dir_all(path.parent().ok_or("no parent")?)?;
             Ok(fs::write(path, text)?)
@@ -60,7 +59,7 @@ impl Workspace {
         self.0.path()
     }
 
-    fn cached(&self) -> Result<BTreeSet<String>, Box<dyn Error>> {
+    fn cached(&self) -> Result<BTreeSet<String>, laws::Unmet> {
         fs::read_dir(self.path().join(".sqlx"))?
             .map(|entry| Ok(entry?.file_name().to_string_lossy().into_owned()))
             .collect()
@@ -72,7 +71,7 @@ impl Workspace {
 }
 
 #[test]
-fn every_store_query_in_the_crates_gets_an_entry_and_entries_no_query_uses_are_removed() -> Result<(), Box<dyn Error>> {
+fn every_store_query_in_the_crates_gets_an_entry_and_entries_no_query_uses_are_removed() -> Result<(), laws::Unmet> {
     let workspace = Workspace::laid()?;
     let arguments = vec![OsString::from(workspace.path()), OsString::from(workspace.path().join("migrations"))];
     let answer = QueryCache::answered(arguments);
@@ -95,7 +94,7 @@ fn a_run_given_the_wrong_arguments_exits_with_failure_and_prints_its_usage_to_st
 }
 
 #[test]
-fn a_second_run_over_a_cache_that_matches_its_queries_changes_nothing() -> Result<(), Box<dyn Error>> {
+fn a_second_run_over_a_cache_that_matches_its_queries_changes_nothing() -> Result<(), laws::Unmet> {
     let workspace = Workspace::laid()?;
     let arguments = || vec![OsString::from(workspace.path()), OsString::from(workspace.path().join("migrations"))];
     QueryCache::try_from(arguments())?.prepared()?;
@@ -104,7 +103,7 @@ fn a_second_run_over_a_cache_that_matches_its_queries_changes_nothing() -> Resul
 }
 
 #[test]
-fn a_table_with_one_key_and_no_nullable_columns_gets_its_record_statements() -> Result<(), Box<dyn Error>> {
+fn a_table_with_one_key_and_no_nullable_columns_gets_its_record_statements() -> Result<(), laws::Unmet> {
     let workspace = Workspace::laid()?;
     fs::write(workspace.path().join("migrations/20260102000000_records.sql"), RECORDS)?;
     let arguments = vec![OsString::from(workspace.path()), OsString::from(workspace.path().join("migrations"))];

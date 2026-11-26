@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::ffi::OsString;
 use std::path::Path;
 
@@ -168,7 +167,7 @@ impl Noting {
 
 #[test]
 fn import_notes_makes_a_node_of_every_content_line_anchors_each_ruling_and_view_notes_gives_the_content_back()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let applying = Noting::ready()?;
     let imported = Noting::imported(&applying, EXCERPT)?;
     let viewed = applying.run(&["view", "notes"])?;

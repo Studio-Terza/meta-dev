@@ -1,5 +1,3 @@
-use std::error::Error;
-
 use design_jobs::JobState;
 use design_model::{JobId, RunId};
 use design_runs::{Delivery, NextJob, NextRun, RunState};
@@ -13,14 +11,14 @@ type Sqlite = <SqliteOpener as store_ports::Opens>::Store;
 struct Placing;
 
 impl Placing {
-    fn job(store: &Port<'_, Sqlite>, state: JobState) -> Result<JobId, Box<dyn Error>> {
+    fn job(store: &Port<'_, Sqlite>, state: JobState) -> Result<JobId, laws::Unmet> {
         let job = store.read(NextJob)?;
         let arguments = vec![job.raw().into_argument(), state.raw().into_argument()];
         store.write(Prepared::written("INSERT INTO jobs (id, state) VALUES (?1, ?2)", arguments))?;
         Ok(job)
     }
 
-    fn run(store: &Port<'_, Sqlite>, state: RunState) -> Result<RunId, Box<dyn Error>> {
+    fn run(store: &Port<'_, Sqlite>, state: RunState) -> Result<RunId, laws::Unmet> {
         let job = Placing::job(store, JobState::Open)?;
         let run = store.read(NextRun)?;
         let arguments = vec![run.raw().into_argument(), job.raw().into_argument(), state.raw().into_argument()];
@@ -31,7 +29,7 @@ impl Placing {
         Ok(run)
     }
 
-    fn failure(store: &Port<'_, Sqlite>, delivery: Delivery) -> Result<JobId, Box<dyn Error>> {
+    fn failure(store: &Port<'_, Sqlite>, delivery: Delivery) -> Result<JobId, laws::Unmet> {
         let job = Placing::job(store, JobState::Flailed)?;
         let arguments =
             vec![job.raw().into_argument(), Argument::Text(String::from("told")), delivery.raw().into_argument()];

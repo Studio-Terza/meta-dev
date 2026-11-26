@@ -1,14 +1,13 @@
 #[path = "generated/laws.rs"]
 mod generated_laws;
 
-use std::error::Error;
 use workspace_metadata::CrateName;
 
 use workspace_metadata::{Graph, Library, Metadata};
 
 #[test]
 fn real_cargo_metadata_lists_each_dependency_library_with_its_root_form_and_renamed_normal_dependencies()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let metadata: Metadata = serde_json::from_str(include_str!("fixtures/metadata.json"))?;
     let listed: Vec<String> = metadata
         .libraries()
@@ -93,7 +92,7 @@ const CHAINED: &str = concat!(
 
 #[test]
 fn each_member_knows_its_depth_and_the_workspace_crates_below_and_above_it_on_the_compile_chain()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let metadata: Metadata = serde_json::from_str(CHAINED)?;
     let graph = Graph::from(&metadata);
     let placed: Vec<String> =
@@ -111,8 +110,8 @@ fn each_member_knows_its_depth_and_the_workspace_crates_below_and_above_it_on_th
 }
 
 #[test]
-fn a_lexer_dependency_reaching_an_owned_package_breaches_unless_a_proc_macro_stands_between()
--> Result<(), Box<dyn Error>> {
+fn a_lexer_dependency_reaching_an_owned_package_breaches_unless_a_proc_macro_stands_between() -> Result<(), laws::Unmet>
+{
     let unleafed = |fixture: &str| -> Result<Vec<String>, serde_json::Error> {
         let metadata: Metadata = serde_json::from_str(fixture)?;
         let graph = Graph::from(&metadata);
@@ -124,7 +123,7 @@ fn a_lexer_dependency_reaching_an_owned_package_breaches_unless_a_proc_macro_sta
 }
 
 #[test]
-fn a_crate_reaching_an_owned_package_only_through_a_proc_macro_breaches_no_role() -> Result<(), Box<dyn Error>> {
+fn a_crate_reaching_an_owned_package_only_through_a_proc_macro_breaches_no_role() -> Result<(), laws::Unmet> {
     let metadata: Metadata = serde_json::from_str(include_str!("fixtures/roles.json"))?;
     let graph = Graph::from(&metadata);
     let breaches = graph.role_breaches();

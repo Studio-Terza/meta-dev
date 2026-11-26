@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::ffi::OsString;
 use std::process::ExitCode;
 
@@ -68,7 +67,7 @@ impl Prior {
         mutants.first().map_or_else(String::new, |_| ["[", &mutants.join(", "), "]"].concat())
     }
 
-    fn planned(&self) -> Result<Planned, Box<dyn Error>> {
+    fn planned(&self) -> Result<Planned, laws::Unmet> {
         let scratch = Scratch::new()?;
         scratch.directory("prior/download/0")?;
         scratch.write("prior/tested", "t0\nh0\n")?;
@@ -138,7 +137,7 @@ impl Prior {
 }
 
 #[test]
-fn a_survivor_a_test_only_commit_fixes_is_selected_again_and_nothing_else_is() -> Result<(), Box<dyn Error>> {
+fn a_survivor_a_test_only_commit_fixes_is_selected_again_and_nothing_else_is() -> Result<(), laws::Unmet> {
     let planned = Prior {
         timed_out: &[],
         survivors: &[SURVIVOR],
@@ -160,7 +159,7 @@ fn a_survivor_a_test_only_commit_fixes_is_selected_again_and_nothing_else_is() -
 }
 
 #[test]
-fn a_fix_commit_s_changed_lines_are_mutated_and_a_survivor_follows_its_line_down() -> Result<(), Box<dyn Error>> {
+fn a_fix_commit_s_changed_lines_are_mutated_and_a_survivor_follows_its_line_down() -> Result<(), laws::Unmet> {
     let planned = Prior {
         timed_out: &[],
         survivors: &[SURVIVOR],
@@ -181,7 +180,7 @@ fn a_fix_commit_s_changed_lines_are_mutated_and_a_survivor_follows_its_line_down
 }
 
 #[test]
-fn a_prior_whose_survivors_are_all_caught_and_no_line_changed_selects_nothing() -> Result<(), Box<dyn Error>> {
+fn a_prior_whose_survivors_are_all_caught_and_no_line_changed_selects_nothing() -> Result<(), laws::Unmet> {
     let planned = Prior {
         timed_out: &[],
         survivors: &[],
@@ -213,7 +212,7 @@ laws::table!(
 );
 
 #[test]
-fn without_a_kept_prior_the_plan_lists_every_changed_line_as_before() -> Result<(), Box<dyn Error>> {
+fn without_a_kept_prior_the_plan_lists_every_changed_line_as_before() -> Result<(), laws::Unmet> {
     let scratch = Scratch::new()?;
     scratch.directory("prior")?;
     let diff = scratch.file("c.diff");
@@ -267,7 +266,7 @@ impl Earlier {
     const RUNS: &'static str = r#"[{"databaseId": 7, "headSha": "h0"}]"#;
     const UPLOADED: &'static str = "[.artifacts[] | select(.expired | not) | .name | capture(\"^mutants-result-(?<index>[0-9]+)-of-(?<count>[0-9]+)$\") | {index: (.index | tonumber), count: (.count | tonumber)}]";
 
-    fn looked(&self) -> Result<Looked, Box<dyn Error>> {
+    fn looked(&self) -> Result<Looked, laws::Unmet> {
         let scratch = Scratch::new()?;
         scratch.directory("prior/download/0")?;
         scratch.directory("prior/download/1")?;
@@ -335,7 +334,7 @@ laws::table!(
 );
 
 #[test]
-fn a_shard_mutates_only_the_selected_names_and_keeps_what_it_left() -> Result<(), Box<dyn Error>> {
+fn a_shard_mutates_only_the_selected_names_and_keeps_what_it_left() -> Result<(), laws::Unmet> {
     let scratch = Scratch::new()?;
     scratch.directory("prior")?;
     scratch.write("prior/selected.txt", "crates/a/src/lib.rs:3:5: replace f -> bool with true")?;
@@ -387,7 +386,7 @@ fn a_shard_mutates_only_the_selected_names_and_keeps_what_it_left() -> Result<()
 }
 
 #[test]
-fn a_shard_given_an_empty_selection_mutates_nothing_and_keeps_an_empty_result() -> Result<(), Box<dyn Error>> {
+fn a_shard_given_an_empty_selection_mutates_nothing_and_keeps_an_empty_result() -> Result<(), laws::Unmet> {
     let scratch = Scratch::new()?;
     scratch.directory("prior")?;
     scratch.write("prior/selected.txt", "")?;
@@ -428,7 +427,7 @@ fn a_shard_given_an_empty_selection_mutates_nothing_and_keeps_an_empty_result() 
 }
 
 #[test]
-fn a_survivor_the_scoped_pass_still_misses_is_kept_for_the_next_push() -> Result<(), Box<dyn Error>> {
+fn a_survivor_the_scoped_pass_still_misses_is_kept_for_the_next_push() -> Result<(), laws::Unmet> {
     let scratch = Scratch::new()?;
     scratch.survived(&[Missed {
         name: "crates/a/src/lib.rs:3:5: replace f -> bool with true",
@@ -498,7 +497,7 @@ laws::table!(
 );
 
 #[test]
-fn a_survivor_that_timed_out_in_the_scope_is_selected_again() -> Result<(), Box<dyn Error>> {
+fn a_survivor_that_timed_out_in_the_scope_is_selected_again() -> Result<(), laws::Unmet> {
     let planned = Prior {
         survivors: &[],
         timed_out: &[SURVIVOR],
@@ -515,7 +514,7 @@ fn a_survivor_that_timed_out_in_the_scope_is_selected_again() -> Result<(), Box<
 }
 
 #[test]
-fn a_full_plan_sizes_each_shard_from_the_prior_s_measured_cost_per_crate() -> Result<(), Box<dyn Error>> {
+fn a_full_plan_sizes_each_shard_from_the_prior_s_measured_cost_per_crate() -> Result<(), laws::Unmet> {
     let planned = Prior {
         timed_out: &[],
         survivors: &[SURVIVOR],

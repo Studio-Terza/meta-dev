@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::sync::LazyLock;
 
 use newtype::Enumerated;
@@ -63,7 +62,7 @@ struct Doors;
 impl Doors {
     const ONLY: i64 = 1;
 
-    fn placed(store: &Port<'_, Sqlite>, state: Door) -> Result<i64, Box<dyn Error>> {
+    fn placed(store: &Port<'_, Sqlite>, state: Door) -> Result<i64, laws::Unmet> {
         store.write(Prepared::written(
             "CREATE TABLE IF NOT EXISTS doors (id INTEGER PRIMARY KEY, state TEXT NOT NULL)",
             Vec::new(),
@@ -97,7 +96,7 @@ fn every_declared_state_is_stored_and_read_back_by_its_spelling() {
 }
 
 #[test]
-fn a_held_state_moves_its_row_and_a_stale_one_is_refused() -> Result<(), Box<dyn Error>> {
+fn a_held_state_moves_its_row_and_a_stale_one_is_refused() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<Bare>());
     let key = Doors::placed(&store, Door::Shut)?;
@@ -111,7 +110,7 @@ fn a_held_state_moves_its_row_and_a_stale_one_is_refused() -> Result<(), Box<dyn
 }
 
 #[test]
-fn a_held_state_moves_to_a_declared_target_chosen_at_runtime() -> Result<(), Box<dyn Error>> {
+fn a_held_state_moves_to_a_declared_target_chosen_at_runtime() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<Bare>());
     let chosen = [door::Leaving::Opened, door::Leaving::Locked];

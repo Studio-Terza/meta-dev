@@ -3,7 +3,6 @@
 #[path = "generated/laws.rs"]
 mod generated_laws;
 
-use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, Files, Memory};
@@ -102,7 +101,7 @@ impl Transcript {
         ClaudeCodeDir::new(memory, PathBuf::from(DIRECTORY))
     }
 
-    fn read(&self, cursor: Cursor) -> Result<Read, Box<dyn Error>> {
+    fn read(&self, cursor: Cursor) -> Result<Read, laws::Unmet> {
         let run = Run::root();
         let port = run.port(self.directory());
         let sessions = Transcripts::sessions(&port)?;
@@ -244,7 +243,7 @@ impl Views {
 }
 
 #[test]
-fn each_line_is_classified_by_who_wrote_it() -> Result<(), Box<dyn Error>> {
+fn each_line_is_classified_by_who_wrote_it() -> Result<(), laws::Unmet> {
     let text =
         [Lines::typed("1"), Lines::answer("2"), Lines::tool_result("3"), Lines::notice("4"), Lines::skipped()].concat();
     let read = Transcript::holding(&text).read(Cursor::default())?;
@@ -253,7 +252,7 @@ fn each_line_is_classified_by_who_wrote_it() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_line_that_is_not_a_message_yields_its_parent_edge() -> Result<(), Box<dyn Error>> {
+fn a_line_that_is_not_a_message_yields_its_parent_edge() -> Result<(), laws::Unmet> {
     let text = [Lines::answer("2"), Lines::system("5", "2"), Lines::skipped()].concat();
     let read = Transcript::holding(&text).read(Cursor::default())?;
     assert_eq!(Views::edges(read), ["5 after 2"]);
@@ -261,14 +260,14 @@ fn a_line_that_is_not_a_message_yields_its_parent_edge() -> Result<(), Box<dyn E
 }
 
 #[test]
-fn a_lead_record_keeps_only_its_text_blocks() -> Result<(), Box<dyn Error>> {
+fn a_lead_record_keeps_only_its_text_blocks() -> Result<(), laws::Unmet> {
     let read = Transcript::holding(&Lines::answer("2")).read(Cursor::default())?;
     assert_eq!(Views::texts(read), ["first second"]);
     Ok(())
 }
 
 #[test]
-fn a_record_carries_the_timestamp_of_its_line() -> Result<(), Box<dyn Error>> {
+fn a_record_carries_the_timestamp_of_its_line() -> Result<(), laws::Unmet> {
     let read = Transcript::holding(&Lines::typed("1")).read(Cursor::default())?;
     let stamps: Vec<Instant> = Views::records(read).into_iter().map(|record| record.stamp().clone()).collect();
     assert_eq!(stamps, [Instant::try_new("2026-01-01T00:00:01Z".to_owned())?]);
@@ -276,7 +275,7 @@ fn a_record_carries_the_timestamp_of_its_line() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_record_carries_its_session_and_parent() -> Result<(), Box<dyn Error>> {
+fn a_record_carries_its_session_and_parent() -> Result<(), laws::Unmet> {
     let read = Transcript::holding(&Lines::shaped(
         "assistant",
         r#""message":{"model":"claude","content":[{"type":"text","text":"a"}]}"#,
@@ -291,7 +290,7 @@ fn a_record_carries_its_session_and_parent() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_partial_last_line_is_not_yielded() -> Result<(), Box<dyn Error>> {
+fn a_partial_last_line_is_not_yielded() -> Result<(), laws::Unmet> {
     let whole = Lines::typed("1");
     let partial = Lines::answer("2");
     let cut = partial.chars().take(partial.len() / 2).collect::<String>();
@@ -302,7 +301,7 @@ fn a_partial_last_line_is_not_yielded() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_record_uuid_reads_as_its_text() -> Result<(), Box<dyn Error>> {
+fn a_record_uuid_reads_as_its_text() -> Result<(), laws::Unmet> {
     let read = Transcript::holding(&Lines::typed("abc")).read(Cursor::default())?;
     let texts: Vec<String> = Views::records(read).into_iter().map(|record| record.uuid().to_string()).collect();
     assert_eq!(texts, ["abc"]);
@@ -358,9 +357,10 @@ laws::law!(resuming_from_the_cursor_yields_every_record_exactly_once, 0usize..40
     let cut = split.min(text.len());
     let first = Transcript::holding(&text.chars().take(cut).collect::<String>())
         .read(Cursor::default())
-        .map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-    let second =
-        Transcript::holding(&text).read(first.cursor()).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+        .map_err(|failure| TestCaseError::fail(format!("{failure:?}")))?;
+    let second = Transcript::holding(&text)
+        .read(first.cursor())
+        .map_err(|failure| TestCaseError::fail(format!("{failure:?}")))?;
     let together: Vec<Record> = Views::records(first).into_iter().chain(Views::records(second)).collect();
     prop_assert_eq!(Views::uuids(&together), ["1", "2"]);
 });

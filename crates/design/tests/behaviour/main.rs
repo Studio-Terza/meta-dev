@@ -9,7 +9,6 @@ mod structure;
 mod view;
 
 use std::collections::BTreeSet;
-use std::error::Error;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
@@ -499,7 +498,7 @@ impl Unheld {
             .collect()
     }
 
-    fn stored(store: &Sqlite) -> Result<Vec<String>, Box<dyn Error>> {
+    fn stored(store: &Sqlite) -> Result<Vec<String>, laws::Unmet> {
         let run = Run::root();
         let shown = run
             .port(store.clone())
@@ -519,7 +518,7 @@ impl Unheld {
 
 #[test]
 fn an_answer_to_an_item_the_store_does_not_hold_is_refused_and_the_rest_of_the_session_ingests()
--> Result<(), Box<dyn Error>> {
+-> Result<(), laws::Unmet> {
     let store = Sqlite::in_memory::<StreamSchema>();
     Invocation::against(&store, &Session::working(Unheld::asked()), &["ingest"])?;
     let run = Run::root();
@@ -2109,7 +2108,7 @@ impl Rendered {
         Rendered::applied(workspace, &format!("sense({}, opinion, general, tentative, implicit)", Applying::answer(0)))
     }
 
-    fn tree() -> Result<String, Box<dyn std::error::Error>> {
+    fn tree() -> Result<String, laws::Unmet> {
         let workspace = Workspace::split();
         workspace.run("/p", &["init", "upstream"])?;
         workspace.run("/q", &["init", "demo", "--consumes", "upstream"])?;
@@ -2136,14 +2135,14 @@ impl Rendered {
 }
 
 #[test]
-fn show_renders_every_stage_edge_role_and_placement_of_a_small_tree() -> Result<(), Box<dyn std::error::Error>> {
+fn show_renders_every_stage_edge_role_and_placement_of_a_small_tree() -> Result<(), laws::Unmet> {
     let rendered = Rendered::tree()?;
     golden::golden!("show.txt", &rendered);
     Ok(())
 }
 
 #[test]
-fn apply_echoes_every_directive_kind_and_show_cites_every_remarked_segment() -> Result<(), Box<dyn std::error::Error>> {
+fn apply_echoes_every_directive_kind_and_show_cites_every_remarked_segment() -> Result<(), laws::Unmet> {
     let applying = Applying::over(&Session::distinct())?;
     let directives = [
         "place(abcd0001.0, n1, decides)",
@@ -2542,7 +2541,7 @@ impl Spread {
         SegmentRef::new(Prefix::new(prefix.to_owned()), Ordinal::new(ordinal))
     }
 
-    fn segment(prefix: &str, ordinal: u32, body: &str) -> Result<Line, Box<dyn Error>> {
+    fn segment(prefix: &str, ordinal: u32, body: &str) -> Result<Line, laws::Unmet> {
         Ok(Line::Segment {
             segment: Spread::reference(prefix, ordinal),
             shape: Shape::Sentence,
@@ -2550,7 +2549,7 @@ impl Spread {
         })
     }
 
-    fn message(uuid: &str) -> Result<Line, Box<dyn Error>> {
+    fn message(uuid: &str) -> Result<Line, laws::Unmet> {
         Ok(Line::Message {
             uuid: Uuid::try_new(uuid.to_owned())?,
             author: Authorship::Owner,
@@ -2561,7 +2560,7 @@ impl Spread {
 }
 
 #[test]
-fn show_and_search_print_the_shortest_unique_ref_and_every_one_printed_applies() -> Result<(), Box<dyn Error>> {
+fn show_and_search_print_the_shortest_unique_ref_and_every_one_printed_applies() -> Result<(), laws::Unmet> {
     let applying = Spread::applying()?;
     let shown = [
         Spread::parsed(&applying.run(&["show", SPREAD[0]])?),
@@ -2579,7 +2578,7 @@ fn show_and_search_print_the_shortest_unique_ref_and_every_one_printed_applies()
     ];
     assert_eq!(shown, wanted);
     let found = Spread::parsed(&applying.run(&["search", "thought"])?);
-    let hit = |prefix: &str, ordinal: u32, body: &str| -> Result<Line, Box<dyn Error>> {
+    let hit = |prefix: &str, ordinal: u32, body: &str| -> Result<Line, laws::Unmet> {
         Ok(Line::Hit {
             segment: Spread::reference(prefix, ordinal),
             author: Authorship::Owner,
@@ -2804,7 +2803,7 @@ impl Echoes {
 }
 
 #[test]
-fn every_ref_that_show_or_search_prints_is_shown() -> Result<(), Box<dyn Error>> {
+fn every_ref_that_show_or_search_prints_is_shown() -> Result<(), laws::Unmet> {
     let uttered = Echoes::uttered();
     let applying = Applying { store: Sqlite::in_memory::<StreamSchema>(), files: Echoes::session(&uttered).files() };
     applying.run(&["ingest"])?;

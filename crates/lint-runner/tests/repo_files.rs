@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -96,7 +95,7 @@ impl Checkout {
 }
 
 #[test]
-fn a_shell_script_fails_the_run_and_names_the_fix() -> Result<(), Box<dyn Error>> {
+fn a_shell_script_fails_the_run_and_names_the_fix() -> Result<(), laws::Unmet> {
     let checkout = Checkout::new()?;
     checkout.write("run.sh", "echo hi\n")?;
     let run = checkout.checked();
@@ -111,7 +110,7 @@ fn a_shell_script_fails_the_run_and_names_the_fix() -> Result<(), Box<dyn Error>
 }
 
 #[test]
-fn a_tree_of_rust_and_configuration_passes() -> Result<(), Box<dyn Error>> {
+fn a_tree_of_rust_and_configuration_passes() -> Result<(), laws::Unmet> {
     let checkout = Checkout::new()?;
     checkout.write(".github/workflows/ci.yml", "name: ci\n")?;
     checkout.write("Dockerfile", "FROM scratch\n")?;
@@ -120,7 +119,7 @@ fn a_tree_of_rust_and_configuration_passes() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_workflow_run_step_with_shell_logic_fails_the_run() -> Result<(), Box<dyn Error>> {
+fn a_workflow_run_step_with_shell_logic_fails_the_run() -> Result<(), laws::Unmet> {
     let checkout = Checkout::new()?;
     checkout.write(".github/workflows/ci.yml", "jobs:\n  a:\n    steps:\n      - run: cargo test | tee out\n")?;
     let run = checkout.checked();
@@ -136,7 +135,7 @@ fn a_workflow_run_step_with_shell_logic_fails_the_run() -> Result<(), Box<dyn Er
 }
 
 #[test]
-fn hidden_directories_are_read() -> Result<(), Box<dyn Error>> {
+fn hidden_directories_are_read() -> Result<(), laws::Unmet> {
     let checkout = Checkout::new()?;
     checkout.write(".github/scripts/matrix.py", "print(1)\n")?;
     let run = checkout.checked();
@@ -149,7 +148,7 @@ fn hidden_directories_are_read() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn version_control_and_build_output_are_not_read() -> Result<(), Box<dyn Error>> {
+fn version_control_and_build_output_are_not_read() -> Result<(), laws::Unmet> {
     let checkout = Checkout::new()?;
     checkout.write(".git/hooks/pre.sh", "x\n")?;
     checkout.write("target/debug/build.sh", "x\n")?;
@@ -158,7 +157,7 @@ fn version_control_and_build_output_are_not_read() -> Result<(), Box<dyn Error>>
 }
 
 #[test]
-fn a_directory_named_target_without_a_manifest_beside_it_is_read() -> Result<(), Box<dyn Error>> {
+fn a_directory_named_target_without_a_manifest_beside_it_is_read() -> Result<(), laws::Unmet> {
     let checkout = Checkout::new()?;
     checkout.write("docs/target/run.sh", "x\n")?;
     assert_eq!(
@@ -169,7 +168,7 @@ fn a_directory_named_target_without_a_manifest_beside_it_is_read() -> Result<(),
 }
 
 #[test]
-fn files_below_assets_are_web_assets_and_pass() -> Result<(), Box<dyn Error>> {
+fn files_below_assets_are_web_assets_and_pass() -> Result<(), laws::Unmet> {
     let checkout = Checkout::new()?;
     let written: Vec<PathBuf> = ["site/assets/app.js", "assets/css/site.css", "site/app.js"]
         .iter()
@@ -186,7 +185,7 @@ fn files_below_assets_are_web_assets_and_pass() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_checkout_below_a_directory_named_assets_is_judged_by_its_own_paths() -> Result<(), Box<dyn Error>> {
+fn a_checkout_below_a_directory_named_assets_is_judged_by_its_own_paths() -> Result<(), laws::Unmet> {
     let nested = Checkout::new()?.below("inner/assets/nested");
     nested.write("Cargo.toml", MANIFEST)?;
     nested.write("src/lib.rs", CLEAN)?;
@@ -198,7 +197,7 @@ fn a_checkout_below_a_directory_named_assets_is_judged_by_its_own_paths() -> Res
 }
 
 #[test]
-fn a_path_given_twice_is_reported_once() -> Result<(), Box<dyn Error>> {
+fn a_path_given_twice_is_reported_once() -> Result<(), laws::Unmet> {
     let checkout = Checkout::new()?;
     checkout.write("run.sh", "x\n")?;
     let roots = [checkout.path().to_path_buf(), checkout.path().to_path_buf()];
@@ -207,7 +206,7 @@ fn a_path_given_twice_is_reported_once() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_symlink_loop_does_not_repeat_findings() -> Result<(), Box<dyn Error>> {
+fn a_symlink_loop_does_not_repeat_findings() -> Result<(), laws::Unmet> {
     let checkout = Checkout::new()?;
     checkout.write("run.sh", "x\n")?;
     let linked = FakeLinked::new(&checkout.files, checkout.path().join("src/loop"), checkout.path().to_path_buf());

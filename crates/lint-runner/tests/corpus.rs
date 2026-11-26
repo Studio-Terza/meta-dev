@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -22,14 +21,14 @@ const FIX_START: &str = "; ";
 const NO_DEPENDENCIES: &str = "{\"workspace_root\": \"/\", \"packages\": []}";
 
 #[test]
-fn every_lint_prints_its_golden_over_its_fixture_and_every_violation_names_its_fix() -> Result<(), Box<dyn Error>> {
+fn every_lint_prints_its_golden_over_its_fixture_and_every_violation_names_its_fix() -> Result<(), laws::Unmet> {
     let corpus = golden::fixtures!(FIXTURES)?;
     let fixtures = corpus.entries(&Path::new(env!("CARGO_MANIFEST_DIR")).join(FIXTURES))?;
     assert_eq!(fixtures.len(), Corpus::lints());
     let outputs = fixtures
         .iter()
         .map(|fixture| Ok((fixture.as_path(), Corpus::output(&corpus, fixture)?)))
-        .collect::<Result<Vec<(&Path, String)>, Box<dyn Error>>>()?;
+        .collect::<Result<Vec<(&Path, String)>, laws::Unmet>>()?;
     let drifted: Vec<String> = outputs.iter().flat_map(|(fixture, output)| Corpus::verify(fixture, output)).collect();
     assert_eq!(drifted, Vec::<String>::new());
     let lines: Vec<String> =
@@ -82,7 +81,7 @@ impl Corpus {
         Ok(inside.into_iter().flatten().collect())
     }
 
-    fn output(corpus: &Memory, fixture: &Path) -> Result<String, Box<dyn Error>> {
+    fn output(corpus: &Memory, fixture: &Path) -> Result<String, laws::Unmet> {
         let root: Memory = corpus
             .entries(fixture)?
             .iter()

@@ -317,7 +317,7 @@ laws::law!(
 );
 
 #[test]
-fn read_from_returns_the_bytes_after_the_offset() -> Result<(), Box<dyn std::error::Error>> {
+fn read_from_returns_the_bytes_after_the_offset() -> Result<(), laws::Unmet> {
     let memory = Memory::default();
     memory.create_directories(Path::new("/scratch"))?;
     assert_eq!(Tails::of(&memory, Path::new("/scratch"), Offset::try_new(7)?)?, Bytes::from("789"));

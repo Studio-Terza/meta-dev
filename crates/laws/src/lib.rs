@@ -1,10 +1,33 @@
 pub use proptest;
 
+use std::fmt;
+
 use proptest::strategy::Strategy;
-use proptest::test_runner::{Config, RngSeed, TestError, TestRunner};
+use proptest::test_runner::{Config, RngSeed, TestCaseError, TestError, TestRunner};
 
 #[derive(Debug)]
 pub struct Generation;
+
+#[derive(Debug)]
+pub struct Unmet(String);
+
+impl<Failure: fmt::Display> From<Failure> for Unmet {
+    fn from(failure: Failure) -> Unmet {
+        Unmet(failure.to_string())
+    }
+}
+
+impl From<Unmet> for TestCaseError {
+    fn from(unmet: Unmet) -> TestCaseError {
+        TestCaseError::fail(unmet.0)
+    }
+}
+
+impl From<Unmet> for String {
+    fn from(unmet: Unmet) -> String {
+        unmet.0
+    }
+}
 
 impl Generation {
     #[must_use]
@@ -23,7 +46,7 @@ macro_rules! generates {
     ($(#[$meta:meta])* $name:ident, $strategy:expr $(,)?) => {
         $(#[$meta])*
         #[test]
-        fn $name() -> Result<(), Box<dyn ::std::error::Error>> {
+        fn $name() -> Result<(), $crate::Unmet> {
             $crate::Generation::bounded(&$strategy)?;
             Ok(())
         }
@@ -82,7 +105,7 @@ macro_rules! law {
     ($(#[$meta:meta])* $name:ident, given $given:ident = $setup:expr, $strategy:expr, $value:ident, $body:block) => {
         $(#[$meta])*
         #[test]
-        fn $name() -> Result<(), Box<dyn ::std::error::Error>> {
+        fn $name() -> Result<(), $crate::Unmet> {
             let $given = $setup;
             let mut runner = $crate::proptest::test_runner::TestRunner::new($crate::Generation::repeatable());
             runner.run(&$strategy, |$value| {
@@ -149,13 +172,13 @@ macro_rules! table {
         #[test]
         fn $name() {
             let checked = ::core::iter::IntoIterator::into_iter($domain)
-                .try_for_each(|$row| -> Result<(), Box<dyn ::std::error::Error>> {
+                .try_for_each(|$row| -> Result<(), $crate::Unmet> {
                     let _: () = $body;
                     Ok(())
                 });
             match checked {
                 Ok(()) => {}
-                Err(failure) => panic!("the table row is broken: {failure}"),
+                Err(failure) => panic!("the table row is broken: {failure:?}"),
             }
         }
     };
@@ -318,7 +341,7 @@ macro_rules! lifecycle {
     ($(#[$meta:meta])* $name:ident, $state:ty, $opened:expr, $placed:expr $(,)?) => {
         $(#[$meta])*
         #[test]
-        fn $name() -> Result<(), Box<dyn ::std::error::Error>> {
+        fn $name() -> Result<(), $crate::Unmet> {
             use ::store_ports::{Lifecycle, Store};
             let run = ::port_core::Run::root();
             let store = run.port($opened);
@@ -326,7 +349,7 @@ macro_rules! lifecycle {
             let moved = states
                 .iter()
                 .flat_map(|from| states.iter().map(move |to| [*from, *to]))
-                .map(|[from, to]| -> Result<usize, Box<dyn ::std::error::Error>> {
+                .map(|[from, to]| -> Result<usize, $crate::Unmet> {
                     let key = ($placed)(&store, from)?;
                     let edge = ::store_ports::Edge::new(from, to);
                     let moved = store.write(::store_ports::Moved::<$state>::new(key, edge));
@@ -334,7 +357,7 @@ macro_rules! lifecycle {
                     assert_eq!(moved.is_ok(), listed, "{from:?} -> {to:?} moves only along a lifecycle edge: {moved:?}");
                     Ok(usize::from(listed))
                 })
-                .sum::<Result<usize, Box<dyn ::std::error::Error>>>()?;
+                .sum::<Result<usize, $crate::Unmet>>()?;
             assert_eq!(moved, <$state as Lifecycle>::EDGES.len(), "every lifecycle edge is a move");
             Ok(())
         }

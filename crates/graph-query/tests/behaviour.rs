@@ -342,8 +342,7 @@ const SIZED_METADATA: &str = concat!(
 );
 
 #[test]
-fn crate_sizes_count_files_and_lines_and_place_each_crate_on_the_compile_chain()
--> Result<(), Box<dyn std::error::Error>> {
+fn crate_sizes_count_files_and_lines_and_place_each_crate_on_the_compile_chain() -> Result<(), laws::Unmet> {
     let metadata: workspace_metadata::Metadata = serde_json::from_str(SIZED_METADATA)?;
     let files = Sources::parsed(&[
         Source::new(

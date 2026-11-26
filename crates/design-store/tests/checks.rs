@@ -1,5 +1,3 @@
-use std::error::Error;
-
 use design_jobs::JobState;
 use design_model::{
     Confidence, Explicitness, Facet, NodeRelation, Ordinal, Role, SegmentRelation, SenseKind, SpanRelation,
@@ -92,10 +90,10 @@ const COLUMNS: [(&str, &str, Checked); 28] = [
 ];
 
 #[test]
-fn every_listed_and_counted_column_refuses_what_its_type_refuses() -> Result<(), Box<dyn Error>> {
+fn every_listed_and_counted_column_refuses_what_its_type_refuses() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
-    COLUMNS.iter().try_for_each(|(table, column, checked)| -> Result<(), Box<dyn Error>> {
+    COLUMNS.iter().try_for_each(|(table, column, checked)| -> Result<(), laws::Unmet> {
         let clause = checked(column).ok_or(format!("{table}.{column} has no generated check"))?;
         let declared = store.read(Declared(table))?;
         assert!(
@@ -138,8 +136,8 @@ const REFUSED: [&str; 3] = [
 ];
 
 #[test]
-fn a_partial_usage_a_sense_superseding_another_segment_and_a_second_root_sense_are_refused()
--> Result<(), Box<dyn Error>> {
+fn a_partial_usage_a_sense_superseding_another_segment_and_a_second_root_sense_are_refused() -> Result<(), laws::Unmet>
+{
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     SEEDED

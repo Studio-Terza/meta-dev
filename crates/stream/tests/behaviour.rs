@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, Files, Memory};
@@ -121,7 +120,7 @@ impl<'said> Say<'said> {
 struct Fixture;
 
 impl Fixture {
-    fn stream(said: &[Say<'_>]) -> Result<Stream, Box<dyn Error>> {
+    fn stream(said: &[Say<'_>]) -> Result<Stream, laws::Unmet> {
         let memory = Memory::default();
         memory.create_directories(Path::new(DIRECTORY))?;
         memory
@@ -142,7 +141,7 @@ impl Fixture {
         })
     }
 
-    fn first(text: &str) -> Result<Message, Box<dyn Error>> {
+    fn first(text: &str) -> Result<Message, laws::Unmet> {
         let stream = Self::stream(&[Say::new("m", None, Authorship::Owner, text)])?;
         stream.as_ref().first().cloned().ok_or_else(|| "no message".into())
     }
@@ -262,7 +261,7 @@ laws::table!(
 );
 
 laws::law!(segments_tile_the_ink_of_the_message_without_loss_or_stray_whitespace, "[ -~\n\t•]{0,80}", text, {
-    let message = Fixture::first(&text).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    let message = Fixture::first(&text).map_err(|failure| TestCaseError::fail(format!("{failure:?}")))?;
     let bodies: Vec<String> = message.segments().iter().map(|segment| Said::text(segment.text(&message))).collect();
     let inked = |text: &str| text.chars().filter(|letter| !letter.is_whitespace()).collect::<String>();
     prop_assert_eq!(inked(&bodies.concat()), inked(&text));
