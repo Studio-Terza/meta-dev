@@ -1,12 +1,12 @@
 use std::collections::BTreeSet;
 
 use invariants::{Ignoring, ignored};
-use laws::proptest::collection::vec;
-use laws::proptest::prelude::{any, prop_assert, prop_assert_eq};
-use laws::proptest::strategy::{Strategy, ValueTree};
-use laws::proptest::test_runner::{TestError, TestRunner};
 use newtype::{Checked, CheckedDeserialize, Counter, Deserialize, Display, Newtype, Serialize, Wrapping};
 use newtype_derive::Arbitrary;
+use proptest::collection::vec;
+use proptest::prelude::{any, prop_assert, prop_assert_eq, proptest};
+use proptest::strategy::{Strategy, ValueTree};
+use proptest::test_runner::{Config, RngSeed, TestError, TestRunner};
 
 ignored! {
     enum Ignored {
@@ -73,8 +73,8 @@ struct Even(u32);
 struct Strategies;
 
 impl Strategies {
-    fn even() -> impl laws::proptest::strategy::Strategy<Value = u32> {
-        laws::proptest::strategy::Strategy::prop_map(0u32..100, |half| half * 2)
+    fn even() -> impl proptest::strategy::Strategy<Value = u32> {
+        proptest::strategy::Strategy::prop_map(0u32..100, |half| half * 2)
     }
 }
 
@@ -138,8 +138,8 @@ enum Parity {
 }
 
 impl Parity {
-    fn sampled() -> impl laws::proptest::strategy::Strategy<Value = Parity> {
-        laws::proptest::strategy::Strategy::prop_map(any::<u32>(), Parity::from)
+    fn sampled() -> impl proptest::strategy::Strategy<Value = Parity> {
+        proptest::strategy::Strategy::prop_map(any::<u32>(), Parity::from)
     }
 
     fn number(self) -> u32 {
@@ -197,90 +197,135 @@ impl Pairs {
     }
 }
 
-laws::roundtrip!(
-    a_tuple_newtype_returns_its_inner_value,
-    any::<usize>(),
-    |number: &usize| Rounds::new(*number),
-    |rounds: &Rounds| rounds.into_inner()
-);
+proptest! {
+    #![proptest_config(Config { failure_persistence: None, rng_seed: RngSeed::Fixed(0), ..Config::default() })]
+    #[test]
+    fn a_tuple_newtype_returns_its_inner_value(number in any::<usize>()) {
+        prop_assert_eq!(Rounds::new(number).into_inner(), number);
+    }
 
-laws::roundtrip!(
-    a_named_field_newtype_returns_its_inner_value,
-    any::<String>(),
-    |text: &String| Label::new(text.clone()),
-    |label: &Label| label.clone().into_inner()
-);
+    #[test]
+    fn a_named_field_newtype_returns_its_inner_value(text in any::<String>()) {
+        prop_assert_eq!(Label::new(text.clone()).into_inner(), text);
+    }
 
-laws::roundtrip!(
-    a_generic_newtype_returns_its_inner_value,
-    any::<u8>(),
-    |number: &u8| Wrapper::new(*number),
-    |wrapper: &Wrapper<u8>| wrapper.clone().into_inner()
-);
+    #[test]
+    fn a_generic_newtype_returns_its_inner_value(number in any::<u8>()) {
+        prop_assert_eq!(Wrapper::new(number).into_inner(), number);
+    }
 
-laws::table!(a_check_decides_what_is_built, Json::built, ["a" => Ok(String::from("a")), "" => Err(Empty)]);
+    #[test]
+    fn a_derived_validated_arbitrary_only_builds_what_the_check_admits(word in any::<Word>()) {
+        prop_assert!(Word::checked(&word.into_inner()).is_ok());
+    }
 
-laws::law!(a_derived_validated_arbitrary_only_builds_what_the_check_admits, any::<Word>(), word, {
-    prop_assert!(Word::checked(&word.into_inner()).is_ok());
-});
+    #[test]
+    fn an_unchecked_newtype_reads_back_what_it_writes(rounds in any::<Rounds>()) {
+        prop_assert_eq!(Json::read::<Rounds>(Json::written(&rounds).as_deref()), Some(rounds));
+    }
 
-laws::roundtrip!(
-    an_unchecked_newtype_reads_back_what_it_writes,
-    any::<Rounds>(),
-    Json::written,
-    |text: &Option<String>| Json::read::<Rounds>(text.as_deref()),
-    Some
-);
+    #[test]
+    fn a_generic_newtype_reads_back_what_it_writes(wrapper in any::<Wrapper<u16>>()) {
+        prop_assert_eq!(Json::read::<Wrapper<u16>>(Json::written(&wrapper).as_deref()), Some(wrapper));
+    }
 
-laws::roundtrip!(
-    a_generic_newtype_reads_back_what_it_writes,
-    any::<Wrapper<u16>>(),
-    Json::written,
-    |text: &Option<String>| Json::read::<Wrapper<u16>>(text.as_deref()),
-    Some
-);
+    #[test]
+    fn a_checked_newtype_reads_back_what_it_writes(word in any::<Word>()) {
+        prop_assert_eq!(Json::read::<Word>(Json::written(&word).as_deref()), Some(word));
+    }
 
-laws::roundtrip!(
-    a_checked_newtype_reads_back_what_it_writes,
-    any::<Word>(),
-    Json::written,
-    |text: &Option<String>| Json::read::<Word>(text.as_deref()),
-    Some
-);
+    #[test]
+    fn a_checked_newtype_reads_what_its_check_builds(text in any::<String>()) {
+        prop_assert_eq!(Json::word(&text), Word::try_new(text).ignoring(Ignored::Refused));
+    }
 
-laws::law!(a_checked_newtype_reads_what_its_check_builds, any::<String>(), text, {
-    prop_assert_eq!(Json::word(&text), Word::try_new(text).ignoring(Ignored::Refused));
-});
+    #[test]
+    fn a_checked_newtype_built_by_try_new_reads_back_through_serde(text in any::<String>()) {
+        let built = Word::try_new(text).ignoring(Ignored::Refused);
+        prop_assert_eq!(built.as_ref().and_then(|word| Json::read::<Word>(Json::written(word).as_deref())), built);
+    }
 
-laws::law!(a_checked_newtype_built_by_try_new_reads_back_through_serde, any::<String>(), text, {
-    let built = Word::try_new(text).ignoring(Ignored::Refused);
-    prop_assert_eq!(built.as_ref().and_then(|word| Json::read::<Word>(Json::written(word).as_deref())), built);
-});
+    #[test]
+    fn a_newtype_writes_its_inner_value(number in any::<usize>()) {
+        prop_assert_eq!(Json::written(&Rounds::new(number)), Json::written(&number));
+    }
 
-laws::law!(a_newtype_writes_its_inner_value, any::<usize>(), number, {
-    prop_assert_eq!(Json::written(&Rounds::new(number)), Json::written(&number));
-});
+    #[test]
+    fn a_count_reads_the_inner_value(rounds in any::<Rounds>()) {
+        prop_assert_eq!(rounds.count(), rounds.into_inner());
+    }
+
+    #[test]
+    fn an_increment_adds_one_and_stops_at_the_largest(rounds in any::<Rounds>()) {
+        prop_assert_eq!(rounds.incremented().count(), rounds.count().saturating_add(1));
+    }
+
+    #[test]
+    fn plus_adds_and_stops_at_the_largest(pair in any::<(Rounds, Rounds)>()) {
+        prop_assert_eq!(pair.0.plus(pair.1).count(), pair.0.count().saturating_add(pair.1.count()));
+    }
+
+    #[test]
+    fn a_total_is_the_sum_of_the_counts(numbers in vec(0usize..4096, 0..8)) {
+        prop_assert_eq!(Rounds::total(numbers.iter().copied().map(Rounds::new)).count(), numbers.iter().sum::<usize>());
+    }
+
+    #[test]
+    fn a_narrow_check_with_its_own_strategy_generates(small in any::<Small>()) {
+        prop_assert!(Small::checked(&small.into_inner()).is_ok());
+    }
+
+    #[test]
+    fn a_formatted_string_with_its_own_strategy_generates(digest in any::<Digest>()) {
+        prop_assert!(Digest::checked(&digest.into_inner()).is_ok());
+    }
+
+    #[test]
+    fn a_plain_newtype_takes_its_own_strategy(even in any::<Even>()) {
+        prop_assert!(even.into_inner().is_multiple_of(2));
+    }
+
+    #[test]
+    fn a_generic_field_that_is_not_the_bare_parameter_generates(many in any::<Many<u8>>()) {
+        prop_assert_eq!(Many::new(many.clone().into_inner()), many);
+    }
+
+    #[test]
+    fn a_derived_display_prints_the_inner_value(number in any::<u32>()) {
+        prop_assert_eq!(Shown::new(number).to_string().parse::<u32>().ignoring(Ignored::Refused), Some(number));
+    }
+
+    #[test]
+    fn a_generic_display_follows_its_parameter(tag in any::<char>()) {
+        prop_assert_eq!(Tagged::new(tag).to_string(), tag.to_string());
+    }
+
+    #[test]
+    fn a_constructor_shapes_every_generated_value(span in any::<Span>()) {
+        prop_assert!(span.start <= span.end);
+    }
+
+    #[test]
+    fn a_fallible_constructor_generates_only_what_it_accepts(ratio in any::<Ratio>()) {
+        prop_assert_eq!(Ratio::try_new(ratio.above, ratio.below), Ok(ratio));
+    }
+
+    #[test]
+    fn a_named_generator_replaces_the_derived_one(parity in any::<Parity>()) {
+        prop_assert_eq!(Parity::from(parity.number()), parity);
+    }
+}
+
+#[test]
+fn a_check_decides_what_is_built() {
+    assert_eq!(Json::built(&"a"), Ok(String::from("a")));
+    assert_eq!(Json::built(&""), Err(Empty));
+}
 
 #[test]
 fn a_checked_newtype_refuses_what_its_check_refuses() {
     assert_eq!(Json::word(&String::new()), None);
 }
-
-laws::law!(a_count_reads_the_inner_value, any::<Rounds>(), rounds, {
-    prop_assert_eq!(rounds.count(), rounds.into_inner());
-});
-
-laws::law!(an_increment_adds_one_and_stops_at_the_largest, any::<Rounds>(), rounds, {
-    prop_assert_eq!(rounds.incremented().count(), rounds.count().saturating_add(1));
-});
-
-laws::law!(plus_adds_and_stops_at_the_largest, any::<(Rounds, Rounds)>(), pair, {
-    prop_assert_eq!(pair.0.plus(pair.1).count(), pair.0.count().saturating_add(pair.1.count()));
-});
-
-laws::law!(a_total_is_the_sum_of_the_counts, vec(0usize..4096, 0..8), numbers, {
-    prop_assert_eq!(Rounds::total(numbers.iter().copied().map(Rounds::new)).count(), numbers.iter().sum::<usize>());
-});
 
 #[test]
 fn counters_saturate_at_the_largest() {
@@ -294,40 +339,16 @@ fn nothing_counted_is_zero() {
     assert_eq!(Rounds::total(std::iter::empty()), Rounds::zero());
 }
 
-laws::law!(a_narrow_check_with_its_own_strategy_generates, any::<Small>(), small, {
-    prop_assert!(Small::checked(&small.into_inner()).is_ok());
-});
-
-laws::law!(a_formatted_string_with_its_own_strategy_generates, any::<Digest>(), digest, {
-    prop_assert!(Digest::checked(&digest.into_inner()).is_ok());
-});
-
 #[test]
 fn derived_checked_generators_stay_under_the_rejection_bound() {
-    assert!(laws::Generation::bounded(&any::<Word>()).is_ok());
-    assert!(laws::Generation::bounded(&any::<Small>()).is_ok());
-    assert!(laws::Generation::bounded(&any::<Digest>()).is_ok());
+    let bounded = || {
+        let config = Config { failure_persistence: None, rng_seed: RngSeed::Fixed(0), ..Config::default() };
+        TestRunner::new(Config { max_local_rejects: config.cases, ..config })
+    };
+    assert!(bounded().run(&any::<Word>(), |_| Ok(())).is_ok());
+    assert!(bounded().run(&any::<Small>(), |_| Ok(())).is_ok());
+    assert!(bounded().run(&any::<Digest>(), |_| Ok(())).is_ok());
 }
-
-laws::law!(a_plain_newtype_takes_its_own_strategy, any::<Even>(), even, {
-    prop_assert!(even.into_inner().is_multiple_of(2));
-});
-
-laws::law!(a_generic_field_that_is_not_the_bare_parameter_generates, any::<Many<u8>>(), many, {
-    prop_assert_eq!(Many::new(many.clone().into_inner()), many);
-});
-
-laws::roundtrip!(
-    a_derived_display_prints_the_inner_value,
-    any::<u32>(),
-    |number: &u32| Shown::new(*number).to_string(),
-    |text: &String| text.parse::<u32>().ignoring(Ignored::Refused),
-    Some
-);
-
-laws::law!(a_generic_display_follows_its_parameter, any::<char>(), tag, {
-    prop_assert_eq!(Tagged::new(tag).to_string(), tag.to_string());
-});
 
 #[test]
 fn derived_constructors_build_constants() {
@@ -341,18 +362,6 @@ fn an_enum_generates_every_variant() {
         (0..64_u8).flat_map(|_| any::<Shape<char>>().new_tree(&mut runner)).map(|tree| tree.current().kind()).collect();
     assert_eq!(kinds, BTreeSet::from(["box", "dot", "line"]));
 }
-
-laws::law!(a_constructor_shapes_every_generated_value, any::<Span>(), span, {
-    prop_assert!(span.start <= span.end);
-});
-
-laws::law!(a_fallible_constructor_generates_only_what_it_accepts, any::<Ratio>(), ratio, {
-    prop_assert_eq!(Ratio::try_new(ratio.above, ratio.below), Ok(ratio));
-});
-
-laws::law!(a_named_generator_replaces_the_derived_one, any::<Parity>(), parity, {
-    prop_assert_eq!(Parity::from(parity.number()), parity);
-});
 
 #[test]
 fn a_constructor_that_refuses_everything_aborts_generation() {
