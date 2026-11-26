@@ -20,23 +20,13 @@ proptest! {
 
 #[test]
 fn a_name_is_cased_by_its_letters() {
-    [
+    for (text, want) in [
         ("snake_case", Casing::Lower),
         ("CamelCase", Casing::Camel),
         ("A1", Casing::Camel),
         ("SHOUTING", Casing::Shouting),
         ("_hidden", Casing::Other),
-    ]
-    .into_iter()
-    .for_each(|(text, want)| assert_eq!(Name::from(text).casing(), want, "{text}"));
-}
-
-#[test]
-fn a_name_splits_into_lowered_humps() {
-    [("PortTrait", "port trait"), ("read_all_files", "read all files"), ("HTTPServer", "http server")]
-        .into_iter()
-        .for_each(|(text, want)| {
-            let humps: Vec<String> = Name::from(text).humps().map(|hump| hump.to_string()).collect();
-            assert_eq!(humps.join(" "), want, "{text}");
-        });
+    ] {
+        assert_eq!(Name::from(text).casing(), want, "{text}");
+    }
 }

@@ -4,7 +4,7 @@ use std::fmt;
 
 use lint_core::{Contribute, Contributing, SourceFile, Unwalked, Violation, Visits};
 
-pub use boundary::{Member, Spelled};
+pub use boundary::Spelled;
 
 pub trait Gathers<Part> {
     fn gathered(self, file: &SourceFile) -> Part;
@@ -54,10 +54,6 @@ impl<'file> IntoIterator for Found<'file> {
     }
 }
 
-pub trait Sorts<'file>: fmt::Debug {
-    fn sorted(self: Box<Self>, file: &SourceFile) -> Ranked<'file>;
-}
-
 pub trait Concludes<'file>: Contribute + fmt::Debug {
     fn violations(self, open: Self::Open, part: Self::Part) -> Vec<Violation<'file>>;
 }
@@ -68,31 +64,6 @@ impl<'file, Contributor: Concludes<'file>> Finds<'file> for Contributing<Contrib
             violations: contributor.violations(open, part),
             visited: Visited { contributor: Spelled::naming::<Contributor>(), nodes },
         })
-    }
-}
-
-#[derive(Debug)]
-pub struct Ranked<'file>(Vec<Vec<Violation<'file>>>);
-
-impl<'file> From<Vec<Vec<Violation<'file>>>> for Ranked<'file> {
-    fn from(lists: Vec<Vec<Violation<'file>>>) -> Ranked<'file> {
-        Ranked(lists)
-    }
-}
-
-impl<'file> From<Ranked<'file>> for Vec<Vec<Violation<'file>>> {
-    fn from(ranked: Ranked<'file>) -> Vec<Vec<Violation<'file>>> {
-        ranked.0
-    }
-}
-
-pub trait Ranks<'file>: Contribute + fmt::Debug {
-    fn ranked(self, open: Self::Open, part: Self::Part) -> Ranked<'file>;
-}
-
-impl<'file, Contributor: Ranks<'file>> Sorts<'file> for Contributing<Contributor> {
-    fn sorted(self: Box<Self>, file: &SourceFile) -> Ranked<'file> {
-        self.concluded(file, Contributor::ranked)
     }
 }
 

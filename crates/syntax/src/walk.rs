@@ -16,7 +16,6 @@ macro_rules! node_kinds {
             Block on_block off_block visit_block Block;
             ExprAssign on_expr_assign off_expr_assign visit_expr_assign ExprAssign;
             ExprBinary on_expr_binary off_expr_binary visit_expr_binary ExprBinary;
-            ExprBreak on_expr_break off_expr_break visit_expr_break ExprBreak;
             ExprCall on_expr_call off_expr_call visit_expr_call ExprCall;
             ExprMacro on_expr_macro off_expr_macro visit_expr_macro ExprMacro;
             ForeignItemFn on_foreign_item_fn off_foreign_item_fn visit_foreign_item_fn ForeignItemFn;
@@ -24,20 +23,12 @@ macro_rules! node_kinds {
             ExprClosure on_expr_closure off_expr_closure visit_expr_closure ExprClosure;
             Expr on_expr off_expr visit_expr Expr;
             ExprConst on_expr_const off_expr_const visit_expr_const ExprConst;
-            ExprContinue on_expr_continue off_expr_continue visit_expr_continue ExprContinue;
-            ExprField on_expr_field off_expr_field visit_expr_field ExprField;
             ExprForLoop on_expr_for_loop off_expr_for_loop visit_expr_for_loop ExprForLoop;
             ExprIf on_expr_if off_expr_if visit_expr_if ExprIf;
-            ExprLet on_expr_let off_expr_let visit_expr_let ExprLet;
             ExprLoop on_expr_loop off_expr_loop visit_expr_loop ExprLoop;
-            ExprMatch on_expr_match off_expr_match visit_expr_match ExprMatch;
             ExprMethodCall on_expr_method_call off_expr_method_call visit_expr_method_call ExprMethodCall;
             ExprPath on_expr_path off_expr_path visit_expr_path ExprPath;
             ExprRepeat on_expr_repeat off_expr_repeat visit_expr_repeat ExprRepeat;
-            ExprReturn on_expr_return off_expr_return visit_expr_return ExprReturn;
-            ExprStruct on_expr_struct off_expr_struct visit_expr_struct ExprStruct;
-            ExprTry on_expr_try off_expr_try visit_expr_try ExprTry;
-            ExprUnary on_expr_unary off_expr_unary visit_expr_unary ExprUnary;
             ExprWhile on_expr_while off_expr_while visit_expr_while ExprWhile;
             Field on_field off_field visit_field Field;
             ImplItemConst on_impl_item_const off_impl_item_const visit_impl_item_const ImplItemConst;
@@ -55,7 +46,6 @@ macro_rules! node_kinds {
             ItemType on_item_type off_item_type visit_item_type ItemType;
             ItemUnion on_item_union off_item_union visit_item_union ItemUnion;
             ItemUse on_item_use off_item_use visit_item_use ItemUse;
-            Lifetime on_lifetime off_lifetime visit_lifetime Lifetime;
             LifetimeParam on_lifetime_param off_lifetime_param visit_lifetime_param LifetimeParam;
             LitFloat on_lit_float off_lit_float visit_lit_float LitFloat;
             LitInt on_lit_int off_lit_int visit_lit_int LitInt;
@@ -64,7 +54,6 @@ macro_rules! node_kinds {
             Path on_path off_path visit_path Path;
             Signature on_signature off_signature visit_signature Signature;
             Stmt on_stmt off_stmt visit_stmt Stmt;
-            TraitBound on_trait_bound off_trait_bound visit_trait_bound TraitBound;
             TraitItemConst on_trait_item_const off_trait_item_const visit_trait_item_const TraitItemConst;
             TraitItemFn on_trait_item_fn off_trait_item_fn visit_trait_item_fn TraitItemFn;
             TypeArray on_type_array off_type_array visit_type_array TypeArray;

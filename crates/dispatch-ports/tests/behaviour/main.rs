@@ -57,7 +57,7 @@ impl Envelope {
 
 #[test]
 fn an_agent_result_is_read_as_its_reply_and_usage_or_its_error() {
-    [
+    for (text, want) in [
         (
             r#"{"type":"result","subtype":"success","is_error":false,"result":"conversational(a.0)","usage":{"input_tokens":4,"output_tokens":9,"cache_creation_input_tokens":2,"cache_read_input_tokens":7,"service_tier":"standard"}}"#,
             Envelope::replied("conversational(a.0)", [4, 9, 2, 7]),
@@ -82,9 +82,9 @@ fn an_agent_result_is_read_as_its_reply_and_usage_or_its_error() {
         (r#"{"subtype":"success","result":"  ","usage":{"input_tokens":1,"output_tokens":2}}"#, Envelope::Garbled),
         (r#"{"subtype":"success","result":"x"}"#, Envelope::Garbled),
         ("not json", Envelope::Garbled),
-    ]
-    .into_iter()
-    .for_each(|(text, want)| assert_eq!(Envelope::read(text), want, "{text}"));
+    ] {
+        assert_eq!(Envelope::read(text), want, "{text}");
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -245,15 +245,21 @@ impl Watching {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+struct Drawn {
+    timeout: u32,
+    count: usize,
+}
+
 impl Watching {
-    fn drawn(counts: Range<usize>) -> impl Iterator<Item = (u32, usize)> {
-        (20..200_u32).step_by(30).flat_map(move |timeout| counts.clone().map(move |count| (timeout, count)))
+    fn drawn(counts: Range<usize>) -> impl Iterator<Item = Drawn> {
+        (20..200_u32).step_by(30).flat_map(move |timeout| counts.clone().map(move |count| Drawn { timeout, count }))
     }
 }
 
 #[test]
 fn a_deadline_that_passes_during_a_sleep_kills_the_run_on_the_next_check() -> Result<(), Box<dyn Error>> {
-    Watching::drawn(0..9).try_for_each(|(timeout, sleeping_after)| {
+    Watching::drawn(0..9).try_for_each(|Drawn { timeout, count: sleeping_after }| {
         let watching = Watching { timeout, sleeping_after, finishing: None };
         let checks = Calls::new(sleeping_after.saturating_add(1));
         assert_eq!(
@@ -270,7 +276,7 @@ fn a_deadline_that_passes_during_a_sleep_kills_the_run_on_the_next_check() -> Re
 
 #[test]
 fn a_run_that_replies_before_its_deadline_is_finished_and_released_once() -> Result<(), Box<dyn Error>> {
-    Watching::drawn(1..9).try_for_each(|(timeout, finishing)| {
+    Watching::drawn(1..9).try_for_each(|Drawn { timeout, count: finishing }| {
         let watching = Watching { timeout, sleeping_after: 9, finishing: Some(finishing) };
         assert_eq!(
             watching.watched()?,

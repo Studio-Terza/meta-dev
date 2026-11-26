@@ -387,9 +387,9 @@ proptest! {
 fn every_named_column_reads_back_as_its_variant() {
     assert_eq!(Stored::unread::<Halt>(), []);
     assert_eq!(Stored::unread::<Fate>(), []);
-    [Authorship::Owner, Authorship::Lead].into_iter().for_each(|author| {
+    for author in [Authorship::Owner, Authorship::Lead] {
         assert_eq!(Stored::back::<Authorship>(&author.raw()), Some(author));
-    });
+    }
 }
 
 type Sqlite = <SqliteOpener as store_ports::Opens>::Store;

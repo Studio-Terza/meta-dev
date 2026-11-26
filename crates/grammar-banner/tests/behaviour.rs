@@ -7,7 +7,7 @@ use proptest::test_runner::{Config, RngSeed};
 
 #[test]
 fn a_banner_label_is_exactly_one_plain_word() {
-    [
+    for (label, want) in [
         ("grammar", Some("grammar")),
         ("doc-test_log", Some("doc-test_log")),
         ("", None),
@@ -16,12 +16,10 @@ fn a_banner_label_is_exactly_one_plain_word() {
         ("a b", None),
         ("a/b", None),
         ("(", None),
-    ]
-    .into_iter()
-    .for_each(|(label, want)| {
+    ] {
         let read = Banner::try_new(label.to_owned()).ignoring(Unlexed::NotThisGrammar).map(Banner::into_inner);
         assert_eq!(read.as_deref(), want, "{label}");
-    });
+    }
 }
 
 proptest! {
@@ -39,7 +37,7 @@ proptest! {
 
 #[test]
 fn a_banner_in_the_build_directory_layout_is_labelled_by_its_package_and_binary() {
-    [
+    for (line, want) in [
         (
             "     Running tests/behaviour.rs (target/debug/build/test-log/9b87ea0c/out/behaviour-9b87ea0c)",
             Some("test-log.behaviour"),
@@ -50,10 +48,8 @@ fn a_banner_in_the_build_directory_layout_is_labelled_by_its_package_and_binary(
         ),
         ("     Running tests/behaviour.rs (target/debug/build/test-log/9b87ea0c/out/behaviour-ffff)", None),
         ("     Running tests/behaviour.rs (target/debug/build/test-log/9b87ea0c/behaviour-9b87ea0c)", None),
-    ]
-    .into_iter()
-    .for_each(|(line, want)| {
+    ] {
         let read = line.parse::<Banner>().ignoring(Unlexed::NotThisGrammar).map(Banner::into_inner);
         assert_eq!(read.as_deref(), want, "{line}");
-    });
+    }
 }

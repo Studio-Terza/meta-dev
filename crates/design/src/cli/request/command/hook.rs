@@ -10,8 +10,9 @@ use store_ports::Store;
 use super::Ground;
 use super::crew::Crew;
 use super::ingest::Ingest;
+use crate::HookEvent;
 use crate::cli::failure::Failure;
-use crate::{HookEvent, Uttered};
+use crate::cli::uttered::Uttered;
 use boundary::{Observed, Settings, Stopping};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

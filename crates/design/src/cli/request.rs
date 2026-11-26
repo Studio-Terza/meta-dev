@@ -31,7 +31,7 @@ struct Words {
 
 impl Request {
     pub fn parsed(arguments: impl Iterator<Item = OsString>) -> Result<Request, Failure> {
-        let words = Words::heard(arguments.collect())?;
+        let words = Words::heard(&arguments.collect::<Vec<OsString>>())?;
         let spoken = words.spoken.iter().map(|word| word.to_str()).collect::<Option<Vec<&str>>>();
         let command = spoken.ok_or(Failure::Usage).and_then(|said| Command::spoken(&said))?;
         Ok(Request { command, workspace: words.workspace })
@@ -53,14 +53,17 @@ impl Request {
 impl Words {
     const WORKSPACE: &'static str = "--workspace";
 
-    fn heard(given: Vec<OsString>) -> Result<Words, Failure> {
+    fn heard(given: &[OsString]) -> Result<Words, Failure> {
         let flagged = given.iter().position(|word| word == Self::WORKSPACE);
-        flagged.map_or(Ok(Words { spoken: given.clone(), workspace: None }), |at| {
-            let mut rest = given.clone();
-            let mut named = rest.split_off(at);
-            let path = named.get(1).cloned().ok_or(Failure::Usage)?;
-            rest.extend(named.drain(..).skip(2));
-            Ok(Words { spoken: rest, workspace: Some(PathBuf::from(path)) })
+        flagged.map_or(Ok(Words { spoken: given.to_vec(), workspace: None }), |at| {
+            let (before, after) = given.split_at(at);
+            match after {
+                [_flag, path, rest @ ..] => Ok(Words {
+                    spoken: before.iter().chain(rest).cloned().collect(),
+                    workspace: Some(PathBuf::from(path)),
+                }),
+                [] | [_] => Err(Failure::Usage),
+            }
         })
     }
 }

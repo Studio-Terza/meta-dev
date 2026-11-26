@@ -388,7 +388,7 @@ fn a_failed_release_on_drop_shows_in_the_measured_failures() {
 
 #[test]
 fn a_resource_is_released_exactly_once_whether_ended_or_dropped() {
-    [false, true].into_iter().for_each(|ending| {
+    for ending in [false, true] {
         let run = Run::root();
         let port = run.port(Memory::holding(&["a"]));
         let held = Transcripts::lock(&port, &Session("a".to_owned()));
@@ -398,7 +398,7 @@ fn a_resource_is_released_exactly_once_whether_ended_or_dropped() {
         let measured = run.finish();
         assert_eq!(measured.snapshot().calls::<Released<SessionLock>>(), Calls::new(1));
         assert!(measured.settled().is_ok());
-    });
+    }
 }
 
 #[test]

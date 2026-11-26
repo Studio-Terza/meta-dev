@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use lint_core::{Headline, Lint, Parsed, Report, SourceFile, Violation};
 use lint_sweep::{Finds, Gathers, Sweep};
 
-pub use lead::{Lead, Leader, Scan, Start};
+pub use lead::{Lead, Leader, Start};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Reads {

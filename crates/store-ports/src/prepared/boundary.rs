@@ -3,7 +3,7 @@ use std::vec;
 
 use port_core::Op;
 
-use crate::{Argument, Batch, ColumnFailure, Columns, Counts, Done, Query, Released, StoreFailure, Value};
+use crate::{Argument, Batch, ColumnFailure, Columns, Counts, Done, Query, StoreFailure, Value};
 
 pub trait Execute: Debug {
     fn fetched(&mut self, sql: &'static str, arguments: Vec<Argument>) -> Result<Vec<Vec<Value>>, StoreFailure>;
@@ -28,14 +28,6 @@ pub trait Execute: Debug {
 
     fn done<D: Done>(&mut self, query: Prepared<()>) -> Result<D, StoreFailure> {
         self.executed(query.sql, query.arguments)
-    }
-
-    fn released(&mut self, query: Prepared<()>) -> Result<Released, StoreFailure> {
-        self.written(query).map(|()| Released::Deleted).or_else(StoreFailure::released)
-    }
-
-    fn released_all(&mut self, deletions: impl IntoIterator<Item = Deletion>) -> Result<Vec<Released>, StoreFailure> {
-        deletions.into_iter().map(|Deletion(query)| self.released(query)).collect()
     }
 
     fn read_all<Q: Query>(&mut self, queries: impl IntoIterator<Item = Q>) -> Result<Vec<Q::Rows>, StoreFailure>
@@ -72,15 +64,6 @@ pub struct Prepared<Row> {
 
 #[derive(Debug)]
 pub struct Values(vec::IntoIter<Value>);
-
-#[derive(Debug)]
-pub struct Deletion(Prepared<()>);
-
-impl From<Prepared<()>> for Deletion {
-    fn from(query: Prepared<()>) -> Deletion {
-        Deletion(query)
-    }
-}
 
 impl Prepared<()> {
     #[must_use]

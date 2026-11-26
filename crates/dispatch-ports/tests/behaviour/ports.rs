@@ -117,13 +117,13 @@ impl Stalling {
 
 #[test]
 fn an_agent_that_leaves_a_large_prompt_unread_is_killed_and_reaped_at_its_deadline() {
-    [&["-c", "exec sleep 30"][..], &["-c", "exec 0<&-; exec sleep 30"][..]].into_iter().for_each(|arguments| {
+    for arguments in [&["-c", "exec sleep 30"][..], &["-c", "exec 0<&-; exec sleep 30"][..]] {
         assert_eq!(
             Stalling::watched(&arguments),
             Some(Stalled { watched: Watched::Stalled(Stall::Overdue), left: None }),
             "{arguments:?}"
         );
-    });
+    }
 }
 
 #[test]

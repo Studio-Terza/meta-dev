@@ -60,7 +60,7 @@ impl<'ports, T: Transcripts, S: Store> Ingest<'ports, T, S> {
         let read = self.transcripts.read_from(session, cursor)?;
         let end = ReadTo { session: session.stem().clone(), cursor: read.cursor() };
         let lines: Vec<Line> = read.into_iter().collect();
-        let records = SessionRecords::read(&end.session, end.cursor, lines);
+        let records = SessionRecords::read(&end.session, end.cursor, &lines);
         let authors = records.authors().collect();
         let unrecognised = records.unrecognised().to_vec();
         let written = self.store.write(Counted::new(records))?;
@@ -80,8 +80,8 @@ impl Tally {
 impl fmt::Display for Tally {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.ends.iter().try_for_each(|end| writeln!(formatter, "session {} read to {}", end.session, end.cursor))?;
-        self.authorship.counted().try_for_each(|(author, count)| writeln!(formatter, "authorship {author} {count}"))?;
-        self.unrecognised.counted().try_for_each(|(kind, count)| writeln!(formatter, "unrecognised {kind} {count}"))?;
+        self.authorship.listed(formatter, "authorship")?;
+        self.unrecognised.listed(formatter, "unrecognised")?;
         writeln!(formatter, "written {}", Count::new(self.written.count()))
     }
 }

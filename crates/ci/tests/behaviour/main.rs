@@ -235,7 +235,7 @@ impl Sample {
 
 #[test]
 fn a_stage_is_recorded_in_seconds_to_two_places() {
-    [
+    for (elapsed, want) in [
         (Duration::from_millis(1_500), "clippy = 1.50"),
         (ROUNDED_UP, "clippy = 2.00"),
         (Duration::from_millis(4), "clippy = 0.00"),
@@ -243,14 +243,14 @@ fn a_stage_is_recorded_in_seconds_to_two_places() {
         (Duration::from_millis(1_006), "clippy = 1.01"),
         (Duration::ZERO, "clippy = 0.00"),
         (Duration::from_secs(125), "clippy = 125.00"),
-    ]
-    .into_iter()
-    .for_each(|(elapsed, want)| assert_eq!(Sample::timed_line(&elapsed), [want], "{elapsed:?}"));
+    ] {
+        assert_eq!(Sample::timed_line(&elapsed), [want], "{elapsed:?}");
+    }
 }
 
 #[test]
 fn the_libtest_seconds_of_every_result_line_are_added() {
-    [
+    for (output, measured) in [
         ("test result: ok. 3 passed; 0 failed; finished in 0.50s\n", Some("test-run = 0.50")),
         (
             "test result: ok. 1 passed; finished in 0.50s\ntest result: ok. 2 passed; finished in 1.25s\n",
@@ -281,15 +281,13 @@ fn the_libtest_seconds_of_every_result_line_are_added() {
         ("test result: ok. finished  in\t7s\n", Some("test-run = 7.00")),
         ("test result: ok. finished in 0.004s\n", Some("test-run = 0.00")),
         ("test result: ok. finished in 2.00s\ntest result: ok. finished in abc\n", None),
-    ]
-    .into_iter()
-    .for_each(|(output, line)| {
-        let want = line.map_or_else(
+    ] {
+        let want = measured.map_or_else(
             || Sample::measured(ExitCode::FAILURE, &[]),
             |line| Sample::measured(ExitCode::SUCCESS, &[line]),
         );
         assert_eq!(Sample::libtest_line(&output), want, "{output}");
-    });
+    }
 }
 
 struct Clippy;
@@ -328,7 +326,7 @@ impl Clippy {
 fn clippy_names_the_kinds_of_target_the_scope_has_and_always_the_tests() {
     let every: &[&str] = &["--lib", "--bins", "--example", "showcase", "--bench", "speed", "--tests"];
     let plain: &[&str] = &["--lib", "--bins", "--tests"];
-    [
+    for (scope, kinds) in [
         (&["--workspace"][..], every),
         (&["--all"][..], every),
         (&["--workspace", "--timings", "--", "-D", "warnings"][..], every),
@@ -353,9 +351,9 @@ fn clippy_names_the_kinds_of_target_the_scope_has_and_always_the_tests() {
         (&["--workspace", "-p", "libonly"][..], every),
         (&["--", "-p", "benched"][..], plain),
         (&["--", "--workspace"][..], plain),
-    ]
-    .into_iter()
-    .for_each(|(scope, kinds)| assert_eq!(Clippy::invoked(scope), [kinds, scope].concat(), "{scope:?}"));
+    ] {
+        assert_eq!(Clippy::invoked(scope), [kinds, scope].concat(), "{scope:?}");
+    }
 }
 
 const UNRESOLVED: &str = "against the cargo metadata: it takes workspace package names, not globs, versions or URLs";
@@ -367,7 +365,7 @@ const NO_DEFAULTS: &str =
 
 #[test]
 fn clippy_refuses_a_package_spec_it_cannot_resolve_naming_the_spec_and_never_runs() {
-    [
+    for (scope, spec) in [
         (&["-p", "unmatched"][..], "unmatched"),
         (&["-p", "lib*"][..], "lib*"),
         (&["-p", "libonly@0.1.0"][..], "libonly@0.1.0"),
@@ -377,20 +375,18 @@ fn clippy_refuses_a_package_spec_it_cannot_resolve_naming_the_spec_and_never_run
         (&["-p", "libonly", "-p", "libonly:0.1.0"][..], "libonly:0.1.0"),
         (&["--workspace", "-p", "unmatched"][..], "unmatched"),
         (&["--package="][..], ""),
-    ]
-    .into_iter()
-    .for_each(|(scope, spec)| {
+    ] {
         assert_eq!(
             Clippy::refused(scope),
             [format!("clippy-targets cannot resolve the package spec `{spec}` {UNRESOLVED}")],
             "{scope:?}"
         );
-    });
+    }
 }
 
 #[test]
 fn clippy_refuses_the_flags_that_would_choose_targets_or_another_workspace() {
-    [
+    for (scope, flag) in [
         (&["--workspace", "--exclude", "libonly"][..], "--exclude"),
         (&["--workspace", "--exclude=libonly"][..], "--exclude=libonly"),
         (&["--manifest-path", "w/Cargo.toml"][..], "--manifest-path"),
@@ -399,25 +395,23 @@ fn clippy_refuses_the_flags_that_would_choose_targets_or_another_workspace() {
         (&["--bench=speed"][..], "--bench=speed"),
         (&["--lib"][..], "--lib"),
         (&["--tests"][..], "--tests"),
-    ]
-    .into_iter()
-    .for_each(|(scope, flag)| {
+    ] {
         assert_eq!(Clippy::refused(scope), [format!("clippy-targets refuses `{flag}`: {REFUSED}")], "{scope:?}");
-    });
+    }
 }
 
 #[test]
 fn clippy_refuses_a_package_flag_without_a_spec() {
-    [&["-p"][..], &["--package"][..], &["-p", "--", "-D", "warnings"][..]]
-        .into_iter()
-        .for_each(|scope| assert!(Clippy::refused(scope).concat().contains("usage: ci "), "{scope:?}"));
+    for scope in [&["-p"][..], &["--package"][..], &["-p", "--", "-D", "warnings"][..]] {
+        assert!(Clippy::refused(scope).concat().contains("usage: ci "), "{scope:?}");
+    }
 }
 
 #[test]
 fn clippy_refuses_a_scope_with_no_target_rather_than_checking_nothing() {
-    [(NO_PACKAGES, &[][..]), (NO_PACKAGES, &["--workspace"][..]), (NO_DEFAULTS, &[][..])]
-        .into_iter()
-        .for_each(|(metadata, scope)| assert_eq!(Clippy::refused_on(metadata, scope), [NOTHING], "{scope:?}"));
+    for (metadata, scope) in [(NO_PACKAGES, &[][..]), (NO_PACKAGES, &["--workspace"][..]), (NO_DEFAULTS, &[][..])] {
+        assert_eq!(Clippy::refused_on(metadata, scope), [NOTHING], "{scope:?}");
+    }
 }
 
 #[test]
@@ -1010,7 +1004,7 @@ fn a_graph_path_needs_rustc_to_name_exactly_one_host() -> Result<(), Box<dyn Err
 
 #[test]
 fn unusable_input_is_refused_with_the_usage() {
-    [
+    for arguments in [
         &[][..],
         &["other"][..],
         &["timed"][..],
@@ -1069,9 +1063,9 @@ fn unusable_input_is_refused_with_the_usage() {
         &["matrix"][..],
         &["matrix", "shards", "out"][..],
         &["matrix", "shards", "out", "sum", "extra"][..],
-    ]
-    .into_iter()
-    .for_each(|arguments| assert!(Answer::refused(arguments), "{arguments:?}"));
+    ] {
+        assert!(Answer::refused(arguments), "{arguments:?}");
+    }
 }
 
 #[test]
@@ -1199,16 +1193,16 @@ impl Exits {
 
 #[test]
 fn a_shard_passes_when_mutants_survive_or_time_out_but_not_on_other_failures() {
-    [(0, 0), (1, 1), (2, 0), (3, 0), (4, 4), (101, 101)]
-        .into_iter()
-        .for_each(|(code, want)| assert_eq!(Exits::shard(&Code(code)), ExitCode::from(want), "{code}"));
+    for (code, want) in [(0, 0), (1, 1), (2, 0), (3, 0), (4, 4), (101, 101)] {
+        assert_eq!(Exits::shard(&Code(code)), ExitCode::from(want), "{code}");
+    }
 }
 
 #[test]
 fn changed_lines_pass_when_mutants_time_out_but_not_on_other_failures() {
-    [(0, 0), (1, 1), (2, 2), (3, 0), (4, 4)]
-        .into_iter()
-        .for_each(|(code, want)| assert_eq!(Exits::changed(&Code(code)), ExitCode::from(want), "{code}"));
+    for (code, want) in [(0, 0), (1, 1), (2, 2), (3, 0), (4, 4)] {
+        assert_eq!(Exits::changed(&Code(code)), ExitCode::from(want), "{code}");
+    }
 }
 
 #[test]
@@ -1383,16 +1377,16 @@ impl Plans {
 
 #[test]
 fn shards_grow_with_the_mutants_up_to_a_ceiling() {
-    [
+    for (mutants, want) in [
         (0, r#"shards=[{"index":0,"minutes":45}]"#.to_owned()),
         (60, r#"shards=[{"index":0,"minutes":45}]"#.to_owned()),
         (61, r#"shards=[{"index":0,"minutes":45},{"index":1,"minutes":45}]"#.to_owned()),
         (5_068, Plans::capped(&[102; 14])),
         (5_069, Plans::capped(&[103, 102, 102, 102, 102, 102, 102, 102, 102, 102, 102, 102, 102, 102])),
         (100_000, Plans::capped(&[360; 14])),
-    ]
-    .into_iter()
-    .for_each(|(mutants, want)| assert_eq!(Plans::shards(mutants), [want], "{mutants}"));
+    ] {
+        assert_eq!(Plans::shards(mutants), [want], "{mutants}");
+    }
 }
 
 #[test]
@@ -1919,7 +1913,7 @@ impl Body {
 
 #[test]
 fn a_pull_request_body_carries_a_well_formed_spec_line_unless_it_repairs_main() {
-    [
+    for (body, want) in [
         ("spec: none\n", Body::formed("spec: none")),
         ("spec: local-tools#D23\n\nMore text.\n", Body::formed("spec: local-tools#D23")),
         ("spec: lint-port#L5\n", Body::formed("spec: lint-port#L5")),
@@ -1961,9 +1955,9 @@ fn a_pull_request_body_carries_a_well_formed_spec_line_unless_it_repairs_main() 
         ("spec: a#D1,\n", Body::malformed(&["spec: a#D1,"])),
         ("spec: a#D1 b#D2\n", Body::malformed(&["spec: a#D1 b#D2"])),
         ("spec: a#D1 and more\nspec: x\n", Body::malformed(&["spec: a#D1 and more", "spec: x"])),
-    ]
-    .into_iter()
-    .for_each(|(body, want)| assert_eq!(Body::checked(&body), want, "{body}"));
+    ] {
+        assert_eq!(Body::checked(&body), want, "{body}");
+    }
 }
 
 #[test]

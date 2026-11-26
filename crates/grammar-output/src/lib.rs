@@ -5,6 +5,6 @@ pub mod field;
 mod record;
 
 pub(crate) use boundary::{Decimal, Field, Kind, Numbered, Token, Unwrapping};
-pub use boundary::{Fields, Source, Unread};
-pub use record::{Mapped, Parsed, Record};
+pub use boundary::{Fields, Source};
+pub use record::{Parsed, Record};
 pub use record_derive::Record;

@@ -28,12 +28,14 @@ const OVERRUN: &str =
     "OVERRUN: these background tasks ran 20 minutes without finishing or writing output; check and stop them:";
 const TRAIL_HEADER: &str = "session\tshells\tagents\thalt\tread\tquoted\tkept\tfate\ttokens\tmillis";
 const LONG_AGO: Duration = Duration::from_secs(3600);
+const TRIMMING: u32 = 1;
+const READING: u32 = 2;
 
 #[derive(Debug, Default)]
 struct Replies {
     quotes: String,
     kept: String,
-    asked: Mutex<Vec<(Pid, String)>>,
+    asked: Mutex<Vec<String>>,
 }
 
 impl Replies {
@@ -42,7 +44,7 @@ impl Replies {
     }
 
     fn prompts(&self) -> Vec<String> {
-        self.asked.lock().unpoisoned().iter().map(|(_pid, prompt)| prompt.clone()).collect()
+        self.asked.lock().unpoisoned().clone()
     }
 }
 
@@ -58,9 +60,9 @@ impl DispatchFiller for Agent<'_> {
         job: &Job,
         prompt: &Prompt,
     ) -> Result<AgentRun, DispatchFailure> {
-        let mut asked = self.replies.asked.lock().unpoisoned();
-        let pid = Pid::new(u32::try_from(asked.len()).unwrap_or(u32::MAX).saturating_add(1));
-        asked.push((pid, String::from_utf8_lossy(AsRef::<[u8]>::as_ref(prompt)).into_owned()));
+        let text: String = String::from_utf8(AsRef::<[u8]>::as_ref(prompt).to_vec()).into_iter().collect();
+        let pid = Pid::new(if text.contains("numbered") { TRIMMING } else { READING });
+        self.replies.asked.lock().unpoisoned().push(text);
         Ok(AgentRun::new(pid, *job.as_ref()))
     }
 
@@ -69,16 +71,9 @@ impl DispatchFiller for Agent<'_> {
         _pass: Pass<'_, dispatch_ops::Output>,
         run: &mut AgentRun,
     ) -> Result<Option<Output>, DispatchFailure> {
-        let asked = self.replies.asked.lock().unpoisoned();
-        let prompt = asked.iter().find(|(pid, _prompt)| *pid == run.pid()).map(|(_pid, prompt)| prompt.as_str());
-        let reply =
-            prompt.map(
-                |said| {
-                    if said.contains("numbered") { self.replies.kept.clone() } else { self.replies.quotes.clone() }
-                },
-            );
+        let reply = if run.pid() == Pid::new(TRIMMING) { &self.replies.kept } else { &self.replies.quotes };
         let usage = Usage::new(Tokens::new(3), Tokens::new(4), Tokens::new(0), Tokens::new(0));
-        Ok(reply.map(|text| Output::Finished(Finished::new(Reply::new(text), usage))))
+        Ok(Some(Output::Finished(Finished::new(Reply::new(reply.clone()), usage))))
     }
 
     fn started(&self, _pass: Pass<'_, dispatch_ops::Started>, _pid: Pid) -> Result<Option<Started>, DispatchFailure> {
@@ -90,10 +85,20 @@ impl DispatchFiller for Agent<'_> {
     }
 }
 
+#[derive(Debug, PartialEq)]
+struct Refusal(String);
+
 #[derive(Debug)]
 struct Said {
     shown: String,
-    ended: Result<Outcome, String>,
+    ended: Result<Outcome, Refusal>,
+}
+
+impl Said {
+    fn reason(&self) -> Result<Option<String>, Box<dyn Error>> {
+        let decision: Value = serde_json::from_str(&self.shown)?;
+        Ok(decision.get("reason").and_then(Value::as_str).map(str::to_owned))
+    }
 }
 
 #[derive(Debug)]
@@ -139,8 +144,12 @@ impl Home {
         )
     }
 
+    fn conversation() -> [String; 2] {
+        [Home::line("user", "o1", OWNER), Home::line("assistant", "l1", "Understood.")]
+    }
+
     fn answered() -> Result<Home, Box<dyn Error>> {
-        Home::holding(&[Home::line("user", "o1", OWNER), Home::line("assistant", "l1", "Understood.")])
+        Home::holding(&Home::conversation())
     }
 
     fn said(&self, arguments: &[&str], input: &str, replies: &Replies) -> Said {
@@ -156,7 +165,7 @@ impl Home {
             Cli::new(&environment, Disk, SqliteOpener, Agents::new(|_kept: PathBuf| Agent { replies }, SystemClock))
                 .rooted(words);
         let shown = AsRef::<Shown>::as_ref(&uttered).to_string();
-        Said { shown, ended: uttered.ended().map_err(|failure| failure.to_string()) }
+        Said { shown, ended: uttered.ended().map_err(|failure| Refusal(failure.to_string())) }
     }
 
     fn stop(&self, extra: &str) -> String {
@@ -164,6 +173,10 @@ impl Home {
             "{{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":false,\"transcript_path\":{}{extra}}}",
             Value::from(self.transcript().to_string_lossy().into_owned())
         )
+    }
+
+    fn asking(&self) -> String {
+        self.stop(&format!(",\"last_assistant_message\":\"{QUESTION}\""))
     }
 
     fn agent_task(&self, name: &str, touched: SystemTime) -> Result<(), Box<dyn Error>> {
@@ -183,11 +196,14 @@ fn ingest_reports_each_session_read_the_authors_and_the_rows_written_and_a_secon
     let replies = Replies::default();
     let first = home.said(&["ingest"], "", &replies);
     let second = home.said(&["ingest"], "", &replies);
-    assert_eq!(first.ended, Ok(Outcome::Ingested));
-    assert!(first.shown.starts_with("session s read to "), "{}", first.shown);
-    assert!(first.shown.contains("authorship owner 1\n"), "{}", first.shown);
-    assert!(first.shown.contains("authorship lead 1\n"), "{}", first.shown);
-    assert!(first.shown.ends_with("written 3\n"), "{}", first.shown);
+    let read = Home::conversation().concat().len();
+    assert_eq!(
+        (first.shown.as_str(), first.ended),
+        (
+            format!("session s read to {read}\nauthorship owner 1\nauthorship lead 1\nwritten 3\n").as_str(),
+            Ok(Outcome::Ingested)
+        )
+    );
     assert_eq!((second.shown.as_str(), second.ended), ("written 0\n", Ok(Outcome::Ingested)));
     Ok(())
 }
@@ -198,7 +214,7 @@ fn a_dry_run_ingest_reports_the_same_rows_but_keeps_none() -> Result<(), Box<dyn
     let replies = Replies::default();
     let dry = home.said(&["ingest", "--dry-run"], "", &replies);
     let real = home.said(&["ingest"], "", &replies);
-    assert!(dry.shown.ends_with("written 3\n"), "{}", dry.shown);
+    assert!(dry.shown.contains("written 3\n"), "{}", dry.shown);
     assert_eq!(dry.shown, real.shown);
     Ok(())
 }
@@ -233,7 +249,7 @@ fn a_continuing_stop_passes_silently() -> Result<(), Box<dyn Error>> {
     let replies = Replies::default();
     let said = home.said(&["hook", "stop"], "{\"stop_hook_active\":true,\"session_id\":\"s\"}", &replies);
     assert_eq!((said.shown.as_str(), said.ended), ("", Ok(Outcome::Hooked(HookEvent::Stop))));
-    assert!(replies.prompts().is_empty());
+    assert_eq!(replies.prompts(), Vec::<String>::new());
     Ok(())
 }
 
@@ -244,7 +260,7 @@ fn a_stop_with_nothing_running_is_blocked_as_stalled() -> Result<(), Box<dyn Err
     let decision: Value = serde_json::from_str(&said.shown)?;
     assert_eq!(said.ended, Ok(Outcome::Blocked));
     assert_eq!(decision.get("decision").and_then(Value::as_str), Some("block"));
-    assert_eq!(decision.get("reason").and_then(Value::as_str), Some(STALLED));
+    assert_eq!(said.reason()?.as_deref(), Some(STALLED));
     Ok(())
 }
 
@@ -272,12 +288,8 @@ fn an_agent_quiet_for_twenty_minutes_is_reported_once_as_an_overrun() -> Result<
     let replies = Replies::default();
     let first = home.said(&["hook", "stop"], &home.stop(""), &replies);
     let second = home.said(&["hook", "stop"], &home.stop(""), &replies);
-    let reasons = [&first, &second].map(|said| {
-        serde_json::from_str::<Value>(&said.shown)
-            .ok()
-            .and_then(|decision| decision.get("reason").and_then(Value::as_str).map(str::to_owned))
-    });
-    assert_eq!(reasons, [Some(format!("{OVERRUN} agent-hung")), Some(STALLED.to_owned())]);
+    assert_eq!(first.reason()?, Some(format!("{OVERRUN} agent-hung")));
+    assert_eq!(second.reason()?.as_deref(), Some(STALLED));
     Ok(())
 }
 
@@ -285,11 +297,9 @@ fn an_agent_quiet_for_twenty_minutes_is_reported_once_as_an_overrun() -> Result<
 fn a_stop_quotes_the_earlier_owner_words_the_reading_agents_keep() -> Result<(), Box<dyn Error>> {
     let home = Home::answered()?;
     let replies = Replies::quoting(&format!("[{{\"uuid\": \"o1\", \"quote\": \"{OWNER}\"}}]"), "[1]");
-    let input = home.stop(&format!(",\"last_assistant_message\":\"{QUESTION}\""));
-    let said = home.said(&["hook", "stop"], &input, &replies);
-    let decision: Value = serde_json::from_str(&said.shown)?;
+    let said = home.said(&["hook", "stop"], &home.asking(), &replies);
     let quoted = format!("Earlier owner words bearing on this:\no1 2026-01-01T00:00:00Z: \"{OWNER}\"\n");
-    assert_eq!(decision.get("reason").and_then(Value::as_str), Some([STALLED, "\n", &quoted].concat().as_str()));
+    assert_eq!(said.reason()?, Some([STALLED, "\n", &quoted].concat()));
     let prompts = replies.prompts();
     assert_eq!(prompts.len(), 2);
     assert!(prompts.iter().all(|prompt| prompt.contains(QUESTION)));
@@ -302,10 +312,8 @@ fn a_stop_quotes_the_earlier_owner_words_the_reading_agents_keep() -> Result<(),
 fn a_quote_the_owner_never_wrote_is_dropped_and_no_trimming_is_asked() -> Result<(), Box<dyn Error>> {
     let home = Home::answered()?;
     let replies = Replies::quoting("[{\"uuid\": \"o1\", \"quote\": \"Never said this.\"}]", "[1]");
-    let input = home.stop(&format!(",\"last_assistant_message\":\"{QUESTION}\""));
-    let said = home.said(&["hook", "stop"], &input, &replies);
-    let decision: Value = serde_json::from_str(&said.shown)?;
-    assert_eq!(decision.get("reason").and_then(Value::as_str), Some(STALLED));
+    let said = home.said(&["hook", "stop"], &home.asking(), &replies);
+    assert_eq!(said.reason()?.as_deref(), Some(STALLED));
     assert_eq!(replies.prompts().len(), 1);
     Ok(())
 }
@@ -314,16 +322,15 @@ fn a_quote_the_owner_never_wrote_is_dropped_and_no_trimming_is_asked() -> Result
 fn the_stops_trail_lists_each_stop_with_its_reading() -> Result<(), Box<dyn Error>> {
     let home = Home::answered()?;
     let replies = Replies::quoting(&format!("[{{\"uuid\": \"o1\", \"quote\": \"{OWNER}\"}}]"), "[1]");
-    let input = home.stop(&format!(",\"last_assistant_message\":\"{QUESTION}\""));
-    home.said(&["hook", "stop"], &input, &replies);
+    home.said(&["hook", "stop"], &home.asking(), &replies);
     let trail = home.said(&["stops"], "", &replies);
-    let lines: Vec<&str> = trail.shown.lines().collect();
-    let row: Vec<&str> = lines.get(1).map_or_default(|row| row.split('\t').collect());
     assert_eq!(trail.ended, Ok(Outcome::Trailed));
-    assert_eq!(lines.first(), Some(&TRAIL_HEADER));
-    assert_eq!(lines.len(), 2);
-    assert_eq!(row.get(..3), Some(&["s", "0", "0"][..]));
-    assert_eq!(row.get(4..9), Some(&["1", "1", "1", "blocked", "14"][..]));
+    assert!(
+        trail.shown.contains(&format!("{TRAIL_HEADER}\ns\t0\t0\tstalled\t1\t1\t1\tblocked\t14\t")),
+        "{}",
+        trail.shown
+    );
+    assert_eq!(trail.shown.matches('\n').count(), 2);
     Ok(())
 }
 
@@ -331,18 +338,18 @@ fn the_stops_trail_lists_each_stop_with_its_reading() -> Result<(), Box<dyn Erro
 fn words_the_cli_does_not_know_are_refused_with_the_usage() -> Result<(), Box<dyn Error>> {
     let home = Home::new()?;
     let usage = Failure::Usage.to_string();
-    [&["frobnicate"][..], &["hook"][..], &["hook", "stop", "--settings"][..], &["ingest", "--wet"][..], &[][..]]
-        .into_iter()
-        .for_each(|words| {
-            let said = home.said(words, "", &Replies::default());
-            assert_eq!((said.shown.as_str(), said.ended), ("", Err(usage.clone())), "{words:?}");
-        });
+    for words in
+        [&["frobnicate"][..], &["hook"][..], &["hook", "stop", "--settings"][..], &["ingest", "--wet"][..], &[][..]]
+    {
+        let said = home.said(words, "", &Replies::default());
+        assert_eq!((said.shown.as_str(), said.ended), ("", Err(Refusal(usage.clone()))), "{words:?}");
+    }
     Ok(())
 }
 
 #[test]
 fn a_stop_hook_that_cannot_read_its_input_fails() -> Result<(), Box<dyn Error>> {
     let said = Home::answered()?.said(&["hook", "stop"], "not json", &Replies::default());
-    assert!(said.ended.is_err_and(|failure| failure.starts_with("cannot read the hook input: ")));
+    assert!(said.ended.is_err_and(|failure| failure.0.contains("cannot read the hook input: ")));
     Ok(())
 }

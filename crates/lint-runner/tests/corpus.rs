@@ -133,8 +133,8 @@ impl Corpus {
         let name = fixture.file_name().unwrap_or_default().to_string_lossy();
         let expected = Path::new(env!("CARGO_MANIFEST_DIR")).join(EXPECTED).join(format!("{name}.txt"));
         let wanted = Disk.read_text(&expected).ignoring(Ignored::Unreadable).map(|text| text.to_string());
-        Some(name)
-            .filter(|_| wanted.as_deref() != Some(output))
+        (wanted.as_deref() != Some(output))
+            .then_some(name)
             .map(|drifted| format!("{drifted} printed:\n{output}"))
             .into_iter()
             .collect()

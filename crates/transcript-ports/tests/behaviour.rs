@@ -323,9 +323,9 @@ impl Views {
 fn a_message_uuid_is_read_only_when_it_is_one_bare_word() {
     assert_eq!(Views::uuids_of("abc"), Some(vec![String::from("abc")]));
     assert_eq!(Views::uuids_of("_a-9"), Some(vec![String::from("_a-9")]));
-    ["msg:1", "a b", "-a", ""]
-        .into_iter()
-        .for_each(|uuid| assert_eq!(Views::uuids_of(uuid), Some(Vec::new()), "{uuid}"));
+    for uuid in ["msg:1", "a b", "-a", ""] {
+        assert_eq!(Views::uuids_of(uuid), Some(Vec::new()), "{uuid}");
+    }
 }
 
 #[test]
@@ -393,7 +393,9 @@ proptest! {
 
 impl Cases {
     fn parents(texts: &[&str], read: fn(&&str) -> Vec<String>) {
-        texts.iter().for_each(|text| assert_eq!(read(text), ["8 after 1"], "{text}"));
+        for text in texts {
+            assert_eq!(read(text), ["8 after 1"], "{text}");
+        }
     }
 }
 
@@ -585,14 +587,16 @@ fn every_surveyed_attachment_other_than_a_queued_command_is_only_a_parent_edge()
 
 #[test]
 fn an_authorship_is_read_back_from_its_display() {
-    [Authorship::Owner, Authorship::Lead].into_iter().for_each(|author| {
+    for author in [Authorship::Owner, Authorship::Lead] {
         assert_eq!(author.to_string().parse::<Authorship>().ignoring(Ignored::Refused), Some(author));
-    });
+    }
 }
 
 #[test]
 fn a_name_of_neither_party_is_no_authorship() {
-    ["human", ""].into_iter().for_each(|name| assert_eq!(name.parse::<Authorship>().ignoring(Ignored::Refused), None));
+    for name in ["human", ""] {
+        assert_eq!(name.parse::<Authorship>().ignoring(Ignored::Refused), None);
+    }
 }
 
 #[test]

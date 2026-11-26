@@ -8,7 +8,6 @@ mod session_records;
 mod stop_trail;
 mod stream_schema;
 
-pub use boundary::{CursorRow, CursorRowNew};
 pub use cursors::Cursors;
 pub use owner_said::{LastSaid, OwnerHistory, Quote, Said, Unabridged};
 pub use session_cursors::SessionCursors;

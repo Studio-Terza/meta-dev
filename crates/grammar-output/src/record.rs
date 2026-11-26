@@ -1,4 +1,4 @@
-use crate::boundary::{Fields, Source, Unread};
+use crate::boundary::{Fields, Source};
 
 #[derive(Debug)]
 pub struct Parsed<T, Rest> {
@@ -9,14 +9,6 @@ pub struct Parsed<T, Rest> {
 pub trait Record<From: Source = Fields>: Sized {
     fn read(from: From) -> Result<Parsed<Self, From>, From::Unread>;
 }
-
-pub trait Mapped<T>: Into<Result<Parsed<T, Fields>, Unread>> {
-    fn mapped<Converted>(self, convert: impl FnOnce(T) -> Converted) -> Result<Parsed<Converted, Fields>, Unread> {
-        self.into().map(|read| read.map(convert))
-    }
-}
-
-impl<T> Mapped<T> for Result<Parsed<T, Fields>, Unread> {}
 
 impl<T, Rest> Parsed<T, Rest> {
     #[must_use]

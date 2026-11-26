@@ -28,7 +28,7 @@ impl Described {
 
 #[test]
 fn a_unit_label_reads_as_the_role_cargo_gave_the_unit() {
-    [
+    for (label, want) in [
         ("", Described::Fixed(Fixed::Built)),
         (" (check)", Described::Fixed(Fixed::Checked)),
         (" (check-test)", Described::Fixed(Fixed::CheckedTest)),
@@ -39,14 +39,14 @@ fn a_unit_label_reads_as_the_role_cargo_gave_the_unit() {
         (" b \"bench\" (check-test)", Described::targeted(" b \"bench\" (check-test) CheckTest")),
         (" ex \"example\" (check)", Described::targeted(" ex \"example\" (check) Check")),
         (" my-tool_2 \"bin\" (check-test)", Described::targeted(" my-tool_2 \"bin\" (check-test) CheckTest")),
-    ]
-    .into_iter()
-    .for_each(|(label, want)| assert_eq!(Described::labelled(label), Some(want), "{label}"));
+    ] {
+        assert_eq!(Described::labelled(label), Some(want), "{label}");
+    }
 }
 
 #[test]
 fn a_label_cargo_does_not_write_for_a_clippy_unit_is_refused() {
-    [
+    for label in [
         "(check)",
         " (check) ",
         "  (check)",
@@ -59,14 +59,14 @@ fn a_label_cargo_does_not_write_for_a_clippy_unit_is_refused() {
         " app \"bin\" (run)",
         " app \"bin\" (doc)",
         "app \"bin\" (check)",
-    ]
-    .into_iter()
-    .for_each(|label| assert_eq!(Described::labelled(label), None, "{label}"));
+    ] {
+        assert_eq!(Described::labelled(label), None, "{label}");
+    }
 }
 
 #[test]
 fn a_fixed_label_is_displayed_and_parsed_back() {
-    Fixed::VARIANTS.iter().for_each(|fixed| {
+    for fixed in Fixed::VARIANTS {
         assert_eq!(fixed.to_string().parse::<Fixed>().ignoring(Unlexed::NotThisGrammar), Some(*fixed));
-    });
+    }
 }

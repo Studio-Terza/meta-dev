@@ -1,5 +1,4 @@
 mod boundary;
-mod camel_word;
 mod casing;
 mod invariant;
 mod length;
@@ -16,7 +15,6 @@ use syntax::{Ident, ItemImpl, Type};
 use crate::matching::{Fitted, Matching};
 use crate::word::Word;
 use boundary::Spelling;
-pub use camel_word::CamelWord;
 pub use casing::Casing;
 use invariant::Invariant;
 use invariants::invariant;

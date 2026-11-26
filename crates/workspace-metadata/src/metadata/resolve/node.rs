@@ -29,8 +29,6 @@ pub struct NodeDependency {
 pub struct Node {
     id: PackageId,
     #[serde(default)]
-    dependencies: Vec<PackageId>,
-    #[serde(default)]
     deps: Vec<NodeDependency>,
 }
 
@@ -47,10 +45,6 @@ impl NodeDependency {
 impl Node {
     pub fn package_id(&self) -> &PackageId {
         &self.id
-    }
-
-    pub fn dependencies(&self) -> &[PackageId] {
-        &self.dependencies
     }
 
     pub fn normal(&self) -> impl Iterator<Item = &NodeDependency> {

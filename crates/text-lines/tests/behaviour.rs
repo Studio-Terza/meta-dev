@@ -19,7 +19,7 @@ impl Sample {
 
 #[test]
 fn text_splits_at_each_line_break_without_keeping_it() {
-    [
+    for (text, want) in [
         ("", ""),
         ("a", "<a>"),
         ("a\nb", "<a><b>"),
@@ -31,14 +31,14 @@ fn text_splits_at_each_line_break_without_keeping_it() {
         ("é\nü", "<é><ü>"),
         ("a b\tc\nd", "<a b\tc><d>"),
         ("a\r\nb", "<a\r><b>"),
-    ]
-    .into_iter()
-    .for_each(|(text, want)| assert_eq!(Sample::bracketed(text), want, "{text:?}"));
+    ] {
+        assert_eq!(Sample::bracketed(text), want, "{text:?}");
+    }
 }
 
 #[test]
 fn text_splits_after_each_line_break_keeping_it() {
-    [
+    for (text, want) in [
         ("", ""),
         ("a", "<a>"),
         ("a\nb", r"<a\n><b>"),
@@ -49,23 +49,23 @@ fn text_splits_after_each_line_break_keeping_it() {
         ("\na", r"<\n><a>"),
         ("é\nü", r"<é\n><ü>"),
         ("a\r\nb", r"<a\r\n><b>"),
-    ]
-    .into_iter()
-    .for_each(|(text, want)| assert_eq!(Sample::kept(text), want, "{text:?}"));
+    ] {
+        assert_eq!(Sample::kept(text), want, "{text:?}");
+    }
 }
 
 #[test]
 fn bytes_that_are_not_utf8_become_the_replacement_character() {
-    [
+    for (bytes, want) in [
         (&b""[..], ""),
         (b"abc", "abc"),
         ("é".as_bytes(), "é"),
         (b"a\xffb", "a\u{FFFD}b"),
         (b"\xff\xfe", "\u{FFFD}\u{FFFD}"),
         (b"ok\xc3", "ok\u{FFFD}"),
-    ]
-    .into_iter()
-    .for_each(|(bytes, want)| assert_eq!(LossyText::from(bytes).to_string(), want, "{bytes:?}"));
+    ] {
+        assert_eq!(LossyText::from(bytes).to_string(), want, "{bytes:?}");
+    }
 }
 
 struct Read;

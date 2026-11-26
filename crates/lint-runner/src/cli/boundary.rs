@@ -31,14 +31,7 @@ impl From<usize> for Slot {
 
 #[derive(Debug)]
 pub(crate) struct Rendered {
-    slot: Slot,
     text: String,
-}
-
-impl Rendered {
-    pub(crate) fn slot(&self) -> Slot {
-        self.slot
-    }
 }
 
 impl fmt::Display for Rendered {
@@ -108,9 +101,7 @@ impl Worked {
         });
         grouped
             .into_iter()
-            .filter_map(|(slot, lines)| {
-                headline(slot).map(|title| Rendered { slot, text: format!("{title}:\n{lines}") })
-            })
+            .filter_map(|(slot, lines)| headline(slot).map(|title| Rendered { text: format!("{title}:\n{lines}") }))
             .collect()
     }
 }

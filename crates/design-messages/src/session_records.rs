@@ -13,15 +13,21 @@ pub struct SessionRecords {
 
 impl SessionRecords {
     #[must_use]
-    pub fn read(session: &SessionId, cursor: Cursor, lines: Vec<Line>) -> SessionRecords {
-        let (messages, unrecognised) = lines.into_iter().fold((Vec::new(), Vec::new()), |(mut said, mut odd), line| {
-            match line {
-                Line::Said(record) => said.push(MessageRow::from(&record)),
-                Line::Unrecognised(unread) => odd.push(unread.kind().clone()),
-                Line::Skipped(_) => {}
-            }
-            (said, odd)
-        });
+    pub fn read(session: &SessionId, cursor: Cursor, lines: &[Line]) -> SessionRecords {
+        let messages = lines
+            .iter()
+            .filter_map(|line| match line {
+                Line::Said(record) => Some(MessageRow::from(record)),
+                Line::Unrecognised(_) | Line::Skipped(_) => None,
+            })
+            .collect();
+        let unrecognised = lines
+            .iter()
+            .filter_map(|line| match line {
+                Line::Unrecognised(unread) => Some(unread.kind().clone()),
+                Line::Said(_) | Line::Skipped(_) => None,
+            })
+            .collect();
         SessionRecords { messages, unrecognised, cursor: CursorRow::reached(session, cursor) }
     }
 
@@ -47,8 +53,7 @@ impl Batch for SessionRecords {
 
 impl Counts for SessionRecords {
     fn counted<D: Done>(self, statements: &mut impl Execute) -> Result<D, StoreFailure> {
-        let written: [D; 2] =
-            [statements.counted_all(self.messages.iter().map(MessageRow::inserted))?, self.cursor.written(statements)?];
-        Ok(D::total(written.into_iter()))
+        let messages = statements.counted_all(self.messages.iter().map(MessageRow::inserted))?;
+        Ok(D::total([messages, self.cursor.written(statements)?].into_iter()))
     }
 }

@@ -19,7 +19,8 @@ use super::super::crew::Crew;
 use super::answers::{Answering, Answers, Search};
 use crate::cli::failure::Failure;
 use crate::cli::request::ignored::Ignored;
-use crate::{HookEvent, Outcome, Uttered};
+use crate::cli::uttered::Uttered;
+use crate::{HookEvent, Outcome};
 use harness::{Harness, Tasks};
 use invariants::Ignoring;
 

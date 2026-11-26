@@ -17,35 +17,30 @@ impl Sample {
     fn failed(text: &str) -> String {
         TestLog::from(text).failed().into_iter().map(|name| ["<", &name.to_string(), ">"].concat()).collect()
     }
-
-    fn checked(rows: &[(&str, &str)], read: fn(&str) -> String) {
-        rows.iter().for_each(|(text, want)| assert_eq!(read(text), *want, "{text:?}"));
-    }
 }
 
 #[test]
 fn a_binary_is_named_by_its_running_line_and_labels_the_tests_after_it() {
-    Sample::checked(
-        &[
-            (UNIT, "<foo-abc123 :: a::b><foo-abc123 :: c>"),
-            (TWO_BINARIES, "<behaviour-2 :: x><foo-1 :: x>"),
-            (DOCTESTS, "<doc-foo :: src/lib.rs - bar (line 3)>"),
-            (BEFORE_ANY_BINARY, "< :: x>"),
-            ("Running x (target/debug/deps/n)\ntest t ... ok\n", "<n :: t>"),
-            ("Running x (target/ignored) (target/debug/deps/last)\ntest t ... ok\n", "<last :: t>"),
-            ("Doc-tests a b\ntest t ... ok\n", "<doc-a :: t>"),
-            (
-                "Running tests/behaviour.rs (target/debug/build/graph/0a1b/out/behaviour-0a1b)\ntest t ... ok\n",
-                "<graph.behaviour :: t>",
-            ),
-        ],
-        Sample::names,
-    );
+    for (text, want) in [
+        (UNIT, "<foo-abc123 :: a::b><foo-abc123 :: c>"),
+        (TWO_BINARIES, "<behaviour-2 :: x><foo-1 :: x>"),
+        (DOCTESTS, "<doc-foo :: src/lib.rs - bar (line 3)>"),
+        (BEFORE_ANY_BINARY, "< :: x>"),
+        ("Running x (target/debug/deps/n)\ntest t ... ok\n", "<n :: t>"),
+        ("Running x (target/ignored) (target/debug/deps/last)\ntest t ... ok\n", "<last :: t>"),
+        ("Doc-tests a b\ntest t ... ok\n", "<doc-a :: t>"),
+        (
+            "Running tests/behaviour.rs (target/debug/build/graph/0a1b/out/behaviour-0a1b)\ntest t ... ok\n",
+            "<graph.behaviour :: t>",
+        ),
+    ] {
+        assert_eq!(Sample::names(text), want, "{text:?}");
+    }
 }
 
 #[test]
 fn a_line_that_is_not_a_running_line_keeps_the_previous_binary() {
-    [
+    for second in [
         "note: Running b (target/debug/deps/two)",
         "Running b (target/a/b/deps/two)",
         "Running b (target//deps/two)",
@@ -58,56 +53,52 @@ fn a_line_that_is_not_a_running_line_keeps_the_previous_binary() {
         "Doc-tests   ",
         "note: Doc-tests z",
         "Doc-testsz",
-    ]
-    .into_iter()
-    .for_each(|second| {
+    ] {
         let text = format!("Running a (target/debug/deps/one)\n{second}\ntest t ... ok\n");
         assert_eq!(Sample::names(&text), "<one :: t>", "{second:?}");
-    });
+    }
 }
 
 #[test]
 fn only_whole_test_lines_with_a_verdict_are_results() {
-    Sample::checked(
-        &[
-            ("test a ... ok\n", "< :: a>"),
-            ("test a ... ok  \n", "< :: a>"),
-            ("test a ... ok\t\n", "< :: a>"),
-            ("test a ... FAILED\n", "< :: a>"),
-            ("test a ... ignored\n", ""),
-            ("test a ... bench\n", ""),
-            ("test a ... okay\n", ""),
-            ("test a ...ok\n", ""),
-            ("test a...ok\n", ""),
-            ("  test a ... ok\n", ""),
-            ("tests a ... ok\n", ""),
-            ("testa ... ok\n", ""),
-            ("test  ... ok\n", ""),
-            ("test ... ok\n", ""),
-            ("test\n", ""),
-            ("test a ... b ... ok\n", "< :: a ... b>"),
-            ("test a ... ok ... ok\n", "< :: a ... ok>"),
-            ("test a ... ok\ntest a ... ok\n", "< :: a>"),
-            ("test a ... ok", "< :: a>"),
-            ("test ü ... ok\n", "< :: ü>"),
-            ("", ""),
-            ("\n\n", ""),
-        ],
-        Sample::names,
-    );
+    for (text, want) in [
+        ("test a ... ok\n", "< :: a>"),
+        ("test a ... ok  \n", "< :: a>"),
+        ("test a ... ok\t\n", "< :: a>"),
+        ("test a ... FAILED\n", "< :: a>"),
+        ("test a ... ignored\n", ""),
+        ("test a ... bench\n", ""),
+        ("test a ... okay\n", ""),
+        ("test a ...ok\n", ""),
+        ("test a...ok\n", ""),
+        ("  test a ... ok\n", ""),
+        ("tests a ... ok\n", ""),
+        ("testa ... ok\n", ""),
+        ("test  ... ok\n", ""),
+        ("test ... ok\n", ""),
+        ("test\n", ""),
+        ("test a ... b ... ok\n", "< :: a ... b>"),
+        ("test a ... ok ... ok\n", "< :: a ... ok>"),
+        ("test a ... ok\ntest a ... ok\n", "< :: a>"),
+        ("test a ... ok", "< :: a>"),
+        ("test ü ... ok\n", "< :: ü>"),
+        ("", ""),
+        ("\n\n", ""),
+    ] {
+        assert_eq!(Sample::names(text), want, "{text:?}");
+    }
 }
 
 #[test]
 fn a_failed_verdict_counts_only_when_it_is_the_last_for_the_name() {
-    Sample::checked(
-        &[
-            (UNIT, "<foo-abc123 :: c>"),
-            (TWO_BINARIES, "<behaviour-2 :: x>"),
-            ("test a ... FAILED\ntest a ... ok\n", ""),
-            ("test a ... ok\ntest a ... FAILED\n", "< :: a>"),
-            ("test a ... ok\n", ""),
-            ("", ""),
-        ],
-        Sample::failed,
-    );
+    for (text, want) in [
+        (UNIT, "<foo-abc123 :: c>"),
+        (TWO_BINARIES, "<behaviour-2 :: x>"),
+        ("test a ... FAILED\ntest a ... ok\n", ""),
+        ("test a ... ok\ntest a ... FAILED\n", "< :: a>"),
+        ("test a ... ok\n", ""),
+        ("", ""),
+    ] {
+        assert_eq!(Sample::failed(text), want, "{text:?}");
+    }
 }

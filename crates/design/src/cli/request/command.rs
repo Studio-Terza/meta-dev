@@ -15,7 +15,8 @@ use strum::VariantArray;
 use super::Ground;
 use super::persistence::Persistence;
 use crate::cli::failure::Failure;
-use crate::{HookEvent, Outcome, Uttered};
+use crate::cli::uttered::Uttered;
+use crate::{HookEvent, Outcome};
 pub use crew::Crew;
 use hook::Hook;
 use ingest::Ingest;
@@ -46,7 +47,7 @@ impl Command {
         }
     }
 
-    pub fn opened<O: Opens>(&self, path: PathBuf, opens: &O) -> O::Store {
+    pub fn opened<O: Opens>(self, path: PathBuf, opens: &O) -> O::Store {
         match self {
             Command::Ingest(persistence) => persistence.opened(path, opens),
             Command::Stops | Command::Hook(_) => Persistence::File.opened(path, opens),

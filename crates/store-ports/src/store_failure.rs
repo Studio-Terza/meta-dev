@@ -1,6 +1,6 @@
 use std::io;
 
-use crate::{Cause, ColumnFailure, Released};
+use crate::{Cause, ColumnFailure};
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreFailure {
@@ -22,31 +22,4 @@ pub enum StoreFailure {
     Missing,
     #[error("the store's rewrite refuses to open it: {0}")]
     Refused(#[source] Cause),
-    #[error("a lifecycle move was refused: {0}")]
-    Unmoved(#[from] Unmoved),
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
-pub enum Unmoved {
-    #[error("the move is not an edge of its lifecycle")]
-    Unlisted,
-    #[error("the row is not in the state the move starts from")]
-    Elsewhere,
-}
-
-impl StoreFailure {
-    pub(crate) fn released(self) -> Result<Released, StoreFailure> {
-        match self {
-            StoreFailure::Referenced(_) => Ok(Released::Referenced),
-            failed @ (StoreFailure::Runtime(_)
-            | StoreFailure::Directory(_)
-            | StoreFailure::Open(_)
-            | StoreFailure::Migrate(_)
-            | StoreFailure::Statement(_)
-            | StoreFailure::Column(_)
-            | StoreFailure::Missing
-            | StoreFailure::Refused(_)
-            | StoreFailure::Unmoved(_)) => Err(failed),
-        }
-    }
 }

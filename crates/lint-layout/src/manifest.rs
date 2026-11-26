@@ -1,4 +1,3 @@
-mod boundary;
 mod key_lines;
 mod members;
 
@@ -25,7 +24,7 @@ use crate::path_dependencies::PathDependencies;
 use crate::source_text::SourceText;
 use crate::untested::Untested;
 use crate::word::Word;
-pub use key_lines::{KeyLines, TableKey};
+pub use key_lines::KeyLines;
 use members::Members;
 
 #[derive(Debug)]

@@ -4,7 +4,7 @@ use grammar_cargo_option::{CargoOption, Options};
 
 #[test]
 fn a_cargo_option_word_is_read_as_a_long_option_or_a_package_flag() {
-    [
+    for (text, want) in [
         ("--package", CargoOption::Long { name: "package", value: None }),
         ("--package=a", CargoOption::Long { name: "package", value: Some("a") }),
         ("--package=a=b", CargoOption::Long { name: "package", value: Some("a=b") }),
@@ -26,7 +26,7 @@ fn a_cargo_option_word_is_read_as_a_long_option_or_a_package_flag() {
         ("p", CargoOption::Plain),
         ("a-p", CargoOption::Plain),
         ("", CargoOption::Plain),
-    ]
-    .into_iter()
-    .for_each(|(text, want)| assert_eq!(Options::spelled(text), want, "{text}"));
+    ] {
+        assert_eq!(Options::spelled(text), want, "{text}");
+    }
 }

@@ -40,7 +40,7 @@ use lint_thin_main::ThinMain;
 use lint_type_shape::TypeShape;
 use lint_vec_out_params::VecOutParams;
 
-use crate::cli::boundary::{FileOrder, Helper, Helpers, Rendered, Slot, Worked, Workers};
+use crate::cli::boundary::{FileOrder, Helper, Helpers, Slot, Worked, Workers};
 use crate::cli::ignored::Ignored;
 use crate::cli::sources::{Claimed, Holding, Settled};
 use crate::cli::timings::{Measured, Step, Stopwatch, Worker};
@@ -147,8 +147,7 @@ impl Lints {
         located: &'run Result<Described, Unlocated>,
         worked: Worked,
     ) -> Outcome<'run> {
-        let mut rendered = worked.into_rendered(|slot| slot.picked(&Self::LINTS).map(Entry::headline));
-        rendered.sort_by_key(Rendered::slot);
+        let rendered = worked.into_rendered(|slot| slot.picked(&Self::LINTS).map(Entry::headline));
         Outcome::located(located, rendered, readout.failures())
     }
 

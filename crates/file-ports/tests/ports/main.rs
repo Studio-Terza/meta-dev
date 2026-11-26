@@ -334,11 +334,11 @@ fn read_from_agrees_between_disk_and_memory() -> Result<(), Box<dyn Error>> {
     let memory = Memory::default();
     memory.create_directories(Path::new("/scratch"))?;
     let offsets = (0..16).map(Offset::try_new).collect::<Result<Vec<Offset>, _>>()?;
-    offsets.into_iter().for_each(|at| {
+    for at in offsets {
         let on_disk = Tails::of(&Disk, scratch.path(), at);
         let in_memory = Tails::of(&memory, Path::new("/scratch"), at);
         assert_eq!(on_disk.ignoring(Ignored::Failing), in_memory.ignoring(Ignored::Failing), "{at:?}");
-    });
+    }
     Ok(())
 }
 

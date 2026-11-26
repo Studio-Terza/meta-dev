@@ -41,10 +41,6 @@ impl Target {
         self.kind.iter().find_map(|kind| kind.form())
     }
 
-    pub fn binary(&self) -> Option<&TargetKind> {
-        self.kind.iter().find(|kind| **kind == TargetKind::Bin)
-    }
-
     pub fn root(&self) -> &Path {
         &self.src_path
     }

@@ -104,10 +104,10 @@ impl Spotted {
 
 impl Spelled {
     fn started(&self, imports: &[Import]) -> Option<LineNumber> {
-        let mut reversed = self.segments.iter().rev();
-        reversed.next().filter(|last| **last == Name::from(CommandPaths::NEW))?;
-        let owner = reversed.next()?;
-        let before = reversed.next();
+        let (last, rest) = self.segments.split_last()?;
+        (*last == Name::from(CommandPaths::NEW)).then_some(())?;
+        let (owner, ahead) = rest.split_last()?;
+        let before = ahead.last();
         let bound: Vec<&Bound> =
             imports.iter().filter(|import| import.module == self.module).map(|import| &import.bound).collect();
         let imported = bound.iter().find(|held| ***held == Bound::Command(owner.clone())).map(|_| ());
@@ -133,9 +133,9 @@ impl Bound {
         )
     }
 
-    fn named(parent: &Name, original: &Ident, bound: &Ident) -> Option<Bound> {
-        let original = Name::from(original);
-        let bound = Name::from(bound);
+    fn named(parent: &Name, spelled: &Ident, as_bound: &Ident) -> Option<Bound> {
+        let original = Name::from(spelled);
+        let bound = Name::from(as_bound);
         let process = Name::from(CommandPaths::PROCESS);
         let in_process = (*parent == process).then_some(());
         let command = in_process.filter(|()| original == Name::from(CommandPaths::COMMAND));
@@ -224,13 +224,19 @@ impl Contribute for Scan {
     ) -> Contributed<Vec<Enclosing>, Spotted> {
         let module = Scan::module(around);
         let spelled = self.scope.inside(Scan::ported(around)).map_or_default(|_| {
-            Run::spelled(invocation.tokens.clone())
+            Spoken::scanned(invocation.tokens.clone())
                 .into_iter()
-                .map(|(line, segments)| Spelled { module, line, segments })
+                .map(|Spoken { line, segments }| Spelled { module, line, segments })
                 .collect()
         });
         Contributed::new(Vec::new(), Spotted { imports: Vec::new(), spelled }, Descend::Over)
     }
+}
+
+#[derive(Debug)]
+struct Spoken {
+    line: LineNumber,
+    segments: Vec<Name>,
 }
 
 #[derive(Debug, Default)]
@@ -238,23 +244,24 @@ struct Run {
     segments: Vec<Name>,
     line: Option<LineNumber>,
     colons: usize,
-    found: Vec<(LineNumber, Vec<Name>)>,
+    found: Vec<Spoken>,
+}
+
+impl Spoken {
+    fn scanned(tokens: TokenStream) -> Vec<Spoken> {
+        tokens.into_iter().fold(Run::default(), Run::read).ended().found
+    }
 }
 
 impl Run {
     const SEPARATOR: usize = 2;
     const COLON: char = ':';
 
-    fn spelled(tokens: TokenStream) -> Vec<(LineNumber, Vec<Name>)> {
-        tokens.into_iter().fold(Run::default(), Run::read).ended().found
-    }
-
     fn read(self, tree: TokenTree) -> Run {
         match tree {
             TokenTree::Group(group) => {
-                let mut ended = self.ended();
-                ended.found.extend(Run::spelled(group.stream()));
-                ended
+                let Run { found, .. } = self.ended();
+                Run { found: found.into_iter().chain(Spoken::scanned(group.stream())).collect(), ..Run::default() }
             }
             TokenTree::Ident(ident) => self.named(&ident),
             TokenTree::Punct(punct) => self.punctuated(punct.as_char()),
@@ -264,14 +271,16 @@ impl Run {
 
     fn named(self, ident: &Ident) -> Run {
         let joined = self.segments.first().map_or(Some(()), |_| (self.colons == Self::SEPARATOR).then_some(()));
-        let mut run = match joined {
+        let run = match joined {
             Some(()) => self,
             None => self.ended(),
         };
-        run.line = run.line.or(Some(LineNumber::from(ident.span())));
-        run.segments.push(Name::from(ident));
-        run.colons = 0;
-        run
+        Run {
+            line: run.line.or(Some(LineNumber::from(ident.span()))),
+            segments: run.segments.into_iter().chain([Name::from(ident)]).collect(),
+            colons: 0,
+            found: run.found,
+        }
     }
 
     fn punctuated(self, mark: char) -> Run {
@@ -283,9 +292,9 @@ impl Run {
     }
 
     fn ended(self) -> Run {
-        let Run { segments, line, colons, mut found } = self;
+        let Run { segments, line, colons, found } = self;
         let whole = line.filter(|_| colons == 0).filter(|_| segments.len() >= Self::SEPARATOR);
-        found.extend(whole.map(|at| (at, segments)));
-        Run { found, ..Run::default() }
+        let spoken = whole.map(|at| Spoken { line: at, segments });
+        Run { found: found.into_iter().chain(spoken).collect(), ..Run::default() }
     }
 }

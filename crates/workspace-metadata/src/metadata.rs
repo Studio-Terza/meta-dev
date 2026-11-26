@@ -3,24 +3,18 @@ mod package;
 mod resolve;
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
 
 use serde::Deserialize;
 
 use crate::crate_name::CrateName;
-use crate::outside::Outside;
 use crate::package_id::PackageId;
-use crate::readers::Readers;
 pub use library::Library;
-pub use package::{Expanders, Form, MacroName};
-pub(crate) use package::{Package, PortTable};
-use resolve::Resolve;
-pub(crate) use resolve::{Node, NodeDependency};
+pub use package::Form;
+use package::Package;
+use resolve::{Node, NodeDependency, Resolve};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Metadata {
-    workspace_root: PathBuf,
     packages: Vec<Package>,
     #[serde(default)]
     workspace_members: Vec<PackageId>,
@@ -28,28 +22,6 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    pub fn checked(self) -> Result<Metadata, Outside> {
-        let Metadata { workspace_root, packages, workspace_members, resolve } = self;
-        let (inside, outside): (Vec<Package>, Vec<Package>) =
-            packages.into_iter().partition(|package| package.directory_under(&workspace_root).is_some());
-        outside
-            .into_iter()
-            .next()
-            .map_or(Ok(Metadata { workspace_root, packages: inside, workspace_members, resolve }), |package| {
-                Err(Outside::new(package.into_manifest()))
-            })
-    }
-
-    #[must_use]
-    pub fn directories(&self) -> BTreeMap<&CrateName, &Path> {
-        self.packages
-            .iter()
-            .filter_map(|package| {
-                Some((AsRef::<CrateName>::as_ref(package), package.directory_under(&self.workspace_root)?))
-            })
-            .collect()
-    }
-
     #[must_use]
     pub fn libraries(&self) -> Vec<Library<'_>> {
         let members: BTreeSet<&PackageId> = self.workspace_members.iter().collect();
@@ -85,66 +57,7 @@ impl Metadata {
             .collect()
     }
 
-    #[must_use]
-    pub fn readers(&self) -> Readers<'_> {
-        Readers::new(
-            self.packages
-                .iter()
-                .filter_map(|package| {
-                    package.readings().first().map(|_| (AsRef::<CrateName>::as_ref(package), package.readings()))
-                })
-                .collect(),
-        )
-    }
-
-    #[must_use]
-    pub fn dependents<'meta>(
-        &'meta self,
-        members: &BTreeMap<&CrateName, &Path>,
-    ) -> BTreeMap<&'meta CrateName, BTreeSet<&'meta CrateName>> {
-        self.packages
-            .iter()
-            .flat_map(|package| {
-                package
-                    .dependencies_among(members)
-                    .map(move |dependency| (dependency, AsRef::<CrateName>::as_ref(package)))
-            })
-            .fold(BTreeMap::new(), |mut dependents, (dependency, name)| {
-                dependents.entry(dependency).or_insert_with(BTreeSet::new).insert(name);
-                dependents
-            })
-    }
-
-    #[must_use]
-    pub fn test_support(&self) -> BTreeSet<&CrateName> {
-        let shipped: BTreeSet<&CrateName> = self.packages.iter().flat_map(Package::shipped_dependencies).collect();
-        let members: BTreeSet<&PackageId> = self.workspace_members.iter().collect();
-        self.packages
-            .iter()
-            .filter(|package| package.package_id().and_then(|id| members.get(id)).is_some())
-            .filter(|package| package.binary().is_none())
-            .map(AsRef::<CrateName>::as_ref)
-            .filter_map(|name| shipped.get(name).map_or(Some(name), |_| None))
-            .collect()
-    }
-
-    pub(crate) fn packages(&self) -> &[Package] {
-        &self.packages
-    }
-
-    pub(crate) fn members(&self) -> &[PackageId] {
-        &self.workspace_members
-    }
-
-    pub(crate) fn nodes(&self) -> &[Node] {
+    fn nodes(&self) -> &[Node] {
         self.resolve.as_ref().map_or(&[], AsRef::as_ref)
-    }
-}
-
-impl FromStr for Metadata {
-    type Err = serde_json::Error;
-
-    fn from_str(text: &str) -> Result<Metadata, serde_json::Error> {
-        serde_json::from_str(text)
     }
 }
