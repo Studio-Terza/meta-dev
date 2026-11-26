@@ -1,5 +1,6 @@
 mod ignored;
 
+use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -48,7 +49,7 @@ impl Outcome {
 }
 
 #[test]
-fn a_shard_lists_the_baseline_tests_and_the_tests_that_failed_per_mutant() -> Result<(), laws::Unmet> {
+fn a_shard_lists_the_baseline_tests_and_the_tests_that_failed_per_mutant() -> Result<(), Box<dyn Error>> {
     let mutants = Mutants::new()?;
     mutants.log("baseline.log", BASELINE_LOG)?;
     mutants.log("one.log", KILLING_LOG)?;
@@ -83,7 +84,7 @@ fn a_shard_lists_the_baseline_tests_and_the_tests_that_failed_per_mutant() -> Re
 }
 
 #[test]
-fn a_log_with_a_byte_that_is_not_utf8_is_still_read() -> Result<(), laws::Unmet> {
+fn a_log_with_a_byte_that_is_not_utf8_is_still_read() -> Result<(), Box<dyn Error>> {
     let mutants = Mutants::new()?;
     mutants.log("baseline.log", [BASELINE_LOG.as_bytes(), b"\xff\n"].concat())?;
     mutants.log("one.log", [KILLING_LOG.as_bytes(), b"\xff\n"].concat())?;
@@ -98,7 +99,7 @@ fn a_log_with_a_byte_that_is_not_utf8_is_still_read() -> Result<(), laws::Unmet>
 }
 
 #[test]
-fn a_mutant_without_a_name_is_titled_by_its_file_and_replacement() -> Result<(), laws::Unmet> {
+fn a_mutant_without_a_name_is_titled_by_its_file_and_replacement() -> Result<(), Box<dyn Error>> {
     let mutants = Mutants::new()?;
     mutants.outcomes(&json!([
         Outcome::baseline(),
@@ -120,7 +121,7 @@ fn a_mutant_without_a_name_is_titled_by_its_file_and_replacement() -> Result<(),
 }
 
 #[test]
-fn the_log_is_the_first_one_that_exists_the_mutant_log_before_its_phases() -> Result<(), laws::Unmet> {
+fn the_log_is_the_first_one_that_exists_the_mutant_log_before_its_phases() -> Result<(), Box<dyn Error>> {
     let mutants = Mutants::new()?;
     mutants.log("baseline.log", BASELINE_LOG)?;
     mutants.log("main.log", KILLING_LOG)?;
@@ -146,7 +147,7 @@ fn the_log_is_the_first_one_that_exists_the_mutant_log_before_its_phases() -> Re
 }
 
 #[test]
-fn a_directory_in_place_of_a_log_is_no_log() -> Result<(), laws::Unmet> {
+fn a_directory_in_place_of_a_log_is_no_log() -> Result<(), Box<dyn Error>> {
     let mutants = Mutants::new()?;
     mutants.log_directory("dir.log")?;
     mutants.log("baseline.log", BASELINE_LOG)?;
@@ -160,7 +161,7 @@ fn a_directory_in_place_of_a_log_is_no_log() -> Result<(), laws::Unmet> {
 }
 
 #[test]
-fn only_the_baseline_scenario_gives_baseline_tests() -> Result<(), laws::Unmet> {
+fn only_the_baseline_scenario_gives_baseline_tests() -> Result<(), Box<dyn Error>> {
     let mutants = Mutants::new()?;
     mutants.log("baseline.log", BASELINE_LOG)?;
     mutants.log("one.log", KILLING_LOG)?;
@@ -175,7 +176,7 @@ fn only_the_baseline_scenario_gives_baseline_tests() -> Result<(), laws::Unmet> 
 }
 
 #[test]
-fn outcomes_that_are_missing_or_broken_are_refused() -> Result<(), laws::Unmet> {
+fn outcomes_that_are_missing_or_broken_are_refused() -> Result<(), Box<dyn Error>> {
     let mutants = Mutants::new()?;
     let missing = mutants.shard();
     assert_eq!(missing.exit, ExitCode::FAILURE);
@@ -191,7 +192,7 @@ fn outcomes_that_are_missing_or_broken_are_refused() -> Result<(), laws::Unmet> 
 }
 
 #[test]
-fn a_matrix_that_cannot_be_written_is_refused() -> Result<(), laws::Unmet> {
+fn a_matrix_that_cannot_be_written_is_refused() -> Result<(), Box<dyn Error>> {
     let mutants = Mutants::new()?;
     mutants.outcomes(&json!([Outcome::baseline()]))?;
     let answer = Answer::to(&mutants.files, &[mutants.path().as_os_str(), "/no/such/dir/matrix.json".as_ref()]);
@@ -202,15 +203,13 @@ fn a_matrix_that_cannot_be_written_is_refused() -> Result<(), laws::Unmet> {
 
 const USAGE: &str = "usage: mutation-shard <mutants.out> <out.json>";
 
-laws::table!(
-    the_wrong_number_of_arguments_is_refused_with_the_usage,
-    |arguments: &[&OsStr]| Answer::to(&Memory::default(), arguments),
-    [
-        [] => Answer::usage(),
-        [OsStr::new("a")] => Answer::usage(),
-        [OsStr::new("a"), OsStr::new("b"), OsStr::new("c")] => Answer::usage(),
-    ]
-);
+#[test]
+fn the_wrong_number_of_arguments_is_refused_with_the_usage() {
+    let memory = Memory::default();
+    assert_eq!(Answer::to(&memory, &[]), Answer::usage());
+    assert_eq!(Answer::to(&memory, &[OsStr::new("a")]), Answer::usage());
+    assert_eq!(Answer::to(&memory, &[OsStr::new("a"), OsStr::new("b"), OsStr::new("c")]), Answer::usage());
+}
 
 struct Mutants {
     files: Memory,
