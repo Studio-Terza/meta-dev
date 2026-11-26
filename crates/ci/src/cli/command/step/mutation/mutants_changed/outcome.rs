@@ -12,8 +12,6 @@ pub enum Outcome {
 }
 
 impl Outcome {
-    pub(crate) const LISTED: [Outcome; 2] = [Outcome::Missed, Outcome::Timeout];
-
     const EXTENSION: &'static str = ".txt";
 
     pub(crate) fn file_name(self) -> PathBuf {

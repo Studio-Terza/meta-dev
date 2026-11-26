@@ -23,7 +23,6 @@ grammar-test-summary = { path = "../grammar-test-summary" }
 grammar-timing-page = { path = "../grammar-timing-page" }
 grammar-unit-label = { path = "../grammar-unit-label" }
 newtype = { path = "../newtype" }
-mutation-report = { path = "../mutation-report" }
 strum.workspace = true
 text-lines = { path = "../text-lines" }
 serde.workspace = true

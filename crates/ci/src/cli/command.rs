@@ -8,7 +8,7 @@ use step::clippy_targets::ClippyTargets;
 use step::cold_size::ColdSize;
 use step::github::{CompileTrend, Show, SpecLine, StageIssues, Summarize, WallTimes};
 use step::graph_path::GraphPath;
-use step::mutation::{Matrix, MutantsChanged, MutantsPlan, MutantsPrior, MutantsShard, ShardSummary};
+use step::mutation::{MutantsChanged, MutantsPlan, MutantsPrior};
 use step::ratchet::{MeasuredHistory, RatchetLower};
 use step::sqlite::BuildSqlite;
 use step::{CompileTimes, InstallTools, LibtestSeconds, Logged, Step, Timed};
@@ -31,7 +31,6 @@ pub enum Command {
     GraphPath(GraphPath),
     Logged(Logged),
     Tools(InstallTools),
-    MutantsShard(MutantsShard),
     MutantsChanged(MutantsChanged),
     MutantsPlan(MutantsPlan),
     MutantsPrior(MutantsPrior),
@@ -41,8 +40,6 @@ pub enum Command {
     SpecLine(SpecLine),
     StageIssues(StageIssues),
     CompileTrend(CompileTrend),
-    ShardSummary(ShardSummary),
-    Matrix(Matrix),
     ColdSize(ColdSize),
     BuildSqlite(BuildSqlite),
 }
@@ -57,7 +54,6 @@ impl Command {
     const GRAPH_PATH: &'static str = "graph-path";
     const LOGGED: &'static str = "logged";
     const TOOLS: &'static str = "tools";
-    const MUTANTS_SHARD: &'static str = "mutants-shard";
     const MUTANTS_CHANGED: &'static str = "mutants-changed";
     const MUTANTS_PLAN: &'static str = "mutants-plan";
     const MUTANTS_PRIOR: &'static str = "mutants-prior";
@@ -67,8 +63,6 @@ impl Command {
     const SPEC_LINE: &'static str = "spec-line";
     const STAGE_ISSUES: &'static str = "stage-issues";
     const COMPILE_TREND: &'static str = "compile-trend";
-    const SHARD_SUMMARY: &'static str = "shard-summary";
-    const MATRIX: &'static str = "matrix";
     const COLD_SIZE: &'static str = "cold-size";
     const SQLITE: &'static str = "sqlite";
 
@@ -83,7 +77,6 @@ impl Command {
             Some(Self::GRAPH_PATH) => Self::parsed(arguments.collect(), Command::GraphPath),
             Some(Self::LOGGED) => Self::parsed(arguments.collect(), Command::Logged),
             Some(Self::TOOLS) => Self::parsed(arguments.collect(), Command::Tools),
-            Some(Self::MUTANTS_SHARD) => Self::parsed(arguments.collect(), Command::MutantsShard),
             Some(Self::MUTANTS_CHANGED) => Self::parsed(arguments.collect(), Command::MutantsChanged),
             Some(Self::MUTANTS_PLAN) => Self::parsed(arguments.collect(), Command::MutantsPlan),
             Some(Self::MUTANTS_PRIOR) => Self::parsed(arguments.collect(), Command::MutantsPrior),
@@ -93,8 +86,6 @@ impl Command {
             Some(Self::SPEC_LINE) => Self::parsed(arguments.collect(), Command::SpecLine),
             Some(Self::STAGE_ISSUES) => Self::parsed(arguments.collect(), Command::StageIssues),
             Some(Self::COMPILE_TREND) => Self::parsed(arguments.collect(), Command::CompileTrend),
-            Some(Self::SHARD_SUMMARY) => Self::parsed(arguments.collect(), Command::ShardSummary),
-            Some(Self::MATRIX) => Self::parsed(arguments.collect(), Command::Matrix),
             Some(Self::COLD_SIZE) => Self::parsed(arguments.collect(), Command::ColdSize),
             Some(Self::SQLITE) => Self::parsed(arguments.collect(), Command::BuildSqlite),
             _ => Err(Failure::Usage),
@@ -123,7 +114,6 @@ impl Command {
             Command::GraphPath(step) => step.carry_out(ports),
             Command::Logged(step) => step.carry_out(ports),
             Command::Tools(step) => step.carry_out(ports),
-            Command::MutantsShard(step) => step.carry_out(ports),
             Command::MutantsChanged(step) => step.carry_out(ports),
             Command::MutantsPlan(step) => step.carry_out(ports),
             Command::MutantsPrior(step) => step.carry_out(ports),
@@ -133,8 +123,6 @@ impl Command {
             Command::SpecLine(step) => step.carry_out(ports),
             Command::StageIssues(step) => step.carry_out(ports),
             Command::CompileTrend(step) => step.carry_out(ports),
-            Command::ShardSummary(step) => step.carry_out(ports),
-            Command::Matrix(step) => step.carry_out(ports),
             Command::ColdSize(step) => step.carry_out(ports),
             Command::BuildSqlite(step) => step.carry_out(ports),
         }

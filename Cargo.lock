@@ -75,7 +75,6 @@ dependencies = [
  "grammar-timing-page",
  "grammar-unit-label",
  "invariants",
- "mutation-report",
  "newtype",
  "serde",
  "serde_json",
@@ -907,37 +906,6 @@ version = "0.1.0"
 dependencies = [
  "grammar-output",
  "newtype",
- "thiserror",
-]
-
-[[package]]
-name = "mutation-report"
-version = "0.1.0"
-dependencies = [
- "console-ports",
- "file-ports",
- "invariants",
- "newtype",
- "serde",
- "serde_json",
- "strum",
- "test-failure",
- "text-lines",
- "thiserror",
-]
-
-[[package]]
-name = "mutation-shard"
-version = "0.1.0"
-dependencies = [
- "console-ports",
- "file-ports",
- "invariants",
- "serde",
- "serde_json",
- "test-failure",
- "test-log",
- "text-lines",
  "thiserror",
 ]
 

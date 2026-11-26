@@ -1036,12 +1036,9 @@ fn unusable_input_is_refused_with_the_usage() {
         &["tools"][..],
         &["tools", "built"][..],
         &["tools", "built", "to", "extra"][..],
-        &["mutants-shard"][..],
-        &["mutants-shard", "0/8"][..],
-        &["mutants-shard", "0/8", "out", "extra"][..],
-        &["mutants-shard", "8/8", "out"][..],
-        &["mutants-shard", "0/0", "out"][..],
-        &["mutants-shard", "3", "out"][..],
+        &["mutants-shard", "3/8", "out"][..],
+        &["mutants-changed", "diff", "out", "0/0", "-p"][..],
+        &["mutants-changed", "diff", "out", "3", "-p"][..],
         &["mutants-changed"][..],
         &["mutants-changed", "diff"][..],
         &["mutants-changed", "diff", "out"][..],
@@ -1057,11 +1054,6 @@ fn unusable_input_is_refused_with_the_usage() {
         &["summarize", "report.txt", "summary.md", "extra"][..],
         &["spec-line"][..],
         &["spec-line", "1", "extra"][..],
-        &["shard-summary"][..],
-        &["shard-summary", "shards"][..],
-        &["matrix"][..],
-        &["matrix", "shards", "out"][..],
-        &["matrix", "shards", "out", "sum", "extra"][..],
     ] {
         assert!(Answer::refused(arguments), "{arguments:?}");
     }
@@ -1130,50 +1122,12 @@ fn a_logged_program_is_run_with_its_log_and_its_exit() -> Result<(), Failed> {
     Ok(())
 }
 
-struct Cargo;
-
-impl Cargo {
-    fn mutants(shard: &str, output: &str) -> Invocation {
-        Invocation::new(
-            "cargo",
-            [
-                "mutants",
-                "--shard",
-                shard,
-                "--sharding",
-                "round-robin",
-                "--jobs",
-                "2",
-                "--colors",
-                "never",
-                "--no-shuffle",
-                "--caught",
-                "--unviable",
-                "--build-timeout",
-                "600",
-                "--timeout",
-                "120",
-                "--cargo-test-arg",
-                Runner::LIMITED,
-                "--output",
-                output,
-                "--",
-                "--no-fail-fast",
-            ],
-        )
-    }
-}
-
 #[derive(Debug)]
 struct Code(u8);
 
 struct Exits;
 
 impl Exits {
-    fn shard(code: &Code) -> ExitCode {
-        Scratch::fresh().answer(&Script::exiting(code.0), &["mutants-shard", "3/8", "out"]).exit
-    }
-
     fn changed(code: &Code) -> ExitCode {
         let scratch = Scratch::fresh();
         let seeded = scratch
@@ -1191,30 +1145,10 @@ impl Exits {
 }
 
 #[test]
-fn a_shard_passes_when_mutants_survive_or_time_out_but_not_on_other_failures() {
-    for (code, want) in [(0, 0), (1, 1), (2, 0), (3, 0), (4, 4), (101, 101)] {
-        assert_eq!(Exits::shard(&Code(code)), ExitCode::from(want), "{code}");
-    }
-}
-
-#[test]
 fn changed_lines_pass_when_mutants_time_out_but_not_on_other_failures() {
     for (code, want) in [(0, 0), (1, 1), (2, 2), (3, 0), (4, 4)] {
         assert_eq!(Exits::changed(&Code(code)), ExitCode::from(want), "{code}");
     }
-}
-
-#[test]
-fn a_shard_runs_cargo_mutants_for_its_slice() {
-    let fake = Script::new();
-    let answer = Scratch::fresh().answer(&fake, &["mutants-shard", "3/8", "/tmp/out"]);
-    assert_eq!(
-        answer.lines().shown(),
-        Printed { exit: ExitCode::SUCCESS, out: Vec::<&str>::new(), err: Vec::<&str>::new() }
-    );
-    assert_eq!(*fake.calls.borrow(), [Cargo::mutants("3/8", "/tmp/out")]);
-    let refused = Scratch::fresh().answer(&Script::refusing("cargo"), &["mutants-shard", "3/8", "out"]);
-    assert_eq!(Text::lines(&refused.err), ["cannot run cargo: boom"]);
 }
 
 #[test]
@@ -1966,68 +1900,6 @@ fn the_spec_line_is_read_from_the_body_of_the_pull_request() {
     let refused = Scratch::fresh().answer(&Script::refusing("gh"), &["spec-line", "9"]);
     assert_eq!(Text::lines(&refused.err), ["cannot run gh: boom"]);
     assert_eq!(refused.err.chars().last(), Some('\n'));
-}
-
-#[test]
-fn shard_results_are_counted_and_the_missed_and_timed_out_are_listed() -> Result<(), Failed> {
-    let scratch = Scratch::new()?;
-    scratch.directory("shards/shard-0")?;
-    scratch.directory("shards/shard-1")?;
-    scratch.write("shards/shard-0/caught.txt", "c1\nc2\n")?;
-    scratch.write("shards/shard-0/missed.txt", "m2\n")?;
-    scratch.write("shards/shard-1/caught.txt", "c3\n")?;
-    scratch.write("shards/shard-1/missed.txt", "m1\n")?;
-    scratch.write("shards/shard-1/timeout.txt", "t1\n")?;
-    scratch.write("sum", "before\n")?;
-    let answer = scratch.answer(&Script::new(), &["shard-summary", &scratch.file("shards"), &scratch.file("sum")]);
-    let expected = ["caught: 3", "missed: 2", "timeout: 1", "unviable: 0", "```", "m1", "m2", "t1", "```"];
-    assert_eq!(
-        answer.lines().shown(),
-        Printed { exit: ExitCode::SUCCESS, out: expected.to_vec(), err: Vec::<&str>::new() }
-    );
-    assert_eq!(Text::lines(&scratch.read("sum")), [["before"].as_slice(), expected.as_slice()].concat());
-    Ok(())
-}
-
-#[test]
-fn a_shard_summary_without_shards_is_reported() -> Result<(), Failed> {
-    let scratch = Scratch::new()?;
-    let answer = scratch.answer(&Script::new(), &["shard-summary", &scratch.file("absent"), &scratch.file("sum")]);
-    assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.contains("absent"));
-    assert_eq!(scratch.kind_of("sum"), Kind::Missing);
-    Ok(())
-}
-
-#[test]
-fn the_matrix_is_written_shown_and_added_to_the_summary() -> Result<(), Failed> {
-    let scratch = Scratch::new()?;
-    scratch.directory("shards/shard-0")?;
-    scratch.write(
-        "shards/shard-0/matrix.json",
-        r#"{"baseline":["t :: one"],"mutants":[{"name":"m1","summary":"MissedMutant","failed":[]}]}"#,
-    )?;
-    let arguments = ["matrix", &scratch.file("shards"), &scratch.file("out/matrix"), &scratch.file("sum")];
-    let answer = scratch.answer(&Script::new(), &arguments);
-    assert_eq!((answer.exit, answer.err.as_str()), (ExitCode::SUCCESS, ""));
-    assert!(answer.out.contains("1 mutants, 1 tests."));
-    assert_eq!(scratch.read("out/matrix/report.md"), answer.out);
-    assert_eq!(scratch.read("sum"), answer.out);
-    assert!(scratch.read("out/matrix/report.json").contains("\"surviving\""));
-    Ok(())
-}
-
-#[test]
-fn a_matrix_that_cannot_be_made_is_reported_with_its_reason() -> Result<(), Failed> {
-    let scratch = Scratch::new()?;
-    let arguments = ["matrix", &scratch.file("shards"), &scratch.file("out"), &scratch.file("sum")];
-    let answer = scratch.answer(&Script::new(), &arguments);
-    assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.contains("the mutation matrix failed: "));
-    scratch.write("blocker", "")?;
-    let blocked = scratch.answer(&Script::new(), &["matrix", "s", &scratch.file("blocker/out"), "sum"]);
-    assert!(blocked.err.contains("blocker/out"));
-    Ok(())
 }
 
 #[test]

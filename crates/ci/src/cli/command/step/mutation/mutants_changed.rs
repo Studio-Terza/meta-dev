@@ -1,5 +1,6 @@
 use crate::cli::command::{Telling, Told};
 mod keeping;
+mod outcome;
 mod pass;
 mod reruns;
 mod selected;
