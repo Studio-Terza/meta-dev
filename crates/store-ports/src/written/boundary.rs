@@ -23,9 +23,7 @@ pub trait Done: Sized {
 impl Done for () {
     fn changed(_rows: usize) {}
 
-    fn total(done: impl Iterator<Item = ()>) {
-        done.for_each(|()| ());
-    }
+    fn total(_done: impl Iterator<Item = ()>) {}
 }
 
 impl Done for Written {
