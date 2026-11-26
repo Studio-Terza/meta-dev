@@ -99,7 +99,7 @@ impl Asking {
     }
 
     fn crowded(replies: &[&str]) -> Result<Asking, Failure> {
-        let crowd = (1..=300_u16).map(|index| Session::line(Speaker::Owner, &format!("m{index:03}"), "null", "noted"));
+        let crowd = (1..=100_u16).map(|index| Session::line(Speaker::Owner, &format!("m{index:03}"), "null", "noted"));
         Asking::spoken(
             crowd.chain([Session::stamped(Speaker::Owner, "o1", "null", Asking::RULED, "2026-01-02")]).collect(),
             replies,
@@ -178,17 +178,17 @@ fn haiku_reads_every_earlier_owner_message_under_its_header_and_a_trim_keeps_the
 }
 
 #[test]
-fn the_owner_messages_are_read_in_chunks_of_300_and_each_quote_is_checked_against_its_own_chunk() -> Result<(), Failure>
+fn the_owner_messages_are_read_in_chunks_of_100_and_each_quote_is_checked_against_its_own_chunk() -> Result<(), Failure>
 {
     let asking = Asking::crowded(&[Asking::PICKED, Asking::PICKED, Asking::KEPT])?;
     let asked = asking.asked("", &["answer", "should the lint limit change"]);
     let first = asked.prompts.first().cloned().unwrap_or_default();
     let second = asked.prompts.get(1).cloned().unwrap_or_default();
     assert_eq!(
-        (first.contains("[m300 "), first.contains("[o1 "), second.contains("[m001 "), second.contains("[o1 ")),
+        (first.contains("[m100 "), first.contains("[o1 "), second.contains("[m001 "), second.contains("[o1 ")),
         (true, false, false, true)
     );
-    assert!(asked.text.contains("read: 301 owner messages\nquoted: 1\n"), "{}", asked.text);
+    assert!(asked.text.contains("read: 101 owner messages\nquoted: 1\n"), "{}", asked.text);
     assert!(asked.text.contains(&format!("o1 2026-01-02T00:00:00Z: {}", Asking::QUOTED)), "{}", asked.text);
     Ok(())
 }

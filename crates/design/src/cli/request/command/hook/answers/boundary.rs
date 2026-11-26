@@ -188,7 +188,7 @@ impl Asked {
 }
 
 impl Reading<'_> {
-    const CHUNK: usize = 300;
+    const CHUNK: usize = 100;
 
     pub fn prompts(&self) -> &[Prompt] {
         &self.prompts
