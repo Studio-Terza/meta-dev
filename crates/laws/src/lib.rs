@@ -178,7 +178,7 @@ macro_rules! table {
                 });
             match checked {
                 Ok(()) => {}
-                Err(failure) => panic!("the table row is broken: {failure:?}"),
+                Err(failure) => panic!("the table row is broken: {}", ::std::string::String::from(failure)),
             }
         }
     };
