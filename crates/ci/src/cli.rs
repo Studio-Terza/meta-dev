@@ -29,10 +29,15 @@ impl<P: Ports> Teller for Cli<'_, P> {
         Self: 'teller;
 
     fn told(&self) -> Unfolding<'_, P> {
-        let telling = match &self.command {
+        Unfolding::new(self.telling(), self.ports)
+    }
+}
+
+impl<P: Ports> Cli<'_, P> {
+    fn telling(&self) -> Telling<'_> {
+        match &self.command {
             Ok(command) => command.carry_out(self.ports),
             Err(refusal) => Telling::refused(refusal),
-        };
-        Unfolding::new(telling, self.ports)
+        }
     }
 }

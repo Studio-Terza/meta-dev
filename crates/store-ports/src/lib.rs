@@ -1,5 +1,6 @@
 mod batch;
 mod busy;
+mod cause;
 mod column;
 mod lifecycle;
 mod migrator;
@@ -18,17 +19,18 @@ mod written;
 
 pub use batch::Batch;
 pub use busy::Busy;
+pub use cause::Cause;
 pub use column::{Column, ColumnFailure, Columns};
 pub use lifecycle::{Edge, Lifecycle, Moved, Staged};
 pub use migrator::{Migration, Migrator};
 pub use opens::{Opens, Provenance};
-pub use prepared::{Execute, Prepared, Values};
+pub use prepared::{Deletion, Execute, Prepared, Values};
 pub use query::Query;
 pub use record::{Created, Record};
 pub use released::Released;
 pub use schema::Schema;
 pub use store::{Store, StoreFiller, store_ops};
-pub use store_failure::{Cause, StoreFailure};
+pub use store_failure::StoreFailure;
 pub use store_lock::{Claim, StoreLock, Unlock};
 pub use store_ports_macros::{Columns, Record, migrate, query};
 pub use value::{Argument, Bind, FromValue, IntoArgument, Value};

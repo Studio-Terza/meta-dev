@@ -12,7 +12,7 @@ pub struct Imports {
     lines: Vec<Imported>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Op)]
 pub struct Imported {
     provenance: Provenance,
     node: Node<Vague>,

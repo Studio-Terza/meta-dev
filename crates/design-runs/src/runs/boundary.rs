@@ -169,7 +169,7 @@ VALUES
             .map(|segment| {
                 let message = AsRef::<Uuid>::as_ref(segment).clone();
                 let ordinal = Ordinal::from(segment);
-                statements.written(store_ports::query!(
+                store_ports::query!(
                     r#"
 INSERT INTO
   successions (released, successor)
@@ -194,10 +194,10 @@ WHERE
                     job: JobId,
                     message: Uuid,
                     ordinal: Ordinal
-                ))
+                )
             })
-            .collect::<Result<Vec<Written>, StoreFailure>>()?;
-        Ok(Written::total([opened].into_iter().chain(succeeded)))
+            .collect::<Vec<Prepared<()>>>();
+        Ok(opened.plus(statements.written_all(succeeded)?))
     }
 }
 
@@ -221,11 +221,8 @@ VALUES
             unreported: Delivery
         ))?;
         let holding = held.map(|flailing| flailing.written(statements)).transpose()?;
-        let retelling = retold
-            .into_iter()
-            .map(|again| again.written(statements))
-            .collect::<Result<Vec<Written>, StoreFailure>>()?;
-        Ok(Written::total([closed, recorded].into_iter().chain(holding).chain(retelling)))
+        let retelling = statements.written_all(retold)?;
+        Ok(Written::total([closed, recorded, retelling].into_iter().chain(holding)))
     }
 }
 
@@ -281,12 +278,7 @@ impl Batch for FailuresReported {
     type Failure = StoreFailure;
 
     fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
-        let written = self
-            .0
-            .into_iter()
-            .map(|held| held.reported().written(statements))
-            .collect::<Result<Vec<Written>, StoreFailure>>()?;
-        Ok(Written::total(written.into_iter()))
+        statements.written_all(self.0.into_iter().map(delivery::Unreported::reported))
     }
 }
 
@@ -294,12 +286,8 @@ impl Batch for JobsInterrupted {
     type Failure = StoreFailure;
 
     fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
-        let moved = OpenJobs
-            .rows(statements)?
-            .into_iter()
-            .map(|open| open.interrupted().written(statements))
-            .collect::<Result<Vec<Written>, StoreFailure>>()?;
-        Ok(Written::total(moved.into_iter()))
+        let open = OpenJobs.rows(statements)?;
+        statements.written_all(open.into_iter().map(design_jobs::job::Open::interrupted))
     }
 }
 
@@ -368,7 +356,7 @@ impl JobFlailed {
             .map(|segment| {
                 let message = AsRef::<Uuid>::as_ref(segment).clone();
                 let ordinal = Ordinal::from(segment);
-                statements.written(store_ports::query!(
+                store_ports::query!(
                     r#"
 INSERT INTO
   flailed (message, ordinal, job, run)
@@ -398,10 +386,10 @@ WHERE
                     message: Uuid,
                     ordinal: Ordinal,
                     run: RunId
-                ))
+                )
             })
-            .collect::<Result<Vec<Written>, StoreFailure>>()?;
-        Ok(Written::total(written.into_iter()))
+            .collect::<Vec<Prepared<()>>>();
+        statements.written_all(written)
     }
 }
 

@@ -1,3 +1,3 @@
 mod boundary;
 
-pub use boundary::{Execute, Prepared, Values};
+pub use boundary::{Deletion, Execute, Prepared, Values};

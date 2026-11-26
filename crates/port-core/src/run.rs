@@ -1,3 +1,5 @@
+mod boundary;
+
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::sync::Mutex;
@@ -8,12 +10,13 @@ use newtype::Counter;
 use super::calls::Calls;
 use super::op::OpName;
 use super::snapshot::Snapshot;
+use boundary::Told;
 
 #[derive(Debug, thiserror::Error)]
 #[error("releasing {resource} failed: {failure}")]
 pub struct ReleaseFailure {
     resource: OpName,
-    failure: String,
+    failure: Told,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -88,6 +91,6 @@ impl Run {
     }
 
     pub(crate) fn fail(&self, resource: OpName, failure: &impl Error) {
-        self.ledger.failures.lock().unpoisoned().push(ReleaseFailure { resource, failure: failure.to_string() });
+        self.ledger.failures.lock().unpoisoned().push(ReleaseFailure { resource, failure: Told::from(failure) });
     }
 }

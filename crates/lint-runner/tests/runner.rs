@@ -587,7 +587,7 @@ fn reading_a_module_path_cycle_finishes() -> Result<(), laws::Unmet> {
     let root = Scratch::package()?;
     PATH_CYCLE.iter().try_for_each(|[path, text]| root.write(path, text).map(|_| ()))?;
     let (sending, receiving) = mpsc::channel();
-    thread::spawn(move || sending.send(root.read_files().map_err(String::from)));
+    thread::spawn(move || sending.send(root.read_files().map_err(|failure| format!("{failure:?}"))));
     let read = receiving.recv_timeout(Duration::from_secs(10))?;
     assert_eq!(read?, ["src/a.rs", "src/b.rs", "src/lib.rs"]);
     Ok(())

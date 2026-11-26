@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 use std::vec;
 
+use newtype::Counter;
 use port_core::Op;
 
 use crate::{Argument, Batch, ColumnFailure, Columns, Query, Released, StoreFailure, Value, Written};
@@ -29,6 +30,26 @@ pub trait Execute: Debug {
     fn released(&mut self, query: Prepared<()>) -> Result<Released, StoreFailure> {
         self.written(query).map(|_written| Released::Deleted).or_else(StoreFailure::released)
     }
+
+    fn released_all(&mut self, deletions: impl IntoIterator<Item = Deletion>) -> Result<Vec<Released>, StoreFailure> {
+        deletions.into_iter().map(|Deletion(query)| self.released(query)).collect()
+    }
+
+    fn read_all<Q: Query>(&mut self, queries: impl IntoIterator<Item = Q>) -> Result<Vec<Q::Rows>, StoreFailure>
+    where
+        Self: Sized,
+    {
+        queries.into_iter().map(|query| query.rows(self)).collect()
+    }
+
+    fn written_all<B: Batch>(&mut self, batches: impl IntoIterator<Item = B>) -> Result<Written, B::Failure>
+    where
+        Self: Sized,
+    {
+        let written =
+            batches.into_iter().map(|batch| batch.written(self)).collect::<Result<Vec<Written>, B::Failure>>()?;
+        Ok(Written::total(written.into_iter()))
+    }
 }
 
 #[derive(Debug, Op)]
@@ -40,6 +61,15 @@ pub struct Prepared<Row> {
 
 #[derive(Debug)]
 pub struct Values(vec::IntoIter<Value>);
+
+#[derive(Debug)]
+pub struct Deletion(Prepared<()>);
+
+impl From<Prepared<()>> for Deletion {
+    fn from(query: Prepared<()>) -> Deletion {
+        Deletion(query)
+    }
+}
 
 impl Prepared<()> {
     #[must_use]

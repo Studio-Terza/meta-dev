@@ -1,11 +1,6 @@
-use std::fmt;
 use std::io;
 
-use crate::{ColumnFailure, Released};
-
-#[derive(Debug, thiserror::Error)]
-#[error("{0}")]
-pub struct Cause(String);
+use crate::{Cause, ColumnFailure, Released};
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreFailure {
@@ -37,13 +32,6 @@ pub enum Unmoved {
     Unlisted,
     #[error("the row is not in the state the move starts from")]
     Elsewhere,
-}
-
-impl Cause {
-    #[must_use]
-    pub fn told(failure: &impl fmt::Display) -> Cause {
-        Cause(failure.to_string())
-    }
 }
 
 impl StoreFailure {

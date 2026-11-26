@@ -1,3 +1,5 @@
+mod boundary;
+
 pub use proptest;
 
 use std::fmt;
@@ -5,27 +7,23 @@ use std::fmt;
 use proptest::strategy::Strategy;
 use proptest::test_runner::{Config, RngSeed, TestCaseError, TestError, TestRunner};
 
+use boundary::Told;
+
 #[derive(Debug)]
 pub struct Generation;
 
 #[derive(Debug)]
-pub struct Unmet(String);
+pub struct Unmet(Told);
 
 impl<Failure: fmt::Display> From<Failure> for Unmet {
     fn from(failure: Failure) -> Unmet {
-        Unmet(failure.to_string())
+        Unmet(Told::from(&failure))
     }
 }
 
 impl From<Unmet> for TestCaseError {
     fn from(unmet: Unmet) -> TestCaseError {
-        TestCaseError::fail(unmet.0)
-    }
-}
-
-impl From<Unmet> for String {
-    fn from(unmet: Unmet) -> String {
-        unmet.0
+        TestCaseError::from(unmet.0)
     }
 }
 
@@ -178,7 +176,7 @@ macro_rules! table {
                 });
             match checked {
                 Ok(()) => {}
-                Err(failure) => panic!("the table row is broken: {}", ::std::string::String::from(failure)),
+                Err(failure) => panic!("the table row is broken: {failure:?}"),
             }
         }
     };

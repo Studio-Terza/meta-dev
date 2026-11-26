@@ -1,5 +1,5 @@
 use design_model::Prefix;
-use store_ports::{Columns, Execute, Query, StoreFailure};
+use store_ports::{Columns, Execute, Prepared, Query, StoreFailure};
 use transcript_ports::Uuid;
 
 use super::{Prefixes, Shortest};
@@ -13,18 +13,20 @@ impl Query for Prefixes {
     type Rows = Shortest;
 
     fn rows(self, statements: &mut impl Execute) -> Result<Shortest, StoreFailure> {
+        let found = statements.read_all(self.0.iter().map(PrefixRow::shortest))?;
         let shortest = self
             .0
             .into_iter()
-            .map(|message| PrefixRow::shortest(&message, statements).map(|prefix| (message, prefix)))
+            .zip(found)
+            .map(|(message, rows)| PrefixRow::only(rows).map(|prefix| (message, prefix)))
             .collect::<Result<_, StoreFailure>>()?;
         Ok(Shortest(shortest))
     }
 }
 
 impl PrefixRow {
-    fn shortest(message: &Uuid, statements: &mut impl Execute) -> Result<Prefix, StoreFailure> {
-        let row = statements.one(store_ports::query!(
+    fn shortest(message: &Uuid) -> Prepared<PrefixRow> {
+        store_ports::query!(
             PrefixRow,
             r#"
 WITH
@@ -69,7 +71,10 @@ WHERE
   )
 "#,
             message: Uuid
-        ))?;
-        Ok(row.prefix)
+        )
+    }
+
+    fn only(rows: Vec<PrefixRow>) -> Result<Prefix, StoreFailure> {
+        rows.into_iter().next().map(|row| row.prefix).ok_or(StoreFailure::Missing)
     }
 }

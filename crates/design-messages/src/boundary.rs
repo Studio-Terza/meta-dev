@@ -10,7 +10,7 @@ use file_ports::Offset;
 use grammar_search::Term;
 use newtype::{Arbitrary, Newtype, Wrapping};
 use store_ports::Record as _;
-use store_ports::{Columns, Execute, Released, StoreFailure, Written};
+use store_ports::{Columns, Deletion, Execute, Prepared, StoreFailure, Written};
 use stream::{Anchor, Anchors, MechanicalLink, Message, Relation, SegmentId, Shape};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Skipped, Uuid};
 
@@ -23,7 +23,7 @@ use invariants::Ignoring;
 pub(crate) struct Rank(f64);
 
 pub(crate) trait Row {
-    fn written(&self, statements: &mut impl Execute) -> Result<Written, StoreFailure>;
+    fn inserted(&self) -> Prepared<()>;
 }
 
 #[derive(Debug, Columns)]
@@ -143,8 +143,8 @@ impl From<&MechanicalLink> for LinkRow {
 }
 
 impl MessageRow {
-    pub(crate) fn named(uuid: &Uuid, statements: &mut impl Execute) -> Result<Vec<MessageRow>, StoreFailure> {
-        statements.rows(store_ports::query!(
+    pub(crate) fn named(uuid: &Uuid) -> Prepared<MessageRow> {
+        store_ports::query!(
             MessageRow,
             r#"
 SELECT
@@ -160,7 +160,7 @@ WHERE
   uuid = ?1
 "#,
             uuid: Uuid
-        ))
+        )
     }
 
     pub(crate) fn last_in(
@@ -265,8 +265,8 @@ impl SegmentRow {
             .collect()
     }
 
-    pub(crate) fn stored_for(uuid: &Uuid, statements: &mut impl Execute) -> Result<Vec<SegmentRow>, StoreFailure> {
-        statements.rows(store_ports::query!(
+    pub(crate) fn stored_for(uuid: &Uuid) -> Prepared<SegmentRow> {
+        store_ports::query!(
             SegmentRow,
             r#"
 SELECT
@@ -282,7 +282,7 @@ ORDER BY
   ordinal
 "#,
             uuid: Uuid
-        ))
+        )
     }
 
     pub(crate) fn every(statements: &mut impl Execute) -> Result<Vec<SegmentRow>, StoreFailure> {
@@ -303,9 +303,9 @@ ORDER BY
         ))
     }
 
-    pub(crate) fn released(&self, statements: &mut impl Execute) -> Result<Released, StoreFailure> {
+    pub(crate) fn deleted(&self) -> Deletion {
         let SegmentRow { message, ordinal, .. } = self;
-        statements.released(store_ports::query!(
+        Deletion::from(store_ports::query!(
             r#"
 DELETE FROM
   segments
@@ -457,8 +457,8 @@ impl Sum for Rank {
 }
 
 impl RankRow {
-    pub(crate) fn matching(term: &Term, statements: &mut impl Execute) -> Result<Vec<RankRow>, StoreFailure> {
-        statements.rows(store_ports::query!(
+    pub(crate) fn matching(term: &Term) -> Prepared<RankRow> {
+        store_ports::query!(
             RankRow,
             r#"
 SELECT
@@ -470,7 +470,7 @@ WHERE
   segments_fts MATCH ?1
 "#,
             term: Term
-        ))
+        )
     }
 
     pub(crate) fn ranked(rows: Vec<RankRow>) -> BTreeMap<Keyed, Rank> {
@@ -552,9 +552,9 @@ FROM
 }
 
 impl Row for MessageRow {
-    fn written(&self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    fn inserted(&self) -> Prepared<()> {
         let MessageRow { uuid, session, parent, at, author, body } = self;
-        statements.written(store_ports::query!(
+        store_ports::query!(
             r#"
 INSERT
   OR IGNORE INTO messages (uuid, session, parent, at, author, body)
@@ -567,14 +567,14 @@ VALUES
             at: Instant,
             author: Authorship,
             body: Body
-        ))
+        )
     }
 }
 
 impl Row for SegmentRow {
-    fn written(&self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    fn inserted(&self) -> Prepared<()> {
         let SegmentRow { message, ordinal, shape, body } = self;
-        statements.written(store_ports::query!(
+        store_ports::query!(
             r#"
 INSERT
   OR IGNORE INTO segments (message, ordinal, shape, body)
@@ -585,14 +585,14 @@ VALUES
             ordinal: Ordinal,
             shape: Shape,
             body: Body
-        ))
+        )
     }
 }
 
 impl Row for LinkRow {
-    fn written(&self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    fn inserted(&self) -> Prepared<()> {
         let LinkRow { source, relation, target, source_message, target_message } = self;
-        statements.written(store_ports::query!(
+        store_ports::query!(
             r#"
 INSERT
   OR IGNORE INTO mechanical_links (
@@ -610,14 +610,14 @@ VALUES
             target: Anchor,
             source_message: Uuid,
             target_message: Uuid
-        ))
+        )
     }
 }
 
 impl Row for EdgeRow {
-    fn written(&self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    fn inserted(&self) -> Prepared<()> {
         let EdgeRow { session, uuid, parent } = self;
-        statements.written(store_ports::query!(
+        store_ports::query!(
             r#"
 INSERT
   OR IGNORE INTO edges (session, uuid, parent)
@@ -627,12 +627,12 @@ VALUES
             session: SessionId,
             uuid: Uuid,
             parent: Option<Uuid>
-        ))
+        )
     }
 }
 
-impl Row for CursorRow {
-    fn written(&self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+impl CursorRow {
+    pub(crate) fn written(&self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let stored = statements.rows(CursorRow::fetched(&self.session))?;
         self.reconciled(stored.first(), statements)
     }

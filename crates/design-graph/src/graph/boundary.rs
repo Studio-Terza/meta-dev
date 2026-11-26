@@ -403,11 +403,9 @@ WHERE
             role: Role,
             provenance: Provenance
         ))?;
-        let relinked = EdgeRow::around(id, statements)?
-            .into_iter()
-            .map(|row| Linked::from(row).written(statements))
-            .collect::<Result<Vec<Written>, Refusal>>()?;
-        Ok(Written::total([written].into_iter().chain(relinked)))
+        let around = EdgeRow::around(id, statements)?;
+        let relinked = statements.written_all(around.into_iter().map(Linked::from))?;
+        Ok(written.plus(relinked))
     }
 }
 
