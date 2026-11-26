@@ -619,46 +619,37 @@ struct Sorted {
     slots: Vec<Slot<ScopeKey>>,
 }
 
-impl Semigroup for Sorted {
-    fn combine(self, other: Sorted) -> Sorted {
-        Sorted {
-            rows: self.rows.combine(other.rows),
-            ops: self.ops.combine(other.ops),
-            slots: self.slots.combine(other.slots),
-        }
-    }
-}
-
-impl Monoid for Sorted {}
-
-impl From<Grain> for Sorted {
-    fn from(grain: Grain) -> Sorted {
+impl Sorted {
+    fn sown(self, grain: Grain) -> Sorted {
         match grain {
-            Grain::Impl(row) => Sorted::from(FileRows { impls: vec![row], ..FileRows::default() }),
-            Grain::Function(row) => Sorted::from(FileRows { functions: vec![row], ..FileRows::default() }),
-            Grain::Alias(row) => Sorted::from(FileRows { aliases: vec![row], ..FileRows::default() }),
-            Grain::Holding(row) => Sorted::from(FileRows { holdings: vec![row], ..FileRows::default() }),
-            Grain::Call(row) => Sorted::from(FileRows { calls: vec![row], ..FileRows::default() }),
-            Grain::Use(row) => Sorted::from(FileRows { uses: vec![row], ..FileRows::default() }),
-            Grain::Law(row) => Sorted::from(FileRows { laws: vec![row], ..FileRows::default() }),
-            Grain::Quote(row) => Sorted::from(FileRows { quotes: vec![row], ..FileRows::default() }),
-            Grain::Transcribed(row) => Sorted::from(FileRows { transcribed: vec![row], ..FileRows::default() }),
-            Grain::Place(places) => Sorted::from(FileRows { places, ..FileRows::default() }),
-            Grain::Op(op) => Sorted { ops: vec![op], ..Sorted::default() },
-            Grain::Slot(slot) => Sorted { slots: vec![slot], ..Sorted::default() },
+            Grain::Impl(row) => self.pushed(row, |sorted| &mut sorted.rows.impls),
+            Grain::Function(row) => self.pushed(row, |sorted| &mut sorted.rows.functions),
+            Grain::Alias(row) => self.pushed(row, |sorted| &mut sorted.rows.aliases),
+            Grain::Holding(row) => self.pushed(row, |sorted| &mut sorted.rows.holdings),
+            Grain::Call(row) => self.pushed(row, |sorted| &mut sorted.rows.calls),
+            Grain::Use(row) => self.pushed(row, |sorted| &mut sorted.rows.uses),
+            Grain::Law(row) => self.pushed(row, |sorted| &mut sorted.rows.laws),
+            Grain::Quote(row) => self.pushed(row, |sorted| &mut sorted.rows.quotes),
+            Grain::Transcribed(row) => self.pushed(row, |sorted| &mut sorted.rows.transcribed),
+            Grain::Place(places) => self.placed(places),
+            Grain::Op(op) => self.pushed(op, |sorted| &mut sorted.ops),
+            Grain::Slot(slot) => self.pushed(slot, |sorted| &mut sorted.slots),
         }
     }
-}
 
-impl From<FileRows> for Sorted {
-    fn from(rows: FileRows) -> Sorted {
-        Sorted { rows, ..Sorted::default() }
+    fn pushed<Item>(mut self, item: Item, column: impl FnOnce(&mut Sorted) -> &mut Vec<Item>) -> Sorted {
+        column(&mut self).push(item);
+        self
+    }
+
+    fn placed(self, places: PlaceRows) -> Sorted {
+        Sorted { rows: FileRows { places: self.rows.places.combine(places), ..self.rows }, ..self }
     }
 }
 
 impl From<Grains> for Sorted {
     fn from(grains: Grains) -> Sorted {
-        Monoid::concat(grains.sown.into_iter().map(Sorted::from))
+        grains.sown.into_iter().fold(Sorted::default(), Sorted::sown)
     }
 }
 
