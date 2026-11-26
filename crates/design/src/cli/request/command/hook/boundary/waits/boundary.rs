@@ -221,14 +221,17 @@ impl fmt::Display for Asking<'_> {
              deadlock is true when the message promises further work (merging, continuing, acting on a result) but \
              nothing below will wake the lead: no background task is still running, and every agent it waits on \
              has gone idle or sent its final report, or is itself waiting on the lead. A lead that waits on the \
-             owner for an answer the owner already gave is also deadlocked. When unsure, answer true.\n"
+             owner for an answer the owner already gave is also deadlocked. When unsure, answer true.\n\
+             A \"sent\" event is the lead messaging the agent it names; an agent the lead sent to after that \
+             agent's last notice is working again and will notify the lead, so waiting on it is not a deadlock. \
+             A message that answers the owner and promises no further work waits on the owner, not on nothing.\n"
         )?;
         let running: Vec<String> = self.snapshot.running(self.now).iter().map(ToString::to_string).collect();
         let shown = running.first().map_or_else(|| vec!["- none".to_owned()], |_first| running.clone());
         writeln!(formatter, "Background tasks still running (launch id):\n{}", shown.join("\n"))?;
         let heard: Vec<String> =
             self.snapshot.heard().into_iter().map(|event| Aged::since(event, self.now).to_string()).collect();
-        writeln!(formatter, "\nRecent notices and agent messages, oldest first:\n{}", heard.join("\n"))?;
+        writeln!(formatter, "\nRecent notices, relayed messages and sends, oldest first:\n{}", heard.join("\n"))?;
         write!(formatter, "\nThe lead's final message:\n{}", self.said)
     }
 }

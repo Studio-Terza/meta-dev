@@ -1,7 +1,7 @@
 use serde::Deserialize;
 
 use super::classified::Classified;
-use super::said::{Hears, Launch, Said};
+use super::said::{Hears, Launch, Said, Sent};
 use super::stamp::Stamp;
 use crate::{Authorship, Body, Happening, Line, Skipped, Unrecognised};
 
@@ -30,6 +30,8 @@ struct Running(Option<Background>);
 struct Input {
     #[serde(default)]
     run_in_background: Running,
+    #[serde(default)]
+    to: Option<Body>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -97,6 +99,15 @@ impl Running {
     }
 }
 
+impl Input {
+    fn said(self, tool: Option<Body>) -> Said {
+        match self.to {
+            Some(to) => Said::Sent(Sent::from(to)),
+            None => self.run_in_background.said(tool),
+        }
+    }
+}
+
 impl From<String> for Model {
     fn from(name: String) -> Model {
         Model((name == Model::SYNTHETIC).then_some(Synthetic))
@@ -127,7 +138,7 @@ impl From<Block> for Said {
     fn from(block: Block) -> Said {
         match block {
             Block::Known(Written::Text { text }) => Said::Text(text),
-            Block::Known(Written::ToolUse { id, input }) => input.run_in_background.said(id),
+            Block::Known(Written::ToolUse { id, input }) => input.said(id),
             Block::Known(Written::Thinking) => Said::Silent,
             Block::Unknown(unrecognised) => Said::Unrecognised(unrecognised),
         }
@@ -141,6 +152,10 @@ impl Hears for Answer {
 
     fn launched(self, launch: Launch) -> Line {
         self.stamp.happened(Happening::Launch, Body::from(launch))
+    }
+
+    fn sent(self, sent: Sent) -> Line {
+        self.stamp.happened(Happening::Sent, Body::from(sent))
     }
 
     fn silence(self) -> Line {

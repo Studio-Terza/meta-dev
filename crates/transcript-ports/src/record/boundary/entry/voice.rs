@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use super::said::{Hears, Launch};
+use super::said::{Hears, Launch, Sent};
 use super::stamp::Stamp;
 use crate::{Authorship, Body, Happening, Line, Skipped, Unrecognised};
 
@@ -72,6 +72,10 @@ impl Hears for Listener {
     }
 
     fn launched(self, _launch: Launch) -> Line {
+        self.silence()
+    }
+
+    fn sent(self, _sent: Sent) -> Line {
         self.silence()
     }
 
