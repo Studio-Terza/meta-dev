@@ -216,7 +216,7 @@ impl Lints {
         located: &'run Result<Described, Unlocated>,
         worked: Worked,
     ) -> Outcome<'run> {
-        let entries = Registry::entries();
+        let entries = Registry::entries(Vec::new());
         let mut rendered = worked.into_rendered(|slot| slot.picked(&entries).and_then(Entry::headline));
         rendered.sort_by_key(Rendered::slot);
         Outcome::located(located, rendered, readout.failures())
@@ -243,7 +243,7 @@ impl Lints {
         let mut lowered = sources.gathered(readout, worker, Filer::started);
         let mut work: Vec<FileWork<'_>> = lowered.filed();
         let filed: Worked = work.iter_mut().map(FileWork::worked).collect();
-        let mut jobs: Vec<Job> = Registry::entries()
+        let mut jobs: Vec<Job> = Registry::entries(Vec::new())
             .into_iter()
             .enumerate()
             .filter_map(|(index, entry)| entry.queued(Slot::from(index)))
@@ -313,7 +313,9 @@ impl<'file> FileWork<'file> {
     }
 
     fn judged<'run: 'file>(self, settled: Settled<'_, 'run>) -> Worked {
-        Registry::judged(Slot::FIRST, self.order, self.file, settled)
+        let judging =
+            Judging { file: self.file, order: self.order, slot: Slot::FIRST, settled, worked: Worked::default() };
+        Registry::judged(judging).worked
     }
 }
 
@@ -395,55 +397,64 @@ trait Registered {
         filing
     }
 
-    fn judged<'file, 'run: 'file>(_: &'file SourceFile, _: Settled<'_, 'run>) -> Option<Vec<Violation<'file>>> {
-        None
+    fn judged<'file, 'settled, 'run: 'file>(judging: Judging<'file, 'settled, 'run>) -> Judging<'file, 'settled, 'run> {
+        judging
     }
 }
 
 trait Walk {
-    fn entries() -> Vec<Entry>;
+    fn entries(entries: Vec<Entry>) -> Vec<Entry>;
 
     fn filed(filing: Filing<'_>) -> Filing<'_>;
 
-    fn judged<'file, 'run: 'file>(
-        slot: Slot,
-        order: FileOrder,
-        file: &'file SourceFile,
-        settled: Settled<'_, 'run>,
-    ) -> Worked;
+    fn judged<'file, 'settled, 'run: 'file>(judging: Judging<'file, 'settled, 'run>) -> Judging<'file, 'settled, 'run>;
 }
 
 impl Walk for Ended {
-    fn entries() -> Vec<Entry> {
-        Vec::new()
+    fn entries(entries: Vec<Entry>) -> Vec<Entry> {
+        entries
     }
 
     fn filed(filing: Filing<'_>) -> Filing<'_> {
         filing
     }
 
-    fn judged<'file, 'run: 'file>(_: Slot, _: FileOrder, _: &'file SourceFile, _: Settled<'_, 'run>) -> Worked {
-        Worked::default()
+    fn judged<'file, 'settled, 'run: 'file>(judging: Judging<'file, 'settled, 'run>) -> Judging<'file, 'settled, 'run> {
+        judging
     }
 }
 
 impl<Head: Registered, Tail: Walk> Walk for Listed<Head, Tail> {
-    fn entries() -> Vec<Entry> {
-        [Head::ENTRY].into_iter().chain(Tail::entries()).collect()
+    fn entries(entries: Vec<Entry>) -> Vec<Entry> {
+        Tail::entries(entries.into_iter().chain([Head::ENTRY]).collect())
     }
 
     fn filed(filing: Filing<'_>) -> Filing<'_> {
         Tail::filed(Head::filed(filing).advanced())
     }
 
-    fn judged<'file, 'run: 'file>(
-        slot: Slot,
-        order: FileOrder,
-        file: &'file SourceFile,
-        settled: Settled<'_, 'run>,
-    ) -> Worked {
-        let head = Head::judged(file, settled).map(|violations| Worked::filing(slot, order, &violations));
-        head.into_iter().chain([Tail::judged(slot.next(), order, file, settled)]).collect()
+    fn judged<'file, 'settled, 'run: 'file>(judging: Judging<'file, 'settled, 'run>) -> Judging<'file, 'settled, 'run> {
+        Tail::judged(Head::judged(judging).advanced())
+    }
+}
+
+#[derive(Debug)]
+struct Judging<'file, 'settled, 'run> {
+    file: &'file SourceFile,
+    order: FileOrder,
+    slot: Slot,
+    settled: Settled<'settled, 'run>,
+    worked: Worked,
+}
+
+impl<'file, 'settled, 'run> Judging<'file, 'settled, 'run> {
+    fn found(self, violations: Option<Vec<Violation<'file>>>) -> Judging<'file, 'settled, 'run> {
+        let found = violations.map(|listed| Worked::filing(self.slot, self.order, &listed));
+        Judging { worked: [self.worked].into_iter().chain(found).collect(), ..self }
+    }
+
+    fn advanced(self) -> Judging<'file, 'settled, 'run> {
+        Judging { slot: self.slot.next(), ..self }
     }
 }
 
@@ -542,12 +553,10 @@ where
 {
     const ENTRY: Entry = Entry::spelled::<Lint>(Work::Filed(Lint::HEADLINE));
 
-    fn judged<'file, 'run: 'file>(
-        file: &'file SourceFile,
-        settled: Settled<'_, 'run>,
-    ) -> Option<Vec<Violation<'file>>> {
-        let read = Lint::READS.admits(file)?;
-        Some(Lint::judged(read, Lint::watched(read).gathered(read), settled.held()))
+    fn judged<'file, 'settled, 'run: 'file>(judging: Judging<'file, 'settled, 'run>) -> Judging<'file, 'settled, 'run> {
+        let settled = judging.settled;
+        let read = Lint::READS.admits(judging.file);
+        judging.found(read.map(|file| Lint::judged(file, Lint::watched(file).gathered(file), settled.held())))
     }
 }
 
@@ -557,11 +566,10 @@ where
 {
     const ENTRY: Entry = Entry::spelled::<Lint>(Work::Filed(Lint::HEADLINE));
 
-    fn judged<'file, 'run: 'file>(
-        file: &'file SourceFile,
-        settled: Settled<'_, 'run>,
-    ) -> Option<Vec<Violation<'file>>> {
-        Some(Lint::ruled(Lint::READS.admits(file)?, settled.held()))
+    fn judged<'file, 'settled, 'run: 'file>(judging: Judging<'file, 'settled, 'run>) -> Judging<'file, 'settled, 'run> {
+        let settled = judging.settled;
+        let read = Lint::READS.admits(judging.file);
+        judging.found(read.map(|file| Lint::ruled(file, settled.held())))
     }
 }
 
@@ -571,11 +579,10 @@ where
 {
     const ENTRY: Entry = Entry::spelled::<Lint>(Work::Filed(Lint::HEADLINE));
 
-    fn judged<'file, 'run: 'file>(
-        file: &'file SourceFile,
-        settled: Settled<'_, 'run>,
-    ) -> Option<Vec<Violation<'file>>> {
-        Some(Lint::judged(Lint::READS.admits(file)?, settled.primer(), settled.primed()))
+    fn judged<'file, 'settled, 'run: 'file>(judging: Judging<'file, 'settled, 'run>) -> Judging<'file, 'settled, 'run> {
+        let settled = judging.settled;
+        let read = Lint::READS.admits(judging.file);
+        judging.found(read.map(|file| Lint::judged(file, settled.primer(), settled.primed())))
     }
 }
 
@@ -688,10 +695,7 @@ where
         Lint::report(heads, workspaces, &(), model)
     }));
 
-    fn judged<'file, 'run: 'file>(
-        file: &'file SourceFile,
-        settled: Settled<'_, 'run>,
-    ) -> Option<Vec<Violation<'file>>> {
-        <Judged<Lint> as Registered>::judged(file, settled)
+    fn judged<'file, 'settled, 'run: 'file>(judging: Judging<'file, 'settled, 'run>) -> Judging<'file, 'settled, 'run> {
+        <Judged<Lint> as Registered>::judged(judging)
     }
 }
