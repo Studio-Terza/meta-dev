@@ -7,7 +7,7 @@ publish.workspace = true
 
 [dev-dependencies]
 laws = { path = "../laws" }
-named-derive = { path = "../named-derive" }
+strum.workspace = true
 store-ports = { path = "../store-ports" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }

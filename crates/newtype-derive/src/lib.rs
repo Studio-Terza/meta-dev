@@ -4,7 +4,7 @@ mod settings;
 mod wrapped;
 
 use generated::Generated;
-use marked::Marked;
+use marked::{Mark, Marked};
 use proc_macro::TokenStream;
 use wrapped::{CheckedDeserializing, Constructors, Deserializing, Formatting, Serializing, Wrapped};
 
@@ -40,5 +40,10 @@ pub fn derive_serialize(input: TokenStream) -> TokenStream {
 
 #[proc_macro_derive(Spelled)]
 pub fn derive_spelled(input: TokenStream) -> TokenStream {
-    Marked::spelled(input.into()).into()
+    Marked::expanded(input.into(), Mark::Spelled).into()
+}
+
+#[proc_macro_derive(Listed)]
+pub fn derive_listed(input: TokenStream) -> TokenStream {
+    Marked::expanded(input.into(), Mark::Listed).into()
 }

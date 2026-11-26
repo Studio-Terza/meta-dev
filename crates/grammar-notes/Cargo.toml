@@ -15,7 +15,7 @@ doctest = false
 [dependencies]
 grammar = { path = "../grammar" }
 grammar-unspelled = { path = "../grammar-unspelled" }
-named-derive = { path = "../named-derive" }
+strum.workspace = true
 newtype = { path = "../newtype" }
 thiserror.workspace = true
 

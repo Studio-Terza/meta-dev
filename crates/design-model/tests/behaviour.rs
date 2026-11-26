@@ -61,20 +61,20 @@ impl Projects {
 
 #[test]
 fn every_facet_is_displayed_as_its_name_and_parsed_back_from_it() {
-    assert_eq!(Names::unparsed(Facet::name), []);
-    assert_eq!(Names::undisplayed(Facet::name), []);
+    assert_eq!(Names::unparsed(<Facet as Into<&str>>::into), []);
+    assert_eq!(Names::undisplayed(<Facet as Into<&str>>::into), []);
 }
 
 #[test]
 fn every_stage_is_displayed_as_its_name_and_parsed_back_from_it() {
-    assert_eq!(Names::unparsed(Stage::name), []);
-    assert_eq!(Names::undisplayed(Stage::name), []);
+    assert_eq!(Names::unparsed(<Stage as Into<&str>>::into), []);
+    assert_eq!(Names::undisplayed(<Stage as Into<&str>>::into), []);
 }
 
 #[test]
 fn every_basis_is_displayed_as_its_name_and_parsed_back_from_it() {
-    assert_eq!(Names::unparsed(Basis::name), []);
-    assert_eq!(Names::undisplayed(Basis::name), []);
+    assert_eq!(Names::unparsed(<Basis as Into<&str>>::into), []);
+    assert_eq!(Names::undisplayed(<Basis as Into<&str>>::into), []);
 }
 
 laws::law!(
@@ -95,62 +95,62 @@ fn every_role_is_displayed_as_its_name_and_parsed_back_from_it() {
 
 #[test]
 fn every_artifact_kind_is_displayed_as_its_name_and_parsed_back_from_it() {
-    assert_eq!(Names::unparsed(ArtifactKind::name), []);
-    assert_eq!(Names::undisplayed(ArtifactKind::name), []);
+    assert_eq!(Names::unparsed(<ArtifactKind as Into<&str>>::into), []);
+    assert_eq!(Names::undisplayed(<ArtifactKind as Into<&str>>::into), []);
 }
 
 #[test]
 fn every_node_relation_is_displayed_as_its_name_and_parsed_back_from_it() {
-    assert_eq!(Names::unparsed(NodeRelation::name), []);
-    assert_eq!(Names::undisplayed(NodeRelation::name), []);
+    assert_eq!(Names::unparsed(<NodeRelation as Into<&str>>::into), []);
+    assert_eq!(Names::undisplayed(<NodeRelation as Into<&str>>::into), []);
 }
 
 #[test]
 fn every_kin_is_displayed_as_its_name_and_parsed_back_from_it() {
-    assert_eq!(Names::unparsed(Kin::name), []);
-    assert_eq!(Names::undisplayed(Kin::name), []);
+    assert_eq!(Names::unparsed(<Kin as Into<&str>>::into), []);
+    assert_eq!(Names::undisplayed(<Kin as Into<&str>>::into), []);
 }
 
 #[test]
 fn every_span_relation_is_displayed_as_its_name_and_parsed_back_from_it() {
-    assert_eq!(Names::unparsed(SpanRelation::name), []);
-    assert_eq!(Names::undisplayed(SpanRelation::name), []);
+    assert_eq!(Names::unparsed(<SpanRelation as Into<&str>>::into), []);
+    assert_eq!(Names::undisplayed(<SpanRelation as Into<&str>>::into), []);
 }
 
 #[test]
 fn every_segment_relation_is_displayed_as_its_name_and_parsed_back_from_it() {
-    assert_eq!(Names::unparsed(SegmentRelation::name), []);
-    assert_eq!(Names::undisplayed(SegmentRelation::name), []);
+    assert_eq!(Names::unparsed(<SegmentRelation as Into<&str>>::into), []);
+    assert_eq!(Names::undisplayed(<SegmentRelation as Into<&str>>::into), []);
 }
 
 #[test]
 fn every_sense_kind_is_displayed_as_its_name_and_parsed_back_from_it() {
-    assert_eq!(Names::unparsed(SenseKind::name), []);
-    assert_eq!(Names::undisplayed(SenseKind::name), []);
+    assert_eq!(Names::unparsed(<SenseKind as Into<&str>>::into), []);
+    assert_eq!(Names::undisplayed(<SenseKind as Into<&str>>::into), []);
 }
 
 #[test]
 fn every_specificity_is_displayed_as_its_name_and_parsed_back_from_it() {
-    assert_eq!(Names::unparsed(Specificity::name), []);
-    assert_eq!(Names::undisplayed(Specificity::name), []);
+    assert_eq!(Names::unparsed(<Specificity as Into<&str>>::into), []);
+    assert_eq!(Names::undisplayed(<Specificity as Into<&str>>::into), []);
 }
 
 #[test]
 fn every_confidence_is_displayed_as_its_name_and_parsed_back_from_it() {
-    assert_eq!(Names::unparsed(Confidence::name), []);
-    assert_eq!(Names::undisplayed(Confidence::name), []);
+    assert_eq!(Names::unparsed(<Confidence as Into<&str>>::into), []);
+    assert_eq!(Names::undisplayed(<Confidence as Into<&str>>::into), []);
 }
 
 #[test]
 fn every_explicitness_is_displayed_as_its_name_and_parsed_back_from_it() {
-    assert_eq!(Names::unparsed(Explicitness::name), []);
-    assert_eq!(Names::undisplayed(Explicitness::name), []);
+    assert_eq!(Names::unparsed(<Explicitness as Into<&str>>::into), []);
+    assert_eq!(Names::undisplayed(<Explicitness as Into<&str>>::into), []);
 }
 
 #[test]
 fn every_way_of_entering_is_displayed_as_its_name_and_parsed_back_from_it() {
-    assert_eq!(Names::unparsed(Entered::name), []);
-    assert_eq!(Names::undisplayed(Entered::name), []);
+    assert_eq!(Names::unparsed(<Entered as Into<&str>>::into), []);
+    assert_eq!(Names::undisplayed(<Entered as Into<&str>>::into), []);
 }
 
 struct Provenances;

@@ -1,7 +1,8 @@
-use named_derive::Named;
+use newtype::Listed;
+use strum::{Display, IntoStaticStr, VariantArray};
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
-#[named(kebab)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "kebab-case")]
 pub enum SegmentRelation {
     Answers,
     RefersTo,

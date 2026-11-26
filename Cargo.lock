@@ -155,11 +155,11 @@ dependencies = [
  "invariants",
  "laws",
  "mutation-report",
- "named-derive",
  "newtype",
  "reach",
  "serde",
  "serde_json",
+ "strum",
  "text-lines",
  "thiserror",
  "toml",
@@ -327,10 +327,10 @@ dependencies = [
  "design-model",
  "laws",
  "message-id",
- "named-derive",
  "newtype",
  "serde_json",
  "store-ports",
+ "strum",
  "thiserror",
 ]
 
@@ -358,11 +358,11 @@ name = "design-jobs"
 version = "0.1.0"
 dependencies = [
  "design-model",
- "named-derive",
  "newtype",
  "port-core",
  "states",
  "store-ports",
+ "strum",
  "thiserror",
 ]
 
@@ -403,6 +403,7 @@ dependencies = [
  "newtype",
  "serde",
  "serde_json",
+ "strum",
  "thiserror",
 ]
 
@@ -416,12 +417,12 @@ dependencies = [
  "dispatch-ports",
  "invariants",
  "laws",
- "named-derive",
  "newtype",
  "port-core",
  "sqlite-ports",
  "states",
  "store-ports",
+ "strum",
  "thiserror",
  "transcript-ports",
 ]
@@ -953,8 +954,8 @@ dependencies = [
  "grammar",
  "grammar-unspelled",
  "laws",
- "named-derive",
  "newtype",
+ "strum",
  "thiserror",
 ]
 
@@ -1062,9 +1063,8 @@ version = "0.1.0"
 dependencies = [
  "grammar",
  "laws",
- "named-derive",
  "newtype",
- "thiserror",
+ "strum",
 ]
 
 [[package]]
@@ -2536,6 +2536,7 @@ dependencies = [
  "proptest",
  "serde",
  "serde_json",
+ "strum",
  "thiserror",
 ]
 
@@ -3180,11 +3181,11 @@ name = "states"
 version = "0.1.0"
 dependencies = [
  "laws",
- "named-derive",
  "newtype",
  "port-core",
  "sqlite-ports",
  "store-ports",
+ "strum",
  "thiserror",
 ]
 
@@ -3265,8 +3266,8 @@ dependencies = [
  "grammar-output",
  "invariants",
  "laws",
- "named-derive",
  "newtype",
+ "strum",
  "text-lines",
  "thiserror",
  "transcript-ports",

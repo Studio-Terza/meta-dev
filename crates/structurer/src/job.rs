@@ -2,6 +2,7 @@ use design_model::Outline;
 use grammar_cited::Cited;
 use grammar_output::Record;
 use grammar_output::field::Quoted;
+use strum::VariantArray;
 use transcript_ports::Body;
 
 use crate::SegmentRef;
@@ -14,7 +15,7 @@ pub struct Said {
     body: Body,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Listing {
     Segment,
     Asked,

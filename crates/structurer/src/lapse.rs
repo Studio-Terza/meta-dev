@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use grammar_output::field::{Quoted, Word};
 use grammar_output::{Fields, Mapped, Parsed, Record, Unread};
-use named_derive::Named;
+use strum::{Display, IntoStaticStr, VariantArray};
 
 use crate::briefing::Quoting;
 use crate::misread::Briefed;
@@ -28,7 +28,8 @@ enum Lapsed {
     Uncovered(Uncovered),
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, IntoStaticStr, VariantArray, newtype::Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
 enum Lapsing {
     Misread,
     Refused,
