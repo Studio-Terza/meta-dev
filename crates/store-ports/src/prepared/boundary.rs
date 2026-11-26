@@ -1,15 +1,14 @@
 use std::fmt::Debug;
 use std::vec;
 
-use newtype::Counter;
 use port_core::Op;
 
-use crate::{Argument, Batch, ColumnFailure, Columns, Query, Released, StoreFailure, Value, Written};
+use crate::{Argument, Batch, ColumnFailure, Columns, Counts, Done, Query, Released, StoreFailure, Value};
 
 pub trait Execute: Debug {
     fn fetched(&mut self, sql: &'static str, arguments: Vec<Argument>) -> Result<Vec<Vec<Value>>, StoreFailure>;
 
-    fn executed(&mut self, sql: &'static str, arguments: Vec<Argument>) -> Result<Written, StoreFailure>;
+    fn executed<D: Done>(&mut self, sql: &'static str, arguments: Vec<Argument>) -> Result<D, StoreFailure>;
 
     fn rows<Row: Columns>(&mut self, query: Prepared<Row>) -> Result<Vec<Row>, StoreFailure> {
         let decode = query.decode;
@@ -23,12 +22,16 @@ pub trait Execute: Debug {
         self.rows(query)?.into_iter().next().ok_or(StoreFailure::Missing)
     }
 
-    fn written(&mut self, query: Prepared<()>) -> Result<Written, StoreFailure> {
+    fn written(&mut self, query: Prepared<()>) -> Result<(), StoreFailure> {
+        self.done(query)
+    }
+
+    fn done<D: Done>(&mut self, query: Prepared<()>) -> Result<D, StoreFailure> {
         self.executed(query.sql, query.arguments)
     }
 
     fn released(&mut self, query: Prepared<()>) -> Result<Released, StoreFailure> {
-        self.written(query).map(|_written| Released::Deleted).or_else(StoreFailure::released)
+        self.written(query).map(|()| Released::Deleted).or_else(StoreFailure::released)
     }
 
     fn released_all(&mut self, deletions: impl IntoIterator<Item = Deletion>) -> Result<Vec<Released>, StoreFailure> {
@@ -42,13 +45,21 @@ pub trait Execute: Debug {
         queries.into_iter().map(|query| query.rows(self)).collect()
     }
 
-    fn written_all<B: Batch>(&mut self, batches: impl IntoIterator<Item = B>) -> Result<Written, B::Failure>
+    fn written_all<B: Batch>(&mut self, batches: impl IntoIterator<Item = B>) -> Result<B::Done, B::Failure>
     where
         Self: Sized,
     {
-        let written =
-            batches.into_iter().map(|batch| batch.written(self)).collect::<Result<Vec<Written>, B::Failure>>()?;
-        Ok(Written::total(written.into_iter()))
+        let done =
+            batches.into_iter().map(|batch| batch.written(self)).collect::<Result<Vec<B::Done>, B::Failure>>()?;
+        Ok(Done::total(done.into_iter()))
+    }
+
+    fn counted_all<B: Counts, D: Done>(&mut self, batches: impl IntoIterator<Item = B>) -> Result<D, B::Failure>
+    where
+        Self: Sized,
+    {
+        let done = batches.into_iter().map(|batch| batch.counted(self)).collect::<Result<Vec<D>, B::Failure>>()?;
+        Ok(D::total(done.into_iter()))
     }
 }
 
@@ -100,8 +111,16 @@ impl<Row: Columns> Query for Prepared<Row> {
 impl Batch for Prepared<()> {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         Execute::written(statements, self)
+    }
+}
+
+impl Counts for Prepared<()> {
+    fn counted<D: Done>(self, statements: &mut impl Execute) -> Result<D, StoreFailure> {
+        statements.done(self)
     }
 }
 

@@ -4,7 +4,7 @@ use std::iter::Sum;
 use design_model::{Fate, Halt};
 use invariants::Ignoring;
 use newtype::{Arbitrary, Display, Newtype};
-use store_ports::{Batch, Columns, Execute, Prepared, Query, StoreFailure, Written};
+use store_ports::{Batch, Columns, Execute, Prepared, Query, StoreFailure};
 use transcript_ports::{Body, SessionId};
 
 use super::{Overran, Overruns, StopTrail, Stopped};
@@ -98,7 +98,9 @@ impl fmt::Display for StopRow {
 impl Batch for Stopped {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         let Stopped(StopRow { session, shells, agents, halt, read, quoted, kept, fate, tokens, millis }) = self;
         statements.written(store_ports::query!(
             r#"
@@ -135,7 +137,9 @@ VALUES
 impl Batch for Overran {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         let Overran(tasks) = self;
         let rows: Vec<OverrunRow> = tasks.into_iter().map(|task| OverrunRow { task }).collect();
         statements.written_all(rows.iter().map(OverrunRow::inserted))

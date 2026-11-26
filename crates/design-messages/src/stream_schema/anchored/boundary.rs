@@ -1,8 +1,7 @@
 use std::error::Error;
 use std::fmt;
 
-use newtype::Counter;
-use store_ports::{Batch, Cause, Execute, StoreFailure, Written};
+use store_ports::{Batch, Cause, Execute, StoreFailure};
 
 use super::Anchored;
 use crate::boundary::LinkRow;
@@ -24,8 +23,10 @@ impl Error for Unanchored {}
 impl Batch for Anchored {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         let links = LinkRow::unchecked(statements)?;
-        links.is_empty().then(Written::zero).ok_or_else(|| StoreFailure::Refused(Cause::told(&Unanchored { links })))
+        links.is_empty().then_some(()).ok_or_else(|| StoreFailure::Refused(Cause::told(&Unanchored { links })))
     }
 }

@@ -17,7 +17,7 @@ mod value;
 mod version;
 mod written;
 
-pub use batch::Batch;
+pub use batch::{Batch, Counted, Counts};
 pub use busy::Busy;
 pub use cause::Cause;
 pub use column::{Column, ColumnFailure, Columns};
@@ -35,4 +35,4 @@ pub use store_lock::{Claim, StoreLock, Unlock};
 pub use store_ports_macros::{Columns, Record, migrate, query};
 pub use value::{Argument, Bind, FromValue, IntoArgument, Value};
 pub use version::Version;
-pub use written::Written;
+pub use written::{Done, Written};

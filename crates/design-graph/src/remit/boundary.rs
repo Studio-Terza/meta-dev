@@ -1,5 +1,5 @@
 use design_jobs::JobState;
-use store_ports::{Batch, Execute, Query, StoreFailure, Written};
+use store_ports::{Batch, Done, Execute, Query, StoreFailure};
 
 use super::{JobRepeated, Paid, Remit};
 use crate::Refusal;
@@ -12,15 +12,17 @@ impl Remit {
 }
 
 impl Paid {
-    pub(crate) fn closed(self, state: JobState, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
-        self.job().map_or(Ok(Written::default()), |job| state.closing(job).written(statements))
+    pub(crate) fn closed<D: Done>(self, state: JobState, statements: &mut impl Execute) -> Result<D, StoreFailure> {
+        self.job().map_or(Ok(D::unchanged()), |job| state.closing(job).moved(statements))
     }
 }
 
 impl Batch for JobRepeated {
     type Failure = Refusal;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, Refusal> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), Refusal> {
         Ok(self.0.paid(statements)?.closed(JobState::Repeated, statements)?)
     }
 }

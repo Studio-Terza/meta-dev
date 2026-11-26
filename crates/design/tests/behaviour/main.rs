@@ -39,14 +39,12 @@ use laws::proptest;
 use laws::proptest::prelude::{Just, any, prop_oneof};
 use laws::proptest::sample::select;
 use laws::proptest::strategy::{BoxedStrategy, Strategy};
-use newtype::Counter;
 use newtype::Enumerated;
 use newtype::Wrapping;
 use port_core::{Held, Op, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
 use sqlite_ports::SqliteOpener;
 use store_ports::{
-    Batch, Busy, Created, Execute, Opens, Query, Record, Schema, Store, StoreFailure, StoreFiller, StoreLock, Written,
-    store_ops,
+    Batch, Busy, Created, Execute, Opens, Query, Record, Schema, Store, StoreFailure, StoreFiller, StoreLock, store_ops,
 };
 use stream::{Relation, Shape};
 use structure::Staff;
@@ -462,7 +460,9 @@ struct Unstored {
 impl Batch for Unstored {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         let Unstored { message, ordinal } = self;
         statements.written(store_ports::query!(
             r#"
@@ -1475,20 +1475,15 @@ impl Graph {
         Graph::shown(store, "n3")
     }
 
-    fn refined(store: &Sqlite, facet: Facet, parents: &[i64]) -> Result<Written, Failure> {
+    fn refined(store: &Sqlite, facet: Facet, parents: &[i64]) -> Result<(), Failure> {
         let run = Run::root();
         let port = run.port(store.clone());
-        let written = (2_i64..)
-            .zip(parents)
-            .map(|(child, parent)| {
-                let entry = Entry::new("demo".parse()?, facet, Entered::Init.into());
-                let planted = port.write(Planting::sown(Node::new(NodeId::new(child), entry)))?;
-                let (refining, refined) = (Graph::resolved(&port, child)?, Graph::resolved(&port, *parent)?);
-                let linked = port.write(Linked::new(refining, NodeRelation::Refines, refined, Entered::Init.into()))?;
-                Ok(planted.plus(linked))
-            })
-            .collect::<Result<Vec<Written>, Failure>>()?;
-        Ok(Written::total(written.into_iter()))
+        (2_i64..).zip(parents).try_for_each(|(child, parent)| {
+            let entry = Entry::new("demo".parse()?, facet, Entered::Init.into());
+            port.write(Planting::sown(Node::new(NodeId::new(child), entry)))?;
+            let (refining, refined) = (Graph::resolved(&port, child)?, Graph::resolved(&port, *parent)?);
+            Ok(port.write(Linked::new(refining, NodeRelation::Refines, refined, Entered::Init.into()))?)
+        })
     }
 
     fn resolved(store: &impl Store, id: i64) -> Result<Resolved, Failure> {
@@ -2903,7 +2898,7 @@ impl StoreFiller for Unbooked {
         StoreFiller::read(&self.0, pass, query)
     }
 
-    fn write<Q: Batch>(&self, pass: Pass<'_, Q>, batch: Q) -> Result<Written, Q::Failure> {
+    fn write<Q: Batch>(&self, pass: Pass<'_, Q>, batch: Q) -> Result<Q::Done, Q::Failure> {
         (Q::NAME == FailuresReported::NAME).then_some(()).map_or_else(
             || StoreFiller::write(&self.0, pass, batch),
             |()| {

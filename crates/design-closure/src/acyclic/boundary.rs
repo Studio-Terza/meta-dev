@@ -1,8 +1,8 @@
 use std::marker::PhantomData;
 
 use design_model::{NodeId, NodeRelation, Ordinal, Segment, SegmentRelation};
-use newtype::{Arbitrary, Counter, Newtype, Wrapping};
-use store_ports::{Columns, Execute, StoreFailure, Written};
+use newtype::{Arbitrary, Newtype, Wrapping};
+use store_ports::{Columns, Done, Execute, StoreFailure};
 
 use super::{Acyclic, Closed, Cycle, Refines, Refuses, SegmentCorrects, SegmentSupersedes, Supersedes};
 use message_id::Uuid;
@@ -68,18 +68,18 @@ impl<R: Acyclic> Closing<R> {
         Closing { source, target, relation: PhantomData }
     }
 
-    pub fn written<E: Execute, Failure, Refused>(
+    pub fn written<E: Execute, D: Done, Failure, Refused>(
         self,
         statements: &mut E,
-        edge: impl FnOnce(&mut E) -> Result<Written, Failure>,
-    ) -> Result<Written, Refused>
+        edge: impl FnOnce(&mut E) -> Result<D, Failure>,
+    ) -> Result<D, Refused>
     where
         Refused: Refuses + From<Failure>,
     {
         let open = self.opened::<Refused>(statements)?;
         let edged = edge(statements)?;
         let closed = open.closed(R::CLOSED, statements)?;
-        Ok(edged.plus(closed))
+        Ok(edged.joined(closed))
     }
 
     fn opened<Refused: Refuses>(self, statements: &mut impl Execute) -> Result<Open, Refused> {
@@ -117,9 +117,9 @@ WHERE
 }
 
 impl Open {
-    fn closed(self, relation: Closed, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    fn closed<D: Done>(self, relation: Closed, statements: &mut impl Execute) -> Result<D, StoreFailure> {
         let Open { ancestor, descendant } = self;
-        statements.written(store_ports::query!(
+        statements.done(store_ports::query!(
             r#"
 INSERT INTO
   closure (relation, ancestor, descendant, depth)

@@ -1,10 +1,10 @@
 use std::fmt::Debug;
 
-use newtype::Enumerated;
+use newtype::{Counter, Enumerated};
 use port_core::Op;
 
 use crate::store_failure::Unmoved;
-use crate::{Batch, Execute, Prepared, StoreFailure, Written};
+use crate::{Batch, Done, Execute, Prepared, StoreFailure, Written};
 
 pub trait Lifecycle: Enumerated + Copy + Eq + Debug + 'static {
     const EDGES: &'static [Edge<Self>];
@@ -52,10 +52,21 @@ impl<S: Staged> Moved<S> {
 impl<S: Staged> Batch for Moved<S> {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
+        self.moved(statements)
+    }
+}
+
+impl<S: Staged> Moved<S> {
+    pub fn moved<D: Done>(self, statements: &mut impl Execute) -> Result<D, StoreFailure> {
         S::State::EDGES.iter().find(|listed| **listed == self.edge).ok_or(StoreFailure::Unmoved(Unmoved::Unlisted))?;
         let Edge { from, to } = self.edge;
-        let written = statements.written(S::moved(&self.key, from, to))?;
-        Some(written).filter(|moved| *moved != Written::default()).ok_or(StoreFailure::Unmoved(Unmoved::Elsewhere))
+        let written: Written = statements.done(S::moved(&self.key, from, to))?;
+        Some(written.count())
+            .filter(|moved| *moved != 0)
+            .map(D::changed)
+            .ok_or(StoreFailure::Unmoved(Unmoved::Elsewhere))
     }
 }
