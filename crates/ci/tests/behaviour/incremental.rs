@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::ffi::OsString;
 use std::process::ExitCode;
 
@@ -67,7 +68,7 @@ impl Prior {
         mutants.first().map_or_else(String::new, |_| ["[", &mutants.join(", "), "]"].concat())
     }
 
-    fn planned(&self) -> Result<Planned, laws::Unmet> {
+    fn planned(&self) -> Result<Planned, Box<dyn Error>> {
         let scratch = Scratch::new()?;
         scratch.directory("prior/download/0")?;
         scratch.write("prior/tested", "t0\nh0\n")?;
@@ -117,10 +118,8 @@ impl Prior {
         };
         let prior = scratch.file("prior");
         let metadata = scratch.file("metadata.json");
-        let answer = scratch.answer(
-            &script,
-            &["mutants-plan", &diff, &scratch.file("plan.txt"), "changed", "--prior", &prior, &metadata, "-p"],
-        );
+        let answer = scratch
+            .answer(&script, &["mutants-plan", &diff, &scratch.file("plan.txt"), "--prior", &prior, &metadata, "-p"]);
         assert_eq!(answer.exit, ExitCode::SUCCESS);
         Ok(Planned {
             out: Text::lines(&answer.out),
@@ -137,7 +136,7 @@ impl Prior {
 }
 
 #[test]
-fn a_survivor_a_test_only_commit_fixes_is_selected_again_and_nothing_else_is() -> Result<(), laws::Unmet> {
+fn a_survivor_a_test_only_commit_fixes_is_selected_again_and_nothing_else_is() -> Result<(), Box<dyn Error>> {
     let planned = Prior {
         timed_out: &[],
         survivors: &[SURVIVOR],
@@ -159,7 +158,7 @@ fn a_survivor_a_test_only_commit_fixes_is_selected_again_and_nothing_else_is() -
 }
 
 #[test]
-fn a_fix_commit_s_changed_lines_are_mutated_and_a_survivor_follows_its_line_down() -> Result<(), laws::Unmet> {
+fn a_fix_commit_s_changed_lines_are_mutated_and_a_survivor_follows_its_line_down() -> Result<(), Box<dyn Error>> {
     let planned = Prior {
         timed_out: &[],
         survivors: &[SURVIVOR],
@@ -180,7 +179,7 @@ fn a_fix_commit_s_changed_lines_are_mutated_and_a_survivor_follows_its_line_down
 }
 
 #[test]
-fn a_prior_whose_survivors_are_all_caught_and_no_line_changed_selects_nothing() -> Result<(), laws::Unmet> {
+fn a_prior_whose_survivors_are_all_caught_and_no_line_changed_selects_nothing() -> Result<(), Box<dyn Error>> {
     let planned = Prior {
         timed_out: &[],
         survivors: &[],
@@ -197,22 +196,38 @@ fn a_prior_whose_survivors_are_all_caught_and_no_line_changed_selects_nothing() 
     Ok(())
 }
 
-laws::table!(
-    only_test_code_edited_other_than_by_additions_since_the_prior_falls_back_to_every_changed_line,
-    |since: &&'static str| Prior { timed_out: &[], survivors: &[SURVIVOR], since_head: since, moved: NOTHING_MOVED, listed: vec![SURVIVOR, UNTOUCHED], since: Vec::new(), earlier_tests: "", since_tests: "" }
+#[test]
+fn only_test_code_edited_other_than_by_additions_since_the_prior_falls_back_to_every_changed_line() {
+    let planned = |since: &'static str| {
+        Prior {
+            timed_out: &[],
+            survivors: &[SURVIVOR],
+            since_head: since,
+            moved: NOTHING_MOVED,
+            listed: vec![SURVIVOR, UNTOUCHED],
+            since: Vec::new(),
+            earlier_tests: "",
+            since_tests: "",
+        }
         .planned()
         .ignoring(Ignored::Unplanned)
-        .map_or_default(|planned| (planned.out.first().cloned().unwrap_or_default(), planned.selected.len())),
-    [
-        TEST_EDITED => ("mutants: every changed line, since test code changed other than by additions: crates/a/tests/behaviour.rs".to_owned(), 0),
-        FAKE_EDITED => ("mutants: every changed line, since test code changed other than by additions: crates/fakes/src/lib.rs".to_owned(), 0),
-        SHARED_EDITED => ("mutants: 1 selected since h0: its 1 survivors and the lines changed since".to_owned(), 1),
-        "not a patch\n" => ("mutants: every changed line, since git printed a patch this cannot read".to_owned(), 0),
-    ]
-);
+        .map_or_default(|planned| (planned.out.first().cloned().unwrap_or_default(), planned.selected.len()))
+    };
+    let every = "mutants: every changed line, since test code changed other than by additions: ";
+    assert_eq!(planned(TEST_EDITED), (format!("{every}crates/a/tests/behaviour.rs"), 0));
+    assert_eq!(planned(FAKE_EDITED), (format!("{every}crates/fakes/src/lib.rs"), 0));
+    assert_eq!(
+        planned(SHARED_EDITED),
+        ("mutants: 1 selected since h0: its 1 survivors and the lines changed since".to_owned(), 1)
+    );
+    assert_eq!(
+        planned("not a patch\n"),
+        ("mutants: every changed line, since git printed a patch this cannot read".to_owned(), 0)
+    );
+}
 
 #[test]
-fn without_a_kept_prior_the_plan_lists_every_changed_line_as_before() -> Result<(), laws::Unmet> {
+fn without_a_kept_prior_the_plan_lists_every_changed_line_as_before() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     scratch.directory("prior")?;
     let diff = scratch.file("c.diff");
@@ -223,10 +238,8 @@ fn without_a_kept_prior_the_plan_lists_every_changed_line_as_before() -> Result<
         ..Script::new()
     };
     let prior = scratch.file("prior");
-    let answer = scratch.answer(
-        &script,
-        &["mutants-plan", &diff, &scratch.file("plan.txt"), "changed", "--prior", &prior, "metadata.json", "-p"],
-    );
+    let answer = scratch
+        .answer(&script, &["mutants-plan", &diff, &scratch.file("plan.txt"), "--prior", &prior, "metadata.json", "-p"]);
     assert_eq!(
         Text::lines(&answer.out),
         ["mutants: every changed line, no earlier run's result to start from", "mutants: 3 to test in 1 shards"]
@@ -266,7 +279,7 @@ impl Earlier {
     const RUNS: &'static str = r#"[{"databaseId": 7, "headSha": "h0"}]"#;
     const UPLOADED: &'static str = "[.artifacts[] | select(.expired | not) | .name | capture(\"^mutants-result-(?<index>[0-9]+)-of-(?<count>[0-9]+)$\") | {index: (.index | tonumber), count: (.count | tonumber)}]";
 
-    fn looked(&self) -> Result<Looked, laws::Unmet> {
+    fn looked(&self) -> Result<Looked, Box<dyn Error>> {
         let scratch = Scratch::new()?;
         scratch.directory("prior/download/0")?;
         scratch.directory("prior/download/1")?;
@@ -322,19 +335,30 @@ impl Earlier {
     }
 }
 
-laws::table!(
-    only_a_complete_earlier_run_on_an_ancestor_of_the_head_is_reused,
-    |earlier: &Earlier| earlier.looked().ignoring(Ignored::Unplanned).unwrap_or_default(),
-    [
-        Earlier { ancestry: Ancestry::Ancestor, uploaded: r#"[{"index": 0, "count": 2}, {"index": 1, "count": 2}]"# } => Looked { out: vec!["mutants: reusing run 7, which tested h0".to_owned()], marked: vec!["t0".to_owned(), "h0".to_owned()], downloads: 2 },
-        Earlier { ancestry: Ancestry::Diverged, uploaded: r#"[{"index": 0, "count": 2}, {"index": 1, "count": 2}]"# } => Looked { out: vec!["mutants: no earlier run on an ancestor of this head kept every shard's result, so this run mutates every changed line".to_owned()], marked: Vec::new(), downloads: 0 },
-        Earlier { ancestry: Ancestry::Ancestor, uploaded: r#"[{"index": 1, "count": 2}]"# } => Looked { out: vec!["mutants: no earlier run on an ancestor of this head kept every shard's result, so this run mutates every changed line".to_owned()], marked: Vec::new(), downloads: 0 },
-        Earlier { ancestry: Ancestry::Ancestor, uploaded: "[]" } => Looked { out: vec!["mutants: no earlier run on an ancestor of this head kept every shard's result, so this run mutates every changed line".to_owned()], marked: Vec::new(), downloads: 0 },
-    ]
-);
+#[test]
+fn only_a_complete_earlier_run_on_an_ancestor_of_the_head_is_reused() {
+    let looked = |earlier: Earlier| earlier.looked().ignoring(Ignored::Unplanned).unwrap_or_default();
+    let both = r#"[{"index": 0, "count": 2}, {"index": 1, "count": 2}]"#;
+    let fresh = Looked {
+        out: vec!["mutants: no earlier run on an ancestor of this head kept every shard's result, so this run mutates every changed line".to_owned()],
+        marked: Vec::new(),
+        downloads: 0,
+    };
+    assert_eq!(
+        looked(Earlier { ancestry: Ancestry::Ancestor, uploaded: both }),
+        Looked {
+            out: vec!["mutants: reusing run 7, which tested h0".to_owned()],
+            marked: vec!["t0".to_owned(), "h0".to_owned()],
+            downloads: 2
+        }
+    );
+    assert_eq!(looked(Earlier { ancestry: Ancestry::Diverged, uploaded: both }), fresh);
+    assert_eq!(looked(Earlier { ancestry: Ancestry::Ancestor, uploaded: r#"[{"index": 1, "count": 2}]"# }), fresh);
+    assert_eq!(looked(Earlier { ancestry: Ancestry::Ancestor, uploaded: "[]" }), fresh);
+}
 
 #[test]
-fn a_shard_mutates_only_the_selected_names_and_keeps_what_it_left() -> Result<(), laws::Unmet> {
+fn a_shard_mutates_only_the_selected_names_and_keeps_what_it_left() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     scratch.directory("prior")?;
     scratch.write("prior/selected.txt", "crates/a/src/lib.rs:3:5: replace f -> bool with true")?;
@@ -386,7 +410,7 @@ fn a_shard_mutates_only_the_selected_names_and_keeps_what_it_left() -> Result<()
 }
 
 #[test]
-fn a_shard_given_an_empty_selection_mutates_nothing_and_keeps_an_empty_result() -> Result<(), laws::Unmet> {
+fn a_shard_given_an_empty_selection_mutates_nothing_and_keeps_an_empty_result() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     scratch.directory("prior")?;
     scratch.write("prior/selected.txt", "")?;
@@ -427,7 +451,7 @@ fn a_shard_given_an_empty_selection_mutates_nothing_and_keeps_an_empty_result() 
 }
 
 #[test]
-fn a_survivor_the_scoped_pass_still_misses_is_kept_for_the_next_push() -> Result<(), laws::Unmet> {
+fn a_survivor_the_scoped_pass_still_misses_is_kept_for_the_next_push() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     scratch.survived(&[Missed {
         name: "crates/a/src/lib.rs:3:5: replace f -> bool with true",
@@ -486,18 +510,16 @@ impl Retested {
     }
 }
 
-laws::table!(
-    a_crate_s_whole_source_is_mutated_only_when_its_tests_first_change_after_the_earlier_run,
-    Retested::wholes,
-    [
-        Retested { earlier: "", since: "crates/a/tests/behaviour.rs\n" } => 1,
-        Retested { earlier: "crates/a/tests/behaviour.rs\n", since: "crates/a/tests/behaviour.rs\n" } => 0,
-        Retested { earlier: "crates/a/tests/behaviour.rs\n", since: "" } => 0,
-    ]
-);
+#[test]
+fn a_crate_s_whole_source_is_mutated_only_when_its_tests_first_change_after_the_earlier_run() {
+    let tests = "crates/a/tests/behaviour.rs\n";
+    assert_eq!(Retested::wholes(&Retested { earlier: "", since: tests }), 1);
+    assert_eq!(Retested::wholes(&Retested { earlier: tests, since: tests }), 0);
+    assert_eq!(Retested::wholes(&Retested { earlier: tests, since: "" }), 0);
+}
 
 #[test]
-fn a_survivor_that_timed_out_in_the_scope_is_selected_again() -> Result<(), laws::Unmet> {
+fn a_survivor_that_timed_out_in_the_scope_is_selected_again() -> Result<(), Box<dyn Error>> {
     let planned = Prior {
         survivors: &[],
         timed_out: &[SURVIVOR],
@@ -514,7 +536,7 @@ fn a_survivor_that_timed_out_in_the_scope_is_selected_again() -> Result<(), laws
 }
 
 #[test]
-fn a_full_plan_sizes_each_shard_from_the_prior_s_measured_cost_per_crate() -> Result<(), laws::Unmet> {
+fn a_full_plan_sizes_each_shard_from_the_prior_s_measured_cost_per_crate() -> Result<(), Box<dyn Error>> {
     let planned = Prior {
         timed_out: &[],
         survivors: &[SURVIVOR],

@@ -44,9 +44,8 @@ impl<'run> Since<'run> {
         let since = self.directory.join(Self::SINCE);
         let parent = [tree, "^1"].concat();
         let earlier = Tested::asked(ports, OsStr::new(&parent), OsStr::new(tree))?;
-        let changed = Tested::asked(ports, OsStr::new(tree), OsStr::new(Tested::HEAD))?
-            .without(&earlier)
-            .diff(ports)?;
+        let changed =
+            Tested::asked(ports, OsStr::new(tree), OsStr::new(Tested::HEAD))?.without(&earlier).diff(ports)?;
         let files = ports.files();
         files
             .write(&since, Bytes::from(changed.as_ref()))
