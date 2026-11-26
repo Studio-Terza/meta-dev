@@ -123,6 +123,10 @@ impl ClockFiller for FakeClock<'_> {
         *self.now.lock().unpoisoned()
     }
 
+    fn moment(&self, _pass: Pass<'_, clock_ops::Moment>) -> dispatch_ports::Moment {
+        dispatch_ports::Moment::from(*self.now.lock().unpoisoned())
+    }
+
     fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause, bell: &Bell) -> Wall {
         let wait = Wait { pause, woke: bell.waited(Duration::ZERO) };
         let mut waits = self.waits.0.lock().unpoisoned();

@@ -301,6 +301,10 @@ impl Files for FakeLent<'_> {
     fn size(&self, path: &Path) -> Result<Size, FileFailure> {
         self.memory.size(path)
     }
+
+    fn stamps(&self, path: &Path) -> Result<file_ports::Stamps, FileFailure> {
+        self.memory.stamps(path)
+    }
 }
 
 struct Invocation;

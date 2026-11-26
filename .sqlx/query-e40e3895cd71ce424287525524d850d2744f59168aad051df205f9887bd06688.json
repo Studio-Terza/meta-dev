@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id!\", session AS \"session!\", at AS \"at!\", gist AS \"gist!\", read AS \"read!\", quoted AS \"quoted!\", kept AS \"kept!\", awaited AS \"awaited!\", halt AS \"halt!\", fate AS \"fate!\" FROM stops",
+  "query": "INSERT INTO stops (session, shells, agents, halt, read, quoted, kept, fate, tokens, millis) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10) RETURNING id AS \"id!\", session AS \"session!\", at AS \"at!\", shells AS \"shells!\", agents AS \"agents!\", halt AS \"halt!\", read AS \"read!\", quoted AS \"quoted!\", kept AS \"kept!\", fate AS \"fate!\", tokens AS \"tokens!\", millis AS \"millis!\"",
   "describe": {
     "columns": [
       {
@@ -37,19 +37,41 @@
         }
       },
       {
-        "name": "gist!",
+        "name": "shells!",
         "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "stops",
+            "name": "shells"
+          }
+        }
+      },
+      {
+        "name": "agents!",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "stops",
+            "name": "agents"
+          }
+        }
+      },
+      {
+        "name": "halt!",
+        "ordinal": 5,
         "type_info": "Text",
         "origin": {
           "Table": {
             "table": "stops",
-            "name": "gist"
+            "name": "halt"
           }
         }
       },
       {
         "name": "read!",
-        "ordinal": 4,
+        "ordinal": 6,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -60,7 +82,7 @@
       },
       {
         "name": "quoted!",
-        "ordinal": 5,
+        "ordinal": 7,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -71,34 +93,12 @@
       },
       {
         "name": "kept!",
-        "ordinal": 6,
+        "ordinal": 8,
         "type_info": "Integer",
         "origin": {
           "Table": {
             "table": "stops",
             "name": "kept"
-          }
-        }
-      },
-      {
-        "name": "awaited!",
-        "ordinal": 7,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "stops",
-            "name": "awaited"
-          }
-        }
-      },
-      {
-        "name": "halt!",
-        "ordinal": 8,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "stops",
-            "name": "halt"
           }
         }
       },
@@ -112,12 +112,36 @@
             "name": "fate"
           }
         }
+      },
+      {
+        "name": "tokens!",
+        "ordinal": 10,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "stops",
+            "name": "tokens"
+          }
+        }
+      },
+      {
+        "name": "millis!",
+        "ordinal": 11,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "stops",
+            "name": "millis"
+          }
+        }
       }
     ],
     "parameters": {
-      "Right": 0
+      "Right": 10
     },
     "nullable": [
+      false,
+      false,
       false,
       false,
       false,
@@ -130,5 +154,5 @@
       false
     ]
   },
-  "hash": "9e288e59a97e9ec36e59ece16557875f3934ab75fd105b8d3fb055b40758abd9"
+  "hash": "e40e3895cd71ce424287525524d850d2744f59168aad051df205f9887bd06688"
 }

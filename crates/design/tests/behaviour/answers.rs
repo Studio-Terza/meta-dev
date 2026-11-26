@@ -1,15 +1,17 @@
 use std::ffi::OsString;
+use std::path::Path;
 
 use console_ports::{Heard, Variables};
 use design::{Agents, Failure, HookEvent, Outcome};
 use design_store::{StopTrail, StreamSchema};
 use dispatch_fakes::{Scripted, Stepped};
 use dispatch_ports::{Finished, Model, Output, Pause, Prompt, Reply, Tokens, Usage, Wall};
-use file_ports::Memory;
+use file_ports::{Bytes, Epoch, Files, Memory, Stamps};
 use newtype::Wrapping;
 use port_core::Run;
 use serde_json::Value;
 use store_ports::Store;
+use text_lines::Lines;
 
 use crate::{Opening, Sqlite};
 
@@ -31,12 +33,9 @@ impl Asking {
     const RULED: &str = "the lint wall time limit stays at three seconds";
     const QUEUED: &str = "yes keep it first in first out";
     const QUOTED: &str = "\"the lint wall time limit stays at three seconds\"";
-    const LINT: &str = "{\"kind\":\"question\",\"question\":\"should the lint limit change\"}";
     const PICKED: &str = "[{\"uuid\":\"o1\",\"quote\":\"the lint wall time limit stays at three seconds\"}]";
     const KEPT: &str = "[1]";
-    const STATEMENT: &str = "{\"kind\":\"statement\",\"question\":\"\"}";
-    const COVERED: &str = "conversational(o1.0)\nconversational(o2.0)";
-    const STOPPING: &str = "{\"hook_event_name\":\"Stop\",\"stop_hook_active\":false,\"last_assistant_message\":\"Should the lint limit change?\"}";
+    const NONE: &str = "[]";
 
     fn over(replies: &[&str]) -> Result<Asking, Failure> {
         Asking::spoken(
@@ -79,7 +78,7 @@ impl Asking {
             &environment,
             FakeLent::new(&self.files),
             Opening(|_path| self.store.clone()),
-            Agents::new(|_scratch| &self.script, Stepped::starting(Wall::new(1_800_000_000), Pause::new(0))),
+            Agents::new(|_scratch| &self.script, Stepped::starting(Wall::new(Tasked::NOW), Pause::new(0))),
         )
         .report(&Run::root(), arguments.iter().map(OsString::from));
         let text = Answered::said(&uttered);
@@ -100,29 +99,83 @@ impl Asking {
     }
 }
 
+struct Tasked;
+
+impl Tasked {
+    const NOW: i64 = 1_800_000_000;
+    const MINUTE: i64 = 60;
+    const FOLDER: &str = "/private/tmp/claude-501/-work/s/tasks";
+    const TRANSCRIPT: &str = "/home/tester/.claude/projects/-work/s.jsonl";
+    const EXITED: &str = "done\n[exited with code 0]\n";
+    const ENDED: &str = "{\"type\":\"assistant\",\"message\":{\"stop_reason\":\"end_turn\",\"content\":[]}}\n";
+    const WORKING: &str = "{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\"}]}}\n";
+    const CALLING: &str = "{\"type\":\"assistant\",\"message\":{\"stop_reason\":\"tool_use\",\"content\":[]}}\n";
+
+    fn placed(asking: &Asking, name: &str, text: &str, [born, touched]: [i64; 2]) -> Result<(), laws::Unmet> {
+        let path = Path::new(Tasked::FOLDER).join(name);
+        asking.files.create_directories(Path::new(Tasked::FOLDER))?;
+        asking.files.write(&path, Bytes::from(text))?;
+        let ago = |minutes: i64| Epoch::new(Tasked::NOW - minutes * Tasked::MINUTE);
+        asking.files.stamped(&path, Stamps::new(ago(born), ago(touched)));
+        Ok(())
+    }
+
+    fn stopping(said: &str) -> String {
+        serde_json::json!({"hook_event_name": "Stop", "stop_hook_active": false, "session_id": "s",
+            "transcript_path": Tasked::TRANSCRIPT, "last_assistant_message": said})
+        .to_string()
+    }
+
+    fn stopped(asking: &Asking) -> Result<Stop, laws::Unmet> {
+        let asked = asking.asked(&Tasked::stopping("I'll merge it once CI is green."), &["hook", "stop"]);
+        let listed = asking.asked("", &["stops"]);
+        let run = Run::root();
+        let rows = run.port(asking.store.clone()).read(StopTrail)?;
+        run.finish().settled()?;
+        Ok(Stop {
+            reason: Tasked::reason(&asked),
+            asked,
+            trail: rows.iter().map(ToString::to_string).collect(),
+            listed,
+        })
+    }
+
+    fn reason(asked: &Asked) -> String {
+        serde_json::from_str::<Value>(&asked.text)
+            .into_iter()
+            .find_map(|decision| decision.get("reason").and_then(Value::as_str).map(str::to_owned))
+            .unwrap_or_default()
+    }
+}
+
+struct Stop {
+    asked: Asked,
+    reason: String,
+    trail: Vec<String>,
+    listed: Asked,
+}
+
 #[test]
-fn haiku_reads_every_earlier_owner_message_under_its_header_and_sonnet_trims_the_quotes() -> Result<(), Failure> {
-    let asking = Asking::over(&[Asking::LINT, Asking::PICKED, Asking::KEPT])?;
+fn haiku_reads_every_earlier_owner_message_under_its_header_and_a_trim_keeps_the_quotes() -> Result<(), Failure> {
+    let asking = Asking::over(&[Asking::PICKED, Asking::KEPT])?;
     let asked = asking.asked("", &["answer", "is the lint limit still three seconds"]);
-    let classifying = asked.prompts.first().cloned().unwrap_or_default();
-    let selecting = asked.prompts.get(1).cloned().unwrap_or_default();
-    let trimming = asked.prompts.get(2).cloned().unwrap_or_default();
-    assert!(classifying.contains("is the lint limit still three seconds"), "{classifying}");
-    assert!(selecting.contains("should the lint limit change"), "{selecting}");
+    let selecting = asked.prompts.first().cloned().unwrap_or_default();
+    let trimming = asked.prompts.get(1).cloned().unwrap_or_default();
+    assert!(selecting.contains("is the lint limit still three seconds"), "{selecting}");
     assert!(selecting.contains(&format!("[o1 2026-01-01T00:00:00Z] {}", Asking::RULED)), "{selecting}");
     assert!(selecting.contains(&format!("[o2 2026-01-01T00:00:00Z] {}", Asking::QUEUED)), "{selecting}");
     assert!(trimming.contains(&format!("1. o1 2026-01-01T00:00:00Z: {}", Asking::QUOTED)), "{trimming}");
-    assert_eq!(asking.script.models(), [Model::Haiku, Model::Haiku, Model::Sonnet]);
+    assert_eq!(asking.script.models(), [Model::Haiku, Model::Haiku]);
     Ok(())
 }
 
 #[test]
 fn the_owner_messages_are_read_in_chunks_of_300_and_each_quote_is_checked_against_its_own_chunk() -> Result<(), Failure>
 {
-    let asking = Asking::crowded(&[Asking::LINT, Asking::PICKED, Asking::PICKED, Asking::KEPT])?;
+    let asking = Asking::crowded(&[Asking::PICKED, Asking::PICKED, Asking::KEPT])?;
     let asked = asking.asked("", &["answer", "should the lint limit change"]);
-    let first = asked.prompts.get(1).cloned().unwrap_or_default();
-    let second = asked.prompts.get(2).cloned().unwrap_or_default();
+    let first = asked.prompts.first().cloned().unwrap_or_default();
+    let second = asked.prompts.get(1).cloned().unwrap_or_default();
     assert_eq!(
         (first.contains("[m300 "), first.contains("[o1 "), second.contains("[m001 "), second.contains("[o1 ")),
         (true, false, false, true)
@@ -133,19 +186,8 @@ fn the_owner_messages_are_read_in_chunks_of_300_and_each_quote_is_checked_agains
 }
 
 #[test]
-fn a_stop_without_its_last_message_reads_the_sessions_last_lead_message() -> Result<(), Failure> {
-    let asking = Asking::over(&[Asking::COVERED, Asking::STATEMENT])?;
-    let stopping = "{\"hook_event_name\":\"Stop\",\"stop_hook_active\":false,\"session_id\":\"s\"}";
-    let stopped = asking.asked(stopping, &["hook", "stop"]);
-    let classifying = stopped.prompts.get(1).cloned().unwrap_or_default();
-    assert!(classifying.contains("Message:\nnoted"), "{classifying}");
-    assert_eq!(stopped.outcome?, Outcome::Hooked(HookEvent::Stop));
-    Ok(())
-}
-
-#[test]
 fn an_answer_quotes_the_owner_messages_the_trim_keeps() -> Result<(), Failure> {
-    let asked = Asking::answered(&[Asking::LINT, Asking::PICKED, Asking::KEPT], "should the lint limit change")?;
+    let asked = Asking::answered(&[Asking::PICKED, Asking::KEPT], "should the lint limit change")?;
     assert_eq!(asked.outcome?, Outcome::Answered);
     assert!(asked.text.contains("read: 2 owner messages\nquoted: 1\n"), "{}", asked.text);
     assert!(asked.text.contains(&format!("o1 2026-01-01T00:00:00Z: {}", Asking::QUOTED)), "{}", asked.text);
@@ -154,8 +196,8 @@ fn an_answer_quotes_the_owner_messages_the_trim_keeps() -> Result<(), Failure> {
 
 #[test]
 fn an_answer_drops_the_quotes_the_trim_rejects() -> Result<(), Failure> {
-    let asked = Asking::answered(&[Asking::LINT, Asking::PICKED, "[]"], "should the lint limit change")?;
-    assert!(asked.text.contains("quoted: 1\nanswers: none"), "{}", asked.text);
+    let asked = Asking::answered(&[Asking::PICKED, Asking::NONE], "should the lint limit change")?;
+    assert!(asked.text.contains("quoted: 1\nquotes kept: none"), "{}", asked.text);
     Ok(())
 }
 
@@ -168,8 +210,7 @@ fn the_trim_keeps_at_most_eight_quotes() -> Result<(), Failure> {
         })
         .collect();
     let picks = format!("[{}]", picked.join(","));
-    let asked =
-        Asking::answered(&[Asking::LINT, &picks, "[1,2,3,4,5,6,7,8,9,10]"], "what order should the queue keep")?;
+    let asked = Asking::answered(&[&picks, "[1,2,3,4,5,6,7,8,9,10]"], "what order should the queue keep")?;
     assert_eq!(asked.text.matches("o2 2026-01-01T00:00:00Z: ").count(), 8, "{}", asked.text);
     Ok(())
 }
@@ -177,180 +218,117 @@ fn the_trim_keeps_at_most_eight_quotes() -> Result<(), Failure> {
 #[test]
 fn an_answer_drops_a_quote_the_owner_never_wrote_and_sends_no_trim() -> Result<(), Failure> {
     let invented = "[{\"uuid\":\"o1\",\"quote\":\"the limit is gone\"},{\"uuid\":\"o2\",\"quote\":\"the lint wall\"}]";
-    let asked = Asking::answered(&[Asking::LINT, invented], "should the lint limit change")?;
-    assert!(asked.text.contains("quoted: 0\nanswers: none"), "{}", asked.text);
-    assert_eq!(asked.prompts.len(), 2);
+    let asked = Asking::answered(&[invented], "should the lint limit change")?;
+    assert!(asked.text.contains("quoted: 0\nquotes kept: none"), "{}", asked.text);
+    assert_eq!(asked.prompts.len(), 1);
     Ok(())
 }
 
 #[test]
-fn a_statement_reads_no_owner_messages() -> Result<(), Failure> {
-    let asked = Asking::answered(&[Asking::STATEMENT], "the build is green")?;
-    assert!(asked.text.contains("statement: asks the owner nothing"), "{}", asked.text);
-    assert_eq!((asked.text.contains("read:"), asked.prompts.len()), (false, 1));
+fn a_stop_without_its_last_message_searches_with_the_sessions_last_lead_message() -> Result<(), Failure> {
+    let asking = Asking::over(&[Asking::NONE])?;
+    let stopping = "{\"hook_event_name\":\"Stop\",\"stop_hook_active\":false,\"session_id\":\"s\"}";
+    let stopped = asking.asked(stopping, &["hook", "stop"]);
+    let selecting = stopped.prompts.first().cloned().unwrap_or_default();
+    assert!(selecting.contains("message to its owner:\nnoted\n"), "{selecting}");
+    assert_eq!(stopped.outcome?, Outcome::Hooked(HookEvent::Stop));
     Ok(())
 }
 
 #[test]
-fn a_stop_that_asks_the_owner_blocks_with_the_quotes_that_answer_it() -> Result<(), laws::Unmet> {
-    let asking = Asking::over(&[Asking::COVERED, Asking::LINT, Asking::PICKED, Asking::KEPT])?;
-    let stopped = asking.asked(Asking::STOPPING, &["hook", "stop"]);
-    let decision: Value = serde_json::from_str(&stopped.text)?;
-    let reason = decision.get("reason").and_then(Value::as_str).unwrap_or_default();
-    assert_eq!(stopped.outcome?, Outcome::Blocked);
-    assert!(reason.contains("The transcript may already answer this; reread before asking:"), "{reason}");
-    assert!(reason.contains(Asking::QUOTED), "{reason}");
-    Ok(())
-}
-
-#[test]
-fn a_stop_already_held_by_its_hook_asks_nothing() -> Result<(), Failure> {
-    let asking = Asking::over(&[Asking::COVERED, Asking::LINT, Asking::PICKED])?;
+fn a_stop_already_held_by_its_hook_reads_nothing() -> Result<(), Failure> {
+    let asking = Asking::over(&[Asking::PICKED])?;
     let held = "{\"hook_event_name\":\"Stop\",\"stop_hook_active\":true,\"last_assistant_message\":\"Should the lint limit change?\"}";
     let stopped = asking.asked(held, &["hook", "stop"]);
-    assert_eq!((stopped.outcome?, stopped.prompts.len()), (Outcome::Hooked(HookEvent::Stop), 1));
+    assert_eq!((stopped.outcome?, stopped.prompts.len()), (Outcome::Hooked(HookEvent::Stop), 0));
     Ok(())
 }
 
-struct Waits;
-
-struct Stop {
-    asked: Asked,
-    trail: Vec<String>,
-    listed: Asked,
-}
-
-impl Waits {
-    const LIVE: &str = "{\"waiting_on\":\"shell\",\"deadlock\":false}";
-    const IDLE: &str = "{\"waiting_on\":\"agent\",\"deadlock\":true}";
-    const NOTHING: &str = "{\"waiting_on\":\"nothing\",\"deadlock\":true}";
-    const TEAMMATE: &str = "<teammate-message teammate_id=\"eval-owner\">idle</teammate-message>";
-
-    fn entry(kind: &str, uuid: &str, at: &str, body: &Value) -> String {
-        let mut entry =
-            serde_json::json!({"type": kind, "uuid": uuid, "parentUuid": null, "sessionId": "s", "timestamp": at});
-        entry
-            .as_object_mut()
-            .into_iter()
-            .for_each(|fields| fields.extend(body.as_object().cloned().unwrap_or_default()));
-        format!("{entry}\n")
-    }
-
-    fn launched(at: &str) -> String {
-        let tool = serde_json::json!({"type": "tool_use", "id": "toolu_1", "name": "Bash", "input": {"run_in_background": true}});
-        Waits::entry("assistant", "t1", at, &serde_json::json!({"message": {"model": "claude", "content": [tool]}}))
-    }
-
-    fn ended() -> String {
-        let notice =
-            "<task-notification><tool-use-id>toolu_1</tool-use-id><status>completed</status></task-notification>";
-        let queued =
-            serde_json::json!({"type": "queued_command", "prompt": notice, "origin": {"kind": "task-notification"}});
-        let relayed = serde_json::json!({"message": {"content": Waits::TEAMMATE}});
-        [
-            Waits::entry("attachment", "n1", "2027-01-15T07:40:00Z", &serde_json::json!({"attachment": queued})),
-            Waits::entry("user", "r1", "2027-01-15T07:41:00Z", &relayed),
-        ]
-        .concat()
-    }
-
-    fn stopped(extra: &str, replies: &[&str]) -> Result<Stop, laws::Unmet> {
-        let base = [
-            Session::line(Speaker::Owner, "o1", "null", Asking::RULED),
-            Session::line(Speaker::Lead, "l1", "\"o1\"", "should the queue keep its order"),
-            Session::line(Speaker::Owner, "o2", "\"l1\"", Asking::QUEUED),
-            Session::line(Speaker::Lead, "l2", "\"o2\"", "noted"),
-        ];
-        let asking = Asking::spoken([base.concat(), extra.to_owned()].concat(), replies)?;
-        let stopping = serde_json::json!({"hook_event_name": "Stop", "stop_hook_active": false, "session_id": "s",
-            "last_assistant_message": "I'll merge it once CI is green."});
-        let asked = asking.asked(&stopping.to_string(), &["hook", "stop"]);
-        let listed = asking.asked("", &["stops"]);
-        let run = Run::root();
-        let rows = run.port(asking.store).read(StopTrail)?;
-        run.finish().settled()?;
-        Ok(Stop { asked, trail: rows.iter().map(ToString::to_string).collect(), listed })
-    }
-
-    fn reason(asked: &Asked) -> String {
-        serde_json::from_str::<Value>(&asked.text)
-            .into_iter()
-            .find_map(|decision| decision.get("reason").and_then(Value::as_str).map(str::to_owned))
-            .unwrap_or_default()
-    }
-
-    fn deadlocked(reply: &str, named: &str, awaited: &str) -> Result<(), laws::Unmet> {
-        let transcript = [Waits::launched("2027-01-15T07:30:00Z"), Waits::ended()].concat();
-        let Stop { asked: stopped, trail, .. } =
-            Waits::stopped(&transcript, &[Asking::COVERED, Asking::STATEMENT, reply])?;
-        assert_eq!(trail, vec![format!("s\tstatement\t0\t0\t0\t{awaited}\tdeadlock\tblocked")]);
-        let asked = stopped.prompts.last().cloned().unwrap_or_default();
-        let reason = Waits::reason(&stopped);
-        assert_eq!(stopped.outcome?, Outcome::Blocked);
-        assert!(reason.contains(&format!("STALLED: you ended your turn waiting on {named}, and nothing")), "{reason}");
-        assert!(asked.contains("Background tasks still running (launch id):\n- none\n"), "{asked}");
-        assert!(
-            asked.contains(&format!("- relayed 2027-01-15T07:41:00Z (19 min ago): {}", Waits::TEAMMATE)),
-            "{asked}"
-        );
-        assert!(asked.contains("- notice 2027-01-15T07:40:00Z (20 min ago): <task-notification>"), "{asked}");
-        Ok(())
-    }
-}
-
 #[test]
-fn a_stop_with_a_background_task_past_an_hour_blocks_as_overrun_without_asking_haiku() -> Result<(), laws::Unmet> {
-    let Stop { asked: stopped, trail, listed } =
-        Waits::stopped(&Waits::launched("2027-01-15T06:30:00Z"), &[Asking::COVERED, Asking::STATEMENT])?;
-    assert_eq!(trail, ["s\tstatement\t0\t0\t0\tunchecked\toverrun\tblocked"]);
-    assert_eq!(listed.outcome?, Outcome::Trailed);
-    golden::golden!("stops.txt", &listed.text);
-    let reason = Waits::reason(&stopped);
-    assert_eq!(stopped.outcome?, Outcome::Blocked);
+fn a_stop_with_nothing_running_blocks_as_stalled_with_the_quotes_that_bear_on_it() -> Result<(), laws::Unmet> {
+    let asking = Asking::over(&[Asking::PICKED, Asking::KEPT])?;
+    Tasked::placed(&asking, "b1.output", Tasked::EXITED, [5, 4])?;
+    Tasked::placed(&asking, "a1.output", Tasked::ENDED, [5, 1])?;
+    let Stop { asked, reason, trail, listed } = Tasked::stopped(&asking)?;
+    assert_eq!(asked.outcome?, Outcome::Blocked);
+    assert!(reason.contains("Nothing is running: no background shell or agent will wake you"), "{reason}");
     assert!(
-        reason.contains("OVERRUN: background task toolu_1 has run 90 minutes, past the 60-minute limit"),
+        reason.contains(&format!("Earlier owner words bearing on this:\no1 2026-01-01T00:00:00Z: {}", Asking::QUOTED)),
         "{reason}"
     );
-    assert_eq!(stopped.prompts.len(), 2);
+    assert_eq!(trail, ["s\t0\t0\tstalled\t2\t1\t1\tblocked\t74\t0"]);
+    assert_eq!(listed.outcome?, Outcome::Trailed);
+    golden::golden!("stops.txt", &listed.text);
     Ok(())
 }
 
 #[test]
-fn a_stop_waiting_on_a_live_task_shows_haiku_the_task_and_passes() -> Result<(), laws::Unmet> {
-    let Stop { asked: stopped, trail, .. } =
-        Waits::stopped(&Waits::launched("2027-01-15T07:30:00Z"), &[Asking::COVERED, Asking::STATEMENT, Waits::LIVE])?;
-    assert_eq!(trail, ["s\tstatement\t0\t0\t0\tshell\tlive\tpassed"]);
-    let asked = stopped.prompts.last().cloned().unwrap_or_default();
-    assert_eq!(stopped.outcome?, Outcome::Hooked(HookEvent::Stop));
-    assert!(asked.contains("running (launch id):\n- launch 2027-01-15T07:30:00Z (30 min ago): toolu_1\n"), "{asked}");
-    assert!(asked.contains("The lead's final message:\nI'll merge it once CI is green."), "{asked}");
-    Ok(())
-}
-
-#[test]
-fn a_task_at_exactly_the_limit_is_not_yet_an_overrun() -> Result<(), laws::Unmet> {
-    let Stop { asked, trail, .. } =
-        Waits::stopped(&Waits::launched("2027-01-15T07:00:00Z"), &[Asking::COVERED, Asking::STATEMENT, Waits::LIVE])?;
-    assert_eq!(trail, ["s\tstatement\t0\t0\t0\tshell\tlive\tpassed"]);
+fn a_stop_while_a_ci_wait_shell_runs_is_not_stalled_and_passes_without_quotes() -> Result<(), laws::Unmet> {
+    let asking = Asking::over(&[Asking::NONE])?;
+    Tasked::placed(&asking, "b1.output", "", [4, 4])?;
+    let Stop { asked, trail, .. } = Tasked::stopped(&asking)?;
     assert_eq!(asked.outcome?, Outcome::Hooked(HookEvent::Stop));
+    assert_eq!(trail, ["s\t1\t0\tlive\t2\t0\t0\tpassed\t37\t0"]);
     Ok(())
 }
 
 #[test]
-fn a_stop_waiting_on_an_idle_agent_blocks_as_deadlocked() -> Result<(), laws::Unmet> {
-    Waits::deadlocked(Waits::IDLE, "an agent", "agent")
+fn a_stop_while_an_agent_works_is_not_stalled_whether_it_waits_on_a_tool_result_or_calls_one() -> Result<(), laws::Unmet>
+{
+    [Tasked::WORKING, Tasked::CALLING].iter().try_for_each(|last| {
+        let asking = Asking::over(&[Asking::NONE])?;
+        Tasked::placed(&asking, "a1.output", last, [40, 2])?;
+        let Stop { asked, trail, .. } = Tasked::stopped(&asking)?;
+        assert_eq!(asked.outcome?, Outcome::Hooked(HookEvent::Stop));
+        assert_eq!(trail, ["s\t0\t1\tlive\t2\t0\t0\tpassed\t37\t0"]);
+        Ok::<(), laws::Unmet>(())
+    })
 }
 
 #[test]
-fn a_stop_waiting_on_nothing_blocks_as_deadlocked() -> Result<(), laws::Unmet> {
-    Waits::deadlocked(Waits::NOTHING, "nothing", "nothing")
-}
-
-#[test]
-fn a_stop_asking_an_answered_question_trails_what_it_read_quoted_and_kept() -> Result<(), laws::Unmet> {
-    let replies = [Asking::COVERED, Asking::LINT, Asking::PICKED, Asking::KEPT, Waits::LIVE];
-    let Stop { asked, trail, .. } = Waits::stopped(&Waits::launched("2027-01-15T07:30:00Z"), &replies)?;
-    assert_eq!(trail, ["s\tquestion\t2\t1\t1\tshell\tlive\tblocked"]);
+fn a_live_stop_with_quotes_blocks_once_with_only_the_quotes() -> Result<(), laws::Unmet> {
+    let asking = Asking::over(&[Asking::PICKED, Asking::KEPT])?;
+    Tasked::placed(&asking, "b1.output", "", [4, 4])?;
+    let Stop { asked, reason, trail, .. } = Tasked::stopped(&asking)?;
     assert_eq!(asked.outcome?, Outcome::Blocked);
+    assert_eq!(
+        reason.parse::<Lines>().into_iter().flatten().collect::<Vec<String>>(),
+        ["Earlier owner words bearing on this:".to_owned(), format!("o1 2026-01-01T00:00:00Z: {}", Asking::QUOTED)]
+    );
+    assert_eq!(trail, ["s\t1\t0\tlive\t2\t1\t1\tblocked\t74\t0"]);
+    Ok(())
+}
+
+#[test]
+fn a_shell_silent_for_twenty_minutes_overruns_once_and_an_attended_one_does_not_excuse_the_stop()
+-> Result<(), laws::Unmet> {
+    let asking = Asking::over(&[Asking::NONE, Asking::NONE])?;
+    Tasked::placed(&asking, "bhung.output", "", [50, 21])?;
+    Tasked::placed(&asking, "bwatched.output", "progress\n", [50, 3])?;
+    let Stop { asked, reason, trail, .. } = Tasked::stopped(&asking)?;
+    let again = Tasked::stopped(&asking)?;
+    assert_eq!(asked.outcome?, Outcome::Blocked);
+    assert!(reason.contains("OVERRUN: these background tasks ran 20 minutes without finishing or writing output; check and stop them: bhung"), "{reason}");
+    assert!(again.reason.contains("Nothing is running"), "{}", again.reason);
+    assert_eq!(again.trail, ["s\t0\t0\toverrun\t2\t0\t0\tblocked\t37\t0", "s\t0\t0\tstalled\t2\t0\t0\tblocked\t37\t0"]);
+    assert_eq!(trail.len(), 1);
+    Ok(())
+}
+
+#[test]
+fn a_shell_started_exactly_twenty_minutes_ago_no_longer_excuses_the_stop() -> Result<(), laws::Unmet> {
+    let asking = Asking::over(&[Asking::NONE])?;
+    Tasked::placed(&asking, "b1.output", "", [20, 1])?;
+    let Stop { trail, .. } = Tasked::stopped(&asking)?;
+    assert_eq!(trail, ["s\t0\t0\tstalled\t2\t0\t0\tblocked\t37\t0"]);
+    Ok(())
+}
+
+#[test]
+fn a_stop_with_no_transcript_path_makes_no_stall_claim() -> Result<(), laws::Unmet> {
+    let asking = Asking::over(&[Asking::NONE])?;
+    let stopping = "{\"hook_event_name\":\"Stop\",\"stop_hook_active\":false,\"session_id\":\"s\",\"last_assistant_message\":\"done\"}";
+    let stopped = asking.asked(stopping, &["hook", "stop"]);
+    assert_eq!(stopped.outcome?, Outcome::Hooked(HookEvent::Stop));
     Ok(())
 }
