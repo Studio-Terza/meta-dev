@@ -44,7 +44,7 @@ fn every_lint_prints_its_golden_over_its_fixture_and_every_violation_names_its_f
     Ok(())
 }
 
-struct Corpus;
+pub(crate) struct Corpus;
 
 struct Copied {
     path: PathBuf,
@@ -103,20 +103,23 @@ impl Corpus {
         Ok(format!("{}{}{verdict}", String::from_utf8(printed)?, String::from_utf8(failed)?))
     }
 
-    fn lints() -> usize {
+    const REGISTERED: [&str; 11] = [
+        "    Filed<",
+        "    Swept<",
+        "    Kin<",
+        "    Judged<",
+        "    Ruled<",
+        "    Primed<",
+        "    Grounded<",
+        "    Modelled<",
+        "::dirty(&system)",
+        "ModelLint>::report(model)",
+        "WorkspaceLint>::report",
+    ];
+
+    pub(crate) fn lints() -> usize {
         let runner = include_str!("../src/cli/mode/lints.rs");
-        [
-            "::report(readout.files())",
-            "flows.report::<",
-            "::dirty(&system)",
-            "::of_names(extraction.names())",
-            "ModelLint>::report",
-            "WorkspaceLint>::report",
-            "as Registered>::ENTRY",
-        ]
-        .iter()
-        .map(|call| runner.matches(call).count())
-        .sum::<usize>()
+        Self::REGISTERED.iter().map(|call| runner.matches(call).count()).sum::<usize>()
     }
 
     fn violation(line: &str) -> Option<Violation<'_>> {

@@ -1781,6 +1781,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-no-dyn"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-file",
+ "lint-fixtures",
+ "lint-layout",
+ "syntax-lexer",
+]
+
+[[package]]
 name = "lint-no-early-exits"
 version = "0.1.0"
 dependencies = [
@@ -2172,6 +2183,7 @@ dependencies = [
  "lint-named-numbers",
  "lint-narrowed-returns",
  "lint-no-comments",
+ "lint-no-dyn",
  "lint-no-early-exits",
  "lint-no-forwarders",
  "lint-no-free-fns",

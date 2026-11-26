@@ -36,11 +36,8 @@ impl SweptLint for ConstShape {
         Headline::new("casts live in const fns or boundary modules, and const loops walk slices");
     const READS: Reads = Reads::Every;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Contributing::new(ConstContexts {
-            path: AsRef::<Path>::as_ref(file.head()),
-            zone: Zone::of_file(file),
-        }))
+    fn watcher(file: &SourceFile) -> impl Finds<'_> {
+        Contributing::new(ConstContexts { path: AsRef::<Path>::as_ref(file.head()), zone: Zone::of_file(file) })
     }
 }
 

@@ -20,8 +20,8 @@ impl SweptLint for VecOutParams {
     );
     const READS: Reads = Reads::Every;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Contributing::new(OutParams { path: AsRef::<Path>::as_ref(file.head()) }))
+    fn watcher(file: &SourceFile) -> impl Finds<'_> {
+        Contributing::new(OutParams { path: AsRef::<Path>::as_ref(file.head()) })
     }
 }
 

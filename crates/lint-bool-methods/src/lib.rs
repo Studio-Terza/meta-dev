@@ -13,7 +13,7 @@ impl SweptLint for BoolMethods {
         Headline::new("a function returning bool forgets what it found and makes the caller branch on a flag");
     const READS: Reads = Reads::Shipped;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Contributing::new(Returns::from(file)))
+    fn watcher(file: &SourceFile) -> impl Finds<'_> {
+        Contributing::new(Returns::from(file))
     }
 }

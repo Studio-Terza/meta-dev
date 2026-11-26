@@ -1,57 +1,42 @@
 use lint_core::{SourceFile, Violation};
-use lint_sweep::{Finds, Member, Sorts};
+use lint_sweep::{Found, Member, Ranked, Visited};
 
-pub type Start = for<'file> fn(&'file SourceFile) -> Box<dyn Finds<'file> + 'file>;
-
-pub type SortStart = for<'file> fn(&'file SourceFile) -> Box<dyn Sorts<'file> + 'file>;
-
-pub type Scan = for<'file> fn(&'file SourceFile) -> Vec<Violation<'file>>;
-
-pub type SortedScan = for<'file> fn(&'file SourceFile) -> Vec<Vec<Violation<'file>>>;
-
-#[derive(Clone, Copy, Debug)]
-pub enum Lead {
-    Swept(Start),
-    Sorting(SortStart),
-    Scanned(SortedScan),
-    Filed(Scan),
+#[derive(Debug)]
+pub struct Led<'file> {
+    lists: Vec<Vec<Violation<'file>>>,
+    visited: Option<Visited>,
 }
 
-impl Lead {
+impl<'file> Led<'file> {
     #[must_use]
-    pub fn swept(self) -> Option<Start> {
-        match self {
-            Lead::Swept(start) => Some(start),
-            Lead::Sorting(_) | Lead::Scanned(_) | Lead::Filed(_) => None,
-        }
+    pub fn visited(&self) -> Option<Visited> {
+        self.visited
     }
 
-    #[must_use]
-    pub fn sorting(self) -> Option<SortStart> {
-        match self {
-            Lead::Sorting(start) => Some(start),
-            Lead::Swept(_) | Lead::Scanned(_) | Lead::Filed(_) => None,
-        }
+    pub fn member(&mut self, member: Member) -> Vec<Violation<'file>> {
+        self.lists.get_mut(member.index()).map_or_default(std::mem::take)
     }
+}
 
-    #[must_use]
-    pub fn scanned(self, file: &SourceFile) -> Option<Vec<Vec<Violation<'_>>>> {
-        match self {
-            Lead::Scanned(scan) => Some(scan(file)),
-            Lead::Filed(scan) => Some(vec![scan(file)]),
-            Lead::Swept(_) | Lead::Sorting(_) => None,
-        }
+impl<'file> From<Found<'file>> for Led<'file> {
+    fn from(found: Found<'file>) -> Led<'file> {
+        let visited = Some(found.visited());
+        Led { lists: vec![found.into_iter().collect()], visited }
     }
+}
 
-    #[must_use]
-    pub fn member_of(self, file: &SourceFile, member: Member) -> Vec<Violation<'_>> {
-        let swept = self.swept().map(|start| vec![start(file).found(file).into_iter().collect()]);
-        let sorted = self.sorting().map(|start| Vec::from(start(file).sorted(file)));
-        let lists = self.scanned(file).or(swept).or(sorted).unwrap_or_default();
-        lists.into_iter().nth(member.index()).unwrap_or_default()
+impl<'file> From<Ranked<'file>> for Led<'file> {
+    fn from(ranked: Ranked<'file>) -> Led<'file> {
+        Led::from(Vec::from(ranked))
+    }
+}
+
+impl<'file> From<Vec<Vec<Violation<'file>>>> for Led<'file> {
+    fn from(lists: Vec<Vec<Violation<'file>>>) -> Led<'file> {
+        Led { lists, visited: None }
     }
 }
 
 pub trait Leader: 'static {
-    const LEAD: Lead;
+    fn led(file: &SourceFile) -> Led<'_>;
 }

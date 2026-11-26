@@ -40,8 +40,8 @@ impl SweptLint for LiteralNames {
     const HEADLINE: Headline = Headline::new("function names say what the function does");
     const READS: Reads = Reads::Shipped;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Contributing::new(VagueNames { path: AsRef::<Path>::as_ref(file.head()) }))
+    fn watcher(file: &SourceFile) -> impl Finds<'_> {
+        Contributing::new(VagueNames { path: AsRef::<Path>::as_ref(file.head()) })
     }
 }
 

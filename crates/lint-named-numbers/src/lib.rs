@@ -4,7 +4,7 @@ use boundary::Numeral;
 use lint_core::{Headline, Parsed};
 use lint_file::{ContextLint, Reads, WatchingLint};
 use lint_sweep::Gathers;
-use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Finds, Kind, Watchers};
+use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Finds, Kind};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -63,12 +63,11 @@ impl ContextLint for NamedNumbers {
 
 impl WatchingLint for NamedNumbers {
     type Found<'file> = Vec<Violation<'file>>;
-    type Watched<'file> = Watchers<'file>;
+    type Watched<'file> = Counted<'file>;
 
-    fn watched(file: &SourceFile) -> Watchers<'_> {
+    fn watched(file: &SourceFile) -> Counted<'_> {
         let counted = Gate::BOUNDARY.admits(file.head(), None).unwrap_or(Some(file));
-        let numbers = counted.map(|found| Contributing::new(Numbers { path: AsRef::<Path>::as_ref(found.head()) }));
-        numbers.into_iter().map(|watched| -> Box<dyn Finds<'_> + '_> { Box::new(watched) }).collect()
+        Counted(counted.map(|found| Contributing::new(Numbers { path: AsRef::<Path>::as_ref(found.head()) })))
     }
 
     fn judged<'file, 'head: 'file>(
@@ -98,6 +97,15 @@ impl NamedNumbers {
 #[derive(Debug)]
 struct Numbers<'file> {
     path: &'file Path,
+}
+
+#[derive(Debug)]
+pub struct Counted<'file>(Option<Contributing<Numbers<'file>>>);
+
+impl<'file> Gathers<Vec<Violation<'file>>> for Counted<'file> {
+    fn gathered(self, file: &SourceFile) -> Vec<Violation<'file>> {
+        self.0.into_iter().flat_map(|watcher| watcher.found(file)).collect()
+    }
 }
 
 type Lines = Contributed<(), Vec<LineNumber>>;

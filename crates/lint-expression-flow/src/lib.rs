@@ -81,8 +81,8 @@ impl SweptLint for ExpressionFlow {
         Headline::new("control flow is an expression; every branch yields the value the function returns");
     const READS: Reads = Reads::Shipped;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Contributing::new(Flows { path: AsRef::<Path>::as_ref(file.head()) }))
+    fn watcher(file: &SourceFile) -> impl Finds<'_> {
+        Contributing::new(Flows { path: AsRef::<Path>::as_ref(file.head()) })
     }
 }
 

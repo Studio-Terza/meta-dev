@@ -26,9 +26,9 @@ impl SweptLint for NoNumbersInBinaries {
     const HEADLINE: Headline = Headline::new("a binary is wiring: a number it needs is a setting in its config file");
     const READS: Reads = Reads::Every;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
+    fn watcher(file: &SourceFile) -> impl Finds<'_> {
         let kinds = file.head().binary().map_or(&[][..], |_| &[Kind::ItemMod, Kind::LitInt, Kind::LitFloat][..]);
-        Box::new(Contributing::new(Numbers { path: AsRef::<Path>::as_ref(file.head()), kinds }))
+        Contributing::new(Numbers { path: AsRef::<Path>::as_ref(file.head()), kinds })
     }
 }
 

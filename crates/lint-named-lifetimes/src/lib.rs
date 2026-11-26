@@ -26,8 +26,8 @@ impl SweptLint for NamedLifetimes {
     const HEADLINE: Headline = Headline::new("lifetimes are named with a word, never a letter");
     const READS: Reads = Reads::Every;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Contributing::new(ShortLifetimes { path: AsRef::<Path>::as_ref(file.head()) }))
+    fn watcher(file: &SourceFile) -> impl Finds<'_> {
+        Contributing::new(ShortLifetimes { path: AsRef::<Path>::as_ref(file.head()) })
     }
 }
 

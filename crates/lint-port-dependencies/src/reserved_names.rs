@@ -7,7 +7,7 @@ use std::borrow::Borrow;
 use syntax_lexer::TokenTable;
 
 use lint_core::{Finding, Site, SourceFile, Violation};
-use lint_file::{Lead, Leader};
+use lint_file::{Leader, Led};
 use lint_layout::{LineNumber, Name, Whole, Word};
 use lint_sweep::Member;
 
@@ -29,7 +29,9 @@ struct Spelled {
 pub struct ReservedNames;
 
 impl Leader for ReservedNames {
-    const LEAD: Lead = Lead::Scanned(ReservedNames::sorted);
+    fn led(file: &SourceFile) -> Led<'_> {
+        Led::from(Self::sorted(file))
+    }
 }
 
 impl ReservedNames {

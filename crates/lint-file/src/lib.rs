@@ -10,7 +10,7 @@ use lint_core::{Headline, Lint, Parsed, Report, SourceFile, Violation};
 use lint_sweep::{Finds, Gathers, Member, Sweep};
 
 pub use concluded::{Concluded, Listed};
-pub use lead::{Lead, Leader, SortStart, Start};
+pub use lead::{Leader, Led};
 pub use model_lint::ModelLint;
 pub use workspace_lint::WorkspaceLint;
 
@@ -41,7 +41,7 @@ pub trait SweptLint {
     const HEADLINE: Headline;
     const READS: Reads;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_>;
+    fn watcher(file: &SourceFile) -> impl Finds<'_>;
 }
 
 pub trait KinLint {
@@ -97,11 +97,15 @@ pub struct Judged<Checked>(PhantomData<Checked>);
 pub struct Ruled<Checked>(PhantomData<Checked>);
 
 impl<Checked: FileLint + 'static> Leader for Filed<Checked> {
-    const LEAD: Lead = Lead::Filed(Checked::violations);
+    fn led(file: &SourceFile) -> Led<'_> {
+        Led::from(vec![Checked::violations(file)])
+    }
 }
 
 impl<Checked: SweptLint + 'static> Leader for Swept<Checked> {
-    const LEAD: Lead = Lead::Swept(Checked::watcher);
+    fn led(file: &SourceFile) -> Led<'_> {
+        Led::from(Sweep::found(file, Checked::watcher(file)))
+    }
 }
 
 impl<Checked: FileLint> Lint for Filed<Checked> {
@@ -121,7 +125,7 @@ impl<Checked: SweptLint> Lint for Swept<Checked> {
 impl<Checked: KinLint> Lint for Kin<Checked> {
     fn report(files: &[SourceFile]) -> Report<'_> {
         let read = files.iter().filter_map(|file| Checked::READS.admits(file));
-        let found = read.flat_map(|file| Checked::Leader::LEAD.member_of(file, Checked::MEMBER));
+        let found = read.flat_map(|file| Checked::Leader::led(file).member(Checked::MEMBER));
         Report::new(Checked::HEADLINE, found.collect())
     }
 }

@@ -13,7 +13,7 @@ impl SweptLint for NoEarlyExits {
         Headline::new("a body leaves through its tail value or ?, never through return, break or continue");
     const READS: Reads = Reads::Every;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Contributing::new(Exits::from(file)))
+    fn watcher(file: &SourceFile) -> impl Finds<'_> {
+        Contributing::new(Exits::from(file))
     }
 }

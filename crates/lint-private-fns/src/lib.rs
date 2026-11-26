@@ -26,8 +26,8 @@ impl SweptLint for PrivateFns {
         Headline::new("too many private fns; a type's logic belongs in its interface or in more types");
     const READS: Reads = Reads::Shipped;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Contributing::new(PrivateFnCounter { file }))
+    fn watcher(file: &SourceFile) -> impl Finds<'_> {
+        Contributing::new(PrivateFnCounter { file })
     }
 }
 

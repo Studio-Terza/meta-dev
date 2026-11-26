@@ -92,8 +92,8 @@ impl SweptLint for FnShape {
         Headline::new("hairy control flow; booleans and tuples become types, nesting becomes methods");
     const READS: Reads = Reads::Shipped;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Contributing::new(Shapes { path: AsRef::<Path>::as_ref(file.head()) }))
+    fn watcher(file: &SourceFile) -> impl Finds<'_> {
+        Contributing::new(Shapes { path: AsRef::<Path>::as_ref(file.head()) })
     }
 }
 

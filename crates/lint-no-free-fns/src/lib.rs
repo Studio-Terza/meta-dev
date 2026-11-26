@@ -39,8 +39,8 @@ impl SweptLint for NoFreeFns {
         Headline::new("free functions are not allowed; make them associated functions or methods");
     const READS: Reads = Reads::Every;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Contributing::new(FreeFns { path: AsRef::<StdPath>::as_ref(file.head()) }))
+    fn watcher(file: &SourceFile) -> impl Finds<'_> {
+        Contributing::new(FreeFns { path: AsRef::<StdPath>::as_ref(file.head()) })
     }
 }
 

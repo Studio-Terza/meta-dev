@@ -18,8 +18,8 @@ impl SweptLint for LongExactStrings {
     const HEADLINE: Headline = Headline::new("assertions do not pin long text");
     const READS: Reads = Reads::Every;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
+    fn watcher(file: &SourceFile) -> impl Finds<'_> {
         let asserting = file.text().mentioning(&Self::NAMED).map(|_| AsRef::<Path>::as_ref(file.head()));
-        Box::new(Contributing::new(Assertions::new(file, asserting)))
+        Contributing::new(Assertions::new(file, asserting))
     }
 }

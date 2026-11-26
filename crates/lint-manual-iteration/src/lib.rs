@@ -71,8 +71,8 @@ impl SweptLint for ManualIteration {
     const HEADLINE: Headline = Headline::new("iterators are driven by combinators, not by hand");
     const READS: Reads = Reads::Shipped;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Contributing::new(Iterations { path: AsRef::<Path>::as_ref(file.head()) }))
+    fn watcher(file: &SourceFile) -> impl Finds<'_> {
+        Contributing::new(Iterations { path: AsRef::<Path>::as_ref(file.head()) })
     }
 }
 
