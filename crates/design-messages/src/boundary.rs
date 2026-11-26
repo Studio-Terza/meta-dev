@@ -122,7 +122,7 @@ impl From<&Message> for MessageRow {
 impl HeardEvent {
     pub(crate) fn in_session(
         session: &SessionId,
-        statements: &mut Statements<'_>,
+        statements: &mut impl Execute,
     ) -> Result<Vec<HeardEvent>, StoreFailure> {
         statements.rows(store_ports::query!(
             HeardEvent,
@@ -651,9 +651,9 @@ VALUES
 }
 
 impl Row for EventRow {
-    fn written(&self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn inserted(&self) -> Prepared<()> {
         let EventRow { uuid, session, at, happening, body } = self;
-        statements.written(store_ports::query!(
+        store_ports::query!(
             r#"
 INSERT
   OR IGNORE INTO events (uuid, session, at, happening, body)
@@ -665,7 +665,7 @@ VALUES
             at: Instant,
             happening: Happening,
             body: Body
-        ))
+        )
     }
 }
 

@@ -254,7 +254,7 @@ impl Waits {
         .concat()
     }
 
-    fn stopped(extra: &str, replies: &[&str]) -> Result<Stop, Box<dyn Error>> {
+    fn stopped(extra: &str, replies: &[&str]) -> Result<Stop, laws::Unmet> {
         let base = [
             Session::line(Speaker::Owner, "o1", "null", Asking::RULED),
             Session::line(Speaker::Lead, "l1", "\"o1\"", "should the queue keep its order"),
@@ -279,7 +279,7 @@ impl Waits {
             .unwrap_or_default()
     }
 
-    fn deadlocked(reply: &str, named: &str, awaited: &str) -> Result<(), Box<dyn Error>> {
+    fn deadlocked(reply: &str, named: &str, awaited: &str) -> Result<(), laws::Unmet> {
         let transcript = [Waits::launched("2027-01-15T07:30:00Z"), Waits::ended()].concat();
         let Stop { asked: stopped, trail, .. } =
             Waits::stopped(&transcript, &[Asking::COVERED, Asking::STATEMENT, reply])?;
@@ -299,7 +299,7 @@ impl Waits {
 }
 
 #[test]
-fn a_stop_with_a_background_task_past_an_hour_blocks_as_overrun_without_asking_haiku() -> Result<(), Box<dyn Error>> {
+fn a_stop_with_a_background_task_past_an_hour_blocks_as_overrun_without_asking_haiku() -> Result<(), laws::Unmet> {
     let Stop { asked: stopped, trail, listed } =
         Waits::stopped(&Waits::launched("2027-01-15T06:30:00Z"), &[Asking::COVERED, Asking::STATEMENT])?;
     assert_eq!(trail, ["s\tstatement\t0\t0\t0\tunchecked\toverrun\tblocked"]);
@@ -316,7 +316,7 @@ fn a_stop_with_a_background_task_past_an_hour_blocks_as_overrun_without_asking_h
 }
 
 #[test]
-fn a_stop_waiting_on_a_live_task_shows_haiku_the_task_and_passes() -> Result<(), Box<dyn Error>> {
+fn a_stop_waiting_on_a_live_task_shows_haiku_the_task_and_passes() -> Result<(), laws::Unmet> {
     let Stop { asked: stopped, trail, .. } =
         Waits::stopped(&Waits::launched("2027-01-15T07:30:00Z"), &[Asking::COVERED, Asking::STATEMENT, Waits::LIVE])?;
     assert_eq!(trail, ["s\tstatement\t0\t0\t0\tshell\tlive\tpassed"]);
@@ -328,7 +328,7 @@ fn a_stop_waiting_on_a_live_task_shows_haiku_the_task_and_passes() -> Result<(),
 }
 
 #[test]
-fn a_task_at_exactly_the_limit_is_not_yet_an_overrun() -> Result<(), Box<dyn Error>> {
+fn a_task_at_exactly_the_limit_is_not_yet_an_overrun() -> Result<(), laws::Unmet> {
     let Stop { asked, trail, .. } =
         Waits::stopped(&Waits::launched("2027-01-15T07:00:00Z"), &[Asking::COVERED, Asking::STATEMENT, Waits::LIVE])?;
     assert_eq!(trail, ["s\tstatement\t0\t0\t0\tshell\tlive\tpassed"]);
@@ -337,17 +337,17 @@ fn a_task_at_exactly_the_limit_is_not_yet_an_overrun() -> Result<(), Box<dyn Err
 }
 
 #[test]
-fn a_stop_waiting_on_an_idle_agent_blocks_as_deadlocked() -> Result<(), Box<dyn Error>> {
+fn a_stop_waiting_on_an_idle_agent_blocks_as_deadlocked() -> Result<(), laws::Unmet> {
     Waits::deadlocked(Waits::IDLE, "an agent", "agent")
 }
 
 #[test]
-fn a_stop_waiting_on_nothing_blocks_as_deadlocked() -> Result<(), Box<dyn Error>> {
+fn a_stop_waiting_on_nothing_blocks_as_deadlocked() -> Result<(), laws::Unmet> {
     Waits::deadlocked(Waits::NOTHING, "nothing", "nothing")
 }
 
 #[test]
-fn a_stop_asking_an_answered_question_trails_what_it_read_quoted_and_kept() -> Result<(), Box<dyn Error>> {
+fn a_stop_asking_an_answered_question_trails_what_it_read_quoted_and_kept() -> Result<(), laws::Unmet> {
     let replies = [Asking::COVERED, Asking::LINT, Asking::PICKED, Asking::KEPT, Waits::LIVE];
     let Stop { asked, trail, .. } = Waits::stopped(&Waits::launched("2027-01-15T07:30:00Z"), &replies)?;
     assert_eq!(trail, ["s\tquestion\t2\t1\t1\tshell\tlive\tblocked"]);
