@@ -12,7 +12,6 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
-use cargo_ports::Recorded;
 use file_ports::{Bytes, FileFailure, Files, Memory};
 
 use crate::fakes::{FakeCounted, FakeLinked, FakeUnlistable, FakeUnsized};
@@ -27,7 +26,6 @@ const SHALLOW_NESTING: usize = 100;
 const MIDDLING_NESTING: usize = 200;
 const MANIFEST: &str = "[package]\nname = \"r\"\n";
 const MOST_READERS: usize = 4;
-const NO_DEPENDENCIES: &str = "{\"workspace_root\": \"/\", \"packages\": []}";
 
 #[test]
 fn every_lint_reports_over_the_same_files() -> Result<(), Failed> {
@@ -80,37 +78,6 @@ fn the_report_flag_fails_on_an_unreadable_root() {
 }
 
 #[test]
-fn the_gate_refuses_a_workspace_cargo_cannot_describe() -> Result<(), Failed> {
-    let root = Scratch::package()?;
-    root.write("src/lib.rs", CLEAN)?;
-    let (mut out, mut err) = (Vec::new(), Vec::new());
-    let gate = Cli::from_args([OsString::from(&root.root)].into_iter()).report_to(
-        Ports::new(
-            &root.files,
-            [(PathBuf::from("/"), Bytes::from("not json"))].into_iter().collect::<Recorded>(),
-            Monotonic::default(),
-        ),
-        &mut out,
-        &mut err,
-    );
-    let (mut report_out, mut report_err) = (Vec::new(), Vec::new());
-    let report = Cli::from_args([OsString::from("--report"), OsString::from(&root.root)].into_iter()).report_to(
-        Ports::new(
-            &root.files,
-            [(PathBuf::from("/"), Bytes::from("not json"))].into_iter().collect::<Recorded>(),
-            Monotonic::default(),
-        ),
-        &mut report_out,
-        &mut report_err,
-    );
-    assert_eq!(gate, ExitCode::FAILURE);
-    assert_ne!(err, Vec::<u8>::new());
-    assert_eq!(out, Vec::<u8>::new());
-    assert_eq!(report, ExitCode::SUCCESS);
-    Ok(())
-}
-
-#[test]
 fn the_verdict_names_what_the_run_decided() -> Result<(), Failed> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", "pub struct A;\n")?;
@@ -119,11 +86,7 @@ fn the_verdict_names_what_the_run_decided() -> Result<(), Failed> {
     let mut err = Vec::new();
     let unwritten = [&["--timings"][..], &["--report"]].map(|flags| {
         Cli::from_args(flags.iter().map(OsString::from).chain([OsString::from(&root.root)])).verdict(
-            Ports::new(
-                &root.files,
-                [(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
-                Monotonic::default(),
-            ),
+            Ports::new(&root.files, Monotonic::default()),
             &mut <&mut [u8]>::default(),
             &mut err,
         )
@@ -132,24 +95,6 @@ fn the_verdict_names_what_the_run_decided() -> Result<(), Failed> {
     assert_eq!([clean, root.verdict(&[]), unreadable], [Verdict::Clean, Verdict::Violations, Verdict::Refused]);
     assert_eq!(unwritten, [Verdict::Refused; 2]);
     assert_eq!(String::from_utf8(err)?.matches("cannot write the output").count(), 2);
-    Ok(())
-}
-
-#[test]
-fn a_cargo_metadata_failure_refuses_the_run_once_rather_than_flagging_each_derive() -> Result<(), Failed> {
-    let root = Scratch::package()?;
-    root.write("src/lib.rs", "#[derive(serde::Deserialize)]\npub struct A {\n    a: Title,\n}\n")?;
-    let mut err = Vec::new();
-    let arguments = [OsString::from(&root.root)].into_iter();
-    let verdict = Cli::from_args(arguments).verdict(
-        Ports::new(&root.files, Recorded::default(), Monotonic::default()),
-        &mut Vec::new(),
-        &mut err,
-    );
-    assert_eq!(
-        (verdict, String::from_utf8(err)?.parse::<text_lines::Lines>().into_iter().flatten().count()),
-        (Verdict::Refused, 1)
-    );
     Ok(())
 }
 
@@ -187,10 +132,9 @@ fn the_timings_flag_lists_every_lint_and_phase_once() -> Result<(), Failed> {
         "lint timings in milliseconds, took then started:\n",
         "  phase total\n",
         "  phase stage: list the trees and their packages\n",
-        "  phase locate: describe the workspaces through cargo metadata\n",
         "  phase contexts: join every file's context-lint parts\n",
     ];
-    assert_eq!(rows.map(|row| timed.matches(row).count()), [1; 5], "{timed}");
+    assert_eq!(rows.map(|row| timed.matches(row).count()), [1; 4], "{timed}");
     let waited = "  wait judged lints on worker ";
     assert_eq!(timed.matches(waited).count(), workers, "{timed}");
     assert_eq!(timed.matches("  phase read: read and parse the sources on worker ").count(), workers, "{timed}");
@@ -214,21 +158,9 @@ struct Trees;
 
 impl Trees {
     fn flagged(files: &(impl Files + Sync), root: &Path, flags: &[&str]) -> Printed {
-        Trees::described(files, root, flags, NO_DEPENDENCIES)
-    }
-
-    fn described(files: &(impl Files + Sync), root: &Path, flags: &[&str], metadata: &str) -> Printed {
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let arguments = flags.iter().map(OsString::from).chain([OsString::from(root)]);
-        let exit = Cli::from_args(arguments).report_to(
-            Ports::new(
-                files,
-                [(PathBuf::from("/"), Bytes::from(metadata))].into_iter().collect::<Recorded>(),
-                Monotonic::default(),
-            ),
-            &mut out,
-            &mut err,
-        );
+        let exit = Cli::from_args(arguments).report_to(Ports::new(files, Monotonic::default()), &mut out, &mut err);
         Printed {
             exit,
             out: String::from_utf8(out).ignoring(Ignored::NotUtf8).unwrap_or_default(),
@@ -239,41 +171,22 @@ impl Trees {
     fn timed(files: &(impl Files + Sync), root: &Path, flags: &[&str]) -> Result<String, Failed> {
         let mut out = Vec::new();
         let arguments = flags.iter().map(OsString::from).chain([OsString::from(root)]);
-        let exit = Cli::from_args(arguments).report_to(
-            Ports::new(
-                files,
-                [(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
-                Monotonic::default(),
-            ),
-            &mut out,
-            &mut Vec::new(),
-        );
+        let exit =
+            Cli::from_args(arguments).report_to(Ports::new(files, Monotonic::default()), &mut out, &mut Vec::new());
         assert_eq!(exit, ExitCode::SUCCESS);
         Ok(String::from_utf8(out)?)
     }
 
     fn verdict(files: &(impl Files + Sync), root: &Path, flags: &[&str]) -> Verdict {
         let arguments = flags.iter().map(OsString::from).chain([OsString::from(root)]);
-        Cli::from_args(arguments).verdict(
-            Ports::new(
-                files,
-                [(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
-                Monotonic::default(),
-            ),
-            &mut Vec::new(),
-            &mut Vec::new(),
-        )
+        Cli::from_args(arguments).verdict(Ports::new(files, Monotonic::default()), &mut Vec::new(), &mut Vec::new())
     }
 
     fn reported_through(files: &(impl Files + Sync), roots: &[PathBuf]) -> Reported {
         let mut out = Vec::new();
         let mut err = Vec::new();
         let exit = Cli::from_args(roots.iter().map(OsString::from)).report_to(
-            Ports::new(
-                files,
-                [(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
-                Monotonic::default(),
-            ),
+            Ports::new(files, Monotonic::default()),
             &mut out,
             &mut err,
         );

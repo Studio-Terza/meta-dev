@@ -61,9 +61,3 @@ identified!(
     ItemType => ident, ItemUnion => ident, ItemConst => ident, ItemStatic => ident, Signature => ident,
     ItemFn => sig.ident, ImplItemFn => sig.ident, TraitItemFn => sig.ident, ForeignItemFn => sig.ident
 );
-
-impl Identified for ItemImpl {
-    fn identity(&self) -> Option<Name> {
-        Name::of_type(&self.self_ty)
-    }
-}

@@ -22,7 +22,6 @@ invariants = { path = "../crates/invariants" }
 file-ports = { path = "../crates/file-ports" }
 
 [dev-dependencies]
-cargo-ports = { path = "../crates/cargo-ports" }
 lint-runner = { path = "../crates/lint-runner" }
 proptest.workspace = true
 strum.workspace = true

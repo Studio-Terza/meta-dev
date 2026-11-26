@@ -8,10 +8,8 @@ mod text;
 use std::fmt;
 use std::path::PathBuf;
 
-use file_ports::{Bytes, Memory};
 use invariants::{invariant, invariants};
 use lint_core::{Report, SourceFile, SourceText};
-use lint_placement::Placement;
 use newtype::Wrapping;
 
 use crate::checks::Checks;
@@ -42,32 +40,6 @@ impl Sources {
             Ok(file) => file,
             Err(failure) => invariant!(broken Invariant::FixtureParses, failure),
         }
-    }
-
-    #[must_use]
-    pub fn placed(manifests: &[Source], sources: &[Source]) -> Vec<SourceFile> {
-        let files: Memory = manifests
-            .iter()
-            .map(|manifest| (AsRef::<Path>::as_ref(manifest).to_path_buf(), Bytes::from(manifest.text().into_inner())))
-            .collect();
-        sources
-            .iter()
-            .map(|source| {
-                let placement = Placement::locate(&files, AsRef::<Path>::as_ref(source));
-                let text = SourceText::new(source.text().into_inner().to_owned());
-                Self::kept(SourceFile::parse_at(
-                    AsRef::<Path>::as_ref(source).into(),
-                    AsRef::<Path>::as_ref(source).into(),
-                    placement,
-                    text,
-                ))
-            })
-            .collect()
-    }
-
-    #[must_use]
-    pub fn placed_flagged<Checked: Checks>(manifests: &[Source], sources: &[Source]) -> Lines {
-        Checked::flagged(&Self::placed(manifests, sources))
     }
 
     #[must_use]

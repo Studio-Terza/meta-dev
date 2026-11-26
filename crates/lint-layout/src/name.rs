@@ -10,7 +10,7 @@ use std::fmt::{self, Write};
 use std::path::Path;
 use std::sync::Arc;
 
-use syntax::{Ident, ItemImpl, Type};
+use syntax::Ident;
 
 use crate::matching::{Fitted, Matching};
 use crate::word::Word;
@@ -30,23 +30,6 @@ pub struct Name(Arc<str>);
 
 impl Name {
     #[must_use]
-    pub fn of_type(found: &Type) -> Option<Name> {
-        match found {
-            Type::Path(path) => path.path.segments.last().map(|last| Name::from(&last.ident)),
-            _ => None,
-        }
-    }
-
-    #[must_use]
-    pub fn implementing(item: &ItemImpl, wanted: Word<'_>) -> Option<Name> {
-        item.trait_
-            .as_ref()
-            .and_then(|(_, path, _)| path.segments.last())
-            .filter(|last| last.ident == wanted.into_inner())
-            .and_then(|_| Self::of_type(&item.self_ty))
-    }
-
-    #[must_use]
     pub fn length(&self) -> Length {
         Length::new(self.0.chars().count())
     }
@@ -59,21 +42,6 @@ impl Name {
     #[must_use]
     pub fn lowered(&self) -> Lowered {
         self.0.chars().flat_map(char::to_lowercase).collect()
-    }
-
-    #[must_use]
-    pub fn reprefixed(&self, opening: Word<'_>, closing: Word<'_>) -> Option<Name> {
-        let spelled = opening.into_inner();
-        self.0
-            .get(..spelled.len())
-            .filter(|head| *head == spelled)
-            .and_then(|_| self.0.get(spelled.len()..))
-            .map(|rest| Name(Spelling::joined(&[closing.into_inner(), rest])))
-    }
-
-    #[must_use]
-    pub fn suffixed(&self, ending: Word<'_>) -> Name {
-        Name(Spelling::joined(&[&self.0, ending.into_inner()]))
     }
 
     #[must_use]

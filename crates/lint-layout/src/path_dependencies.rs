@@ -1,12 +1,11 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use newtype::{Arbitrary, Newtype};
+use newtype::Newtype;
 
 use crate::manifest::Manifest;
 
-#[derive(Newtype, Arbitrary, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[newtype(strategy = crate::untested::Untested::sampled())]
+#[derive(Newtype, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PathDependencies(Vec<PathBuf>);
 
 impl PathDependencies {

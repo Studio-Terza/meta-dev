@@ -5,7 +5,6 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::thread::Scope;
 
-use cargo_ports::Cargo;
 use file_ports::Files;
 use lint_core::{Readout, SourceFile};
 use lint_test_budget::TestBudget;
@@ -47,10 +46,10 @@ impl Mode {
         }
     }
 
-    pub(crate) fn started<'scope, 'run: 'scope, F: Files + Sync, C: Cargo + Sync, T: Timer + Sync>(
+    pub(crate) fn started<'scope, 'run: 'scope, F: Files + Sync, T: Timer + Sync>(
         self,
         scope: &'scope Scope<'scope, '_>,
-        sources: &'scope Sources<F, C, T>,
+        sources: &'scope Sources<F, T>,
         readers: Vec<lint_reader::Reader<'run>>,
     ) -> Run<'scope> {
         match self {
@@ -64,7 +63,7 @@ impl Run<'_> {
     pub(crate) fn verdict_of(
         self,
         readout: &Measured<Readout>,
-        sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>,
+        sources: &Sources<impl Files, impl Timer + Sync>,
         out: &mut impl Write,
         err: &mut impl Write,
     ) -> Verdict {

@@ -46,7 +46,6 @@ impl From<usize> for Worker {
 pub(crate) enum Step {
     Total,
     Stage,
-    Locate,
     Read(Worker),
     Lower(Worker),
     Judged(Worker),
@@ -58,13 +57,7 @@ impl Step {
     pub(crate) fn waited(self) -> Step {
         match self {
             Step::Judged(worker) => Step::Waited(worker),
-            Step::Total
-            | Step::Stage
-            | Step::Locate
-            | Step::Read(_)
-            | Step::Lower(_)
-            | Step::Contexts
-            | Step::Waited(_) => self,
+            Step::Total | Step::Stage | Step::Read(_) | Step::Lower(_) | Step::Contexts | Step::Waited(_) => self,
         }
     }
 }
@@ -74,7 +67,6 @@ impl fmt::Display for Step {
         match self {
             Step::Total => formatter.write_str("phase total"),
             Step::Stage => formatter.write_str("phase stage: list the trees and their packages"),
-            Step::Locate => formatter.write_str("phase locate: describe the workspaces through cargo metadata"),
             Step::Read(Worker(index)) => write!(formatter, "phase read: read and parse the sources on worker {index}"),
             Step::Lower(Worker(index)) => {
                 write!(formatter, "phase lower: lower and file-lint its share of files on worker {index}")

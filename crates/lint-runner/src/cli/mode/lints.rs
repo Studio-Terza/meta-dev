@@ -5,12 +5,9 @@ use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
 use std::thread::Scope;
 
-use cargo_ports::Cargo;
-
 use file_ports::Files;
 use lint_core::{Headline, Readout, SourceFile, Violation};
 use lint_file::{FileLint, Filed, Judged, Leader, Led, Reads, Ruled, RuledLint, Swept, SweptLint, WatchingLint};
-use lint_reader::{Described, Unlocated};
 use lint_sweep::{Found, Founds, Gathers, Joined, Joint, Unjoined};
 use timer_ports::Timer;
 
@@ -47,7 +44,7 @@ impl Crew<'_> {
     pub(crate) fn gated(
         self,
         readout: &Measured<Readout>,
-        sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>,
+        sources: &Sources<impl Files, impl Timer + Sync>,
         out: &mut impl Write,
         err: &mut impl Write,
     ) -> Verdict {
@@ -55,7 +52,7 @@ impl Crew<'_> {
         let worked: Worked = [mine].into_iter().chain(self.helpers.into_iter().map(Helper::joined)).collect();
         let first = sources.earlier().chain([readout.timing()]);
         let table = sources.wired().table(first.chain(worked.timings().iter().copied()), worked.visited().clone());
-        let outcome = Lints::gathered(readout.done(), sources.located().done(), worked);
+        let outcome = Lints::gathered(readout.done(), worked);
         outcome.surveyed(&[table], out, err)
     }
 }
@@ -91,35 +88,26 @@ type Registry = registry![
 ];
 
 impl Lints {
-    pub(crate) fn started<'scope, 'run: 'scope, F: Files + Sync, C: Cargo + Sync, T: Timer + Sync>(
+    pub(crate) fn started<'scope, 'run: 'scope, F: Files + Sync, T: Timer + Sync>(
         scope: &'scope Scope<'scope, '_>,
-        sources: &'scope Sources<F, C, T>,
+        sources: &'scope Sources<F, T>,
         readers: Vec<lint_reader::Reader<'run>>,
     ) -> Crew<'scope> {
         let helpers = Workers::available().helpers().zip(readers).filter_map(|(index, reader)| {
             Helper::spawned(scope, move || Self::helped(sources, Worker::from(index), reader))
                 .ignoring(Ignored::Unspawned)
         });
-        let locating = Helper::spawned(scope, move || Self::locating(sources)).ignoring(Ignored::Unspawned);
-        Crew { helpers: locating.into_iter().chain(helpers).collect() }
+        Crew { helpers: helpers.collect() }
     }
 
-    fn gathered<'run>(
-        readout: &'run Readout,
-        located: &'run Result<Described, Unlocated>,
-        worked: Worked,
-    ) -> Outcome<'run> {
+    fn gathered(readout: &Readout, worked: Worked) -> Outcome<'_> {
         let headlines = Registry::headlines(Vec::new());
         let rendered = worked.into_rendered(|slot| slot.picked(&headlines).copied());
-        Outcome::located(located, rendered, readout.failures())
-    }
-
-    fn locating(sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>) -> Worked {
-        Worked::timed(sources.located().timing())
+        Outcome::from_rendered(rendered, readout.failures())
     }
 
     fn helped(
-        sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>,
+        sources: &Sources<impl Files, impl Timer + Sync>,
         worker: Worker,
         reader: lint_reader::Reader<'_>,
     ) -> Worked {
@@ -127,11 +115,7 @@ impl Lints {
         [Self::worked(readout.done(), sources, worker), Worked::timed(readout.timing())].into_iter().collect()
     }
 
-    fn worked(
-        readout: &Readout,
-        sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>,
-        worker: Worker,
-    ) -> Worked {
+    fn worked(readout: &Readout, sources: &Sources<impl Files, impl Timer + Sync>, worker: Worker) -> Worked {
         let mut lowered = sources.gathered(readout, worker, Filer::started);
         let mut work: Vec<FileWork<'_>> = lowered.filed();
         let filed: Worked = work.iter_mut().map(FileWork::worked).collect();

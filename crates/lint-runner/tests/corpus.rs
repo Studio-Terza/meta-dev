@@ -3,7 +3,6 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use test_failure::Failed;
 
-use cargo_ports::Recorded;
 use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Memory};
 use lint_runner::{Cli, Ports};
 use timer_ports::Monotonic;
@@ -16,11 +15,9 @@ const FIXTURES: &str = "tests/fixtures";
 const EXPECTED: &str = "tests/goldens/lints";
 const STORED_MANIFEST: &str = "manifest.toml";
 const MANIFEST: &str = "Cargo.toml";
-const METADATA: &str = "metadata.json";
 const SITE_END: &str = ": ";
 const LINE_START: &str = ":";
 const FIX_START: &str = "; ";
-const NO_DEPENDENCIES: &str = "{\"workspace_root\": \"/\", \"packages\": []}";
 
 #[test]
 fn every_lint_prints_its_expected_output_over_its_fixture_and_every_violation_names_its_fix() -> Result<(), Failed> {
@@ -87,17 +84,15 @@ impl Corpus {
         let root: Memory = corpus
             .entries(fixture)?
             .iter()
-            .filter(|found| found.file_name() != Some(METADATA.as_ref()))
             .map(|found| Self::copied(corpus, found, Path::new(Self::renamed(found))))
             .collect::<Result<Vec<Vec<Copied>>, FileFailure>>()?
             .into_iter()
             .flatten()
             .map(|copied| (copied.path, copied.bytes))
             .collect();
-        let described = Self::described(corpus.read(&fixture.join(METADATA)))?;
         let (mut printed, mut failed) = (Vec::new(), Vec::new());
         let exit = Cli::from_args(std::iter::empty()).report_to(
-            Ports::new(&root, [(PathBuf::from(""), described)].into_iter().collect::<Recorded>(), Monotonic::default()),
+            Ports::new(&root, Monotonic::default()),
             &mut printed,
             &mut failed,
         );
@@ -139,13 +134,5 @@ impl Corpus {
             .map(|drifted| format!("{drifted} printed:\n{output}"))
             .into_iter()
             .collect()
-    }
-
-    fn described(read: Result<Bytes, FileFailure>) -> Result<Bytes, FileFailure> {
-        match read {
-            Ok(bytes) => Ok(bytes),
-            Err(FileFailure::Missing(_)) => Ok(Bytes::from(NO_DEPENDENCIES)),
-            Err(failure @ FileFailure::Failed(_)) => Err(failure),
-        }
     }
 }

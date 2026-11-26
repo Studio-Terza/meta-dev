@@ -13,7 +13,6 @@ doctest = false
 [dependencies]
 invariants = { path = "../invariants" }
 lint-sweep = { path = "../lint-sweep" }
-cargo-ports = { path = "../cargo-ports" }
 file-ports = { path = "../file-ports" }
 lint-core = { path = "../lint-core" }
 lint-file = { path = "../lint-file" }
@@ -36,7 +35,6 @@ lint-vec-out-params = { path = "../lint-vec-out-params" }
 port-core = { path = "../port-core" }
 timer-ports = { path = "../timer-ports" }
 thiserror.workspace = true
-workspace-metadata = { path = "../workspace-metadata" }
 
 [[test]]
 name = "behaviour"
@@ -44,7 +42,6 @@ path = "tests/behaviour.rs"
 
 [dev-dependencies]
 test-failure = { path = "../test-failure" }
-cargo-ports = { path = "../cargo-ports" }
 lint-fixtures = { path = "../lint-fixtures" }
 text-lines = { path = "../text-lines" }
 

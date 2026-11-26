@@ -1,10 +1,9 @@
 use std::ffi::OsString;
 use std::iter;
 use std::panic::{self, AssertUnwindSafe};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Instant;
 
-use cargo_ports::Recorded;
 use file_ports::{Bytes, Memory, Text};
 use fuzz::ports::{Case, Crashes};
 use lint_runner::{Cli, Ports, Verdict};
@@ -26,16 +25,6 @@ struct Run {
 }
 
 pub struct Campaign;
-
-struct Workspace;
-
-impl Workspace {
-    const METADATA: &'static str = "{\"workspace_root\": \"/fuzzed\", \"packages\": [], \"resolve\": null}";
-
-    fn described() -> Recorded {
-        [(PathBuf::from(ROOT), Bytes::from(Self::METADATA))].into_iter().collect()
-    }
-}
 
 impl Campaign {
     fn case(target: &str, input: &Input) -> Case {
@@ -60,7 +49,7 @@ impl Campaign {
     fn ran(files: &Memory) -> Run {
         let mut err = Vec::new();
         let verdict = Cli::from_args(iter::once(OsString::from(ROOT))).verdict(
-            Ports::new(files, Workspace::described(), Monotonic::default()),
+            Ports::new(files, Monotonic::default()),
             &mut Vec::new(),
             &mut err,
         );
