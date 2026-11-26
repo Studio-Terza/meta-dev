@@ -11,6 +11,7 @@ use port_core::{
     Calls, Counted, Held, Measured, Metered, Op, Pass, Port, Release, ReleaseReceipt, Released, Resource, Run,
     Snapshot, port,
 };
+use strum::VariantArray;
 
 ignored! {
     enum Ignored {
@@ -25,7 +26,7 @@ struct Session(String);
 #[error("the session lock was already gone")]
 struct Gone;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(VariantArray, Debug, Clone, Copy, PartialEq, Eq)]
 enum Lockable {
     Intact,
     Broken,
@@ -105,14 +106,12 @@ impl TranscriptsFiller for Memory {
 
 impl SessionLock {
     fn of(session: &Session) -> SessionLock {
-        let lockable = Lockable::ALL.into_iter().find(|lockable| lockable.session() == *session);
+        let lockable = Lockable::VARIANTS.iter().copied().find(|lockable| lockable.session() == *session);
         SessionLock { lockable: lockable.unwrap_or(Lockable::Intact) }
     }
 }
 
 impl Lockable {
-    const ALL: [Lockable; 2] = [Lockable::Intact, Lockable::Broken];
-
     fn session(self) -> Session {
         match self {
             Lockable::Intact => Session("a".to_owned()),
@@ -120,9 +119,9 @@ impl Lockable {
         }
     }
 
-    fn ended(self, receipt: Result<ReleaseReceipt, Gone>) -> Result<ReleaseReceipt, Gone> {
+    fn ended(self) -> Result<(), Gone> {
         match self {
-            Lockable::Intact => receipt,
+            Lockable::Intact => Ok(()),
             Lockable::Broken => Err(Gone),
         }
     }
@@ -302,7 +301,7 @@ laws::law!(per_type_ops_count_each_query_type_apart, (0usize..6, 0usize..6), ask
     prop_assert_eq!(measured.snapshot().calls::<Names>(), Calls::new(asked.1.saturating_add(1)));
 });
 
-#[derive(Clone, Copy, Debug)]
+#[derive(VariantArray, Clone, Copy, Debug)]
 enum Acquisition {
     Fallible,
     Optional,
@@ -310,8 +309,6 @@ enum Acquisition {
 }
 
 impl Acquisition {
-    const ALL: [Acquisition; 3] = [Acquisition::Fallible, Acquisition::Optional, Acquisition::Bare];
-
     fn held<'port>(self, port: &'port Port<'_, Memory>, session: &Session) -> Option<Held<'port, SessionLock>> {
         match self {
             Acquisition::Fallible => Transcripts::lock(port, session).ignoring(Ignored::Unlocked),
@@ -322,7 +319,7 @@ impl Acquisition {
 }
 
 laws::law!(acquiring_counts_the_op_and_dropping_counts_one_release, 0usize..3, shape, {
-    let acquisition = Acquisition::ALL.get(shape).copied().unwrap_or(Acquisition::Bare);
+    let acquisition = Acquisition::VARIANTS.get(shape).copied().unwrap_or(Acquisition::Bare);
     let run = Run::root();
     let port = run.port(Memory::holding(&["a"]));
     let held = acquisition.held(&port, &Session("a".to_owned()));
@@ -343,25 +340,18 @@ laws::law!(acquiring_counts_the_op_and_dropping_counts_one_release, 0usize..3, s
     prop_assert!(measured.settled().is_ok());
 });
 
-laws::law!(
-    ending_a_held_resource_releases_once_and_returns_its_receipt_or_failure,
-    select(Lockable::ALL.to_vec()),
-    lockable,
-    {
-        let run = Run::root();
-        let port = run.port(Memory::default());
-        let ended = Transcripts::lock(&port, &lockable.session()).map(Held::end);
-        drop(port);
-        let measured = run.finish();
-        let other = Run::root();
-        let receipt = Transcripts::lock_bare(&other.port(Memory::default()), &Session("a".to_owned())).end();
-        prop_assert_eq!(ended, Ok(lockable.ended(receipt)));
-        prop_assert_eq!(measured.snapshot().calls::<Released<SessionLock>>(), Calls::new(1));
-        prop_assert!(measured.settled().is_ok());
-    }
-);
+laws::law!(ending_a_held_resource_releases_once_and_returns_its_failure, select(Lockable::VARIANTS), lockable, {
+    let run = Run::root();
+    let port = run.port(Memory::default());
+    let ended = Transcripts::lock(&port, &lockable.session()).map(Held::end);
+    drop(port);
+    let measured = run.finish();
+    prop_assert_eq!(ended, Ok(lockable.ended()));
+    prop_assert_eq!(measured.snapshot().calls::<Released<SessionLock>>(), Calls::new(1));
+    prop_assert!(measured.settled().is_ok());
+});
 
-laws::law!(a_failed_release_on_drop_shows_in_the_measured_failures, select(Lockable::ALL.to_vec()), lockable, {
+laws::law!(a_failed_release_on_drop_shows_in_the_measured_failures, select(Lockable::VARIANTS), lockable, {
     let run = Run::root();
     let port = run.port(Memory::default());
     drop(Transcripts::lock(&port, &lockable.session()));
@@ -380,7 +370,7 @@ laws::law!(a_resource_is_released_exactly_once_whether_ended_or_dropped, any::<b
     let port = run.port(Memory::holding(&["a"]));
     let held = Transcripts::lock(&port, &Session("a".to_owned()));
     let ended = ending.then_some(held).map(|lock| lock.map(Held::end));
-    prop_assert!(ended.iter().all(|result| matches!(result, Ok(Ok(_)))));
+    prop_assert!(ended.iter().all(|result| matches!(result, Ok(Ok(())))));
     drop(port);
     let measured = run.finish();
     prop_assert_eq!(measured.snapshot().calls::<Released<SessionLock>>(), Calls::new(1));

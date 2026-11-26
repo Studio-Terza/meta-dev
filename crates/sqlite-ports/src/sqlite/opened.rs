@@ -4,7 +4,7 @@ mod connected;
 use std::path::Path;
 
 use rusqlite::Connection;
-use store_ports::{Batch, Created, Provenance, Query, Record, StoreFailure, Written};
+use store_ports::{Batch, Created, Provenance, Query, Record, StoreFailure};
 
 use super::failed::{Unexecuted, Unopened};
 use super::migrations::Migrations;
@@ -50,7 +50,7 @@ impl Opened {
         query.rows(&mut Connected::over(&self.connection))
     }
 
-    pub(super) fn transacted<B: Batch>(&self, batch: B) -> Result<Written, B::Failure> {
+    pub(super) fn transacted<B: Batch>(&self, batch: B) -> Result<B::Done, B::Failure> {
         self.settled(|connected| batch.written(connected))
     }
 

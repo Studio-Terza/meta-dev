@@ -24,10 +24,10 @@ impl<R: Resource> Op for Released<R> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use = "a release receipt proves the resource was released; hand it back to the run"]
 pub struct ReleaseReceipt(OpName);
 
 impl<R: Resource> Pass<'_, Released<R>> {
-    #[must_use]
     pub fn released(self) -> ReleaseReceipt {
         ReleaseReceipt(R::RELEASE)
     }
@@ -52,10 +52,10 @@ impl<'run, R: Release> Held<'run, R> {
         Held { resource, holding: Holding::Held, run }
     }
 
-    pub fn end(mut self) -> Result<ReleaseReceipt, R::Failure> {
+    pub fn end(mut self) -> Result<(), R::Failure> {
         match std::mem::replace(&mut self.holding, Holding::Released) {
             Holding::Held => self.run.released(&mut self.resource),
-            Holding::Released => Ok(ReleaseReceipt(R::RELEASE)),
+            Holding::Released => Ok(()),
         }
     }
 }
@@ -75,14 +75,25 @@ impl<R: Release> DerefMut for Held<'_, R> {
 }
 
 impl Run {
-    fn released<R: Release>(&self, resource: &mut R) -> Result<ReleaseReceipt, R::Failure> {
+    fn released<R: Release>(&self, resource: &mut R) -> Result<(), R::Failure> {
+        resource
+            .release(Pass::minted())
+            .map(|receipt| self.receipted(receipt))
+            .map_err(|failure| self.unreleased::<R>(failure))
+    }
+
+    fn receipted(&self, ReleaseReceipt(released): ReleaseReceipt) {
+        self.count(released);
+    }
+
+    fn unreleased<R: Release>(&self, failure: R::Failure) -> R::Failure {
         self.count(R::RELEASE);
-        resource.release(Pass::minted())
+        failure
     }
 
     fn dropped<R: Release>(&self, resource: &mut R) {
         match self.released(resource) {
-            Ok(_receipt) => (),
+            Ok(()) => (),
             Err(failure) => self.fail(R::NAME, &failure),
         }
     }

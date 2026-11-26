@@ -35,7 +35,7 @@ use newtype::{Checked, Counter, Display, Newtype, Wrapping};
 use port_core::{Op, Port, Run};
 use sqlite_ports::SqliteOpener;
 use store_ports::Record as _;
-use store_ports::{Batch, Columns, Execute, Migrator, Query, Schema, Store, StoreFailure, Version, Written};
+use store_ports::{Batch, Columns, Counted, Execute, Migrator, Query, Schema, Store, StoreFailure, Version, Written};
 use stream::{Message, Relation, Shape, Stream};
 use transcript_ports::{
     Authorship, Body, ClaudeCodeDir, Cursor, Instant, Malformed, SessionId, Skipped, Transcripts, Uuid,
@@ -124,8 +124,8 @@ fn a_written_session_reads_back_with_its_segments_links_and_cursor() -> Result<(
 fn writing_the_same_session_again_writes_no_row() -> Result<(), laws::Unmet> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
-    let first = store.write(store.read(Holding::from(Recorded::session()?.records))?)?;
-    let second = store.write(store.read(Holding::from(Recorded::session()?.records))?)?;
+    let first = store.write(Counted::new(store.read(Holding::from(Recorded::session()?.records))?))?;
+    let second = store.write(Counted::new(store.read(Holding::from(Recorded::session()?.records))?))?;
     assert!(first.count() > 0);
     assert_eq!(second, Written::zero());
     Ok(())
@@ -283,7 +283,9 @@ impl Schema for Seeded {
 impl Batch for Seeding {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         match self {
             Seeding::Untrimmed => Around::untrimmed(statements),
             Seeding::Streamed(streamed) => streamed.written(statements),
@@ -312,18 +314,14 @@ const KEPT: [char; 7] = ['a', 'é', 'か', '.', '—', '\u{200b}', '😀'];
 struct Around(char);
 
 impl Around {
-    fn untrimmed(statements: &mut impl Execute) -> Result<Written, StoreFailure> {
-        let written = SHED
-            .iter()
-            .map(|blank| Around(*blank).stored(statements))
-            .collect::<Result<Vec<Written>, StoreFailure>>()?;
-        Ok(Written::total(written.into_iter()))
+    fn untrimmed(statements: &mut impl Execute) -> Result<(), StoreFailure> {
+        SHED.iter().try_for_each(|blank| Around(*blank).stored(statements))
     }
 
-    fn stored(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    fn stored(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         let uuid = self.uuid().map_err(|failed| StoreFailure::Refused(store_ports::Cause::told(&failed)))?;
         let body = self.kept().map_err(|failed| StoreFailure::Refused(store_ports::Cause::told(&failed)))?;
-        let message = statements.written(store_ports::query!(
+        statements.written(store_ports::query!(
             r#"
 INSERT INTO
   messages (uuid, session, parent, at, author, body)
@@ -340,7 +338,7 @@ VALUES
             uuid: Uuid,
             body: Body
         ))?;
-        let segment = statements.written(store_ports::query!(
+        statements.written(store_ports::query!(
             r#"
 INSERT INTO
   segments (message, ordinal, shape, body)
@@ -349,8 +347,7 @@ VALUES
 "#,
             uuid: Uuid,
             body: Body
-        ))?;
-        Ok(message.plus(segment))
+        ))
     }
 
     fn uuid(self) -> Result<Uuid, <Uuid as Checked>::Error> {
@@ -637,6 +634,10 @@ impl Dag {
         Dag::planting(store, Entry::new("p".parse()?, facet, Provenance::from(Entered::Init)))
     }
 
+    fn nodes(store: &Port<'_, Sqlite>, count: usize) -> Result<(), laws::Unmet> {
+        (0..count).try_for_each(|_| Ok(store.write(Dag::node(store, Facet::Feature)?)?))
+    }
+
     fn planting(store: &Port<'_, Sqlite>, entry: Entry) -> Result<Planting, laws::Unmet> {
         Ok(Planting::sown(Node::new(store.read(NextNode)?, entry)))
     }
@@ -649,28 +650,21 @@ impl Dag {
         store: &Port<'_, Sqlite>,
         [source, target]: [NodeId; 2],
         relation: NodeRelation,
-    ) -> Result<Result<Written, Refusal>, laws::Unmet> {
+    ) -> Result<Result<(), Refusal>, laws::Unmet> {
         let (from, to) = (Dag::resolved(store, source)?, Dag::resolved(store, target)?);
         Ok(store.write(Linked::new(from, relation, to, Entered::Init.into())))
     }
 
-    fn cast(store: &Port<'_, Sqlite>, node: NodeId, role: Role) -> Result<Result<Written, Refusal>, laws::Unmet> {
+    fn cast(store: &Port<'_, Sqlite>, node: NodeId, role: Role) -> Result<Result<(), Refusal>, laws::Unmet> {
         let resolved = Dag::resolved(store, node)?;
         Ok(store.write(Cast::new(resolved, Casting::new(role, Entered::Role.into()))))
     }
 
-    fn planted(&self, store: &Port<'_, Sqlite>) -> Result<Written, laws::Unmet> {
-        let nodes = self
-            .facets
-            .iter()
-            .map(|facet| Ok(store.write(Dag::node(store, *facet)?)?))
-            .collect::<Result<Vec<Written>, laws::Unmet>>()?;
-        let links = self
-            .edges
-            .iter()
-            .map(|edge| Ok(Dag::linked(store, [Dag::id(edge.child), Dag::id(edge.parent)], NodeRelation::Refines)??))
-            .collect::<Result<Vec<Written>, laws::Unmet>>()?;
-        Ok(Written::total(nodes.into_iter().chain(links)))
+    fn planted(&self, store: &Port<'_, Sqlite>) -> Result<(), laws::Unmet> {
+        self.facets.iter().try_for_each(|facet| Ok::<(), laws::Unmet>(store.write(Dag::node(store, *facet)?)?))?;
+        self.edges.iter().try_for_each(|edge| {
+            Ok(Dag::linked(store, [Dag::id(edge.child), Dag::id(edge.parent)], NodeRelation::Refines)??)
+        })
     }
 
     fn parents(&self, node: usize) -> impl Iterator<Item = usize> + '_ {
@@ -787,10 +781,12 @@ fn linking_the_same_nodes_again_writes_no_row() -> Result<(), laws::Unmet> {
     let parent = Projects::rooted(&store, "p")?;
     store.write(Dag::node(&store, Facet::Project)?)?;
     let child = NodeId::new(parent.into_inner().saturating_add(1));
-    let first = Dag::linked(&store, [child, parent], NodeRelation::Refines)??;
-    let second = Dag::linked(&store, [child, parent], NodeRelation::Refines)??;
-    assert!(first > Written::zero());
-    assert_eq!(second, Written::zero());
+    Dag::linked(&store, [child, parent], NodeRelation::Refines)??;
+    Dag::linked(&store, [child, parent], NodeRelation::Refines)??;
+    let shown = store.read(ShownNode::from(child))?.ok_or("no child shown")?;
+    let links: Vec<NodeEdge> = shown.links().iter().map(|link| link.edge()).collect();
+    assert_eq!(links, [NodeEdge::new(child, NodeRelation::Refines, parent)]);
+    assert_eq!(Ids::kin(&shown, Kin::Ancestor), [parent]);
     Ok(())
 }
 
@@ -831,7 +827,7 @@ impl Proposals {
         Ok(Directed::Superseded(Supersession::within(&Proposals::node(old)?, &Proposals::node(by)?)?))
     }
 
-    fn written(store: &Port<'_, Sqlite>, directed: Vec<Directed>) -> Result<Written, laws::Unmet> {
+    fn written(store: &Port<'_, Sqlite>, directed: Vec<Directed>) -> Result<(), laws::Unmet> {
         let file = Proposals::unseen(store, &format!("{directed:?}"))?;
         Ok(store.write(Directions::new(Provenance::from(Entered::Apply), file, directed, Remit::Unbounded))?)
     }
@@ -1056,7 +1052,7 @@ const SEGMENTED: &str = concat!(
 
 const ENDS: usize = 5;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(strum::VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
 enum Closed {
     Refines,
     Supersedes,
@@ -1078,8 +1074,6 @@ struct Probe {
 }
 
 impl Closed {
-    const ALL: [Closed; 4] = [Closed::Refines, Closed::Supersedes, Closed::SegmentSupersedes, Closed::SegmentCorrects];
-
     fn ends(self) -> Ends {
         match self {
             Closed::Refines => Ends::Nodes(NodeRelation::Refines),
@@ -1091,12 +1085,7 @@ impl Closed {
 }
 
 impl Ends {
-    fn linked(
-        self,
-        store: &Port<'_, Sqlite>,
-        edge: Edge,
-        file: Unseen,
-    ) -> Result<Result<Written, Refusal>, laws::Unmet> {
+    fn linked(self, store: &Port<'_, Sqlite>, edge: Edge, file: Unseen) -> Result<Result<(), Refusal>, laws::Unmet> {
         match self {
             Ends::Nodes(relation) => Dag::linked(store, [Dag::id(edge.child), Dag::id(edge.parent)], relation),
             Ends::Segments(relation) => Ok(store.write(Directions::new(
@@ -1128,8 +1117,11 @@ impl Ends {
 
 impl Probe {
     fn any() -> impl Strategy<Value = Probe> {
-        (select(Closed::ALL.to_vec()), Probe::edges(), 0..ENDS, 0..ENDS)
-            .prop_map(|(closed, edges, child, parent)| Probe { closed, edges, tried: Edge { child, parent } })
+        (select(Closed::VARIANTS), Probe::edges(), 0..ENDS, 0..ENDS).prop_map(|(closed, edges, child, parent)| Probe {
+            closed,
+            edges,
+            tried: Edge { child, parent },
+        })
     }
 
     fn edges() -> impl Strategy<Value = Vec<Edge>> {
@@ -1147,9 +1139,7 @@ impl Probe {
         let run = Run::root();
         let store = run.port(Sqlite::in_memory::<StreamSchema>());
         store.write(store.read(Holding::from(records))?)?;
-        iter::repeat_with(|| Ok(store.write(Dag::node(&store, Facet::Feature)?)?))
-            .take(ENDS)
-            .collect::<Result<Vec<Written>, laws::Unmet>>()?;
+        Dag::nodes(&store, ENDS)?;
         let ends = self.closed.ends();
         let mut files = (0..=self.edges.len())
             .map(|nth| Proposals::unseen(&store, &nth.to_string()))
@@ -1159,14 +1149,13 @@ impl Probe {
         self.edges
             .iter()
             .zip(files)
-            .map(|(edge, file)| Ok(ends.linked(&store, *edge, file)??))
-            .collect::<Result<Vec<Written>, laws::Unmet>>()?;
+            .try_for_each(|(edge, file)| Ok::<(), laws::Unmet>(ends.linked(&store, *edge, file)??))?;
         Probe::cyclic(ends.linked(&store, self.tried, tried)?)
     }
 
-    fn cyclic(written: Result<Written, Refusal>) -> Result<Option<Cycle>, laws::Unmet> {
+    fn cyclic(written: Result<(), Refusal>) -> Result<Option<Cycle>, laws::Unmet> {
         match written {
-            Ok(_written) => Ok(None),
+            Ok(()) => Ok(None),
             Err(Refusal::Cyclic(cycle)) => Ok(Some(cycle)),
             Err(failure) => Err(failure.into()),
         }
@@ -1202,12 +1191,14 @@ laws::law!(an_edge_is_refused_exactly_where_the_closure_holds_its_reverse_path, 
 
 #[test]
 fn an_edge_reversing_a_written_path_is_refused_for_every_acyclic_relation() -> Result<(), laws::Unmet> {
-    let refused = Closed::ALL
-        .into_iter()
+    let refused = Closed::VARIANTS
+        .iter()
+        .copied()
         .map(|closed| Probe { closed, edges: Probe::chain(), tried: Probe::closing() }.refused())
         .collect::<Result<Vec<Option<Cycle>>, laws::Unmet>>()?;
-    let cycles = Closed::ALL
-        .into_iter()
+    let cycles = Closed::VARIANTS
+        .iter()
+        .copied()
         .map(|closed| Ok(Some(closed.ends().cycle(Probe::closing())?)))
         .collect::<Result<Vec<Option<Cycle>>, laws::Unmet>>()?;
     assert_eq!(refused, cycles);
@@ -1230,7 +1221,8 @@ struct Shown {
 
 impl Mixed {
     fn any() -> impl Strategy<Value = Mixed> {
-        let others: Vec<Closed> = Closed::ALL.into_iter().filter(|closed| *closed != Closed::Refines).collect();
+        let others: Vec<Closed> =
+            Closed::VARIANTS.iter().copied().filter(|closed| *closed != Closed::Refines).collect();
         (Dag::any(), select(others), Probe::edges()).prop_map(|(dag, closed, edges)| {
             let ends = dag.facets.len().min(ENDS);
             Mixed { dag, closed, edges: edges.into_iter().filter(|edge| edge.child < ends).collect() }
@@ -1247,15 +1239,12 @@ impl Mixed {
         let files = (0..self.edges.len())
             .map(|nth| Proposals::unseen(&store, &nth.to_string()))
             .collect::<Result<Vec<Unseen>, laws::Unmet>>()?;
-        self.edges
-            .iter()
-            .zip(files)
-            .map(|(edge, file)| {
-                Ok(ends.linked(&store, *edge, file)?.or_else(|refusal| {
-                    matches!(refusal, Refusal::Ancestral { .. }).then_some(Written::zero()).ok_or(refusal)
-                })?)
-            })
-            .collect::<Result<Vec<Written>, laws::Unmet>>()?;
+        self.edges.iter().zip(files).try_for_each(|(edge, file)| {
+            Ok::<(), laws::Unmet>(
+                ends.linked(&store, *edge, file)?
+                    .or_else(|refusal| matches!(refusal, Refusal::Ancestral { .. }).then_some(()).ok_or(refusal))?,
+            )
+        })?;
         (0..self.dag.facets.len())
             .map(|node| {
                 let placed = store.read(ShownNode::from(Dag::id(node)))?.ok_or("a planted node is not shown")?;
@@ -1294,7 +1283,7 @@ struct Mismatch {
     stored: Restaging,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(strum::VariantArray, Clone, Copy, Debug)]
 enum Step {
     Refine,
     Specify,
@@ -1305,8 +1294,6 @@ enum Step {
 struct Staging;
 
 impl Staging {
-    const STEPS: [Step; 4] = [Step::Refine, Step::Specify, Step::Reopen, Step::Drop];
-
     fn transition(step: Step) -> Result<Transition, laws::Unmet> {
         match step {
             Step::Refine => Ok(Transition::Refine),
@@ -1368,7 +1355,7 @@ impl Staging {
 
 laws::law!(
     a_restaged_node_reads_back_as_its_transition_applies_or_is_refused_unchanged_as_misstaged,
-    vec(select(Staging::STEPS.to_vec()), 0..8),
+    vec(select(Step::VARIANTS), 0..8),
     steps,
     {
         let mismatched = Staging::mismatched(&steps).map_err(|failure| TestCaseError::fail(format!("{failure:?}")))?;
@@ -1408,7 +1395,10 @@ fn a_missing_node_resolves_to_nothing_and_once_planted_refines_without_a_cycle()
     let missing = NodeId::new(root.into_inner().saturating_add(1));
     assert_eq!(store.read(Resolving::from(missing))?, None);
     store.write(Dag::node(&store, Facet::Feature)?)?;
-    assert!(Dag::linked(&store, [missing, root], NodeRelation::Refines)?? > Written::zero());
+    Dag::linked(&store, [missing, root], NodeRelation::Refines)??;
+    let shown = store.read(ShownNode::from(missing))?.ok_or("the planted node is not shown")?;
+    let links: Vec<NodeEdge> = shown.links().iter().map(|link| link.edge()).collect();
+    assert_eq!(links, [NodeEdge::new(missing, NodeRelation::Refines, root)]);
     Ok(())
 }
 
@@ -1422,7 +1412,10 @@ fn a_proposal_under_a_missing_parent_is_refused_and_closes_nothing() -> Result<(
     assert_eq!(store.read(Resolving::from(NodeId::new(2)))?, None);
     Proposals::written(&store, vec![Proposals::child(root, 2)?])?;
     store.write(Planting::sown(Proposals::node(9)?))?;
-    assert!(Dag::linked(&store, [missing, NodeId::new(2)], NodeRelation::Refines)?? > Written::zero());
+    Dag::linked(&store, [missing, NodeId::new(2)], NodeRelation::Refines)??;
+    let shown = store.read(ShownNode::from(missing))?.ok_or("the planted node is not shown")?;
+    let links: Vec<NodeEdge> = shown.links().iter().map(|link| link.edge()).collect();
+    assert_eq!(links, [NodeEdge::new(missing, NodeRelation::Refines, NodeId::new(2))]);
     Ok(())
 }
 
@@ -1458,9 +1451,7 @@ impl Changes {
     fn written(&self) -> Result<Settled, laws::Unmet> {
         let run = Run::root();
         let store = run.port(Sqlite::in_memory::<StreamSchema>());
-        iter::repeat_with(|| Ok(store.write(Dag::node(&store, Facet::Feature)?)?))
-            .take(ENDS)
-            .collect::<Result<Vec<Written>, laws::Unmet>>()?;
+        Dag::nodes(&store, ENDS)?;
         let refused = self
             .0
             .iter()
@@ -1472,9 +1463,9 @@ impl Changes {
         Ok(Settled { refused, roles })
     }
 
-    fn inverted(written: Result<Written, Refusal>) -> Result<Option<NodeEdge>, laws::Unmet> {
+    fn inverted(written: Result<(), Refusal>) -> Result<Option<NodeEdge>, laws::Unmet> {
         match written {
-            Ok(_written) => Ok(None),
+            Ok(()) => Ok(None),
             Err(Refusal::Inverted(inversion)) => Ok(Some(inversion.edge())),
             Err(failure) => Err(failure.into()),
         }
@@ -1488,7 +1479,7 @@ impl Changes {
 }
 
 impl Change {
-    fn written(self, store: &Port<'_, Sqlite>) -> Result<Result<Written, Refusal>, laws::Unmet> {
+    fn written(self, store: &Port<'_, Sqlite>) -> Result<Result<(), Refusal>, laws::Unmet> {
         match self {
             Change::Cast(node, role) => Dag::cast(store, Dag::id(node), role),
             Change::Refined(edge) => {
@@ -1600,14 +1591,13 @@ fn the_structurer_s_context_outlines_every_live_node_past_200_with_its_parent() 
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(Dag::planting(&store, Entry::new("q".parse()?, Facet::Project, Provenance::from(Entered::Init)))?)?;
     store.write(Dag::node(&store, Facet::Project)?)?;
-    iter::repeat_with(|| Ok(store.write(Dag::node(&store, Facet::Feature)?)?))
-        .take(201)
-        .collect::<Result<Vec<Written>, laws::Unmet>>()?;
+    Dag::nodes(&store, 201)?;
     let [specified, dropped] = [NodeId::new(203), NodeId::new(202)];
-    [Step::Refine, Step::Specify]
-        .into_iter()
-        .map(|step| Ok(store.write(Restaged::new(Dag::resolved(&store, specified)?, Staging::transition(step)?))?))
-        .collect::<Result<Vec<Written>, laws::Unmet>>()?;
+    [Step::Refine, Step::Specify].into_iter().try_for_each(|step| {
+        Ok::<(), laws::Unmet>(
+            store.write(Restaged::new(Dag::resolved(&store, specified)?, Staging::transition(step)?))?,
+        )
+    })?;
     store.write(Restaged::new(Dag::resolved(&store, dropped)?, Staging::transition(Step::Drop)?))?;
     let child = Dag::node(&store, Facet::Feature)?;
     store.write(child)?;

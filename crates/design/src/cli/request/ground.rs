@@ -27,6 +27,10 @@ impl<'run, F: Files, S: Store> Ground<'run, F, S> {
         self.store
     }
 
+    pub fn files(&self) -> &F {
+        &self.files
+    }
+
     pub fn transcripts(self) -> Port<'run, ClaudeCodeDir<F>> {
         self.run.port(self.located.transcripts(self.files))
     }

@@ -14,7 +14,7 @@ use design_store::{
 use dispatch_ports::Reply;
 use file_ports::{Bytes, Files, Text};
 use newtype::{Counter, Wrapping};
-use store_ports::{Store, Written};
+use store_ports::{Counted, Store, Written};
 use structurer::{Bind, Directive, Directives, Edge, Label, NodeRef, SegmentRef, Visit};
 use transcript_ports::{Authorship, Uuid};
 
@@ -233,7 +233,8 @@ impl Applied {
         })?;
         let directed: Vec<Directed> =
             folded.resolved.iter().map(|resolved| resolved.grounded.directed.clone()).collect();
-        let written = store.write(Directions::new(grounds.provenance, unseen, directed, grounds.remit))?;
+        let written =
+            store.write(Counted::new(Directions::new(grounds.provenance, unseen, directed, grounds.remit)))?;
         Applied::covered(store, folded.resolved, written)
     }
 

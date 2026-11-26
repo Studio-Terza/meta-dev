@@ -10,11 +10,12 @@ use design_runs::{
     Account, Flailed, FlailedSegments, Halted, JobFlailed, JobHalted, JobOpened, JobsInterrupted, LiveRuns, NextJob,
     NextRun, Retold, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced, Unstructured, run,
 };
-use design_store::{Asked, AskedEarlier, ContextNodes, Remit};
+use design_store::{Asked, AskedEarlier, ContextNodes, Remit, Tally};
 use dispatch_ports::{
-    AgentRun, Clock, Deadline, Dispatch, DispatchFailure, Due, Ended, Fault, Finished, Job, Model, Prompt, Reply,
-    Stall, Timeout, Wall, Watch, Watched, Watching,
+    AgentRun, Clock, Deadline, Dispatch, DispatchFailure, Due, Ended, Fault, Finished, Job, Model, Moment, Prompt,
+    Reply, Stall, Timeout, Usage, Wall, Watch, Watched, Watching,
 };
+use newtype::Wrapping;
 use port_core::Held;
 use store_ports::{Store, StoreFailure};
 use structurer::{Attempt, Directives, Lapse, Readings, Said, SegmentRef};
@@ -142,12 +143,16 @@ impl<'ports, D: Dispatch, C: Clock> Crew<'ports, D, C> {
         self.clock.now()
     }
 
-    pub fn replied(&self, prompt: &Prompt, timeout: Timeout, model: Model) -> Result<Option<Reply>, Failure> {
+    pub fn moment(&self) -> Moment {
+        self.clock.moment()
+    }
+
+    pub fn replied(&self, prompt: &Prompt, timeout: Timeout, model: Model) -> Result<Heard, Failure> {
         let held = self.dispatch.dispatch(&Job::due_by(Deadline::after(self.clock.now(), timeout), model), prompt)?;
         Ok(Watch::over(self.dispatch, self.clock).watched(held)?.visited(Replying))
     }
 
-    pub fn fanned(&self, reading: &Reading<'_>, timeout: Timeout) -> Result<Vec<Option<Reply>>, Failure> {
+    pub fn fanned(&self, reading: &Reading<'_>, timeout: Timeout) -> Result<Vec<Heard>, Failure> {
         let job = Job::due_by(Deadline::after(self.clock.now(), timeout), Model::Haiku);
         let watched = Watch::over(self.dispatch, self.clock).fanned(&job, reading.prompts())?;
         Ok(watched.iter().map(|each| each.visited(Replying)).collect())
@@ -319,15 +324,37 @@ impl Readings for Unapplied {
 #[derive(Clone, Copy, Debug)]
 struct Replying;
 
-impl Watching for Replying {
-    type Output = Option<Reply>;
+#[derive(Clone, Debug, Default)]
+pub struct Heard {
+    reply: Option<Reply>,
+    tokens: Tally,
+}
 
-    fn finished(self, finished: &Finished) -> Option<Reply> {
-        Some(finished.reply().clone())
+impl Heard {
+    fn spent(usage: Option<Usage>) -> Tally {
+        usage.map_or_default(|used| {
+            used.spent().iter().flat_map(|tokens| usize::try_from(tokens.into_inner())).map(Tally::from).sum()
+        })
     }
 
-    fn stalled(self, _stall: &Stall) -> Option<Reply> {
-        None
+    pub fn reply(&self) -> Option<&Reply> {
+        self.reply.as_ref()
+    }
+
+    pub fn tokens(&self) -> Tally {
+        self.tokens
+    }
+}
+
+impl Watching for Replying {
+    type Output = Heard;
+
+    fn finished(self, finished: &Finished) -> Heard {
+        Heard { reply: Some(finished.reply().clone()), tokens: Heard::spent(Some(finished.usage())) }
+    }
+
+    fn stalled(self, stall: &Stall) -> Heard {
+        Heard { reply: None, tokens: Heard::spent(stall.usage()) }
     }
 }
 

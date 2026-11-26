@@ -11,6 +11,7 @@ test = false
 doctest = false
 
 [dependencies]
+strum.workspace = true
 syntax = { path = "../syntax" }
 
 [lints]

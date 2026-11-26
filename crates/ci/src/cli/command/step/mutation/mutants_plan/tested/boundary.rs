@@ -2,7 +2,8 @@ use std::collections::BTreeSet;
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
-use named_derive::Named;
+use newtype::Listed;
+use strum::{Display, IntoStaticStr, VariantArray};
 use text_lines::Lines;
 
 use crate::cli::command::failure::Failure;
@@ -16,8 +17,8 @@ pub(in super::super) struct Tested {
     base: OsString,
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
-#[named(kebab)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "kebab-case")]
 pub(in super::super) enum Reaching {
     Changed,
     ConsumedBy,

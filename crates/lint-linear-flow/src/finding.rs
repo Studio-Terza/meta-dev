@@ -1,11 +1,10 @@
-use std::fmt;
-
+use strum::{Display, VariantArray};
 use syntax::{BinOp, Expr, UnOp};
 
 use lint_core::Fix;
 use lint_sweep::Member;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Rule {
     LinearBodies,
     PureRouters,
@@ -13,8 +12,6 @@ pub enum Rule {
 }
 
 impl Rule {
-    pub const ALL: [Rule; 3] = [Rule::LinearBodies, Rule::PureRouters, Rule::PlainConditions];
-
     const ROUTERS: Member = Member::new(1);
     const CONDITIONS: Member = Member::new(2);
 
@@ -27,20 +24,33 @@ impl Rule {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Finding {
+    #[strum(serialize = "if")]
     If,
+    #[strum(serialize = "if let that is not the whole body")]
     IfLet,
+    #[strum(serialize = "match that is not the whole body")]
     Match,
+    #[strum(serialize = "while loop")]
     While,
+    #[strum(serialize = "for loop")]
     For,
+    #[strum(serialize = "loop")]
     Loop,
+    #[strum(serialize = "let-else")]
     LetElse,
+    #[strum(serialize = "match guard in a router")]
     Guard,
+    #[strum(serialize = "router arm matches a literal, range, tuple or slice")]
     ValuePattern,
+    #[strum(serialize = "router arm is not a single call or value")]
     ArmLogic,
+    #[strum(serialize = "boolean operator &&")]
     And,
+    #[strum(serialize = "boolean operator ||")]
     Or,
+    #[strum(serialize = "boolean operator !")]
     Not,
 }
 
@@ -81,26 +91,6 @@ impl Finding {
             | Finding::LetElse => Rule::LinearBodies,
             Finding::Guard | Finding::ValuePattern | Finding::ArmLogic => Rule::PureRouters,
             Finding::And | Finding::Or | Finding::Not => Rule::PlainConditions,
-        }
-    }
-}
-
-impl fmt::Display for Finding {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Finding::If => formatter.write_str("if"),
-            Finding::IfLet => formatter.write_str("if let that is not the whole body"),
-            Finding::Match => formatter.write_str("match that is not the whole body"),
-            Finding::While => formatter.write_str("while loop"),
-            Finding::For => formatter.write_str("for loop"),
-            Finding::Loop => formatter.write_str("loop"),
-            Finding::LetElse => formatter.write_str("let-else"),
-            Finding::Guard => formatter.write_str("match guard in a router"),
-            Finding::ValuePattern => formatter.write_str("router arm matches a literal, range, tuple or slice"),
-            Finding::ArmLogic => formatter.write_str("router arm is not a single call or value"),
-            Finding::And => formatter.write_str("boolean operator &&"),
-            Finding::Or => formatter.write_str("boolean operator ||"),
-            Finding::Not => formatter.write_str("boolean operator !"),
         }
     }
 }

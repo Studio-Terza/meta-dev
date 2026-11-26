@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  task\nFROM\n  overruns\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "task",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "overruns",
+            "name": "task"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5ebd1d4863fdddb897cb63e221fbb3252ac161a171de92034e1d7c87c4ec0d44"
+}

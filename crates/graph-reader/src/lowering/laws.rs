@@ -8,6 +8,7 @@ use syntax::{TokenStream, TokenTree};
 
 use graph::{Law, LawKind, ModelPart, Operation, OperationOwner, Property, Route, Side, TypeRef};
 use lint_layout::{Name, TestMarks, Whole, Word, words};
+use newtype::Enumerated;
 
 use super::seat::{Footing, Located, Lowers};
 use super::signature::Written;
@@ -52,28 +53,6 @@ impl Kinds {
     const ROUNDTRIP: [Word<'static>; 1] = words!["roundtrip"];
     const CRUD: [Word<'static>; 1] = words!["crud"];
     const PROPTEST: [Word<'static>; 1] = words!["proptest"];
-    const PROPERTIES: [Word<'static>; 9] = words![
-        "associative",
-        "commutative",
-        "identity",
-        "inverse",
-        "idempotent",
-        "absorbing",
-        "distributive",
-        "preserves",
-        "action"
-    ];
-    const NAMED: [Property; 9] = [
-        Property::Associative,
-        Property::Commutative,
-        Property::Identity,
-        Property::Inverse,
-        Property::Idempotent,
-        Property::Absorbing,
-        Property::Distributive,
-        Property::Preserves,
-        Property::Acting,
-    ];
 
     fn of_macro(invocation: &Macro) -> Option<LawKind> {
         let last = invocation.path.segments.last().map(|segment| Name::from(&segment.ident));
@@ -87,11 +66,7 @@ impl Kinds {
     }
 
     fn property(name: &Name) -> Option<Property> {
-        Self::PROPERTIES
-            .iter()
-            .zip(Self::NAMED)
-            .find(|(word, _)| *name == Name::from(**word))
-            .map(|(_, property)| property)
+        Property::VARIANTS.iter().copied().find(|property| *name == Name::from(<&str>::from(*property)))
     }
 }
 

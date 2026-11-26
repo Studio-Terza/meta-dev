@@ -31,7 +31,7 @@ pub use prompt::Prompt;
 pub use started::Started;
 pub use stderr::Stderr;
 pub use system_clock::SystemClock;
-pub use wall::{Deadline, Due, Pause, Timeout, Wall};
+pub use wall::{Deadline, Due, Moment, Pause, Timeout, Wall};
 pub use watch::{Stall, Stalled, Watch, Watched, Watching};
 
 invariants::ignored! {

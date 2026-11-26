@@ -39,14 +39,12 @@ use laws::proptest;
 use laws::proptest::prelude::{Just, any, prop_oneof};
 use laws::proptest::sample::select;
 use laws::proptest::strategy::{BoxedStrategy, Strategy};
-use newtype::Counter;
 use newtype::Enumerated;
 use newtype::Wrapping;
 use port_core::{Held, Op, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
 use sqlite_ports::SqliteOpener;
 use store_ports::{
-    Batch, Busy, Created, Execute, Opens, Query, Record, Schema, Store, StoreFailure, StoreFiller, StoreLock, Written,
-    store_ops,
+    Batch, Busy, Created, Execute, Opens, Query, Record, Schema, Store, StoreFailure, StoreFiller, StoreLock, store_ops,
 };
 use stream::{Relation, Shape};
 use structure::Staff;
@@ -301,6 +299,10 @@ impl Files for FakeLent<'_> {
     fn size(&self, path: &Path) -> Result<Size, FileFailure> {
         self.memory.size(path)
     }
+
+    fn stamps(&self, path: &Path) -> Result<file_ports::Stamps, FileFailure> {
+        self.memory.stamps(path)
+    }
 }
 
 struct Invocation;
@@ -458,7 +460,9 @@ struct Unstored {
 impl Batch for Unstored {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         let Unstored { message, ordinal } = self;
         statements.written(store_ports::query!(
             r#"
@@ -1471,20 +1475,15 @@ impl Graph {
         Graph::shown(store, "n3")
     }
 
-    fn refined(store: &Sqlite, facet: Facet, parents: &[i64]) -> Result<Written, Failure> {
+    fn refined(store: &Sqlite, facet: Facet, parents: &[i64]) -> Result<(), Failure> {
         let run = Run::root();
         let port = run.port(store.clone());
-        let written = (2_i64..)
-            .zip(parents)
-            .map(|(child, parent)| {
-                let entry = Entry::new("demo".parse()?, facet, Entered::Init.into());
-                let planted = port.write(Planting::sown(Node::new(NodeId::new(child), entry)))?;
-                let (refining, refined) = (Graph::resolved(&port, child)?, Graph::resolved(&port, *parent)?);
-                let linked = port.write(Linked::new(refining, NodeRelation::Refines, refined, Entered::Init.into()))?;
-                Ok(planted.plus(linked))
-            })
-            .collect::<Result<Vec<Written>, Failure>>()?;
-        Ok(Written::total(written.into_iter()))
+        (2_i64..).zip(parents).try_for_each(|(child, parent)| {
+            let entry = Entry::new("demo".parse()?, facet, Entered::Init.into());
+            port.write(Planting::sown(Node::new(NodeId::new(child), entry)))?;
+            let (refining, refined) = (Graph::resolved(&port, child)?, Graph::resolved(&port, *parent)?);
+            Ok(port.write(Linked::new(refining, NodeRelation::Refines, refined, Entered::Init.into()))?)
+        })
     }
 
     fn resolved(store: &impl Store, id: i64) -> Result<Resolved, Failure> {
@@ -1784,10 +1783,10 @@ struct Ruled {
 impl Ruled {
     fn recast(self) -> Result<Roles, Option<NodeEdge>> {
         let applying = Applying::ready().map_err(|_unready| None)?;
-        applying.outcome(&["role", "n1", self.parent.name()]).map_err(|_unrecast| None)?;
+        applying.outcome(&["role", "n1", self.parent.into()]).map_err(|_unrecast| None)?;
         applying.applied("propose(new, refines(n1), feature, \"metering\")").map_err(|_unproposed| None)?;
         let proposed = applying.role(NodeId::new(2)).ok_or(None)?;
-        applying.outcome(&["role", "n2", self.child.name()]).map_err(|failure| Ruled::inverted(&failure))?;
+        applying.outcome(&["role", "n2", self.child.into()]).map_err(|failure| Ruled::inverted(&failure))?;
         applying.role(NodeId::new(2)).map(|recast| Roles { proposed, recast }).ok_or(None)
     }
 
@@ -1972,29 +1971,27 @@ enum Parsed {
     Otherwise,
 }
 
-impl Spoken {
-    fn words(self) -> &'static [&'static str] {
-        match self {
-            Spoken::Ingest => &["ingest"],
-            Spoken::Show => &["show"],
-            Spoken::Search => &["search"],
-            Spoken::Init => &["init"],
-            Spoken::Apply => &["apply"],
-            Spoken::Refine => &["refine"],
-            Spoken::Specify => &["specify", "--artifact", "lint:x", "--condition", "it holds"],
-            Spoken::Reopen => &["reopen"],
-            Spoken::Drop => &["drop", "--reason", "folded"],
-            Spoken::Role => &["role", "n1"],
-        }
-    }
+#[derive(Clone, Copy, Debug)]
+struct Typed {
+    words: &'static [&'static str],
+    missing: &'static str,
+}
 
-    fn missing(self) -> &'static str {
+impl Spoken {
+    fn typed(self) -> Typed {
         match self {
-            Spoken::Ingest | Spoken::Init => "demo",
-            Spoken::Show | Spoken::Refine | Spoken::Specify | Spoken::Reopen | Spoken::Drop => "n1",
-            Spoken::Search => "thanks",
-            Spoken::Apply => "notes/directives",
-            Spoken::Role => "core",
+            Spoken::Ingest => Typed { words: &["ingest"], missing: "demo" },
+            Spoken::Show => Typed { words: &["show"], missing: "n1" },
+            Spoken::Search => Typed { words: &["search"], missing: "thanks" },
+            Spoken::Init => Typed { words: &["init"], missing: "demo" },
+            Spoken::Apply => Typed { words: &["apply"], missing: "notes/directives" },
+            Spoken::Refine => Typed { words: &["refine"], missing: "n1" },
+            Spoken::Specify => {
+                Typed { words: &["specify", "--artifact", "lint:x", "--condition", "it holds"], missing: "n1" }
+            }
+            Spoken::Reopen => Typed { words: &["reopen"], missing: "n1" },
+            Spoken::Drop => Typed { words: &["drop", "--reason", "folded"], missing: "n1" },
+            Spoken::Role => Typed { words: &["role", "n1"], missing: "core" },
         }
     }
 }
@@ -2002,7 +1999,8 @@ impl Spoken {
 impl Foreign {
     fn parsed(&self) -> Parsed {
         let Foreign(spoken, flag) = *self;
-        let arguments = [spoken.words(), &[flag, spoken.missing()]].concat();
+        let Typed { words, missing } = spoken.typed();
+        let arguments = [words, &[flag, missing]].concat();
         Some(Invocation::output(&Session::typical(), &arguments))
             .filter(|parsed| matches!(parsed, Err(Failure::Usage)))
             .map_or(Parsed::Otherwise, |_usage| Parsed::Usage)
@@ -2900,7 +2898,7 @@ impl StoreFiller for Unbooked {
         StoreFiller::read(&self.0, pass, query)
     }
 
-    fn write<Q: Batch>(&self, pass: Pass<'_, Q>, batch: Q) -> Result<Written, Q::Failure> {
+    fn write<Q: Batch>(&self, pass: Pass<'_, Q>, batch: Q) -> Result<Q::Done, Q::Failure> {
         (Q::NAME == FailuresReported::NAME).then_some(()).map_or_else(
             || StoreFiller::write(&self.0, pass, batch),
             |()| {

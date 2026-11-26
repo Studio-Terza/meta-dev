@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use invariants::Ignoring;
 
-use crate::{Bytes, FileFailure, Ignored, Kind, Offset, Size, Text, Written};
+use crate::{Bytes, FileFailure, Ignored, Kind, Offset, Size, Stamps, Tail, Text, Written};
 
 pub trait Files {
     fn read(&self, path: &Path) -> Result<Bytes, FileFailure>;
@@ -38,6 +38,8 @@ pub trait Files {
 
     fn size(&self, path: &Path) -> Result<Size, FileFailure>;
 
+    fn stamps(&self, path: &Path) -> Result<Stamps, FileFailure>;
+
     fn read_many(&self, paths: &[impl AsRef<Path>]) -> Vec<Result<Bytes, FileFailure>> {
         paths.iter().map(|path| self.read(path.as_ref())).collect()
     }
@@ -71,6 +73,18 @@ pub trait Files {
 
     fn kinds(&self, paths: &[impl AsRef<Path>]) -> Vec<Kind> {
         paths.iter().map(|path| self.kind(path.as_ref())).collect()
+    }
+
+    fn sizes(&self, paths: &[impl AsRef<Path>]) -> Vec<Result<Size, FileFailure>> {
+        paths.iter().map(|path| self.size(path.as_ref())).collect()
+    }
+
+    fn stamps_many(&self, paths: &[impl AsRef<Path>]) -> Vec<Result<Stamps, FileFailure>> {
+        paths.iter().map(|path| self.stamps(path.as_ref())).collect()
+    }
+
+    fn read_tails(&self, tails: &[Tail]) -> Vec<Result<Bytes, FileFailure>> {
+        tails.iter().map(|tail| self.read_from(tail.as_ref(), tail.offset())).collect()
     }
 
     fn bytes_below(&self, root: &Path) -> Result<Size, FileFailure> {

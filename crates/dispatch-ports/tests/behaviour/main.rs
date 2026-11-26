@@ -123,6 +123,10 @@ impl ClockFiller for FakeClock<'_> {
         *self.now.lock().unpoisoned()
     }
 
+    fn moment(&self, _pass: Pass<'_, clock_ops::Moment>) -> dispatch_ports::Moment {
+        dispatch_ports::Moment::from(*self.now.lock().unpoisoned())
+    }
+
     fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause, bell: &Bell) -> Wall {
         let wait = Wait { pause, woke: bell.waited(Duration::ZERO) };
         let mut waits = self.waits.0.lock().unpoisoned();
@@ -364,4 +368,10 @@ fn each_stall_names_its_own_cause() -> Result<(), laws::Unmet> {
     let causes: Vec<Cause> = stalls.iter().map(Stall::stalled).collect();
     assert_eq!(causes, [Cause::Errored, Cause::Unreadable, Cause::Overdue, Cause::Unspawned, Cause::Failed]);
     Ok(())
+}
+
+#[test]
+fn a_moment_counts_the_milliseconds_since_an_earlier_one_and_back_to_a_later_one() {
+    let [early, late] = [Wall::new(2), Wall::new(5)].map(dispatch_ports::Moment::from);
+    assert_eq!([late.since(early), early.since(late), late.since(late)], [3000, -3000, 0]);
 }

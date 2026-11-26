@@ -28,6 +28,7 @@ use lint_arbitrary_newtypes::ArbitraryNewtypes;
 use lint_bool_methods::BoolMethods;
 use lint_const_shape::ConstShape;
 use lint_crate_graph::CrateGraph;
+use lint_derived_tables::DerivedTables;
 use lint_distinct_signatures::DistinctSignatures;
 use lint_effect_sites::EffectsInPorts;
 use lint_enum_predicates::EnumPredicates;
@@ -161,6 +162,7 @@ type Registry = registry![
     Modelled<RepeatedMethods>,
     Primed<StateGraph>,
     Ruled<GuardMustUse>,
+    Ruled<DerivedTables>,
     Judged<PublicApiTests>,
     Grounded<NoTestOnlyApi>,
     Swept<NoIgnoredTests>,

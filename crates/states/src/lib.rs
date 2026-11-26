@@ -38,7 +38,18 @@ macro_rules! states {
         }
     ) => {
         $(#[$meta])*
-        #[derive(::named_derive::Named, Clone, Copy, Debug, PartialEq, Eq)]
+        #[derive(
+            ::strum::Display,
+            ::strum::IntoStaticStr,
+            ::strum::VariantArray,
+            ::newtype::Listed,
+            Clone,
+            Copy,
+            Debug,
+            PartialEq,
+            Eq
+        )]
+        #[strum(serialize_all = "snake_case")]
         $vis enum $lifecycle {
             $($state),*
         }

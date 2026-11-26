@@ -10,6 +10,7 @@ use crate::cli::command::failure::Failure;
 use crate::cli::command::step::changed::Changed;
 use crate::cli::command::step::journal::Journal;
 use crate::cli::ports::{Ports, Text};
+use strum::VariantArray;
 
 #[derive(Debug)]
 pub struct Scope<'journal> {
@@ -23,7 +24,7 @@ impl<'journal> Scope<'journal> {
     pub(crate) fn reached_by(metadata: &'journal Journal, changes: &[Change]) -> Scope<'journal> {
         let sources = changes
             .iter()
-            .filter(|change| Check::ALL.iter().all(|check| check.flagging(change).is_none()))
+            .filter(|change| Check::VARIANTS.iter().all(|check| check.flagging(change).is_none()))
             .flat_map(Change::paths)
             .map(|path| path.as_os_str().to_owned())
             .collect();

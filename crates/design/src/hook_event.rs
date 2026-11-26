@@ -1,8 +1,11 @@
-use named_derive::Named;
+use newtype::Listed;
 use serde::Serialize;
+use strum::{Display, IntoStaticStr, VariantArray};
 
-#[derive(Named, Serialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-#[named(kebab)]
+#[derive(
+    Display, IntoStaticStr, VariantArray, Listed, Serialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord,
+)]
+#[strum(serialize_all = "kebab-case")]
 pub enum HookEvent {
     UserPromptSubmit,
     Stop,

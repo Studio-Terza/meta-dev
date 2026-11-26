@@ -9,7 +9,7 @@ mod boundary;
 
 use boundary::Recall;
 
-use crate::{Bytes, FileFailure, Files, Ignored, Kind, Size, Text};
+use crate::{Bytes, FileFailure, Files, Ignored, Kind, Size, Stamps, Text};
 
 #[derive(Debug)]
 pub struct Cached<'files, F> {
@@ -117,5 +117,9 @@ impl<F: Files> Files for Cached<'_, F> {
 
     fn size(&self, path: &Path) -> Result<Size, FileFailure> {
         self.files.size(path)
+    }
+
+    fn stamps(&self, path: &Path) -> Result<Stamps, FileFailure> {
+        self.files.stamps(path)
     }
 }

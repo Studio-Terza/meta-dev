@@ -4,8 +4,8 @@ use design_model::{NodeId, NotesLine, Prefix, Provenance};
 use grammar_notes::{Cite, Quote};
 use grammar_output::field::{Bare, Id, Integer, Quoted, Word};
 use grammar_output::{Fields, Mapped, Parsed, Record, Unread};
-use named_derive::Named;
-use newtype::Wrapping;
+use newtype::{Listed, Wrapping};
+use strum::{Display, IntoStaticStr, VariantArray};
 use transcript_ports::Authorship;
 
 use crate::cli::count::Count;
@@ -27,7 +27,8 @@ pub enum Reference {
     Cite(Cite),
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
 pub enum Miss {
     Unheard,
     Ambiguous,
@@ -50,7 +51,8 @@ pub struct Reconciliation {
     anchored: Count,
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
 enum Part {
     Line,
     Quote,
@@ -62,8 +64,8 @@ enum Part {
     Segments,
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
-#[named(kebab)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "kebab-case")]
 pub(crate) enum Note {
     Imported,
     Unresolved,

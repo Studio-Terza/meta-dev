@@ -17,9 +17,9 @@ grammar-node = { path = "../grammar-node" }
 grammar-notes = { path = "../grammar-notes" }
 grammar-project = { path = "../grammar-project" }
 grammar-provenance = { path = "../grammar-provenance" }
-named-derive = { path = "../named-derive" }
 newtype = { path = "../newtype" }
 serde.workspace = true
+strum.workspace = true
 thiserror.workspace = true
 message-id = { path = "../message-id" }
 

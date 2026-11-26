@@ -1,0 +1,134 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  session,\n  shells,\n  agents,\n  halt,\n  read,\n  quoted,\n  kept,\n  fate,\n  tokens,\n  millis\nFROM\n  stops\nORDER BY\n  id\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "session",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "stops",
+            "name": "session"
+          }
+        }
+      },
+      {
+        "name": "shells",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "stops",
+            "name": "shells"
+          }
+        }
+      },
+      {
+        "name": "agents",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "stops",
+            "name": "agents"
+          }
+        }
+      },
+      {
+        "name": "halt",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "stops",
+            "name": "halt"
+          }
+        }
+      },
+      {
+        "name": "read",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "stops",
+            "name": "read"
+          }
+        }
+      },
+      {
+        "name": "quoted",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "stops",
+            "name": "quoted"
+          }
+        }
+      },
+      {
+        "name": "kept",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "stops",
+            "name": "kept"
+          }
+        }
+      },
+      {
+        "name": "fate",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "stops",
+            "name": "fate"
+          }
+        }
+      },
+      {
+        "name": "tokens",
+        "ordinal": 8,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "stops",
+            "name": "tokens"
+          }
+        }
+      },
+      {
+        "name": "millis",
+        "ordinal": 9,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "stops",
+            "name": "millis"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "d6d55e76b2fe96f68c6e61fbd77e06ae0de8ba92bb3175d2c97b931b7883b879"
+}

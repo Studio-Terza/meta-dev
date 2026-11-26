@@ -81,7 +81,8 @@ pub trait Reading {
     fn entry(self, line: &Line, entry: &Entry, marking: Marking) -> Self::Output;
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(strum::IntoStaticStr, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
 pub enum Marking {
     Heading,
     Ruling,

@@ -1,19 +1,24 @@
 mod platform;
 
-use std::fmt;
 use std::path::Path;
 
 use lint_core::RepoFile;
+use strum::Display;
 
 use crate::language::{Fix, Language};
 use platform::Platform;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Display, Clone, Copy, Debug)]
 pub(crate) enum Place {
+    #[strum(serialize = "source outside assets")]
     Outside,
+    #[strum(serialize = "source below assets is not a web asset")]
     Assets,
+    #[strum(serialize = "vendored source")]
     Vendored,
+    #[strum(serialize = "platform test source")]
     PlatformTests,
+    #[strum(serialize = "source below platform is not test code")]
     Platform,
 }
 
@@ -39,18 +44,6 @@ impl Place {
             Place::Outside | Place::Platform => Some(language),
             Place::Vendored | Place::PlatformTests => None,
             Place::Assets => (language.fix() != Fix::MoveToAssets).then_some(language),
-        }
-    }
-}
-
-impl fmt::Display for Place {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Place::Outside => formatter.write_str("source outside assets"),
-            Place::Vendored => formatter.write_str("vendored source"),
-            Place::Assets => formatter.write_str("source below assets is not a web asset"),
-            Place::PlatformTests => formatter.write_str("platform test source"),
-            Place::Platform => formatter.write_str("source below platform is not test code"),
         }
     }
 }

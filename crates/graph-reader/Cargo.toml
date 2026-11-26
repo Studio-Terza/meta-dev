@@ -19,6 +19,7 @@ graph = { path = "../graph" }
 lint-core = { path = "../lint-core" }
 lint-layout = { path = "../lint-layout" }
 lint-placement = { path = "../lint-placement" }
+strum.workspace = true
 syntax = { path = "../syntax" }
 
 [dev-dependencies]

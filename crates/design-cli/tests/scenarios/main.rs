@@ -70,56 +70,57 @@ fn a_prompt_hook_ingests_and_prints_nothing_into_the_conversation() -> Result<()
 }
 
 #[test]
-fn a_stop_whose_agent_flails_blocks_once_with_a_json_decision_at_exit_zero_and_a_stop_already_continuing_only_notices()
+fn a_flail_from_structuring_blocks_the_next_stop_once_with_a_json_decision_at_exit_zero_and_a_continuing_stop_prints_nothing()
 -> Result<(), laws::Unmet> {
     let stopping = "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":false}";
     let continuing = "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":true}";
     let design = Design::with_a_session_in_work()?;
+    let structured = [design.in_work(&["ingest"], "")?, design.in_work(&["structure"], "")?];
     let blocked = design.in_work(&["hook", "stop"], stopping)?;
     let passed = design.in_work(&["hook", "stop"], stopping)?;
     let prompted = design.in_work(&["hook", "user-prompt-submit"], "")?;
-    let noticed = Design::with_a_session_in_work()?.in_work(&["hook", "stop"], continuing)?;
+    let continued = design.in_work(&["hook", "stop"], continuing)?;
     let decision: Value = serde_json::from_slice(&blocked.stdout)?;
-    let notice: Value = serde_json::from_slice(&noticed.stdout)?;
+    assert_eq!(structured.map(|output| output.status.code()), [Some(0_i32), Some(1_i32)]);
     assert_eq!((blocked.status.code(), blocked.stderr), (Some(0_i32), Vec::new()));
     assert_eq!(decision.get("decision").and_then(Value::as_str), Some("block"));
     assert!(decision.get("reason").is_some_and(Value::is_string));
-    assert_eq!((passed.status.code(), passed.stdout, passed.stderr), (Some(0_i32), Vec::new(), Vec::new()));
-    assert_eq!((prompted.status.code(), prompted.stdout, prompted.stderr), (Some(0_i32), Vec::new(), Vec::new()));
-    assert_eq!((noticed.status.code(), noticed.stderr), (Some(0_i32), Vec::new()));
-    assert_eq!(notice.get("decision"), None);
-    assert_eq!(notice.get("systemMessage"), decision.get("reason"));
+    assert_eq!(
+        [passed, prompted, continued].map(|output| (output.status.code(), output.stdout, output.stderr)),
+        [
+            (Some(0_i32), Vec::new(), Vec::new()),
+            (Some(0_i32), Vec::new(), Vec::new()),
+            (Some(0_i32), Vec::new(), Vec::new())
+        ]
+    );
     Ok(())
 }
 
 #[test]
-fn a_flail_first_met_by_a_continuing_stop_reaches_the_lead_once_through_the_next_prompt_or_the_next_stop()
--> Result<(), laws::Unmet> {
+fn a_flail_from_structuring_reaches_the_lead_once_through_the_next_prompt_or_the_next_stop() -> Result<(), laws::Unmet>
+{
     let stopping = "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":false}";
-    let continuing = "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":true}";
     let prompted = Design::with_a_session_in_work()?;
-    let noticed = prompted.in_work(&["hook", "stop"], continuing)?;
-    let continued = prompted.in_work(&["hook", "stop"], continuing)?;
+    prompted.in_work(&["ingest"], "")?;
+    prompted.in_work(&["structure"], "")?;
     let told = prompted.in_work(&["hook", "user-prompt-submit"], "")?;
     let after =
         [prompted.in_work(&["hook", "user-prompt-submit"], "")?, prompted.in_work(&["hook", "stop"], stopping)?];
     let blocking = Design::with_a_session_in_work()?;
-    let renoticed = blocking.in_work(&["hook", "stop"], continuing)?;
+    blocking.in_work(&["ingest"], "")?;
+    blocking.in_work(&["structure"], "")?;
     let blocked = blocking.in_work(&["hook", "stop"], stopping)?;
-    let passed = blocking.in_work(&["hook", "stop"], stopping)?;
-    let messages: [Value; 2] = [serde_json::from_slice(&noticed.stdout)?, serde_json::from_slice(&renoticed.stdout)?];
     let context: Value = serde_json::from_slice(&told.stdout)?;
     let decision: Value = serde_json::from_slice(&blocked.stdout)?;
     let specific = context.get("hookSpecificOutput");
     assert_eq!(specific.and_then(|output| output.get("hookEventName")), Some(&Value::from("UserPromptSubmit")));
-    assert_eq!(specific.and_then(|output| output.get("additionalContext")), messages[0].get("systemMessage"));
+    assert!(specific.and_then(|output| output.get("additionalContext")).is_some_and(Value::is_string));
     assert_eq!(decision.get("decision").and_then(Value::as_str), Some("block"));
-    assert_eq!(decision.get("reason"), messages[1].get("systemMessage"));
+    assert_eq!(decision.get("reason"), specific.and_then(|output| output.get("additionalContext")));
     assert_eq!(
-        [&continued, &told, &blocked].map(|output| (output.status.code(), output.stderr.as_slice())),
-        [(Some(0_i32), &[][..]), (Some(0_i32), &[][..]), (Some(0_i32), &[][..])]
+        [&told, &blocked].map(|output| (output.status.code(), output.stderr.as_slice())),
+        [(Some(0_i32), &[][..]), (Some(0_i32), &[][..])]
     );
-    assert_eq!([continued, passed].map(|output| output.stdout), [Vec::<u8>::new(), Vec::new()]);
     assert_eq!(after.map(|output| output.stdout), [Vec::<u8>::new(), Vec::new()]);
     Ok(())
 }
@@ -127,11 +128,11 @@ fn a_flail_first_met_by_a_continuing_stop_reaches_the_lead_once_through_the_next
 #[test]
 fn a_run_killed_during_its_second_job_leaves_the_first_job_s_flail_told_and_the_next_run_sends_only_the_second_job_s_segment_again()
 -> Result<(), laws::Unmet> {
-    let stopping = "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":false}";
     let design = Design::with_two_jobs_whose_agent_dies_on_the_second()?;
-    let killed = design.in_work(&["hook", "stop"], stopping)?;
+    design.in_work(&["ingest"], "")?;
+    let killed = design.in_work(&["structure"], "")?;
     let told = design.in_work(&["hook", "user-prompt-submit"], "")?;
-    let restarted = design.in_work(&["hook", "stop"], stopping)?;
+    let restarted = design.in_work(&["structure"], "")?;
     let unrun = design.in_work(&["show", "job", "4"], "")?;
     let lapse = "place(".parse::<Directives>().map(drop).map_err(Lapse::from);
     let flail = |job, sequel| {
@@ -140,13 +141,12 @@ fn a_run_killed_during_its_second_job_leaves_the_first_job_s_flail_told_and_the_
     };
     let [first, second] = [flail(1, Sequel::WentOn), flail(3, Sequel::NoMoreJobs)];
     let context: Value = serde_json::from_slice(&told.stdout)?;
-    let decision: Value = serde_json::from_slice(&restarted.stdout)?;
+    let failed = String::from_utf8(restarted.stderr)?;
     let specific = context.get("hookSpecificOutput").and_then(|specific| specific.get("additionalContext"));
     assert_eq!((killed.status.code(), killed.stdout), (None, Vec::new()));
+    assert_eq!(restarted.status.code(), Some(1_i32));
     assert!(matches!((specific.and_then(Value::as_str), &first), (Some(said), Err(expected)) if said == expected));
-    assert!(
-        matches!((decision.get("reason").and_then(Value::as_str), &second), (Some(said), Err(expected)) if said == expected)
-    );
+    assert!(matches!(&second, Err(expected) if failed == format!("{expected}\n")));
     let refused = String::from_utf8(unrun.stderr)?;
     assert_eq!(unrun.status.code(), Some(1_i32));
     assert_eq!(

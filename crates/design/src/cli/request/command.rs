@@ -214,8 +214,8 @@ impl Command {
             Command::Search(terms, scope) => Search::found(ground.store(), terms, scope)
                 .map(|lines| Uttered::new(Shown::said(Lines::from(&lines)), Ok(Outcome::Searched))),
             Command::Answer(said) => Answering::new(ground.store(), crew)
-                .traced(&said)
-                .map(|traced| Uttered::new(Shown::said(traced), Ok(Outcome::Answered))),
+                .searched(&said)
+                .map(|searched| Uttered::new(Shown::said(searched), Ok(Outcome::Answered))),
             Command::Recall(said) => Answering::new(ground.store(), crew)
                 .recalled(&said)
                 .map(|recalled| Uttered::new(Shown::said(recalled), Ok(Outcome::Recalled))),

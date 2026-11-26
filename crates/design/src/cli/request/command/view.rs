@@ -11,9 +11,9 @@ use design_store::{
 };
 use file_ports::Files;
 use grammar_notes::{self as notes, Notes};
-use named_derive::Named;
-use newtype::Wrapping;
+use newtype::{Listed, Wrapping};
 use store_ports::Store;
+use strum::{Display, IntoStaticStr, VariantArray};
 
 use super::rendering::Refs;
 use super::subject::Found;
@@ -44,8 +44,8 @@ pub enum Root {
     Node(NodeId),
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
-#[named(kebab)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "kebab-case")]
 enum Lens {
     CurrentDecision,
     OpenQuestions,

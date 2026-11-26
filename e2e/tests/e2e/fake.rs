@@ -3,20 +3,14 @@ use std::path::{Path, PathBuf};
 
 use ci::ports::{Invocation, Ports, Run, Text};
 use file_ports::Memory;
+use strum::{Display, IntoStaticStr, VariantArray};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Display, Debug, Clone, Copy)]
 pub enum Edit {
+    #[strum(serialize = "M")]
     Modified,
+    #[strum(serialize = "A")]
     Added,
-}
-
-impl Edit {
-    fn status(self) -> &'static str {
-        match self {
-            Edit::Modified => "M",
-            Edit::Added => "A",
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -55,23 +49,23 @@ impl Fake {
     }
 
     fn statuses(&self) -> String {
-        self.changes.iter().map(|change| format!("{}\t{}\n", change.edit.status(), change.path.display())).collect()
+        self.changes.iter().map(|change| format!("{}\t{}\n", change.edit, change.path.display())).collect()
     }
 
     fn git(&self, invocation: &Invocation) -> String {
         match Asked::of(invocation) {
-            Asked::MergeBase => Self::FORK.to_owned(),
-            Asked::NameStatus => self.statuses(),
-            Asked::Names => self.names(),
+            Some(Asked::MergeBase) => Self::FORK.to_owned(),
+            Some(Asked::NameStatus) => self.statuses(),
+            None => self.names(),
         }
     }
 
-    fn answered(&self, program: Program, invocation: &Invocation) -> io::Result<String> {
+    fn answered(&self, program: Option<Program>, invocation: &Invocation) -> io::Result<String> {
         match program {
-            Program::Cargo => Ok(self.metadata.clone()),
-            Program::Git => Ok(self.git(invocation)),
-            Program::Gh => Ok(Self::UNLABELLED_CHANGE.to_owned()),
-            Program::Other => Err(Self::refused(invocation)),
+            Some(Program::Cargo) => Ok(self.metadata.clone()),
+            Some(Program::Git) => Ok(self.git(invocation)),
+            Some(Program::Gh) => Ok(Self::UNLABELLED_CHANGE.to_owned()),
+            None => Err(Self::refused(invocation)),
         }
     }
 
@@ -108,37 +102,34 @@ impl Ports for Fake {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(IntoStaticStr, VariantArray, Clone, Copy, Debug)]
 enum Asked {
+    #[strum(serialize = "merge-base")]
     MergeBase,
+    #[strum(serialize = "--name-status")]
     NameStatus,
-    Names,
 }
 
 impl Asked {
-    const NAMED: [(&'static str, Asked); 2] = [("merge-base", Asked::MergeBase), ("--name-status", Asked::NameStatus)];
-
-    fn of(invocation: &Invocation) -> Asked {
-        Self::NAMED
+    fn of(invocation: &Invocation) -> Option<Asked> {
+        Self::VARIANTS
             .iter()
-            .find(|(word, _)| invocation.arguments().iter().any(|argument| argument == word))
-            .map_or(Asked::Names, |(_, asked)| *asked)
+            .copied()
+            .find(|asked| invocation.arguments().iter().any(|argument| argument == <&'static str>::from(*asked)))
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(IntoStaticStr, VariantArray, Clone, Copy, Debug)]
+#[strum(serialize_all = "snake_case")]
 enum Program {
     Cargo,
     Git,
     Gh,
-    Other,
 }
 
 impl Program {
-    const NAMED: [(&'static str, Program); 3] = [("cargo", Program::Cargo), ("git", Program::Git), ("gh", Program::Gh)];
-
-    fn of(invocation: &Invocation) -> Program {
+    fn of(invocation: &Invocation) -> Option<Program> {
         let program = invocation.program().to_str();
-        Self::NAMED.iter().find(|(name, _)| program == Some(*name)).map_or(Program::Other, |(_, named)| *named)
+        Self::VARIANTS.iter().copied().find(|named| program == Some(<&'static str>::from(*named)))
     }
 }

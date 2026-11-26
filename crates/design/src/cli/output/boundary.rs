@@ -13,10 +13,10 @@ use file_ports::Offset;
 use grammar_cited::Cited;
 use grammar_output::field::{Bare, Id, Integer, Phrase, Quoted, Word};
 use grammar_output::{Fields, Mapped, Parsed, Record, Unread};
-use named_derive::Named;
-use newtype::Wrapping;
+use newtype::{Listed, Wrapping};
 use stream::{Relation, Shape};
 use structurer::{Directive, Lapse, Retried, SegmentRef};
+use strum::{Display, IntoStaticStr, VariantArray};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Kind, SessionId, Uuid};
 
 use crate::cli::Viewed;
@@ -205,8 +205,8 @@ pub struct Lapsed {
     lapse: Lapse,
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
-#[named(kebab)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "kebab-case")]
 pub(crate) enum Key {
     Session,
     Read,
@@ -251,18 +251,21 @@ pub(crate) enum Key {
     Owed,
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
 enum Spend {
     Job,
     Tokens,
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
 enum Replying {
     Reply,
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
 enum Remarked {
     Place,
     Sense,

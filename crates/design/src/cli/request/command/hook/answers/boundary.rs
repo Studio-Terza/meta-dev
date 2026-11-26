@@ -2,23 +2,20 @@ use std::collections::BTreeSet;
 use std::fmt;
 use std::ops::Not;
 
-use design_model::{Gist, NodeId, Outline, Stage, Title};
+use design_model::{NodeId, Outline, Stage, Title};
 use design_store::{Quote, Said, StopRow, Tally, Unabridged};
 use dispatch_ports::{Prompt, Reply};
 use newtype::Wrapping;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
-use transcript_ports::{Body, SessionId, Uuid};
+use transcript_ports::{Body, Uuid};
 
+use super::super::super::structure::Heard;
 use crate::cli::request::ignored::Ignored;
 use invariants::Ignoring;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Role(&'static str);
-
-#[derive(Debug, Deserialize)]
+#[derive(Debug)]
 pub struct Asked {
-    kind: Kind,
     question: Body,
 }
 
@@ -34,13 +31,6 @@ pub struct Trimming<'asked> {
     quotes: Vec<String>,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-enum Kind {
-    Question,
-    Statement,
-}
-
 #[derive(Debug, Deserialize)]
 struct Picked {
     uuid: Uuid,
@@ -51,23 +41,11 @@ struct Picked {
 pub struct Answers(Vec<Quote>);
 
 #[derive(Debug)]
-pub struct Question {
-    asked: Asked,
-    read: usize,
-    quoted: usize,
+pub struct Search {
+    read: Tally,
+    quoted: Tally,
     answers: Option<Answers>,
-}
-
-#[derive(Debug)]
-pub enum Traced {
-    Statement,
-    Question(Question),
-}
-
-#[derive(Debug)]
-pub struct Classifying {
-    role: Role,
-    said: String,
+    tokens: Tally,
 }
 
 #[derive(Debug)]
@@ -154,70 +132,37 @@ impl fmt::Display for Recalling<'_> {
     }
 }
 
-impl Traced {
-    pub fn answers(self) -> Option<Answers> {
-        match self {
-            Traced::Statement => None,
-            Traced::Question(question) => question.answers,
-        }
+impl Search {
+    pub fn new(history: &[Said], quoted: &[Quote], answers: Option<Answers>, tokens: Tally) -> Search {
+        Search { read: Tally::from(history.len()), quoted: Tally::from(quoted.len()), answers, tokens }
     }
 
-    pub fn heard(&self, session: SessionId) -> StopRow {
-        match self {
-            Traced::Statement => StopRow::heard(session, Gist::Statement, [Tally::default(); 3]),
-            Traced::Question(question) => question.heard(session),
-        }
+    pub fn answers(&self) -> Option<&Answers> {
+        self.answers.as_ref()
+    }
+
+    pub fn trailed(&self, row: StopRow) -> StopRow {
+        let kept = Tally::from(self.answers.as_ref().map_or(0, |answers| answers.0.len()));
+        row.searched([self.read, self.quoted, kept, self.tokens])
     }
 }
 
-impl fmt::Display for Traced {
+impl fmt::Display for Search {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Traced::Statement => writeln!(formatter, "statement: asks the owner nothing"),
-            Traced::Question(question) => writeln!(formatter, "{question}"),
-        }
-    }
-}
-
-impl Question {
-    pub fn new(asked: Asked, read: usize, quoted: usize, answers: Option<Answers>) -> Question {
-        Question { asked, read, quoted, answers }
-    }
-
-    fn heard(&self, session: SessionId) -> StopRow {
-        let kept = self.answers.as_ref().map_or(0, |answers| answers.0.len());
-        StopRow::heard(session, Gist::Question, [self.read, self.quoted, kept].map(Tally::from))
-    }
-}
-
-impl fmt::Display for Question {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(formatter, "question: {}", self.asked.question)?;
         writeln!(formatter, "read: {} owner messages", self.read)?;
         writeln!(formatter, "quoted: {}", self.quoted)?;
-        let shown = self.answers.as_ref().map_or_else(|| String::from("answers: none"), ToString::to_string);
+        let shown = self.answers.as_ref().map_or_else(|| String::from("quotes kept: none\n"), ToString::to_string);
         write!(formatter, "{shown}")
     }
 }
 
-impl Role {
-    pub const LEAD: Role = Role(
-        "the lead agent of a software project, reporting to its owner; it asks when it wants the owner to answer a question, rule on something, approve or choose",
-    );
-    const KEPT: usize = 4000;
-
-    pub fn classifying(self, said: &Body) -> Classifying {
-        let text: &str = said.as_ref();
-        let skipped = text.chars().count().saturating_sub(Self::KEPT);
-        Classifying { role: self, said: text.chars().skip(skipped).collect() }
+impl From<&Body> for Asked {
+    fn from(said: &Body) -> Asked {
+        Asked { question: said.clone() }
     }
 }
 
 impl Asked {
-    pub fn read(reply: &Reply) -> Option<Asked> {
-        Replied(reply).object::<Asked>().ignoring(Ignored::Unclassified).filter(|asked| asked.kind == Kind::Question)
-    }
-
     fn selecting(&self, shown: &[impl fmt::Display]) -> Selecting<'_> {
         Selecting { question: &self.question, shown: shown.iter().map(ToString::to_string).collect() }
     }
@@ -249,11 +194,11 @@ impl Reading<'_> {
         &self.prompts
     }
 
-    pub fn quoted(&self, replies: &[Option<Reply>]) -> Vec<Vec<Quote>> {
+    pub fn quoted(&self, heard: &[Heard]) -> Vec<Vec<Quote>> {
         self.chunks
             .iter()
-            .zip(replies)
-            .map(|(chunk, read)| read.as_ref().map_or_default(|reply| Answers::quoted(reply, chunk)))
+            .zip(heard)
+            .map(|(chunk, read)| read.reply().map_or_default(|reply| Answers::quoted(reply, chunk)))
             .collect()
     }
 }
@@ -264,17 +209,7 @@ impl AsRef<Body> for Asked {
     }
 }
 
-impl<'reply> From<&'reply Reply> for Replied<'reply> {
-    fn from(reply: &'reply Reply) -> Replied<'reply> {
-        Replied(reply)
-    }
-}
-
 impl Replied<'_> {
-    pub fn object<T: DeserializeOwned>(self) -> Result<T, serde_json::Error> {
-        serde_json::from_str(&self.braced('{', '}'))
-    }
-
     pub fn listed<T: DeserializeOwned>(self) -> Vec<T> {
         serde_json::from_str(&self.braced('[', ']')).ignoring(Ignored::Unpicked).unwrap_or_default()
     }
@@ -311,27 +246,13 @@ impl Answers {
     }
 }
 
-impl fmt::Display for Classifying {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            formatter,
-            "You read the last message an AI agent wrote at the end of its turn. The agent is {}.\n\
-             Decide whether the message asks its owner a question, or asks the owner to make a decision, approve something, or choose between options.\n\
-             Reply with JSON only, no prose and no code fence:\n\
-             {{\"kind\": \"question\" or \"statement\", \"question\": the question restated in one line (empty for a statement)}}\n\n\
-             Message:\n{}",
-            self.role.0, self.said
-        )
-    }
-}
-
 impl fmt::Display for Selecting<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
-            "An AI agent is about to ask its owner this question:\n{}\n\n\
+            "An AI agent just ended its turn with this message to its owner:\n{}\n\n\
              Below are earlier messages from the owner, each headed by [uuid timestamp].\n\
-             List every passage that answers the question or bears on it: a missed answer costs far more than an extra passage, so when unsure, include it.\n\
+             List every passage that bears on the message: an earlier answer to anything it asks, a decision, rule, preference or instruction it should follow, or the next step the owner set. A missed passage costs far more than an extra one, so when unsure, include it.\n\
              Reply with JSON only, no prose and no code fence: a list of {{\"uuid\": the full uuid from the header, \"quote\": an excerpt of that message copied exactly, character for character, one or two sentences}}. Reply [] if none bear on it.\n\n{}",
             self.question,
             self.shown.join("\n\n")
@@ -343,10 +264,10 @@ impl fmt::Display for Trimming<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
-            "An AI agent is about to ask its owner this question:\n{}\n\n\
+            "An AI agent just ended its turn with this message to its owner:\n{}\n\n\
              Below, numbered, are passages the owner wrote earlier, each with its message uuid and timestamp.\n\
-             Keep only the passages that answer the question: the owner already stated the decision, rule, preference or fact the question needs, so the agent could act without asking. Keep at most {}.\n\
-             Reply with JSON only, no prose and no code fence: a list of passage numbers, such as [3, 1]. Reply [] if none answer it.\n\n{}",
+             Keep only the passages the agent needs now: an earlier answer to what it asks, or a decision, rule, preference or next step that bears directly on what it says it will do. Keep at most {}.\n\
+             Reply with JSON only, no prose and no code fence: a list of passage numbers, such as [3, 1]. Reply [] if none bear on it.\n\n{}",
             self.question,
             Answers::KEPT,
             self.quotes.join("\n")
@@ -356,7 +277,7 @@ impl fmt::Display for Trimming<'_> {
 
 impl fmt::Display for Answers {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(formatter, "The transcript may already answer this; reread before asking:")?;
+        writeln!(formatter, "Earlier owner words bearing on this:")?;
         self.0.iter().try_for_each(|quote| writeln!(formatter, "{quote}"))
     }
 }

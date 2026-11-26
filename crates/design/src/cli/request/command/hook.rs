@@ -9,11 +9,11 @@ use store_ports::Store;
 
 use super::Ground;
 use super::ingest::Ingest;
-use super::structure::{Crew, Structure};
+use super::structure::Crew;
 use crate::cli::failure::Failure;
 use crate::{HookEvent, Uttered};
 use answers::Answering;
-use boundary::{Decision, Prompting, Settings, Stopping};
+use boundary::{Decision, Observed, Prompting, Settings, Stopping};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Hook {
@@ -55,9 +55,10 @@ impl Hook {
         ground: Ground<'_, F, S>,
         crew: &Crew<'_, D, C>,
     ) -> Result<Uttered, Failure> {
+        let started = crew.moment();
         let store = ground.store();
+        let tasks = stopping.tasks(&ground, crew.now());
         Ingest::read(store, &ground.transcripts())?;
-        let concluded = Structure::new(store, crew).worked()?.concluded();
-        stopping.decided(concluded, store, crew)
+        stopping.decided(crew, &Observed::new(store, tasks, started))
     }
 }

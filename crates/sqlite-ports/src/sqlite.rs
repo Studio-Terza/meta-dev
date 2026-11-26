@@ -16,7 +16,7 @@ use opened::Opened;
 use place::Place;
 use store_ports::{
     Batch, Busy, Claim, Created, Opens, Provenance, Query, Record, Schema, StoreFailure, StoreFiller, StoreLock,
-    Written, store_ops,
+    store_ops,
 };
 
 #[derive(Clone, Debug)]
@@ -75,7 +75,7 @@ impl StoreFiller for Sqlite {
         self.shared.opened(|path: &Path| fs::create_dir_all(path), |opened| opened.read(query))
     }
 
-    fn write<Q: Batch>(&self, _pass: Pass<'_, Q>, batch: Q) -> Result<Written, Q::Failure> {
+    fn write<Q: Batch>(&self, _pass: Pass<'_, Q>, batch: Q) -> Result<Q::Done, Q::Failure> {
         self.shared.opened(|path: &Path| fs::create_dir_all(path), |opened| opened.transacted(batch))
     }
 

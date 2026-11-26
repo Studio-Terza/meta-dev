@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use invariants::Ignoring;
 use newtype::Wrapping;
 
-use crate::{Bytes, FileFailure, Files, Ignored, Kind, Size, Text};
+use crate::{Bytes, FileFailure, Files, Ignored, Kind, Size, Stamps, Text};
 use locked::Locked;
 use resolved::Resolved;
 
@@ -17,9 +17,14 @@ use resolved::Resolved;
 pub struct Memory {
     files: Locked<BTreeMap<PathBuf, Bytes>>,
     directories: Locked<BTreeSet<PathBuf>>,
+    stamps: Locked<BTreeMap<PathBuf, Stamps>>,
 }
 
 impl Memory {
+    pub fn stamped(&self, path: &Path, stamps: Stamps) {
+        self.stamps.held().insert(path.to_path_buf(), stamps);
+    }
+
     fn missing() -> FileFailure {
         FileFailure::Missing(io::Error::from(io::ErrorKind::NotFound))
     }
@@ -54,7 +59,11 @@ impl Memory {
 
 impl FromIterator<(PathBuf, Bytes)> for Memory {
     fn from_iter<Entries: IntoIterator<Item = (PathBuf, Bytes)>>(entries: Entries) -> Memory {
-        Memory { files: Locked::new(entries.into_iter().collect()), directories: Locked::default() }
+        Memory {
+            files: Locked::new(entries.into_iter().collect()),
+            directories: Locked::default(),
+            stamps: Locked::default(),
+        }
     }
 }
 
@@ -129,5 +138,11 @@ impl Files for Memory {
 
     fn size(&self, path: &Path) -> Result<Size, FileFailure> {
         self.stored(path).map(|bytes| Size::from(&bytes))
+    }
+
+    fn stamps(&self, path: &Path) -> Result<Stamps, FileFailure> {
+        self.stored(path)?;
+        let stamped = self.stamps.held().get(path).copied();
+        stamped.ok_or_else(|| FileFailure::Failed(io::Error::from(io::ErrorKind::Unsupported)))
     }
 }

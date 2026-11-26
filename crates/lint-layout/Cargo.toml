@@ -14,6 +14,7 @@ invariants = { path = "../invariants" }
 newtype = { path = "../newtype" }
 file-ports = { path = "../file-ports" }
 syntax = { path = "../syntax" }
+strum.workspace = true
 thiserror.workspace = true
 toml.workspace = true
 serde_core.workspace = true

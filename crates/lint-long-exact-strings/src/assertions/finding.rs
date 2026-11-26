@@ -15,10 +15,7 @@ impl From<Pinning> for Finding {
 
 impl fmt::Display for Finding {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.0 {
-            Pinning::LineBreak => formatter.write_str("assertion pins text with a line break"),
-            Pinning::Debug | Pinning::Plain => formatter.write_str("assertion pins Debug-formatted text"),
-        }
+        write!(formatter, "{}", self.0)
     }
 }
 

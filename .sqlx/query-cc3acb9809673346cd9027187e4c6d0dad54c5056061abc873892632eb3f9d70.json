@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM overruns WHERE task = ?1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "cc3acb9809673346cd9027187e4c6d0dad54c5056061abc873892632eb3f9d70"
+}

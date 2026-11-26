@@ -4,14 +4,15 @@ use design_model::{JobId, NodeId, Prefix};
 use grammar_cited::Cited;
 use grammar_output::field::{Bare, Checked, Integer, Word};
 use grammar_output::{Fields, Mapped, Parsed};
-use named_derive::Named;
-use newtype::Wrapping;
+use newtype::{Listed, Wrapping};
 use structurer::SegmentRef;
+use strum::{Display, IntoStaticStr, VariantArray};
 
 use super::Subject;
 use crate::cli::failure::Failure;
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
 enum Keyed {
     Job,
 }

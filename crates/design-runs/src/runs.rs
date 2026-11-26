@@ -9,9 +9,9 @@ use std::fmt;
 use design_jobs::JobState;
 use design_model::{JobId, RunId, Segment};
 use dispatch_ports::{Deadline, Finished, Pid, Reply, Stall, Stalled, Started, Usage};
-use named_derive::Named;
-use newtype::{Arbitrary, Display, Newtype, Wrapping};
+use newtype::{Arbitrary, Display, Listed, Newtype, Wrapping};
 use port_core::Op;
+use strum::{IntoStaticStr, VariantArray};
 use transcript_ports::{Body, SessionId};
 
 #[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
@@ -20,7 +20,8 @@ pub struct Account(String);
 #[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
 pub struct Excerpt(String);
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(strum::Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
 pub enum Halted {
     Flailed,
     Stalled,

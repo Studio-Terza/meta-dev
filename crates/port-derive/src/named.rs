@@ -18,7 +18,6 @@ pub struct Named {
 
 impl Derived {
     const OP: [Constant; 1] = [Constant::Name];
-    const RESOURCE: [Constant; 2] = [Constant::Name, Constant::Release];
 
     fn implemented(self) -> TokenStream {
         match self {
@@ -30,7 +29,7 @@ impl Derived {
     fn constants(self) -> &'static [Constant] {
         match self {
             Derived::Op => &Self::OP,
-            Derived::Resource => &Self::RESOURCE,
+            Derived::Resource => <Constant as strum::VariantArray>::VARIANTS,
         }
     }
 }

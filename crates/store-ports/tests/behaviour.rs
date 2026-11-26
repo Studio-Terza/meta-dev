@@ -21,12 +21,11 @@ use laws::proptest::prelude::{any, prop_assert, prop_oneof};
 use laws::proptest::sample::select;
 use laws::proptest::strategy::Strategy;
 use newtype::Enumerated;
-use newtype::{Arbitrary, Counter, Newtype};
+use newtype::{Arbitrary, Newtype};
 use port_core::{Op, Run};
 use sqlite_ports::SqliteOpener;
 use store_ports::{
     Batch, Busy, Column, ColumnFailure, Columns, Execute, Migrator, Query, Schema, Store, StoreFailure, Version,
-    Written,
 };
 use stream::{Relation, Shape};
 use strum::VariantArray;
@@ -52,7 +51,9 @@ struct Applied;
 impl Batch for Resumed {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         statements.written(store_ports::query!(
             r#"
 INSERT INTO
@@ -67,7 +68,9 @@ VALUES
 impl Batch for HalfWritten {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         statements.written(store_ports::query!(
             r#"
 INSERT INTO
@@ -93,7 +96,9 @@ struct Stale;
 impl Batch for Stale {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         statements.written(store_ports::query!(
             r#"
 INSERT INTO
@@ -226,7 +231,9 @@ enum Rewriteless {}
 impl Batch for Rewriteless {
     type Failure = StoreFailure;
 
-    fn written(self, _statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, _statements: &mut impl Execute) -> Result<(), StoreFailure> {
         match self {}
     }
 }
@@ -299,7 +306,9 @@ impl Schema for Faulted {
 impl Batch for Crashing {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         self.0.written(statements)?;
         HalfWritten.written(statements)
     }
@@ -348,7 +357,9 @@ impl Schema for Early {
 impl Batch for Staged {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         statements.written(store_ports::query!(
             r#"
 INSERT INTO
@@ -369,7 +380,9 @@ struct Edited;
 impl Batch for Edited {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         statements.written(store_ports::query!(
             r#"
 UPDATE
@@ -389,9 +402,12 @@ struct Annotated;
 impl Batch for Annotated {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
-        statements.written(store_ports::query!(
-            r#"
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
+        statements.written_all([
+            store_ports::query!(
+                r#"
 INSERT INTO
   messages (uuid, session, parent, at, author, body)
 VALUES
@@ -404,24 +420,25 @@ VALUES
     'kept forever'
   )
 "#
-        ))?;
-        statements.written(store_ports::query!(
-            r#"
+            ),
+            store_ports::query!(
+                r#"
 INSERT INTO
   segments (message, ordinal, shape, body)
 VALUES
   ('o1', 0, 'sentence', 'kept forever'),
   ('o1', 1, 'sentence', 'gone')
 "#
-        ))?;
-        statements.written(store_ports::query!(
-            r#"
+            ),
+            store_ports::query!(
+                r#"
 INSERT INTO
   conversational (message, ordinal, provenance)
 VALUES
   ('o1', 1, 'init')
 "#
-        ))
+            ),
+        ])
     }
 }
 
@@ -434,16 +451,17 @@ enum Told {
 impl Batch for Told {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
-        let context = Told::context(statements)?;
-        let told = self.segments(statements)?;
-        Ok(context.plus(told))
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
+        Told::context(statements)?;
+        self.segments(statements)
     }
 }
 
 impl Told {
-    fn context(statements: &mut impl Execute) -> Result<Written, StoreFailure> {
-        let messages = statements.written(store_ports::query!(
+    fn context(statements: &mut impl Execute) -> Result<(), StoreFailure> {
+        statements.written(store_ports::query!(
             r#"
 INSERT INTO
   messages (uuid, session, parent, at, author, body)
@@ -466,18 +484,17 @@ VALUES
   )
 "#
         ))?;
-        let segment = statements.written(store_ports::query!(
+        statements.written(store_ports::query!(
             r#"
 INSERT INTO
   segments (message, ordinal, shape, body)
 VALUES
   ('o2', 0, 'sentence', 'Only one.')
 "#
-        ))?;
-        Ok(messages.plus(segment))
+        ))
     }
 
-    fn segments(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    fn segments(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         match self {
             Told::Stale => statements.written(store_ports::query!(
                 r#"
@@ -534,13 +551,15 @@ struct Remarked {
 impl Batch for Remarked {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         self.remark.written(&self.on, statements)
     }
 }
 
 impl Remark {
-    fn written(self, on: &Uuid, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    fn written(self, on: &Uuid, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         match self {
             Remark::Conversational => statements.written(store_ports::query!(
                 r#"
@@ -645,8 +664,8 @@ VALUES
 }
 
 impl Remarked {
-    fn spanned(on: &Uuid, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
-        let node = statements.written(store_ports::query!(
+    fn spanned(on: &Uuid, statements: &mut impl Execute) -> Result<(), StoreFailure> {
+        statements.written(store_ports::query!(
             r#"
 INSERT INTO
   nodes (id, project, facet, stage, provenance)
@@ -654,7 +673,7 @@ VALUES
   (1, 'p', 'feature', 'vague', 'init')
 "#
         ))?;
-        let edge = statements.written(store_ports::query!(
+        statements.written(store_ports::query!(
             r#"
 INSERT INTO
   span_edges (message, ordinal, relation, node, provenance)
@@ -662,12 +681,11 @@ VALUES
   (?1, 0, 'decides', 1, 'init')
 "#,
             on: Uuid
-        ))?;
-        Ok(node.plus(edge))
+        ))
     }
 
-    fn flailed(on: &Uuid, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
-        let job = statements.written(store_ports::query!(
+    fn flailed(on: &Uuid, statements: &mut impl Execute) -> Result<(), StoreFailure> {
+        statements.written(store_ports::query!(
             r#"
 INSERT INTO
   jobs (id)
@@ -675,7 +693,7 @@ VALUES
   (1)
 "#
         ))?;
-        let ran = statements.written(store_ports::query!(
+        statements.written(store_ports::query!(
             r#"
 INSERT INTO
   runs (id, job, pid, deadline, state)
@@ -683,7 +701,7 @@ VALUES
   (1, 1, 1, 1, 'replied')
 "#
         ))?;
-        let flailed = statements.written(store_ports::query!(
+        statements.written(store_ports::query!(
             r#"
 INSERT INTO
   flailed (message, ordinal, run)
@@ -691,8 +709,7 @@ VALUES
   (?1, 0, 1)
 "#,
             on: Uuid
-        ))?;
-        Ok(job.plus(ran).plus(flailed))
+        ))
     }
 }
 
@@ -727,9 +744,12 @@ impl Cited {
 impl Batch for Cited {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
-        let messages = statements.written(store_ports::query!(
-            r#"
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
+        statements.written_all([
+            store_ports::query!(
+                r#"
 INSERT INTO
   messages (uuid, session, parent, at, author, body)
 VALUES
@@ -750,9 +770,9 @@ VALUES
     'First point. See 00000000-0000-4000-8000-000000000001.'
   )
 "#
-        ))?;
-        let segments = statements.written(store_ports::query!(
-            r#"
+            ),
+            store_ports::query!(
+                r#"
 INSERT INTO
   segments (message, ordinal, shape, body)
 VALUES
@@ -769,9 +789,9 @@ VALUES
     'First point. See 00000000-0000-4000-8000-000000000001.'
   )
 "#
-        ))?;
-        let link = statements.written(store_ports::query!(
-            r#"
+            ),
+            store_ports::query!(
+                r#"
 INSERT INTO
   mechanical_links (
     source,
@@ -789,8 +809,8 @@ VALUES
     '00000000-0000-4000-8000-000000000001'
   )
 "#
-        ))?;
-        Ok(messages.plus(segments).plus(link))
+            ),
+        ])
     }
 }
 
@@ -931,8 +951,7 @@ fn a_rederivation_opens_a_store_whose_annotated_segments_it_does_not_change() ->
     let older = run.port(place.opened_as::<Older>());
     older.write(Told::Current)?;
     let on = Uuid::try_new("o1".to_owned())?;
-    let remarks = Remark::VARIANTS.iter().map(|remark| Remarked { remark: *remark, on: on.clone() });
-    remarks.map(|remarked| older.write(remarked)).collect::<Result<Vec<Written>, StoreFailure>>()?;
+    Remark::VARIANTS.iter().try_for_each(|remark| older.write(Remarked { remark: *remark, on: on.clone() }))?;
     assert_eq!(run.port(place.opened()).read(Applied)?.len(), StreamSchema::migrator().iter().count());
     assert_eq!(place.shown("o1")?, ["0 sentence First point.", "1 sentence Second point."]);
     Ok(())

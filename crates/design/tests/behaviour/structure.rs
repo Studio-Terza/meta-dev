@@ -24,7 +24,7 @@ use newtype::Wrapping;
 use port_core::Run;
 use port_core::{Calls, Snapshot};
 use serde_json::Value;
-use store_ports::{Store, Written};
+use store_ports::Store;
 use structurer::{Briefing, Lapse, SegmentRef, Uncovered};
 use text_lines::Lines;
 use transcript_ports::transcripts_ops::ReadFrom;
@@ -133,7 +133,7 @@ impl Structuring {
         Ok(run.port(self.applying.store.clone()).read(Unstructured)?.len())
     }
 
-    fn stored_run(&self, pid: u32, started: &str) -> Result<Written, Failure> {
+    fn stored_run(&self, pid: u32, started: &str) -> Result<(), Failure> {
         let run = Run::root();
         let store = run.port(self.applying.store.clone());
         store.write(JobOpened::from(JobId::new(1)))?;
@@ -403,7 +403,7 @@ fn a_deadline_passed_during_a_sleep_stalls_the_run_loudly_before_its_next_job_an
 }
 
 #[test]
-fn a_flail_then_a_stall_halts_the_stop_before_its_third_job_and_the_stop_tells_the_flail_and_the_stall_it_halted_on()
+fn a_flail_then_a_stall_halts_the_run_before_its_third_job_and_the_next_stop_tells_the_flail_and_the_stall_it_halted_on()
 -> Result<(), laws::Unmet> {
     let u = Some(Script::UNCOVERING);
     let structuring = Structuring {
@@ -416,6 +416,8 @@ fn a_flail_then_a_stall_halts_the_stop_before_its_third_job_and_the_stop_tells_t
         script: Script::replying(&[u, u, None]),
         sleep: Pause::new(3600),
     };
+    let ran = structuring.structured(&["structure"]);
+    let briefs = Script::briefs(&structuring.script).len();
     let stopped = structuring.structured(&["hook", "stop"]);
     let decision: Value = serde_json::from_str(&stopped.text)?;
     let segment = |ordinal| SegmentRef::new(Prefix::new(Script::LISTED.to_owned()), Ordinal::new(ordinal));
@@ -433,9 +435,10 @@ fn a_flail_then_a_stall_halts_the_stop_before_its_third_job_and_the_stop_tells_t
         .into_iter()
         .flatten()
         .collect::<Vec<String>>();
+    assert!(matches!(ran.outcome, Err(Failure::Stalled { .. })), "{:?}", ran.outcome);
     assert_eq!(told, [flailed.to_string(), stalled.to_string()]);
     assert_eq!(stopped.outcome?, Outcome::Blocked);
-    assert_eq!((structuring.unstructured()?, Script::briefs(&structuring.script).len()), (9, 3));
+    assert_eq!((structuring.unstructured()?, briefs), (9, 3));
     let overdue = Line::Ran(Attempted::new(RunId::new(3), JobId::new(2), RunState::Overdue, None));
     assert_eq!(Structured::parsed(&structuring.applying.run(&["show", "job", "2"])?), [overdue]);
     assert!(
@@ -598,51 +601,45 @@ fn an_agent_that_errs_writes_no_result_cannot_start_or_cannot_be_read_stalls_the
 }
 
 #[test]
-fn a_stop_whose_agent_cannot_be_started_blocks_loudly_and_closes_its_job_stalled() -> Result<(), laws::Unmet> {
+fn a_run_whose_agent_cannot_be_started_halts_loudly_and_closes_its_job_stalled() -> Result<(), laws::Unmet> {
     let structuring = Structuring::over(Scripted::default(), Pause::new(0))?;
     let scratch = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let stopped = [(); 2].map(|()| {
+    let ran = [(); 2].map(|()| {
         let missing = Agent::new("/nonexistent/claude", &[]);
         structuring.structured_by(
             Agents::new(|_scratch| HeadlessClaude::new(scratch.clone(), missing), SystemClock),
-            &["hook", "stop"],
+            &["structure"],
         )
     });
-    let [first, second] = stopped.map(|stop| (serde_json::from_str::<Value>(&stop.text), stop.outcome));
-    let reasons =
-        [first.0?, second.0?].map(|decision| decision.get("reason").and_then(Value::as_str).map(str::to_owned));
+    let reasons = ran.map(|run| run.outcome.map(drop).map_err(|failure| failure.to_string()));
     let stalled = [1, 2].map(|job| {
         let unstarted = Stall::Unspawned(Fault::from(DispatchFailure::Spawn(io::Error::from_raw_os_error(2))));
-        Some(Failure::Stalled { job: JobId::new(job), stall: unstarted }.to_string())
+        Err(Failure::Stalled { job: JobId::new(job), stall: unstarted }.to_string())
     });
     let interrupted = Line::Interrupted(JobId::new(1));
     assert_eq!(reasons, stalled);
-    assert_eq!([first.1?, second.1?], [Outcome::Blocked, Outcome::Blocked]);
     assert_eq!(structuring.structured(&["structure"]).has(slice::from_ref(&interrupted)), [interrupted]);
     assert_eq!(structuring.unstructured()?, 4);
     Ok(())
 }
 
 #[test]
-fn a_stop_ingests_what_was_said_since_and_structures_it_and_a_stop_after_it_reads_and_dispatches_nothing()
--> Result<(), laws::Unmet> {
+fn a_stop_ingests_what_was_said_since_and_leaves_its_structuring_to_the_structure_command() -> Result<(), laws::Unmet> {
     let later = "aaaaaaaa-0000-4000-8000-000000000006";
     let covering = format!("{}\nconversational({later}.0)", Script::COVERING);
     let structuring = Structuring::over(Script::replying(&[Some(&covering)]), Pause::new(0))?;
     let linked = Session::linked();
     let said = [linked.lines, Session::line(Speaker::Owner, later, "null", "and later")].concat();
     structuring.applying.files.write(&Path::new(linked.directory).join("s.jsonl"), Bytes::from(&said))?;
+    let before = structuring.unstructured()?;
     let stopped = structuring.structured(&["hook", "stop"]);
-    let again = structuring.structured(&["hook", "stop"]);
-    let counted = [&stopped, &again]
-        .map(|hooked| [hooked.counted.calls::<ReadFrom>(), hooked.counted.calls::<dispatch_ops::Dispatch>()]);
-    assert_eq!(counted, [[Calls::new(1), Calls::new(1)], [Calls::new(0), Calls::new(0)]]);
-    assert_eq!(structuring.unstructured()?, 0);
-    assert_eq!(again.text, "");
-    assert_eq!(
-        [stopped.outcome?, again.outcome?],
-        [Outcome::Hooked(HookEvent::Stop), Outcome::Hooked(HookEvent::Stop)]
-    );
+    let owed = structuring.unstructured()?;
+    let structured = structuring.structured(&["structure"]);
+    let counted = [stopped.counted.calls::<ReadFrom>(), stopped.counted.calls::<dispatch_ops::Dispatch>()];
+    assert_eq!(counted, [Calls::new(1), Calls::new(0)]);
+    assert_eq!((before, owed, structuring.unstructured()?), (4, 5, 0));
+    assert_eq!(stopped.outcome?, Outcome::Hooked(HookEvent::Stop));
+    assert_eq!(structured.outcome?, Outcome::Structured { jobs: Count::new(1) });
     Ok(())
 }
 
@@ -661,11 +658,14 @@ fn a_prompt_ingests_silently_and_leaves_what_it_ingested_to_the_stop() -> Result
 }
 
 #[test]
-fn a_stop_that_flails_blocks_loudly_and_the_stop_after_it_passes_with_the_segments_held() -> Result<(), laws::Unmet> {
+fn a_run_that_flails_is_told_once_by_the_next_stop_and_the_stop_after_it_passes_with_the_segments_held()
+-> Result<(), laws::Unmet> {
     let u = Some(Script::UNCOVERING);
     let structuring = Structuring::over(Script::replying(&[u, u]), Pause::new(0))?;
+    let ran = structuring.structured(&["structure"]);
     let flailed = structuring.structured(&["hook", "stop"]);
     let again = structuring.structured(&["hook", "stop"]);
+    assert!(matches!(ran.outcome, Err(Failure::Flailed { sequel: Sequel::NoMoreJobs, .. })), "{:?}", ran.outcome);
     let decision: Value = serde_json::from_str(&flailed.text)?;
     let segment = |message: u8, ordinal| {
         SegmentRef::new(Prefix::new(format!("aaaaaaaa-0000-4000-8000-00000000000{message}")), Ordinal::new(ordinal))
@@ -681,16 +681,14 @@ fn a_stop_that_flails_blocks_loudly_and_the_stop_after_it_passes_with_the_segmen
 }
 
 #[test]
-fn a_stop_whose_agent_stalls_blocks_loudly_and_the_stop_after_it_sends_the_segments_again() -> Result<(), laws::Unmet> {
+fn a_run_whose_agent_stalls_halts_loudly_and_the_run_after_it_sends_the_segments_again() -> Result<(), laws::Unmet> {
     let structuring = Structuring::over(Script::replying(&[None, Some(Script::COVERING)]), Pause::new(3600))?;
-    let stalled = structuring.structured(&["hook", "stop"]);
+    let stalled = structuring.structured(&["structure"]);
     let owed = structuring.unstructured()?;
-    let again = structuring.structured(&["hook", "stop"]);
-    let decision: Value = serde_json::from_str(&stalled.text)?;
-    assert_eq!(decision.get("decision").and_then(Value::as_str), Some("block"));
-    assert_eq!(stalled.outcome?, Outcome::Blocked);
+    let again = structuring.structured(&["structure"]);
+    assert!(matches!(stalled.outcome, Err(Failure::Stalled { .. })), "{:?}", stalled.outcome);
     assert_eq!((owed, structuring.unstructured()?), (4, 0));
-    assert_eq!(again.outcome?, Outcome::Hooked(HookEvent::Stop));
+    assert_eq!(again.outcome?, Outcome::Structured { jobs: Count::new(1) });
     Ok(())
 }
 
