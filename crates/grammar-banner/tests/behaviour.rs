@@ -1,5 +1,8 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
+#[path = "generated/laws.rs"]
+mod generated_laws;
+
 use grammar::{Ignoring, Unlexed};
 use grammar_banner::Banner;
 use laws::proptest::prelude::prop_assert_eq;

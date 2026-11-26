@@ -1,2 +1,2 @@
 [workspace]
-members = ["grammar", "notes", "design", "derive"]
+members = ["grammar", "notes", "design", "derive", "app"]

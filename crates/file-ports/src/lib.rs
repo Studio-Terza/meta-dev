@@ -9,6 +9,7 @@ mod memory;
 mod offset;
 mod size;
 mod text;
+mod written;
 
 pub use absent::Absent;
 pub use bytes::Bytes;
@@ -21,6 +22,7 @@ pub use memory::Memory;
 pub use offset::Offset;
 pub use size::Size;
 pub use text::Text;
+pub use written::Written;
 
 invariants::ignored! {
     pub(crate) enum Ignored {

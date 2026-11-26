@@ -1,3 +1,6 @@
+#[path = "generated/laws.rs"]
+mod generated_laws;
+
 use test_log::TestLog;
 
 const UNIT: &str = "     Running unittests src/lib.rs (target/debug/deps/foo-abc123)\n\

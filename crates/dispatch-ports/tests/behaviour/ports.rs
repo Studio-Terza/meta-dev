@@ -146,3 +146,24 @@ fn a_ring_wakes_one_wait_and_is_then_spent() -> Result<(), Box<dyn Error>> {
     assert_eq!(woke, [Woke::Lapsed, Woke::Rung, Woke::Lapsed]);
     Ok(())
 }
+
+#[test]
+fn a_dispatched_agent_rings_its_own_bell_when_it_finishes() -> Result<(), Box<dyn Error>> {
+    let waits = Waits::default();
+    let run = Run::root();
+    let woke = {
+        let agent = run.port(HeadlessClaude::new(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")),
+            Agent::new("sh", &["-c", "echo spoken"]),
+        ));
+        let clock = run.port(FakeClock::new(Sleep::STILL, &waits));
+        let finished = agent
+            .dispatch(&Job::due_by(Deadline::after(clock.now(), Timeout::new(60))), &Prompt::new("x".to_owned()))?;
+        let woke = finished.bell().waited(Duration::from_secs(20));
+        finished.end()?;
+        woke
+    };
+    run.finish().settled()?;
+    assert_eq!(woke, Woke::Rung);
+    Ok(())
+}

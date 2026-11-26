@@ -1,3 +1,6 @@
+#[path = "generated/laws.rs"]
+mod generated_laws;
+
 use algebra::Act;
 use equivalence::{Agreement, Equivalence, Holes, Laws, Pair, Renaming};
 use laws::proptest::collection::vec;

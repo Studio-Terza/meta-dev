@@ -14,9 +14,6 @@ dependencies = [
 [[package]]
 name = "algebra"
 version = "0.1.0"
-dependencies = [
- "laws",
-]
 
 [[package]]
 name = "allocator-api2"
@@ -79,6 +76,7 @@ dependencies = [
 name = "body-lifts"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "lint-layout",
  "newtype",
  "syntax",
@@ -178,6 +176,7 @@ name = "console-ports"
 version = "0.1.0"
 dependencies = [
  "invariants",
+ "laws",
  "newtype",
 ]
 
@@ -326,6 +325,7 @@ name = "design-closure"
 version = "0.1.0"
 dependencies = [
  "design-model",
+ "laws",
  "message-id",
  "named-derive",
  "newtype",
@@ -1346,6 +1346,7 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 name = "laws"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "proptest",
 ]
 
@@ -1452,6 +1453,7 @@ dependencies = [
  "algebra",
  "file-ports",
  "invariants",
+ "laws",
  "lint-layout",
  "lint-placement",
  "newtype",
@@ -1593,6 +1595,21 @@ name = "lint-hand-impls"
 version = "0.1.0"
 dependencies = [
  "graph",
+ "laws",
+ "lint-core",
+ "lint-file",
+ "lint-fixtures",
+ "lint-layout",
+]
+
+[[package]]
+name = "lint-laws"
+version = "0.1.0"
+dependencies = [
+ "file-ports",
+ "golden",
+ "graph",
+ "graph-reader",
  "laws",
  "lint-core",
  "lint-file",
@@ -2139,6 +2156,7 @@ dependencies = [
  "lint-fn-shape",
  "lint-guard-must-use",
  "lint-hand-impls",
+ "lint-laws",
  "lint-layout",
  "lint-linear-flow",
  "lint-literal-names",
@@ -2447,6 +2465,7 @@ name = "message-id"
 version = "0.1.0"
 dependencies = [
  "grammar-output",
+ "laws",
  "newtype",
  "thiserror",
 ]

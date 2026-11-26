@@ -1,5 +1,8 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
+#[path = "generated/laws.rs"]
+mod generated_laws;
+
 use grammar::{Ignoring, Unlexed};
 use grammar_notes::{Date, Ending, Entry, Line, Marking, Notes, Quote, Reading, Unclosed};
 use laws::proptest::collection::vec;

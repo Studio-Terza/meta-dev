@@ -13,5 +13,8 @@ doctest = false
 invariants = { path = "../invariants" }
 newtype = { path = "../newtype" }
 
+[dev-dependencies]
+laws = { path = "../laws" }
+
 [lints]
 workspace = true

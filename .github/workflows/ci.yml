@@ -171,6 +171,12 @@ jobs:
         run: cargo fetch --locked
       - name: lint
         run: '"$TOOLS/ci" logged "$BUDGET" "$TOOLS/ci" timed "$MEASURED" lint "$TOOLS/lint" --timings .'
+      - name: generate laws from the graph
+        run: '"$TOOLS/lint" laws .'
+      - name: stage new law runners for the diff
+        run: git add --intent-to-add .
+      - name: generated laws match the committed runners
+        run: git diff --exit-code
       - name: budget
         if: (github.ref == 'refs/heads/main' || github.base_ref == 'main') && always()
         run: '"$TOOLS/ci" show "$BUDGET"'

@@ -1,3 +1,6 @@
+#[path = "generated/laws.rs"]
+mod generated_laws;
+
 use std::error::Error;
 use workspace_metadata::CrateName;
 
@@ -104,5 +107,35 @@ fn each_member_knows_its_depth_and_the_workspace_crates_below_and_above_it_on_th
             "tools: depth 1 on the compile chain, 0 workspace crates below it, 0 above it",
         ]
     );
+    Ok(())
+}
+
+#[test]
+fn a_lexer_dependency_reaching_an_owned_package_breaches_unless_a_proc_macro_stands_between()
+-> Result<(), Box<dyn Error>> {
+    let unleafed = |fixture: &str| -> Result<Vec<String>, serde_json::Error> {
+        let metadata: Metadata = serde_json::from_str(fixture)?;
+        let graph = Graph::from(&metadata);
+        Ok(graph.role_breaches().unleafed().iter().map(ToString::to_string).collect())
+    };
+    assert_eq!(unleafed(include_str!("fixtures/lexer-through-library.json"))?.len(), 1);
+    assert_eq!(unleafed(include_str!("fixtures/lexer-through-macro.json"))?, Vec::<String>::new());
+    Ok(())
+}
+
+#[test]
+fn a_crate_reaching_an_owned_package_only_through_a_proc_macro_breaches_no_role() -> Result<(), Box<dyn Error>> {
+    let metadata: Metadata = serde_json::from_str(include_str!("fixtures/roles.json"))?;
+    let graph = Graph::from(&metadata);
+    let breaches = graph.role_breaches();
+    let breaching: Vec<String> = breaches
+        .unported()
+        .iter()
+        .map(ToString::to_string)
+        .chain(breaches.unroled().iter().map(ToString::to_string))
+        .chain(breaches.unleafed().iter().map(ToString::to_string))
+        .chain(breaches.reformatted().iter().map(ToString::to_string))
+        .collect();
+    golden::golden!("roles.txt", &format!("{}\n", breaching.join("\n")));
     Ok(())
 }

@@ -3,6 +3,7 @@ mod call;
 mod crate_root;
 mod dispatch;
 mod domain;
+mod exported;
 mod external;
 mod found;
 mod function;
@@ -32,6 +33,7 @@ pub use call::{Call, Callee, MacroCall};
 pub use crate_root::{CrateExports, CrateRoots, Reexport, Root};
 pub use dispatch::Dispatch;
 pub use domain::Domain;
+pub use exported::Exported;
 pub use external::External;
 
 pub use found::Found;

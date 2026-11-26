@@ -55,9 +55,9 @@ impl Resolved {
     }
 
     #[must_use]
-    pub fn std_trait(&self) -> Option<StdTrait<'_>> {
+    pub fn std_trait(&self) -> Option<StdTrait> {
         match self {
-            Resolved::StdTrait(path) => Some(StdTrait(path)),
+            Resolved::StdTrait(_) => Some(StdTrait),
             Resolved::Std(_)
             | Resolved::Crate(_)
             | Resolved::Member(_)
@@ -195,13 +195,7 @@ impl Resolved {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct StdTrait<'path>(&'path ItemPath);
-
-impl AsRef<ItemPath> for StdTrait<'_> {
-    fn as_ref(&self) -> &ItemPath {
-        self.0
-    }
-}
+pub struct StdTrait;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct UnknownPath<'path>(&'path ItemPath);

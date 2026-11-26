@@ -154,7 +154,7 @@ impl DeclaredKind {
         }
     }
 
-    fn module(self) -> Option<ScopeId> {
+    pub(super) fn module(self) -> Option<ScopeId> {
         match self {
             DeclaredKind::Module(module) => Some(module),
             DeclaredKind::OpaqueModule | DeclaredKind::Item(_) | DeclaredKind::Rules(_) | DeclaredKind::Alias(_) => {
@@ -169,6 +169,40 @@ impl DeclaredKind {
             DeclaredKind::Rules(_) => Some(ItemKind::Macro),
             DeclaredKind::Module(_) | DeclaredKind::OpaqueModule | DeclaredKind::Alias(_) => None,
         }
+    }
+}
+
+#[derive(Debug)]
+pub(super) struct Below {
+    scope: ScopeId,
+    modules: Vec<Name>,
+}
+
+impl Below {
+    pub(super) fn root(scope: ScopeId, krate: &Name) -> Below {
+        Below { scope, modules: vec![krate.clone()] }
+    }
+
+    pub(super) fn scope(&self) -> ScopeId {
+        self.scope
+    }
+
+    pub(super) fn modules(&self) -> &[Name] {
+        &self.modules
+    }
+
+    pub(super) fn deeper(&self, entries: &Entries) -> Vec<Below> {
+        entries
+            .declared
+            .iter()
+            .filter(|declared| declared.visibility == Visibility::Visible)
+            .filter_map(|declared| {
+                Some(Below {
+                    scope: declared.kind.module()?,
+                    modules: self.modules.iter().chain([&declared.name]).cloned().collect(),
+                })
+            })
+            .collect()
     }
 }
 

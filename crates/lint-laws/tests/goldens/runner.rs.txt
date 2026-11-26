@@ -1,0 +1,8 @@
+use laws::proptest::prelude::any;
+
+laws::generates!(span_width_generates, any::<x::SpanWidth>());
+
+laws::generates!(total_generates, any::<x::Total>());
+laws::monoid!(total_forms_a_monoid, x::Total, any::<x::Total>());
+
+laws::generates!(b_nested_generates, any::<x::b::Nested>());

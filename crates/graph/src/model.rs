@@ -12,6 +12,7 @@ use crate::call::Call;
 use crate::crate_root::CrateRoots;
 use crate::dispatch::Dispatch;
 use crate::domain::Domain;
+use crate::exported::Exported;
 use crate::function::Function;
 use crate::holding::Holding;
 use crate::implementation::Implementation;
@@ -263,6 +264,15 @@ impl Model {
     #[must_use]
     pub fn exported(&self, domain: Domain, path: &ItemPath) -> Option<&Resolved> {
         self.declarations.exports().get(&domain).and_then(|paths| paths.get(path))
+    }
+
+    pub fn exports(&self, domain: Domain) -> impl Iterator<Item = Exported<'_>> {
+        self.declarations
+            .exports()
+            .get(&domain)
+            .into_iter()
+            .flatten()
+            .map(|(path, resolved)| Exported::new(path, resolved))
     }
 
     #[must_use]

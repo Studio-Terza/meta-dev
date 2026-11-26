@@ -1,3 +1,6 @@
+#[path = "generated/laws.rs"]
+mod generated_laws;
+
 use algebra::{Act, Semigroup};
 use graph::{CrateRoots, External, ItemPath, Resolved, Root};
 use laws::proptest::collection::vec;
