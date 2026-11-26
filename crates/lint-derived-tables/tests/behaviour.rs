@@ -16,8 +16,33 @@ const DISPLAYED: &str = "impl fmt::Display for Door {\n    fn fmt(&self, formatt
 const COMPUTED: &str = "impl Door {\n    fn name(self) -> String {\n        match self {\n            Door::Open => \"open\",\n            Door::Shut => shut(),\n        }\n    }\n}\n";
 const WILDCARD: &str = "impl Door {\n    fn name(self) -> &'static str {\n        match self {\n            Door::Open => \"open\",\n            _ => \"other\",\n        }\n    }\n}\n";
 const TESTED: &str = "#[test]\nfn f() {\n    const ALL: [Door; 2] = [Door::Open, Door::Shut];\n}\n";
+const GROUPED: &str = "fn name(door: Door) -> &'static str {\n    match door {\n        Door::Open | Door::Ajar => \"open\",\n        Door::Shut => \"shut\",\n    }\n}\n";
+const MIXED: &str = "fn name(door: Door) -> &'static str {\n    match door {\n        Door::Open | Gate::Open => \"open\",\n        Door::Shut => \"shut\",\n    }\n}\n";
+const SINGLE: &str =
+    "fn name(door: Door) -> &'static str {\n    match door {\n        Door::Open => \"open\",\n    }\n}\n";
+const BRACED: &str = "fn name(door: Door) -> &'static str {\n    match door {\n        Door::Open => {\n            \"open\"\n        }\n        Door::Shut => {\n            \"shut\"\n        }\n    }\n}\n";
 
-const CASES: [Case; 9] = [
+const CASES: [Case; 13] = [
+    Case::new(
+        Title::new("a fn mapping grouped variants to literals"),
+        &[Source::new(Located::new("a.rs"), Text::new(GROUPED))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a fn whose grouped arm spans two enums"),
+        &[Source::new(Located::new("a.rs"), Text::new(MIXED))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a fn matching a single variant"),
+        &[Source::new(Located::new("a.rs"), Text::new(SINGLE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a fn mapping each variant to a literal in a block"),
+        &[Source::new(Located::new("a.rs"), Text::new(BRACED))],
+        Flagged::new(&["a.rs:1"]),
+    ),
     Case::new(
         Title::new("a const listing every variant"),
         &[Source::new(Located::new("a.rs"), Text::new(EVERY))],

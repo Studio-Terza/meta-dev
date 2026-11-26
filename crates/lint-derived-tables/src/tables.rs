@@ -3,12 +3,12 @@ mod shape;
 
 use std::path::Path;
 
-use syntax::{Block, Expr, Ident, ImplItemConst, ImplItemFn, ItemConst, ItemEnum, ItemFn, ItemImpl};
+use syntax::{Block, Expr, Ident, ImplItem, ItemConst, ItemEnum, ItemFn, ItemImpl};
 
-use algebra::{Monoid, Semigroup};
+use algebra::Monoid;
 use lint_core::{Parsed, Site, SourceFile};
 use lint_layout::{LineNumber, Name};
-use lint_sweep::{Around, Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Scope, Sweep};
+use lint_sweep::{Around, Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Sweep};
 
 pub use found::Tables;
 use shape::Shape;
@@ -24,17 +24,6 @@ struct TableScan<'file> {
     path: &'file Path,
 }
 
-#[derive(Debug, Default)]
-struct Implementing(Option<Name>);
-
-impl Semigroup for Implementing {
-    fn combine(self, other: Implementing) -> Implementing {
-        Implementing(self.0.or(other.0))
-    }
-}
-
-impl Monoid for Implementing {}
-
 impl<'file> Scanning<'file> {
     pub fn reading(parsed: Parsed<'_, 'file>) -> Scanning<'file> {
         let tested = parsed
@@ -47,48 +36,35 @@ impl<'file> Scanning<'file> {
 }
 
 impl<'file> TableScan<'file> {
-    const KINDS: &'static [Kind] =
-        &[Kind::ItemImpl, Kind::ItemEnum, Kind::ItemConst, Kind::ImplItemConst, Kind::ItemFn, Kind::ImplItemFn];
+    const KINDS: &'static [Kind] = &[Kind::ItemImpl, Kind::ItemEnum, Kind::ItemConst, Kind::ItemFn];
 
     fn site(&self, ident: &Ident) -> Site<'file> {
         Site::new(self.path, LineNumber::from(ident.span()))
     }
 
-    fn tabled(
-        &self,
-        ident: &Ident,
-        expr: &Expr,
-        around: &Around<'_, Implementing>,
-    ) -> Contributed<Implementing, Tables<'file>> {
-        let found = Shape::within(Self::implementing(around)).table(expr);
-        Contributed::new(Implementing::default(), Tables::tabled(self.site(ident), found), Descend::Over)
+    fn tabled(&self, ident: &Ident, expr: &Expr, implementing: Option<&Name>) -> Tables<'file> {
+        Tables::tabled(self.site(ident), Shape::within(implementing).table(expr))
     }
 
-    fn mapped(
-        &self,
-        ident: &Ident,
-        block: &Block,
-        around: &Around<'_, Implementing>,
-    ) -> Contributed<Implementing, Tables<'file>> {
-        let found = Shape::within(Self::implementing(around)).mapped(block);
-        Contributed::new(Implementing::default(), Tables::tabled(self.site(ident), found), Descend::Into)
+    fn mapped(&self, ident: &Ident, block: &Block, implementing: Option<&Name>) -> Tables<'file> {
+        Tables::tabled(self.site(ident), Shape::within(implementing).mapped(block))
     }
 
-    fn implementing<'around>(around: &'around Around<'_, Implementing>) -> Option<&'around Name> {
-        around.nearest().find_map(|open| open.0.as_ref())
+    fn implemented(&self, item: &ImplItem, implementing: Option<&Name>) -> Tables<'file> {
+        match item {
+            ImplItem::Const(constant) => self.tabled(&constant.ident, &constant.expr, implementing),
+            ImplItem::Fn(function) => self.mapped(&function.sig.ident, &function.block, implementing),
+            _ => Tables::default(),
+        }
     }
 }
 
 impl<'file> Contribute for TableScan<'file> {
-    type Open = Implementing;
+    type Open = ();
     type Part = Tables<'file>;
 
     fn kinds(&self) -> &'static [Kind] {
         Self::KINDS
-    }
-
-    fn scopes(&self) -> &'static [Scope] {
-        const { &[Scope::new(Kind::ItemImpl)] }
     }
 
     fn on_item_impl(
@@ -96,8 +72,10 @@ impl<'file> Contribute for TableScan<'file> {
         item: &ItemImpl,
         _: &Facts<'_, ItemImpl>,
         _around: &Around<'_, Self::Open>,
-    ) -> Contributed<Implementing, Tables<'file>> {
-        Contributed::new(Implementing(Name::of_type(&item.self_ty)), Tables::default(), Descend::Into)
+    ) -> Contributed<(), Tables<'file>> {
+        let implementing = Name::of_type(&item.self_ty);
+        let found = Monoid::concat(item.items.iter().map(|inner| self.implemented(inner, implementing.as_ref())));
+        Contributed::new((), found, Descend::Over)
     }
 
     fn on_item_enum(
@@ -105,51 +83,33 @@ impl<'file> Contribute for TableScan<'file> {
         item: &ItemEnum,
         _: &Facts<'_, ItemEnum>,
         _around: &Around<'_, Self::Open>,
-    ) -> Contributed<Implementing, Tables<'file>> {
+    ) -> Contributed<(), Tables<'file>> {
         let variants = item.variants.iter().map(|variant| Name::from(&variant.ident)).collect();
-        Contributed::new(Implementing::default(), Tables::declaring(Name::from(&item.ident), variants), Descend::Over)
+        Contributed::new((), Tables::declaring(Name::from(&item.ident), variants), Descend::Over)
     }
 
     fn on_item_const(
         &self,
         item: &ItemConst,
         _: &Facts<'_, ItemConst>,
-        around: &Around<'_, Self::Open>,
-    ) -> Contributed<Implementing, Tables<'file>> {
-        self.tabled(&item.ident, &item.expr, around)
-    }
-
-    fn on_impl_item_const(
-        &self,
-        item: &ImplItemConst,
-        _: &Facts<'_, ImplItemConst>,
-        around: &Around<'_, Self::Open>,
-    ) -> Contributed<Implementing, Tables<'file>> {
-        self.tabled(&item.ident, &item.expr, around)
+        _around: &Around<'_, Self::Open>,
+    ) -> Contributed<(), Tables<'file>> {
+        Contributed::new((), self.tabled(&item.ident, &item.expr, None), Descend::Over)
     }
 
     fn on_item_fn(
         &self,
         item: &ItemFn,
         _: &Facts<'_, ItemFn>,
-        around: &Around<'_, Self::Open>,
-    ) -> Contributed<Implementing, Tables<'file>> {
-        self.mapped(&item.sig.ident, &item.block, around)
-    }
-
-    fn on_impl_item_fn(
-        &self,
-        item: &ImplItemFn,
-        _: &Facts<'_, ImplItemFn>,
-        around: &Around<'_, Self::Open>,
-    ) -> Contributed<Implementing, Tables<'file>> {
-        self.mapped(&item.sig.ident, &item.block, around)
+        _around: &Around<'_, Self::Open>,
+    ) -> Contributed<(), Tables<'file>> {
+        Contributed::new((), self.mapped(&item.sig.ident, &item.block, None), Descend::Into)
     }
 }
 
 impl<'file> Gathers<Tables<'file>> for Scanning<'file> {
     fn gathered(self, file: &SourceFile) -> Tables<'file> {
         let tested = self.tested;
-        self.scan.concluded(file, |_, _, found| Monoid::concat([found].into_iter().chain(tested)))
+        self.scan.concluded(file, |_, (), found| Monoid::concat([found].into_iter().chain(tested)))
     }
 }
