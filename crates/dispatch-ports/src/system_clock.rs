@@ -2,7 +2,7 @@ use std::time::{Duration, SystemTime};
 
 use port_core::Pass;
 
-use crate::{Bell, ClockFiller, Pause, Wall, clock_ops};
+use crate::{Bell, ClockFiller, Moment, Pause, Wall, clock_ops};
 
 #[derive(Debug)]
 pub struct SystemClock;
@@ -10,6 +10,10 @@ pub struct SystemClock;
 impl ClockFiller for SystemClock {
     fn now(&self, _pass: Pass<'_, clock_ops::Now>) -> Wall {
         Wall::from(SystemTime::now())
+    }
+
+    fn moment(&self, _pass: Pass<'_, clock_ops::Moment>) -> Moment {
+        Moment::from(SystemTime::now())
     }
 
     fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause, bell: &Bell) -> Wall {

@@ -13,7 +13,7 @@ impl From<Vec<StopRow>> for Trail {
 
 impl fmt::Display for Trail {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(formatter, "session\tgist\tread\tquoted\tkept\tawaited\thalt\tfate")?;
+        writeln!(formatter, "session\tshells\tagents\thalt\tread\tquoted\tkept\tfate\ttokens\tmillis")?;
         self.0.iter().try_for_each(|row| writeln!(formatter, "{row}"))
     }
 }

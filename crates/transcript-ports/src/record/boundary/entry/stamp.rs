@@ -1,7 +1,6 @@
 use serde::Deserialize;
 
-use crate::event::Placed;
-use crate::{Authorship, Body, Happening, Instant, Line, Record, SessionId, Skipped, Unrecognised, Uuid};
+use crate::{Authorship, Body, Instant, Line, Record, SessionId, Skipped, Unrecognised, Uuid};
 
 #[derive(Clone, Copy, Debug)]
 struct Side;
@@ -38,12 +37,6 @@ impl From<bool> for Chain {
     }
 }
 
-impl From<Stamp> for Placed {
-    fn from(stamp: Stamp) -> Placed {
-        Placed::new(stamp.uuid, stamp.parent, stamp.session, stamp.timestamp)
-    }
-}
-
 impl From<Stamp> for Skipped {
     fn from(stamp: Stamp) -> Skipped {
         Skipped::new(stamp.uuid, stamp.parent)
@@ -54,13 +47,6 @@ impl Stamp {
     pub fn said(self, author: Authorship, text: Body) -> Line {
         match self.chain.0 {
             None => Line::Said(Main(self).voiced(author, text)),
-            Some(Side) => Line::Skipped(Skipped::from(self)),
-        }
-    }
-
-    pub fn happened(self, happening: Happening, text: Body) -> Line {
-        match self.chain.0 {
-            None => Line::Happened(Placed::from(self).happened(happening, text)),
             Some(Side) => Line::Skipped(Skipped::from(self)),
         }
     }

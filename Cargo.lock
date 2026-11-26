@@ -279,6 +279,7 @@ dependencies = [
  "golden",
  "grammar-cited",
  "grammar-flag",
+ "grammar-lines",
  "grammar-notes",
  "grammar-output",
  "grammar-search",

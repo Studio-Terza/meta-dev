@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "DELETE FROM events WHERE uuid = ?1",
+  "query": "DELETE FROM overruns WHERE task = ?1",
   "describe": {
     "columns": [],
     "parameters": {
@@ -8,5 +8,5 @@
     },
     "nullable": []
   },
-  "hash": "71eb4e6fd2f6802a45936840530067812aa50d308d8ee5cfce14e031fe0071be"
+  "hash": "cc3acb9809673346cd9027187e4c6d0dad54c5056061abc873892632eb3f9d70"
 }

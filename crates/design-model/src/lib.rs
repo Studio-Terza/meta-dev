@@ -72,7 +72,7 @@ pub use span_relation::SpanRelation;
 pub use specificity::Specificity;
 pub use stage::Stage;
 pub use standing::Standing;
-pub use stop::{Awaited, Fate, Gist, Halt};
+pub use stop::{Fate, Halt};
 pub use supersession::{Straddling, Supersession};
 pub use title::Title;
 pub use transition::Transition;

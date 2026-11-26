@@ -7,12 +7,11 @@ use port_core::Op;
 use stream::Stream;
 use transcript_ports::{Cursor, SessionId};
 
-use crate::boundary::{CursorRow, EdgeRow, EventRow, LinkRow, MessageRow, SegmentRow};
+use crate::boundary::{CursorRow, EdgeRow, LinkRow, MessageRow, SegmentRow};
 
 #[derive(Debug, Op)]
 pub struct SessionRecords {
     messages: Vec<MessageRow>,
-    events: Vec<EventRow>,
     segments: Vec<SegmentRow>,
     links: Vec<LinkRow>,
     refused: Vec<LinkRow>,
@@ -37,7 +36,6 @@ impl SessionRecords {
         let messages = stream.as_ref();
         SessionRecords {
             messages: messages.iter().map(MessageRow::from).collect(),
-            events: stream.events().iter().map(EventRow::from).collect(),
             segments: messages.iter().flat_map(SegmentRow::within).collect(),
             links: stream.links().iter().map(LinkRow::from).collect(),
             refused: Vec::new(),

@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use invariants::Ignoring;
 
-use crate::{Bytes, FileFailure, Files, Ignored, Kind, Offset, Size, Text};
+use crate::{Bytes, Epoch, FileFailure, Files, Ignored, Kind, Offset, Size, Stamps, Text};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Disk;
@@ -59,5 +59,10 @@ impl Files for Disk {
 
     fn size(&self, path: &Path) -> Result<Size, FileFailure> {
         Ok(Size::new(fs::symlink_metadata(path)?.len()))
+    }
+
+    fn stamps(&self, path: &Path) -> Result<Stamps, FileFailure> {
+        let metadata = fs::metadata(path)?;
+        Ok(Stamps::new(Epoch::from(metadata.created()?), Epoch::from(metadata.modified()?)))
     }
 }
