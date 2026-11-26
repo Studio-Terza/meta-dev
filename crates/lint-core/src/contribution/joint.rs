@@ -135,7 +135,7 @@ impl<Head, Tail> Joined<Head, Tail> {
 
 impl Semigroup for Alive {
     fn combine(self, other: Alive) -> Alive {
-        Alive(self.0 | other.0)
+        Alive(self.0.wrapping_add(other.0))
     }
 }
 

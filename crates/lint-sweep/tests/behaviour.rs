@@ -105,7 +105,7 @@ const JOINED: &str = "fn f() {\n    {\n        let a = 1 + 2;\n        m!({ 3 + 
 struct Positions;
 
 impl Positions {
-    const SCOPES: [Scope; 1] = [Scope::new(Kind::Ident)];
+    const SCOPES: [Scope; 2] = [Scope::new(Kind::Ident), Scope::new(Kind::Macro)];
 }
 
 impl Contribute for Positions {
@@ -143,6 +143,10 @@ impl Contribute for Positions {
 
     fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>, around: &Around<'_, ()>) -> Contributed<(), Vec<String>> {
         Contributed::new((), vec![format!("macro at {:?}", around.position())], Descend::Expand)
+    }
+
+    fn off_macro(&self, _: &Macro, _: &Facts<'_, Macro>, inner: Contribution<(), Vec<String>>) -> Vec<String> {
+        inner.concluded(|(), heard| heard.into_iter().chain(["left the macro".to_owned()]).collect())
     }
 }
 
