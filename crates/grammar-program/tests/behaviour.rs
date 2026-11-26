@@ -3,6 +3,7 @@
 #[path = "generated/laws.rs"]
 mod generated_laws;
 
+use grammar::{Ignoring, Unlexed};
 use grammar_program::Program;
 use laws::proptest::prelude::any;
 
@@ -10,13 +11,13 @@ laws::roundtrip!(
     a_command_s_program_is_its_first_word_whatever_follows,
     (any::<Program>(), "[ \t]{0,3}", "([ \t][ -~]{0,20})?"),
     |(program, lead, rest): &(Program, String, String)| format!("{lead}{}{rest}", program.clone().into_inner()),
-    |text: &String| text.parse::<Program>().ok(),
+    |text: &String| text.parse::<Program>().ignoring(Unlexed::NotThisGrammar),
     |(program, _lead, _rest): (Program, String, String)| Some(program)
 );
 
 laws::table!(
     a_program_holds_exactly_one_word_with_no_space_around_it,
-    |word: &&str| Program::try_new((*word).to_owned()).ok().map(Program::into_inner),
+    |word: &&str| Program::try_new((*word).to_owned()).ignoring(Unlexed::NotThisGrammar).map(Program::into_inner),
     [
         "cargo" => Some("cargo".to_owned()),
         "./run.sh" => Some("./run.sh".to_owned()),

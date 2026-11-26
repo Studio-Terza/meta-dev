@@ -1,0 +1,13 @@
+{"workspace_root": "/", "workspace_members": ["grammar", "notes", "helper", "derive"], "packages": [
+  {"id": "grammar", "name": "grammar", "manifest_path": "/grammar/Cargo.toml", "dependencies": [{"name": "logos"}], "metadata": {"port": {"owns": ["logos"], "dependents": "lexer"}}, "targets": [{"kind": ["lib"], "src_path": "/grammar/src/lib.rs"}]},
+  {"id": "notes", "name": "notes", "manifest_path": "/notes/Cargo.toml", "dependencies": [{"name": "helper"}], "metadata": {"lexer": {"format": "notes"}}, "targets": [{"kind": ["lib"], "src_path": "/notes/src/lib.rs"}]},
+  {"id": "helper", "name": "helper", "manifest_path": "/helper/Cargo.toml", "dependencies": [{"name": "derive"}], "targets": [{"kind": ["lib"], "src_path": "/helper/src/lib.rs"}]},
+  {"id": "derive", "name": "derive", "manifest_path": "/derive/Cargo.toml", "dependencies": [{"name": "grammar"}], "targets": [{"kind": ["proc-macro"], "src_path": "/derive/src/lib.rs"}]},
+  {"id": "logos", "name": "logos", "manifest_path": "/r/logos/Cargo.toml", "dependencies": []}
+], "resolve": {"nodes": [
+  {"id": "grammar", "dependencies": ["logos"], "deps": [{"name": "logos", "pkg": "logos", "dep_kinds": [{"kind": null}]}]},
+  {"id": "notes", "dependencies": ["helper"], "deps": [{"name": "helper", "pkg": "helper", "dep_kinds": [{"kind": null}]}]},
+  {"id": "helper", "dependencies": ["derive"], "deps": [{"name": "derive", "pkg": "derive", "dep_kinds": [{"kind": null}]}]},
+  {"id": "derive", "dependencies": ["grammar"], "deps": [{"name": "grammar", "pkg": "grammar", "dep_kinds": [{"kind": null}]}]},
+  {"id": "logos", "dependencies": [], "deps": []}
+]}}

@@ -7,12 +7,15 @@ use std::ffi::OsString;
 use super::Step;
 use super::pull_number::PullNumber;
 use crate::cli::command::failure::Failure;
-use crate::cli::command::step::Arguments;
+use crate::cli::command::step::{Arguments, Ended, Utf8};
 use crate::cli::ports::{Invocation, Ports};
+use grammar_output::Record;
 use verdict::Verdict;
 
-#[derive(Debug)]
+#[derive(Debug, Record)]
+#[record(source = Arguments)]
 pub struct SpecLine {
+    #[field(Utf8, via = PullNumber::new)]
     pull_request: PullNumber,
 }
 
@@ -23,10 +26,7 @@ impl SpecLine {
 
 impl Step for SpecLine {
     fn from_arguments(given: Vec<OsString>) -> Result<SpecLine, Failure<'static>> {
-        let mut arguments = Arguments::from(given);
-        let pull_request = &arguments.taken()?;
-        arguments.ended()?;
-        Ok(SpecLine { pull_request: PullNumber::new(pull_request.to_str().ok_or(Failure::Usage)?.to_owned()) })
+        SpecLine::read(Arguments::from(given))?.ended()
     }
 
     fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {

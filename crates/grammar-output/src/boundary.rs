@@ -3,6 +3,7 @@ use std::str::FromStr;
 use std::vec::IntoIter;
 
 use grammar::logos::{Lexer, Logos};
+use grammar::{Ignoring, Unlexed};
 
 use crate::record::{Parsed, Record};
 use newtype::{Guarded, Inner, Listed, Newtype, Stored, Validated};
@@ -102,6 +103,14 @@ pub enum Unread {
 #[derive(Debug)]
 pub struct Fields(Peekable<IntoIter<Token>>);
 
+pub trait Source: Sized {
+    type Unread;
+}
+
+impl Source for Fields {
+    type Unread = Unread;
+}
+
 pub trait Field {
     type Value;
 
@@ -120,13 +129,15 @@ impl<T: Newtype<Inner = String>> Unwrapping<T> for Inner {
 
 impl<T: FromStr> Unwrapping<T> for Listed {
     fn unwrapped(text: String) -> Option<T> {
-        text.parse().ok()
+        text.parse().ignoring(Unlexed::NotThisGrammar)
     }
 }
 
 impl<T: Guarded<Inner: FromStr>> Unwrapping<T> for Validated {
     fn unwrapped(text: String) -> Option<T> {
-        text.parse().ok().and_then(|inner| T::try_new(inner).ok())
+        text.parse()
+            .ignoring(Unlexed::NotThisGrammar)
+            .and_then(|inner| T::try_new(inner).ignoring(Unlexed::NotThisGrammar))
     }
 }
 
@@ -165,14 +176,17 @@ impl Fields {
 
     #[must_use]
     pub fn optional<F: Field>(mut self) -> Parsed<Option<F::Value>, Fields> {
-        let value = self.0.next_if(|token| F::taken(token.clone()).is_ok()).and_then(|token| F::taken(token).ok());
+        let value = self
+            .0
+            .next_if(|token| F::taken(token.clone()).is_ok())
+            .and_then(|token| F::taken(token).ignoring(Unlexed::NotThisGrammar));
         Parsed::new(value, self)
     }
 
     #[must_use]
     pub fn repeated<F: Field>(mut self) -> Parsed<Vec<F::Value>, Fields> {
         let values = iter::from_fn(|| self.0.next_if(|token| F::taken(token.clone()).is_ok()))
-            .filter_map(|token| F::taken(token).ok())
+            .filter_map(|token| F::taken(token).ignoring(Unlexed::NotThisGrammar))
             .collect();
         Parsed::new(values, self)
     }
@@ -211,7 +225,8 @@ impl Token {
         let kept = self.clone();
         let length = self.text.len();
         let mut lexer = L::lexer(&self.text);
-        let whole = lexer.next().and_then(Result::ok).map(|_spelling| lexer.span());
+        let whole =
+            lexer.next().and_then(|lexed| lexed.ignoring(Unlexed::NotThisGrammar)).map(|_spelling| lexer.span());
         whole.filter(|span| *span == (0..length)).map(|_whole| self).ok_or(kept)
     }
 

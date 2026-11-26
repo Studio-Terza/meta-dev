@@ -6,6 +6,8 @@ use design_model::Project;
 use super::super::command::Hook;
 use super::super::persistence::Persistence;
 use crate::cli::failure::Failure;
+use crate::cli::request::ignored::Ignored;
+use invariants::Ignoring;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Valued {
@@ -40,7 +42,7 @@ impl Token {
     pub fn persisted(&self, earlier: Persistence) -> Result<Persistence, Failure> {
         match self {
             Token::Word(_) | Token::Valued(..) | Token::Settings => Err(Failure::Usage),
-            Token::Persisted(next) => earlier.then(*next),
+            Token::Persisted(next) => (earlier == Persistence::File).then_some(*next).ok_or(Failure::Usage),
         }
     }
 
@@ -54,7 +56,11 @@ impl Token {
     pub fn hook(&self) -> Result<Hook, Failure> {
         match self {
             Token::Settings => Ok(Hook::Settings),
-            Token::Word(word) => word.to_str().and_then(|event| event.parse().ok()).map(Hook::On).ok_or(Failure::Usage),
+            Token::Word(word) => word
+                .to_str()
+                .and_then(|event| event.parse().ignoring(Ignored::Unparsed))
+                .map(Hook::On)
+                .ok_or(Failure::Usage),
             Token::Persisted(_) | Token::Valued(..) => Err(Failure::Usage),
         }
     }
@@ -75,7 +81,7 @@ impl Token {
     }
 
     pub fn only(rest: &[Token]) -> Result<&str, Failure> {
-        <&[Token; 1]>::try_from(rest).ok().and_then(|[word]| word.text()).ok_or(Failure::Usage)
+        <&[Token; 1]>::try_from(rest).ignoring(Ignored::OtherShape).and_then(|[word]| word.text()).ok_or(Failure::Usage)
     }
 
     pub fn shaped<'rest, const WORDS: usize>(
@@ -90,7 +96,7 @@ impl Token {
             .count();
         let counted = [once, WORDS + wanted.len()];
         <[&str; WORDS]>::try_from(words)
-            .ok()
+            .ignoring(Ignored::OtherShape)
             .filter(|_words| counted == [wanted.len(), rest.len()])
             .map(|shaped| Shaped { words: shaped, rest })
             .ok_or(Failure::Usage)

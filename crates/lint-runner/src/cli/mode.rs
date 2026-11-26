@@ -130,14 +130,15 @@ impl Run<'_, '_> {
                 out,
                 err,
             ),
-            Run::Laws => Self::lawful(readout.done().files(), sources.wired().files(), err),
+            Run::Laws => Verdict::ran(
+                sources
+                    .wired()
+                    .files()
+                    .write_each(LawRunners::from(&Reader::read_files(readout.done().files())).written())
+                    .map(|()| Verdict::Clean),
+                err,
+            ),
         }
-    }
-
-    fn lawful(files: &[SourceFile], disk: &impl Files, err: &mut impl Write) -> Verdict {
-        let model = Reader::read_files(files);
-        disk.write_each(LawRunners::from(&model).written())
-            .map_or_else(|failure| Verdict::refused(&failure, err), |()| Verdict::Clean)
     }
 
     fn reported(files: &[SourceFile], out: &mut impl Write, err: &mut impl Write) -> Verdict {

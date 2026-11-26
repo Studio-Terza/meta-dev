@@ -4,6 +4,7 @@ mod ports;
 mod reserved_names;
 mod roles;
 
+use algebra::Monoid;
 use graph::Model;
 use lint_core::{FileHead, Headline, Parsed, Report, Violation};
 use lint_file::{Gleaning, KinLint, Reads};
@@ -47,7 +48,7 @@ impl WorkspaceLint for OwnedDependencies {
             Headline::new(
                 "only the owning unit, which is a port together with the workspace proc-macro crates it depends on, depends directly on a package its [package.metadata.port] owns or on a package in that package's closure, unless the unit declares the package shared; and every owns entry names a package its unit depends on",
             ),
-            Self::flagged(&Owners::declared(heads), &workspaces.iter().collect()),
+            Self::flagged(&Owners::declared(heads), &Monoid::concat(workspaces.iter().map(Graph::from))),
         )
     }
 }
@@ -71,7 +72,7 @@ impl WorkspaceLint for KeyDependencyRoles {
         facts: &'file RoleFacts<'head>,
         model: &'file Model,
     ) -> Report<'file> {
-        let graph: Graph<'file> = workspaces.iter().collect();
+        let graph: Graph<'file> = Monoid::concat(workspaces.iter().map(Graph::from));
         let breaches = graph.role_breaches();
         let roles = Roles::new(heads, facts);
         Report::new(

@@ -1,15 +1,18 @@
+use crate::ignored::Ignored;
+use invariants::Ignoring;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Symbol(u32);
 
 impl From<usize> for Symbol {
     fn from(index: usize) -> Symbol {
-        Symbol(u32::try_from(index).unwrap_or(u32::MAX))
+        Symbol(u32::try_from(index).ignoring(Ignored::BeyondRange).unwrap_or(u32::MAX))
     }
 }
 
 impl From<Symbol> for usize {
     fn from(symbol: Symbol) -> usize {
-        usize::try_from(symbol.0).unwrap_or(usize::MAX)
+        usize::try_from(symbol.0).ignoring(Ignored::BeyondRange).unwrap_or(usize::MAX)
     }
 }
 

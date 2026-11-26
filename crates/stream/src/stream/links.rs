@@ -9,9 +9,11 @@ use grammar_message::Lexemes;
 use transcript_ports::{Authorship, Skipped, Uuid};
 
 use crate::anchor::Anchor;
+use crate::ignored::Ignored;
 use crate::segment::Segment;
 use crate::{MechanicalLink, Message, Relation};
 use chain::Chain;
+use invariants::Ignoring;
 use reply::Reply;
 use resends::Resends;
 use turn::Turn;
@@ -39,10 +41,7 @@ impl<'stream> Links<'stream> {
     }
 
     fn replies(&self) -> Vec<Reply<'stream>> {
-        self.messages
-            .iter()
-            .filter_map(|message| self.chain.parent(message).map(|replied| Reply::new(message, replied)))
-            .collect()
+        self.messages.iter().filter_map(|message| self.chain.replied(message)).collect()
     }
 
     fn turns(&self) -> Vec<Turn<'stream>> {
@@ -62,7 +61,7 @@ impl<'stream> Links<'stream> {
             .text(message)
             .iter()
             .flat_map(Lexemes::uuids)
-            .filter_map(|word| Uuid::try_new(word.into_inner()).ok())
+            .filter_map(|word| Uuid::try_new(word.into_inner()).ignoring(Ignored::NotAUuid))
             .filter(|cited| cited != message.record().uuid())
             .filter_map(|cited| self.chain.known(&cited))
             .map(|known| {

@@ -5,6 +5,8 @@ use grammar_artifact::Artifacts;
 use newtype::{Display, Spelled};
 
 use crate::ArtifactKind;
+use crate::ignored::Ignored;
+use invariants::Ignoring;
 
 #[derive(Display, Clone, Debug, PartialEq, Eq)]
 pub struct ArtifactName(String);
@@ -34,7 +36,7 @@ impl FromStr for Artifact {
 impl Artifact {
     fn joined(kind: &str, name: &str) -> Option<Artifact> {
         let named = ArtifactName(name.to_owned());
-        kind.parse::<ArtifactKind>().ok().map(|parsed| Artifact { kind: parsed, name: named })
+        kind.parse::<ArtifactKind>().ignoring(Ignored::NotAKind).map(|parsed| Artifact { kind: parsed, name: named })
     }
 }
 

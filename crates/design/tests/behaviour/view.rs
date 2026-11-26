@@ -5,11 +5,13 @@ use design::{Failure, Line, Unresolved, Viewed};
 use design_model::{Ending, NodeId, Segment};
 use design_runs::Unstructured;
 use design_store::StreamSchema;
+use invariants::Ignoring;
 use newtype::Wrapping;
 use port_core::Run;
 use store_ports::Store;
 use structurer::SegmentRef;
 
+use super::ignored::Ignored;
 use super::{Applying, Invocation, Session, Spread};
 
 const LEAD: &str = "aaaaaaaa-0000-4000-8000-000000000002.0";
@@ -113,8 +115,8 @@ pub(super) struct Viewing;
 
 impl Viewing {
     fn listed(view: &str, files: &[String], dropped: &[&str]) -> Option<Vec<NodeId>> {
-        let applying = Applying::ready().ok()?;
-        applying.applied(PLANTED).ok()?;
+        let applying = Applying::ready().ignoring(Ignored::Unrun)?;
+        applying.applied(PLANTED).ignoring(Ignored::Unrun)?;
         files
             .iter()
             .try_for_each(|file| {
@@ -122,9 +124,12 @@ impl Viewing {
                     matches!(failure, Failure::Unresolved(Unresolved::Ancestral { .. })).then_some(()).ok_or(failure)
                 })
             })
-            .ok()?;
-        dropped.iter().try_for_each(|node| applying.run(&["drop", node, "--reason", "gone"]).map(drop)).ok()?;
-        let lines = Spread::parsed(&applying.run(&["view", view]).ok()?);
+            .ignoring(Ignored::Unrun)?;
+        dropped
+            .iter()
+            .try_for_each(|node| applying.run(&["drop", node, "--reason", "gone"]).map(drop))
+            .ignoring(Ignored::Unrun)?;
+        let lines = Spread::parsed(&applying.run(&["view", view]).ignoring(Ignored::Unrun)?);
         Some(lines.iter().filter_map(Viewing::node).collect())
     }
 
@@ -447,11 +452,11 @@ impl Derivation {
     }
 
     fn staged(self) -> Option<Vec<String>> {
-        let applying = Applying::ready().ok()?;
-        applying.applied(PLANTED).ok()?;
-        self.moves().iter().try_for_each(|arguments| applying.run(arguments).map(drop)).ok()?;
-        self.files().iter().try_for_each(|file| applying.applied(file).map(drop)).ok()?;
-        let lines = Spread::parsed(&applying.run(&["view", "outline"]).ok()?);
+        let applying = Applying::ready().ignoring(Ignored::Unrun)?;
+        applying.applied(PLANTED).ignoring(Ignored::Unrun)?;
+        self.moves().iter().try_for_each(|arguments| applying.run(arguments).map(drop)).ignoring(Ignored::Unrun)?;
+        self.files().iter().try_for_each(|file| applying.applied(file).map(drop)).ignoring(Ignored::Unrun)?;
+        let lines = Spread::parsed(&applying.run(&["view", "outline"]).ignoring(Ignored::Unrun)?);
         Some(lines.into_iter().filter_map(Viewing::outlined).collect())
     }
 }

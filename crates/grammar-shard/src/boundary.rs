@@ -3,13 +3,14 @@ use std::num::NonZeroU16;
 use std::str::FromStr;
 
 use grammar::logos::Logos;
+use grammar::{Ignoring, Unlexed};
 
 use grammar_unspelled::Unspelled;
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
 enum Spelling {
-    #[regex("[0-9]+", |lexer| lexer.slice().parse().ok())]
+    #[regex("[0-9]+", |lexer| lexer.slice().parse().ignoring(Unlexed::OutOfRange))]
     Number(u16),
     #[token("/")]
     Slash,
@@ -46,8 +47,8 @@ impl FromStr for Sharding {
     fn from_str(text: &str) -> Result<Sharding, Unspelled> {
         let spelled: Result<Vec<Spelling>, ()> = Spelling::lexer(text).collect();
         spelled
-            .ok()
-            .and_then(|lexed| <[Spelling; 3]>::try_from(lexed).ok())
+            .ignoring(Unlexed::NotThisGrammar)
+            .and_then(|lexed| <[Spelling; 3]>::try_from(lexed).ignoring(Unlexed::OtherShape))
             .and_then(Sharding::spelled)
             .ok_or(Unspelled)
     }

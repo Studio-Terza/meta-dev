@@ -57,8 +57,7 @@ impl Kinds {
 
 impl From<Kind> for Kinds {
     fn from(kind: Kind) -> Kinds {
-        let bit = Kind::ALL.binary_search(&kind).ok().and_then(|at| u32::try_from(at).ok());
-        Kinds(bit.and_then(|at| 1_u128.checked_shl(at)).unwrap_or_default())
+        Kinds(kind.bit())
     }
 }
 

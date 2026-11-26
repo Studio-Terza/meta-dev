@@ -118,10 +118,6 @@ impl Classes {
         let sign = window.neighbours(lexemes, index).sign();
         lexemes.get(index).and_then(|lexeme| lexeme.kind().read(&Speaking { facts: &self.facts, sign }))
     }
-
-    fn literals_erased(&self) -> Option<Erased> {
-        self.equivalence.erases(Erased::Literals)
-    }
 }
 
 #[derive(Debug)]
@@ -132,21 +128,19 @@ struct Classifying<'classes> {
 
 impl Classifying<'_> {
     fn renamed(&self, named: Named, sort: Sort, word: &Code) -> Token {
-        let every = self.classes.equivalence.erases(Erased::Names);
-        let local = self
-            .classes
-            .equivalence
-            .erases(Erased::Locals)
-            .filter(|_| sort == Sort::Lower)
-            .filter(|_| self.spot != Spot::Named);
-        every.or(local).map_or_else(|| Token::Shaped(word.clone()), |_| Token::Slotted(*named.as_ref()))
+        let equivalence = &self.classes.equivalence;
+        let local = (sort == Sort::Lower).then_some(word).filter(|_| self.spot != Spot::Named);
+        let kept = local.map_or(Some(Token::Shaped(word.clone())), |spelled| {
+            equivalence.unerased(Erased::Locals, Token::Shaped(spelled.clone()))
+        });
+        kept.and_then(|token| equivalence.unerased(Erased::Names, token)).unwrap_or(Token::Slotted(*named.as_ref()))
     }
 
     fn sorted(&self, named: Named, fact: &Fact) -> Token {
         match fact.sort {
-            Sort::LiteralWord => {
-                self.classes.literals_erased().map_or(Token::Shaped(fact.word.clone()), |_| Token::Shaped(Code::Erased))
-            }
+            Sort::LiteralWord => Token::Shaped(
+                self.classes.equivalence.unerased(Erased::Literals, fact.word.clone()).unwrap_or(Code::Erased),
+            ),
             Sort::Keyword => Token::Shaped(fact.word.clone()),
             Sort::Lower | Sort::Other => self.renamed(named, fact.sort, &fact.word),
         }
@@ -162,15 +156,15 @@ impl Lexemes for Classifying<'_> {
 
     fn literal(&self, quoted: Quoted) -> Token {
         let code = self.classes.facts.fact(*quoted.as_ref()).map_or(Code::Erased, |fact| fact.word.literal());
-        self.classes.literals_erased().map_or(Token::Shaped(code), |_| Token::Shaped(Code::Erased))
+        Token::Shaped(self.classes.equivalence.unerased(Erased::Literals, code).unwrap_or(Code::Erased))
     }
 
     fn mark(&self, mark: char) -> Token {
-        let dropped = Some(mark)
-            .filter(|found| *found == '-')
-            .filter(|_| self.spot == Spot::BeforeLiteral)
-            .and(self.classes.literals_erased());
-        dropped.map_or(Token::Shaped(Code::Mark(mark)), |_| Token::Dropped)
+        let signed = Some(mark).filter(|found| *found == '-').filter(|_| self.spot == Spot::BeforeLiteral);
+        let kept = signed.map_or(Some(Token::Shaped(Code::Mark(mark))), |sign| {
+            self.classes.equivalence.unerased(Erased::Literals, Token::Shaped(Code::Mark(sign)))
+        });
+        kept.unwrap_or(Token::Dropped)
     }
 }
 

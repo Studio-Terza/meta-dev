@@ -5,7 +5,7 @@ use std::path::Path;
 use syntax::{ItemMod, ItemUse, Macro, MacroTree};
 
 use algebra::{Monoid, Semigroup};
-use lint_core::{Aliases, MacroAliases, Macros, SourceFile, Violation, Walk};
+use lint_core::{Aliases, MacroAliases, Macros, SourceFile, Violation};
 use lint_layout::{Name, Word};
 use lint_sweep::{Contribute, Contributed, Contribution, Descend, Facts, Kind, Scope};
 
@@ -34,13 +34,6 @@ impl Semigroup for Invoked {
 }
 
 impl Monoid for Invoked {}
-
-impl Invoked {
-    fn gated(self, gate: Walk) -> Invoked {
-        let invocations = Descend::from(gate).entered().map_or_else(Vec::new, |()| self.invocations);
-        Invoked { aliases: self.aliases, invocations }
-    }
-}
 
 impl<'run, 'scan> DeclaredGraphs<'run, 'scan> {
     const MACRO: &'static str = "states";
@@ -75,7 +68,10 @@ impl Contribute for DeclaredGraphs<'_, '_> {
     }
 
     fn off_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>, inner: Contribution<(), Invoked>) -> Invoked {
-        inner.concluded(|(), invoked| invoked.gated(facts.gate()))
+        inner.concluded(|(), Invoked { aliases, invocations }| Invoked {
+            aliases,
+            invocations: Descend::from(facts.gate()).entered().map_or_else(Vec::new, |()| invocations),
+        })
     }
 
     fn on_item_use(

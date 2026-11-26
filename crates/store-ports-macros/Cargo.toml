@@ -14,6 +14,7 @@ test = false
 doctest = false
 
 [dependencies]
+invariants = { path = "../invariants" }
 grammar-migration = { path = "../grammar-migration" }
 query-cache = { path = "../query-cache" }
 hex.workspace = true

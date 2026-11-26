@@ -1,5 +1,7 @@
 use crate::Uttered;
 use crate::cli::request::command::printed::Lines;
+use crate::cli::request::ignored::Ignored;
+use invariants::Ignoring;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -21,6 +23,7 @@ use crate::cli::failure::Failure;
 use crate::cli::noted::{Miss, Noted, Reconciliation, Reference};
 use crate::cli::output::{Count, Line};
 use crate::cli::request::Ground;
+use algebra::Semigroup;
 use console_ports::Shown;
 
 #[derive(Debug)]
@@ -48,21 +51,33 @@ struct Answers {
 
 #[derive(Debug)]
 struct Draft {
-    next: NodeId,
-    section: Parent,
     drafted: Vec<Drafted>,
     ending: Ending,
 }
 
 #[derive(Debug)]
+struct Step {
+    next: NodeId,
+    section: Parent,
+    drafted: Vec<Drafted>,
+}
+
+#[derive(Clone, Copy, Debug)]
 struct Taking<'heard> {
-    draft: Draft,
+    next: NodeId,
+    section: Parent,
     heard: &'heard Answers,
     project: &'heard Project,
 }
 
 #[derive(Clone, Copy, Debug)]
 struct Entries;
+
+#[derive(Debug, Default)]
+struct Mentions {
+    cites: Vec<Cite>,
+    quotes: Vec<Quote>,
+}
 
 #[derive(Debug)]
 struct Drafted {
@@ -190,14 +205,13 @@ impl<S: Store> Sheet<'_, S> {
             || Ok(self.store.read(NextNode)?),
             |_imported| Err(Failure::Reimported(self.project.clone())),
         )?;
-        let entries: Vec<notes::Entry> = notes.lines().iter().filter_map(|line| line.read_by(Entries)).collect();
-        let cited: Cited = entries
+        let mentions: Vec<Mentions> = notes.lines().iter().filter_map(|line| line.read_by(Entries)).collect();
+        let cited: Cited = mentions
             .iter()
-            .flat_map(notes::Entry::cites)
+            .flat_map(|mentioned| &mentioned.cites)
             .map(|cite: &Cite| Prefix::new(cite.clone().into_inner()))
             .collect();
-        let quoted: QuotedSegments =
-            entries.iter().flat_map(notes::Entry::quotes).filter_map(Result::ok).cloned().collect();
+        let quoted: QuotedSegments = mentions.iter().flat_map(|mentioned| &mentioned.quotes).cloned().collect();
         Ok(Answers { root, next, cited: self.store.read(cited)?, quoted: self.store.read(quoted)? })
     }
 
@@ -223,8 +237,12 @@ impl<S: Store> Sheet<'_, S> {
 
 impl Answers {
     fn drafted(&self, notes: &Notes, project: &Project) -> Draft {
-        let start = Draft { next: self.next, section: self.root, drafted: Vec::new(), ending: notes.ending() };
-        notes.lines().iter().fold(start, |draft, line| line.read_by(Taking { draft, heard: self, project }))
+        let start = Step { next: self.next, section: self.root, drafted: Vec::new() };
+        let stepped = notes.lines().iter().fold(start, |step, line| {
+            let taken = line.read_by(Taking { next: step.next, section: step.section, heard: self, project });
+            taken.into_iter().fold(step, Semigroup::combine)
+        });
+        Draft { drafted: stepped.drafted, ending: notes.ending() }
     }
 
     fn resolved(&self, entry: &notes::Entry, node: NodeId, voice: Voice) -> Findings {
@@ -233,21 +251,17 @@ impl Answers {
             .into_iter()
             .map(|cite| Sought { reference: Reference::Cite(cite.clone()), found: self.cite(cite) })
             .collect();
-        let authors: Vec<&Speech> = citations.iter().filter_map(|cited| cited.found.as_ref().ok()).collect();
+        let authors: Vec<&Speech> =
+            citations.iter().filter_map(|cited| cited.found.as_ref().ignoring(Ignored::Missed)).collect();
         let cited: BTreeSet<Uuid> = authors.iter().map(|author| author.message.clone()).collect();
         let dates = entry.dates();
         let quotations: Vec<Sought<Vec<Segment>>> = entry
             .quotes()
             .into_iter()
-            .map(|quote| {
-                quote.map_or_else(Sought::unclosed, |closed| Sought {
-                    reference: Reference::Quote(closed.clone()),
-                    found: self.quote(closed, &cited, &dates),
-                })
-            })
+            .map(|quote| Sought::quoted(quote, |closed| self.quote(closed, &cited, &dates)))
             .collect();
         let quoted: BTreeSet<&Segment> =
-            quotations.iter().filter_map(|quoted| quoted.found.as_ref().ok()).flatten().collect();
+            quotations.iter().filter_map(|quoted| quoted.found.as_ref().ignoring(Ignored::Missed)).flatten().collect();
         let owned: Vec<&Speech> = authors.iter().copied().filter(|author| author.author == Authorship::Owner).collect();
         let anchors = Count::new(quoted.len().saturating_add(owned.len()));
         let resolved = voice.anchored(quoted, &owned);
@@ -312,12 +326,12 @@ impl Answers {
 
 impl Speech {
     fn anchor(&self) -> Anchor<'_> {
-        <&[Segment; 1]>::try_from(self.segments.as_slice()).map_or_else(
-            |_several| {
+        match <&[Segment; 1]>::try_from(self.segments.as_slice()) {
+            Ok([whole]) => Anchor::Whole(whole),
+            Err(_several) => {
                 Anchor::Ambiguous(Ambiguity { cite: self.cite.clone(), segments: Count::new(self.segments.len()) })
-            },
-            |[whole]| Anchor::Whole(whole),
-        )
+            }
+        }
     }
 
     fn anchors<'heard>(owned: &[&'heard Speech]) -> Vec<Anchor<'heard>> {
@@ -365,35 +379,50 @@ impl Miss {
 }
 
 impl<Found> Sought<Found> {
+    fn quoted(quote: Result<&Quote, &Unclosed>, found: impl FnOnce(&Quote) -> Result<Found, Miss>) -> Sought<Found> {
+        match quote {
+            Ok(closed) => Sought { reference: Reference::Quote(closed.clone()), found: found(closed) },
+            Err(unclosed) => Sought::unclosed(unclosed),
+        }
+    }
+
     fn unclosed(unclosed: &Unclosed) -> Sought<Found> {
         Sought { reference: Reference::Quote(unclosed.clone().into_inner()), found: Err(Miss::Unclosed) }
     }
 
     fn missed(&self) -> Option<Missed> {
-        self.found.as_ref().err().map(|miss| Missed { reference: self.reference.clone(), miss: *miss })
+        match &self.found {
+            Ok(_found) => None,
+            Err(miss) => Some(Missed { reference: self.reference.clone(), miss: *miss }),
+        }
     }
 }
 
 impl Reading for Entries {
-    type Output = Option<notes::Entry>;
+    type Output = Mentions;
 
-    fn layout(self, _line: &notes::Line) -> Option<notes::Entry> {
-        None
+    fn entry(self, _line: &notes::Line, entry: &notes::Entry, _marking: Marking) -> Mentions {
+        Mentions {
+            cites: entry.cites().into_iter().cloned().collect(),
+            quotes: entry.quotes().into_iter().filter_map(|quote| quote.ignoring(Ignored::Unclosed)).cloned().collect(),
+        }
     }
+}
 
-    fn entry(self, _line: &notes::Line, entry: &notes::Entry, _marking: Marking) -> Option<notes::Entry> {
-        Some(entry.clone())
+impl Semigroup for Step {
+    fn combine(self, later: Step) -> Step {
+        Step { next: later.next, section: later.section, drafted: self.drafted.combine(later.drafted) }
     }
 }
 
 impl Taking<'_> {
     fn node(&self, parent: Parent, line: &notes::Line) -> Node<Vague> {
         let entry = Entry::new(self.project.clone(), Facet::Feature, Provenance::Import(NotesLine::new(line.number())));
-        Node::proposed(self.draft.next, entry, Inherited::from(parent.casting), Title::from(line))
+        Node::proposed(self.next, entry, Inherited::from(parent.casting), Title::from(line))
     }
 
-    fn entered(self, line: &notes::Line, entry: &notes::Entry, voice: Voice) -> Draft {
-        let parent = self.draft.section;
+    fn entered(self, line: &notes::Line, entry: &notes::Entry, voice: Voice) -> Step {
+        let parent = self.section;
         let node = self.node(parent, line);
         let Findings { directed, misses, anchors, ambiguities } = self.heard.resolved(entry, node.identity(), voice);
         let drafted = Drafted {
@@ -404,18 +433,14 @@ impl Taking<'_> {
             misses,
             ruled: voice.judged(anchors, ambiguities),
         };
-        self.draft.after(drafted, parent)
+        Step { next: NodeId::new(self.next.into_inner().saturating_add(1)), section: parent, drafted: vec![drafted] }
     }
 }
 
 impl Reading for Taking<'_> {
-    type Output = Draft;
+    type Output = Step;
 
-    fn layout(self, _line: &notes::Line) -> Draft {
-        self.draft
-    }
-
-    fn entry(self, line: &notes::Line, entry: &notes::Entry, marking: Marking) -> Draft {
+    fn entry(self, line: &notes::Line, entry: &notes::Entry, marking: Marking) -> Step {
         match marking {
             Marking::Heading => self.headed(line, entry),
             Marking::Ruling => self.entered(line, entry, Voice::Ruling),
@@ -425,25 +450,15 @@ impl Reading for Taking<'_> {
 }
 
 impl Taking<'_> {
-    fn headed(self, line: &notes::Line, entry: &notes::Entry) -> Draft {
-        let Taking { draft, heard, project } = self;
-        let rooted = Taking { draft: Draft { section: heard.root, ..draft }, heard, project };
-        let node = rooted.node(heard.root, line);
+    fn headed(self, line: &notes::Line, entry: &notes::Entry) -> Step {
+        let rooted = Taking { section: self.heard.root, ..self };
+        let node = rooted.node(self.heard.root, line);
         let section = Parent { node: node.identity(), casting: node.casting() };
-        Draft { section, ..rooted.entered(line, entry, Voice::Remark) }
+        Step { section, ..rooted.entered(line, entry, Voice::Remark) }
     }
 }
 
 impl Draft {
-    fn after(self, drafted: Drafted, section: Parent) -> Draft {
-        Draft {
-            next: NodeId::new(self.next.into_inner().saturating_add(1)),
-            section,
-            drafted: self.drafted.into_iter().chain([drafted]).collect(),
-            ending: self.ending,
-        }
-    }
-
     fn landing(&self) -> Landing {
         self.drafted.iter().map(|drafted| drafted.ruled.landing()).max().unwrap_or(Landing::Written)
     }

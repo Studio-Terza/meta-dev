@@ -14,7 +14,9 @@ use step::sqlite::BuildSqlite;
 use step::{CompileTimes, History, InstallTools, LibtestSeconds, Logged, ReachScope, Step, Timed, ToolsKey};
 
 use super::ports::Ports;
+use crate::cli::ignored::Ignored;
 pub(crate) use failure::Failure;
+use invariants::Ignoring;
 pub use telling::Telling;
 pub(crate) use telling::Told;
 
@@ -79,7 +81,7 @@ impl Command {
     const SQLITE: &'static str = "sqlite";
 
     pub fn parse(mut arguments: impl Iterator<Item = OsString>) -> Result<Command, Failure<'static>> {
-        match arguments.next().and_then(|name| name.into_string().ok()).as_deref() {
+        match arguments.next().and_then(|name| name.into_string().ignoring(Ignored::NotUnicode)).as_deref() {
             Some(Self::TIMED) => Self::parsed(arguments.collect(), Command::Timed),
             Some(Self::CLIPPY_TARGETS) => Self::parsed(arguments.collect(), Command::ClippyTargets),
             Some(Self::LIBTEST_SECONDS) => Self::parsed(arguments.collect(), Command::LibtestSeconds),
@@ -116,7 +118,10 @@ impl Command {
     }
 
     pub fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Telling<'step> {
-        self.told(ports).unwrap_or_else(|failure| Telling::ended(Err(failure)))
+        match self.told(ports) {
+            Ok(telling) => telling,
+            Err(failure) => Telling::ended(Err(failure)),
+        }
     }
 
     fn told<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {

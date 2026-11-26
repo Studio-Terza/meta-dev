@@ -5,15 +5,16 @@ mod incremental;
 mod tested;
 
 use std::ffi::{OsStr, OsString};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use super::super::journal::Journal;
 use super::Step;
 use super::kept::Mutant;
 use crate::cli::command::failure::Failure;
-use crate::cli::command::step::{Arguments, Flag};
+use crate::cli::command::step::{Arguments, Flag, Journaled, Location};
 use crate::cli::ports::{Exit, Invocation, Ports, Text};
 use boundary::Shards;
+use grammar_output::Record;
 use incremental::{Choice, Prior};
 use tested::{Reach, Reaching, Tested};
 
@@ -55,32 +56,37 @@ impl MutantsPlan {
         let mutants = Mutant::listed(&Text::new(listed.as_ref().to_owned())).map_err(Failure::Outcomes)?;
         Ok(Shards::for_mutants(mutants.iter().map(|mutant| costs.per_mutant(mutant)).collect()))
     }
+
+    fn reached(head: PlanHead, given: Arguments) -> Result<MutantsPlan, Failure<'static>> {
+        let reached = Reach::taken(head.reaching, given)?;
+        reached.concluded(|reach, following| {
+            let directory = following.flagged::<Location>(Self::PRIOR)?;
+            let read = directory.concluded(Prior::following)?;
+            Ok(read.concluded(|prior, rest| MutantsPlan {
+                diff: head.diff,
+                reach,
+                output: head.output,
+                prior,
+                scope: rest.rest(),
+            }))
+        })
+    }
+}
+
+#[derive(Debug, Record)]
+#[record(source = Arguments)]
+struct PlanHead {
+    #[field(Journaled)]
+    diff: Journal,
+    #[field(Journaled)]
+    output: Journal,
+    #[field(Reaching)]
+    reaching: Reaching,
 }
 
 impl Step for MutantsPlan {
     fn from_arguments(given: Vec<OsString>) -> Result<MutantsPlan, Failure<'static>> {
-        let mut arguments = Arguments::from(given);
-        let diff = &arguments.taken()?;
-        let output = &arguments.taken()?;
-        let reaching = arguments
-            .taken()?
-            .to_str()
-            .ok_or(Failure::Usage)?
-            .parse::<Reaching>()
-            .map_err(|_unreached| Failure::Usage)?;
-        let reach = Reach::taken(reaching, &mut arguments)?;
-        let flagged = arguments.flagged(Self::PRIOR)?;
-        let directory = flagged.path();
-        let mut rest = flagged.following();
-        let metadata = directory.as_ref().map(|_| rest.taken()).transpose()?;
-        let prior = directory.zip(metadata).map(|(found, read)| Prior::new(found, PathBuf::from(read)));
-        Ok(MutantsPlan {
-            diff: Journal::from(PathBuf::from(diff)),
-            reach,
-            output: Journal::file(Path::new(output)),
-            prior,
-            scope: rest.rest(),
-        })
+        PlanHead::read(Arguments::from(given))?.concluded(MutantsPlan::reached)
     }
 
     fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {

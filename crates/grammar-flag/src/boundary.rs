@@ -1,4 +1,5 @@
 use grammar::logos::Logos;
+use grammar::{Ignoring, Unlexed};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
@@ -13,6 +14,6 @@ pub struct Flags;
 impl Flags {
     #[must_use]
     pub fn spelled(text: &str) -> Option<&str> {
-        Spelling::lexer(text).next().and_then(Result::ok).map(|_lead| text)
+        Spelling::lexer(text).next().and_then(|lexed| lexed.ignoring(Unlexed::NotThisGrammar)).map(|_lead| text)
     }
 }

@@ -1,9 +1,13 @@
+mod ignored;
+
 use std::env;
 use std::ffi::{OsStr, OsString};
 use std::io::{self, Stderr, Stdout, Write};
 use std::process::ExitCode;
 
+use crate::process::ignored::Ignored;
 use crate::{Answer, Complaint, Environment, Heard, Shown, Tale, Teller};
+use invariants::Ignoring;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Process;
@@ -17,7 +21,7 @@ impl Process {
         let teller = parse(env::args_os().skip(1).collect());
         let mut tale = teller.told();
         let printed = tale.by_ref().try_for_each(|line| io::stdout().write_all(AsRef::<str>::as_ref(&line).as_bytes()));
-        printed.map_or(ExitCode::FAILURE, |()| Process::written(&tale.ended()))
+        printed.ignoring(Ignored::Unwritable).map_or(ExitCode::FAILURE, |()| Process::written(&tale.ended()))
     }
 
     fn written(answer: &Answer) -> ExitCode {
@@ -26,7 +30,7 @@ impl Process {
         let written = io::stdout()
             .write_all(AsRef::<str>::as_ref(shown).as_bytes())
             .and_then(|()| io::stderr().write_all(AsRef::<str>::as_ref(complaint).as_bytes()));
-        written.map_or(ExitCode::FAILURE, |()| answer.code())
+        written.ignoring(Ignored::Unwritable).map_or(ExitCode::FAILURE, |()| answer.code())
     }
 }
 

@@ -65,6 +65,13 @@ fn every_operation_and_partial_is_listed_by_type() {
 }
 
 #[test]
+fn a_method_through_mut_self_is_an_operation_only_when_it_gives_unit() {
+    let source = "struct A;\nimpl A {\n    fn bump(&mut self) {}\n    fn count(&mut self) -> u8 {}\n}\n";
+    let text = Declared::of(&[Declared::at("crates/x/src/lib.rs", source)]);
+    assert!(text.contains("crate x: 1 of 1 algebra operations declare no law; x::A: bump"), "{text}");
+}
+
+#[test]
 fn counts_are_per_crate() {
     let text = Declared::of(&[
         Declared::at("crates/x/src/lib.rs", ADD),

@@ -4,6 +4,7 @@ use syntax::{WherePredicate, format_ident, quote};
 
 use crate::settings::{Checking, Expressed, Settings};
 use crate::wrapped::{Strategy, Wrapped};
+use syntax::Compiled;
 
 pub struct Generated<'input> {
     ident: &'input Ident,
@@ -31,7 +32,7 @@ impl Generated<'_> {
             .and_then(|input: DeriveInput| {
                 Settings::declared(&input.attrs).and_then(|settings| Generator::from(&settings).routed(&input))
             })
-            .unwrap_or_else(Error::into_compile_error)
+            .compiled()
     }
 
     fn escaped(&self, generate: &Expr) -> TokenStream {

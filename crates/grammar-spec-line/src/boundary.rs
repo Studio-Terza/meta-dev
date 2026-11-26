@@ -6,6 +6,7 @@ use std::iter;
 use std::str::FromStr;
 
 use grammar::logos::{Lexer, Logos};
+use grammar::{Ignoring, Unlexed};
 use newtype::{Arbitrary, Checked, Newtype};
 
 use head::Head;
@@ -70,7 +71,7 @@ impl Head {
 
 impl Spec {
     fn after(rest: &[Lexed]) -> Option<Spec> {
-        let only = <&[Lexed; 1]>::try_from(rest).ok();
+        let only = <&[Lexed; 1]>::try_from(rest).ignoring(Unlexed::OtherShape);
         rest.first().map(|_said| Spec {
             value: rest.iter().map(|piece| piece.text.as_str()).collect(),
             attachment: only.and_then(|[sole]| sole.attachment()),
@@ -85,7 +86,7 @@ impl Spec {
 
 impl Lexed {
     fn attachment(&self) -> Option<Attachment> {
-        Attachment::try_new(self.text.clone()).ok()
+        Attachment::try_new(self.text.clone()).ignoring(Unlexed::NotThisGrammar)
     }
 
     fn spoken(lexed: &[Lexed]) -> &[Lexed] {
@@ -103,10 +104,13 @@ impl FromStr for Line {
 
     fn from_str(text: &str) -> Result<Line, Unspecified> {
         let mut head = Head::lexer(text);
-        let opening = head.next().and_then(Result::ok);
+        let opening = head.next().and_then(|lexed| lexed.ignoring(Unlexed::NotThisGrammar));
         let mut pieces = head.morph::<Piece>();
         let lexed = iter::from_fn(|| Lexed::next(&mut pieces)).collect::<Result<Vec<Lexed>, ()>>();
-        opening.zip(lexed.ok()).and_then(|(opened, said)| opened.line(Lexed::spoken(&said))).ok_or(Unspecified)
+        opening
+            .zip(lexed.ignoring(Unlexed::NotThisGrammar))
+            .and_then(|(opened, said)| opened.line(Lexed::spoken(&said)))
+            .ok_or(Unspecified)
     }
 }
 
@@ -125,8 +129,8 @@ impl Checked for Attachment {
     fn checked(value: &String) -> Result<&String, Unspelled> {
         let spelled: Vec<Result<Piece, ()>> = Piece::lexer(value).collect();
         <[Result<Piece, ()>; 1]>::try_from(spelled)
-            .ok()
-            .and_then(|[only]| only.ok())
+            .ignoring(Unlexed::OtherShape)
+            .and_then(|[only]| only.ignoring(Unlexed::NotThisGrammar))
             .and_then(Piece::attached)
             .map(|_form| value)
             .ok_or(Unspelled)

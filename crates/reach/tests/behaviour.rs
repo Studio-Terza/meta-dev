@@ -3,7 +3,14 @@ use std::process::ExitCode;
 
 use console_ports::{Complaint, Shown};
 use file_ports::Memory;
+use invariants::{Ignoring, ignored};
 use reach::Cli;
+
+ignored! {
+    enum Ignored {
+        Unmirrored => "fixtures that fail to mirror leave an empty tree, so the answer finds nothing and the case reports it",
+    }
+}
 
 const WORKSPACE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/workspace.json");
 const PATCHED: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/patched.json");
@@ -32,7 +39,7 @@ struct Answer {
 
 impl Answer {
     fn to(arguments: &[&str]) -> Answer {
-        let files: Memory = golden::fixtures!("tests/metadata").unwrap_or_default();
+        let files: Memory = golden::fixtures!("tests/metadata").ignoring(Ignored::Unmirrored).unwrap_or_default();
         let answered = Cli::answer(arguments.iter().map(OsString::from), &files);
         let out: &Shown = answered.as_ref();
         let err: &Complaint = answered.as_ref();

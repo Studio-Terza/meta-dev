@@ -69,7 +69,10 @@ impl<'environment, E: Environment, F: Files, O, H, C: ClockFiller> Cli<'environm
         O: Opens,
         H: FnOnce(PathBuf) -> D,
     {
-        self.answered(run, arguments).unwrap_or_else(|failure| Uttered::silent(Err(failure)))
+        match self.answered(run, arguments) {
+            Ok(uttered) => uttered,
+            Err(failure) => Uttered::silent(Err(failure)),
+        }
     }
 
     fn answered<D: DispatchFiller>(

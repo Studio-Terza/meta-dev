@@ -1,4 +1,11 @@
+use invariants::{Ignoring, ignored};
 use query_cache::{Entry, Origin, Table};
+
+ignored! {
+    enum Ignored {
+        Unparsed => "an entry that does not parse binds nothing, so no refusal is read and the row reports it",
+    }
+}
 
 const TWO_PARAMETERS: &str = r#"{"describe": {"columns": [], "parameters": {"Right": 2}, "nullable": []}}"#;
 
@@ -6,10 +13,13 @@ struct Binding(usize);
 
 impl Binding {
     fn refused(&self) -> Option<String> {
-        serde_json::from_str::<Entry<String>>(TWO_PARAMETERS)
-            .ok()
-            .and_then(|entry| entry.bound(self.0).err())
-            .map(|refusal| refusal.to_string())
+        match serde_json::from_str::<Entry<String>>(TWO_PARAMETERS)
+            .ignoring(Ignored::Unparsed)
+            .map(|entry| entry.bound(self.0))
+        {
+            Some(Err(refusal)) => Some(refusal.to_string()),
+            Some(Ok(())) | None => None,
+        }
     }
 }
 

@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use grammar::logos::Logos;
+use grammar::{Ignoring, Unlexed};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
@@ -38,7 +39,8 @@ impl FromStr for Cited {
     type Err = Uncited;
 
     fn from_str(cited: &str) -> Result<Cited, Uncited> {
-        let spelled: Vec<Spelling<'_>> = Spelling::lexer(cited).collect::<Result<_, ()>>().unwrap_or_default();
+        let spelled: Vec<Spelling<'_>> =
+            Spelling::lexer(cited).collect::<Result<_, ()>>().ignoring(Unlexed::NotThisGrammar).unwrap_or_default();
         let unshaped = || Uncited::Unshaped(cited.to_owned());
         let [prefix, dot, digits] = <[Spelling<'_>; 3]>::try_from(spelled).map_err(|_miscounted| unshaped())?;
         Some(dot).filter(|spelling| *spelling == Spelling::Dot).ok_or_else(unshaped)?;

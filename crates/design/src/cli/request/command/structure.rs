@@ -1,5 +1,7 @@
 use crate::Uttered;
 use crate::cli::request::command::printed::Lines;
+use crate::cli::request::ignored::Ignored;
+use invariants::Ignoring;
 use std::collections::BTreeSet;
 
 use design_jobs::{OpenJobs, job};
@@ -10,8 +12,8 @@ use design_runs::{
 };
 use design_store::{Asked, AskedEarlier, ContextNodes, Remit};
 use dispatch_ports::{
-    AgentRun, Clock, Deadline, Dispatch, Due, Ended, Fault, Finished, Job, Prompt, Stall, Timeout, Watch, Watched,
-    Watching,
+    AgentRun, Clock, Deadline, Dispatch, DispatchFailure, Due, Ended, Fault, Finished, Job, Prompt, Stall, Timeout,
+    Watch, Watched, Watching,
 };
 use port_core::Held;
 use store_ports::{Store, StoreFailure};
@@ -116,12 +118,6 @@ struct RunEnding {
     run: RunId,
 }
 
-#[derive(Debug)]
-enum Progress {
-    Going(Vec<Worked>),
-    Halted(Vec<Worked>),
-}
-
 #[derive(Clone, Copy, Debug)]
 struct Reaped {
     run: RunId,
@@ -164,10 +160,12 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
         let unplaced = self.store.read(Unstructured)?;
         let chunks = unplaced.chunks(structurer::Job::SEGMENTS);
         let sequels = chunks.clone().skip(1).map(|_later| Sequel::WentOn).chain([Sequel::NoMoreJobs]);
-        let progress = chunks
-            .zip(sequels)
-            .try_fold(Progress::Going(Vec::new()), |progress, (chunk, sequel)| progress.next(self, chunk, sequel))?;
-        let worked = progress.worked();
+        let worked = chunks.zip(sequels).try_fold(Vec::new(), |mut worked: Vec<Worked>, (chunk, sequel)| {
+            let halted = worked.last().map(Worked::course).filter(|course| *course == Course::Halting);
+            let done = halted.map_or_else(|| self.job(chunk, sequel, &worked).map(Some), |_| Ok(None))?;
+            worked.extend(done);
+            Ok::<Vec<Worked>, Failure>(worked)
+        })?;
         let flailed = self.store.read(FlailedSegments)?;
         lock.end()?;
         Ok(Structured { reaped, interrupted, worked, flailed })
@@ -237,11 +235,8 @@ impl<S: Store, D: Dispatch, C: Clock> Attempts<'_, '_, S, D, C> {
         let run = store.read(NextRun)?;
         let deadline = Deadline::after(crew.clock.now(), Structure::<S, D, C>::TIMEOUT);
         let record = RunRecord { structure: self.structure, job: self.id, run };
-        let watched =
-            crew.dispatch.dispatch(&Job::due_by(deadline), &Prompt::from(&self.job.briefing(&attempt))).map_or_else(
-                |failure| Ok(Watched::Stalled(Stall::Unspawned(Fault::from(failure)))),
-                |held| record.ended(held, deadline),
-            )?;
+        let dispatched = crew.dispatch.dispatch(&Job::due_by(deadline), &Prompt::from(&self.job.briefing(&attempt)));
+        let watched = record.spawned(dispatched, deadline)?;
         let retried = attempt.lapse().cloned();
         let step = watched.visited(Stepping { attempts: self, run, attempt })?;
         self.continued(run, retried, step)
@@ -320,13 +315,29 @@ impl<S: Store, D: Dispatch, C: Clock> RunRecord<'_, '_, S, D, C> {
     fn ended(&self, held: Held<'_, AgentRun>, deadline: Deadline) -> Result<Watched, Failure> {
         let Structure { store, crew } = self.structure;
         let looked = crew.dispatch.started(held.pid());
-        let started = looked.as_ref().ok().cloned().flatten();
+        let started = looked.as_ref().ignoring(Ignored::Unlooked).cloned().flatten();
         store.write(RunSpawned::new(self.run, self.job, Spawned::new(held.pid(), started, deadline)))?;
-        let watched = looked
-            .and_then(|_started| Watch::over(crew.dispatch, crew.clock).watched(held))
-            .unwrap_or_else(|failure| Watched::Stalled(Stall::Failed(Fault::from(failure))));
+        let watched = Self::watched(looked.and_then(|_started| Watch::over(crew.dispatch, crew.clock).watched(held)));
         store.write(watched.visited(RunEnding { run: self.run }))?;
         Ok(watched)
+    }
+
+    fn spawned(
+        &self,
+        dispatched: Result<Held<'_, AgentRun>, DispatchFailure>,
+        deadline: Deadline,
+    ) -> Result<Watched, Failure> {
+        match dispatched {
+            Ok(held) => self.ended(held, deadline),
+            Err(failure) => Ok(Watched::Stalled(Stall::Unspawned(Fault::from(failure)))),
+        }
+    }
+
+    fn watched(watching: Result<Watched, DispatchFailure>) -> Watched {
+        match watching {
+            Ok(watched) => watched,
+            Err(failure) => Watched::Stalled(Stall::Failed(Fault::from(failure))),
+        }
     }
 }
 
@@ -404,30 +415,6 @@ impl Step {
     }
 }
 
-impl Progress {
-    fn next<S: Store, D: Dispatch, C: Clock>(
-        self,
-        structure: &Structure<'_, S, D, C>,
-        chunk: &[Unplaced],
-        sequel: Sequel,
-    ) -> Result<Progress, Failure> {
-        match self {
-            Progress::Going(worked) => structure.job(chunk, sequel, &worked).map(|done| Progress::after(worked, done)),
-            Progress::Halted(worked) => Ok(Progress::Halted(worked)),
-        }
-    }
-
-    fn after(worked: Vec<Worked>, done: Worked) -> Progress {
-        done.course().progress(worked.into_iter().chain([done]).collect())
-    }
-
-    fn worked(self) -> Vec<Worked> {
-        match self {
-            Progress::Going(worked) | Progress::Halted(worked) => worked,
-        }
-    }
-}
-
 impl Worked {
     fn course(&self) -> Course {
         self.halt.as_ref().map_or(Course::Onward, Halt::course)
@@ -437,15 +424,6 @@ impl Worked {
         let flailed = self.halt.as_ref().and_then(Halt::flailed).cloned().map(Halt::Flailed);
         flailed
             .map(|halt| Retold::new(self.job, Account::told(&halt.failure(self.job, Sequel::Halted { job: stalled }))))
-    }
-}
-
-impl Course {
-    fn progress(self, worked: Vec<Worked>) -> Progress {
-        match self {
-            Course::Onward => Progress::Going(worked),
-            Course::Halting => Progress::Halted(worked),
-        }
     }
 }
 

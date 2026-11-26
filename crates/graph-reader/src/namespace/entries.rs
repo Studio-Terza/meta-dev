@@ -23,6 +23,8 @@ use super::std_names::{Expansion, StdNames};
 use super::tables::{Declaring, Explicit, GlobView, Key, Keyed, Layer, ModuleGlob, Row};
 use super::use_path::{Leaf, UsePath};
 use super::view::View;
+use crate::ignored::Ignored;
+use invariants::Ignoring;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Visibility {
@@ -348,7 +350,8 @@ impl DeriveMacro<'_> {
 
     fn named(attribute: &Attribute) -> Option<Name> {
         attribute.path().get_ident().map(Name::from).and_then(|ident| ident.matches::<Whole>(&Self::ATTRIBUTE))?;
-        let settings = attribute.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated).ok()?;
+        let settings =
+            attribute.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated).ignoring(Ignored::Unparsed)?;
         settings.first().and_then(|first| first.path().get_ident()).map(Name::from)
     }
 }

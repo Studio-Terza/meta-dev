@@ -1,5 +1,7 @@
 use crate::cli::command::Telling;
+use crate::cli::ignored::Ignored;
 use console_ports::Shown;
+use invariants::Ignoring;
 mod listing;
 mod unit;
 
@@ -17,15 +19,19 @@ use super::Step;
 use super::journal::Journal;
 use super::seconds::Seconds;
 use crate::cli::command::failure::Failure;
-use crate::cli::command::step::Arguments;
+use crate::cli::command::step::{Arguments, Ended, Journaled};
 use crate::cli::ports::{Exit, Ports};
+use grammar_output::Record;
 use listing::Listing;
 use text_lines::OneLine;
 use unit::Unit;
 
-#[derive(Debug)]
+#[derive(Debug, Record)]
+#[record(source = Arguments)]
 pub struct CompileTimes {
+    #[field(Journaled)]
     page: Journal,
+    #[field(Journaled)]
     report: Journal,
 }
 
@@ -49,26 +55,20 @@ impl CompileTimes {
             .next()
             .and_then(|(at, found)| text.get(at + found.len()..))
             .and_then(|rest| Deserializer::from_str(rest).into_iter::<Vec<Timed>>().next())
-            .and_then(Result::ok)
+            .and_then(|timed| timed.ignoring(Ignored::Unparsed))
             .ok_or_else(|| Failure::NoTimings { path: page.into() })
     }
 }
 
 impl Step for CompileTimes {
     fn from_arguments(given: Vec<OsString>) -> Result<CompileTimes, Failure<'static>> {
-        let mut arguments = Arguments::from(given);
-        let page = &arguments.taken()?;
-        let report = &arguments.taken()?;
-        arguments.ended()?;
-        Ok(CompileTimes { page: Journal::file(Path::new(page)), report: Journal::file(Path::new(report)) })
+        CompileTimes::read(Arguments::from(given))?.ended()
     }
 
     fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         let listing = Listing::totalled(Self::per_crate(&self.page, &self.page.read(ports.files())?)?);
         let said = vec![Shown::said(format_args!("{listing}"))];
-        Ok(Telling::reported(
-            said,
-            self.report.emptied(ports.files())?.append(ports.files(), &listing).map(|()| Exit::Success),
-        ))
+        self.report.replace(ports.files(), &Text::default())?;
+        Ok(Telling::reported(said, self.report.append(ports.files(), &listing).map(|()| Exit::Success)))
     }
 }

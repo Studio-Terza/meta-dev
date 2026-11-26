@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
 use super::Change;
+use crate::cli::ignored::Ignored;
+use invariants::Ignoring;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Status {
@@ -24,11 +26,11 @@ impl Status {
         match self {
             Status::Added => Self::single(paths).map(Change::Added),
             Status::Copied => <&[&str; Self::PAIR]>::try_from(paths)
-                .ok()
+                .ignoring(Ignored::OtherShape)
                 .map(|[_, path]| Change::Copied(PathBuf::from(path)))
                 .or_else(|| Self::single(paths).map(Change::Touched)),
             Status::Renamed => <&[&str; Self::PAIR]>::try_from(paths)
-                .ok()
+                .ignoring(Ignored::OtherShape)
                 .map(|[from, to]| Change::Renamed { from: PathBuf::from(from), to: PathBuf::from(to) })
                 .or_else(|| Self::single(paths).map(Change::Touched)),
             Status::Other => Self::single(paths).map(Change::Touched),
@@ -36,6 +38,6 @@ impl Status {
     }
 
     fn single(paths: &[&str]) -> Option<PathBuf> {
-        <&[&str; 1]>::try_from(paths).ok().map(|[path]| PathBuf::from(path))
+        <&[&str; 1]>::try_from(paths).ignoring(Ignored::OtherShape).map(|[path]| PathBuf::from(path))
     }
 }

@@ -1,13 +1,15 @@
 use std::fmt;
 
+use crate::cli::ignored::Ignored;
 use file_ports::Text;
+use invariants::Ignoring;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Refusal(String);
 
 impl From<Vec<u8>> for Refusal {
     fn from(bytes: Vec<u8>) -> Refusal {
-        Refusal(String::from_utf8(bytes).unwrap_or_default())
+        Refusal(String::from_utf8(bytes).ignoring(Ignored::NotUtf8).unwrap_or_default())
     }
 }
 

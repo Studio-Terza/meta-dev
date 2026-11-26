@@ -9,16 +9,25 @@ use std::str::FromStr;
 
 use design_model::{
     AnyNode, AnyStage, Artifact, ArtifactKind, Basis, Casting, Condition, Confidence, Dropped, Entered, Entry,
-    Explicitness, Facet, Inherited, Inversion, Kin, Misstaged, Node, NodeEdge, NodeId, NodeRelation, NotesLine,
-    Project, Provenance, Reason, Role, RunId, SegmentRelation, SenseKind, SpanRelation, Specificity, Stage, Terminal,
-    Title, Transition,
+    Explicitness, Facet, Inherited, Kin, Misstaged, Node, NodeEdge, NodeId, NodeRelation, NotesLine, Project,
+    Provenance, Reason, Role, RunId, SegmentRelation, SenseKind, SpanRelation, Specificity, Stage, Terminal, Title,
+    Transition,
 };
+use invariants::{Ignoring, ignored};
 use laws::proptest::collection::vec;
 use laws::proptest::prelude::{any, prop_assert, prop_assert_eq, prop_oneof};
 use laws::proptest::sample::select;
 use laws::proptest::strategy::Strategy;
 use laws::proptest::test_runner::TestCaseError;
 use newtype::Enumerated;
+
+ignored! {
+    enum Ignored {
+        Refused => "a text the check or parse refuses is filtered out, or is the None the case expects",
+        Unserialised => "a project that fails to write or read as JSON breaks the roundtrip, which the law reports",
+        Misstaged => "a refused transition leaves the node as it was",
+    }
+}
 
 struct Names;
 
@@ -30,7 +39,7 @@ impl Names {
         Named::VARIANTS
             .iter()
             .copied()
-            .filter(|variant| name(*variant).parse::<Named>().ok() != Some(*variant))
+            .filter(|variant| name(*variant).parse::<Named>().ignoring(Ignored::Refused) != Some(*variant))
             .collect()
     }
 
@@ -46,7 +55,8 @@ struct Projects;
 
 impl Projects {
     fn any() -> impl Strategy<Value = Project> {
-        "[A-Za-z0-9][A-Za-z0-9._-]{0,15}".prop_filter_map("a project name", |name| name.parse::<Project>().ok())
+        "[A-Za-z0-9][A-Za-z0-9._-]{0,15}"
+            .prop_filter_map("a project name", |name| name.parse::<Project>().ignoring(Ignored::Refused))
     }
 }
 
@@ -160,13 +170,13 @@ laws::roundtrip!(
     a_provenance_is_displayed_and_parsed_back,
     Provenances::any(),
     |provenance: &Provenance| provenance.to_string(),
-    |text: &String| text.parse::<Provenance>().ok(),
+    |text: &String| text.parse::<Provenance>().ignoring(Ignored::Refused),
     Some
 );
 
 laws::table!(
     a_provenance_is_a_way_of_entering_an_agent_run_or_a_notes_line,
-    |text: &&'static str| text.parse::<Provenance>().ok(),
+    |text: &&'static str| text.parse::<Provenance>().ignoring(Ignored::Refused),
     [
         "apply" => Some(Provenance::from(Entered::Apply)),
         "stage" => Some(Provenance::from(Entered::Stage)),
@@ -199,15 +209,17 @@ laws::roundtrip!(
     a_project_is_displayed_and_parsed_back,
     Projects::any(),
     |project: &Project| project.to_string(),
-    |text: &String| text.parse::<Project>().ok(),
+    |text: &String| text.parse::<Project>().ignoring(Ignored::Refused),
     Some
 );
 
 laws::roundtrip!(
     a_project_is_serialized_and_deserialized_back,
     Projects::any(),
-    |project: &Project| serde_json::to_string(project).ok(),
-    |text: &Option<String>| text.as_deref().and_then(|written| serde_json::from_str::<Project>(written).ok()),
+    |project: &Project| serde_json::to_string(project).ignoring(Ignored::Unserialised),
+    |text: &Option<String>| text
+        .as_deref()
+        .and_then(|written| serde_json::from_str::<Project>(written).ignoring(Ignored::Unserialised)),
     Some
 );
 
@@ -219,7 +231,7 @@ laws::law!(a_project_name_never_starts_or_holds_what_names_cannot, "[ ./_-][a-z]
 
 laws::law!(a_node_id_is_read_from_n_and_its_number, 0..i64::MAX, number, {
     let spelled = format!("n{number}");
-    prop_assert_eq!(spelled.parse::<NodeId>().ok(), Some(NodeId::new(number)));
+    prop_assert_eq!(spelled.parse::<NodeId>().ignoring(Ignored::Refused), Some(NodeId::new(number)));
 });
 
 laws::law!(no_message_uuid_reads_as_a_node_id, "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", uuid, {
@@ -315,8 +327,8 @@ laws::table!(
 
 #[test]
 fn a_refused_transition_names_the_node_it_was_asked_of() -> Result<(), Box<dyn Error>> {
-    let refused = Transition::Reopen.applied(Lifecycle::fresh()?).err().map(Misstaged::node);
-    assert_eq!(refused, Some(NodeId::new(7)));
+    let applied = Transition::Reopen.applied(Lifecycle::fresh()?);
+    assert!(matches!(applied, Err(misstaged) if misstaged.node() == NodeId::new(7)));
     Ok(())
 }
 
@@ -341,7 +353,7 @@ laws::law!(
         let walked = steps.iter().try_fold(fresh.clone(), |node, step| {
             let transition =
                 Lifecycle::transition(*step).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-            Ok::<AnyNode, TestCaseError>(transition.applied(node.clone()).unwrap_or(node))
+            Ok::<AnyNode, TestCaseError>(transition.applied(node.clone()).ignoring(Ignored::Misstaged).unwrap_or(node))
         })?;
         prop_assert_eq!(walked.identity(), fresh.identity());
         prop_assert_eq!(walked.entry(), fresh.entry());
@@ -354,13 +366,13 @@ laws::roundtrip!(
     an_artifact_is_displayed_and_parsed_back,
     (select(ArtifactKind::VARIANTS), "[A-Za-z0-9_][A-Za-z0-9_.:/-]{0,12}"),
     |(kind, name): &(ArtifactKind, String)| format!("{kind}:{name}"),
-    |text: &String| text.parse::<Artifact>().ok().map(|artifact| artifact.to_string()),
+    |text: &String| text.parse::<Artifact>().ignoring(Ignored::Refused).map(|artifact| artifact.to_string()),
     |(kind, name): (ArtifactKind, String)| Some(format!("{kind}:{name}"))
 );
 
 laws::table!(
     an_artifact_needs_a_known_kind_a_colon_and_a_name,
-    |text: &&str| text.parse::<Artifact>().ok().map(|artifact| artifact.to_string()),
+    |text: &&str| text.parse::<Artifact>().ignoring(Ignored::Refused).map(|artifact| artifact.to_string()),
     [
         "behaviour:a_dropped_node_stays_resolvable" => Some("behaviour:a_dropped_node_stays_resolvable".to_owned()),
         "hook:stop" => Some("hook:stop".to_owned()),
@@ -380,8 +392,8 @@ laws::roundtrip!(
     "[ -~]{0,4}[!-~][ -~]{0,20}",
     |text: &String| text.clone(),
     |text: &String| {
-        let condition = text.parse::<Condition>().ok().map(|condition| condition.to_string());
-        let reason = text.parse::<Reason>().ok().map(|reason| reason.to_string());
+        let condition = text.parse::<Condition>().ignoring(Ignored::Refused).map(|condition| condition.to_string());
+        let reason = text.parse::<Reason>().ignoring(Ignored::Refused).map(|reason| reason.to_string());
         [condition, reason]
     },
     |text: String| [Some(text.clone()), Some(text)]
@@ -397,12 +409,25 @@ laws::law!(
     }
 );
 
+struct Refusal;
+
+impl Refusal {
+    fn of(text: &str) -> String {
+        match text.parse::<Provenance>() {
+            Ok(_provenance) => String::new(),
+            Err(refusal) => refusal.to_string(),
+        }
+    }
+}
+
 struct Dependence;
 
 impl Dependence {
     fn upheld(Ends(relation, source, target): Ends) -> Option<NodeEdge> {
-        let edge = NodeEdge::new(NodeId::new(2), relation, NodeId::new(1));
-        edge.upheld(source, target).err().map(Inversion::edge)
+        match NodeEdge::new(NodeId::new(2), relation, NodeId::new(1)).upheld(source, target) {
+            Ok(_upheld) => None,
+            Err(inversion) => Some(inversion.edge()),
+        }
     }
 }
 
@@ -424,6 +449,6 @@ laws::table!(
 #[test]
 fn a_refused_provenance_lists_every_way_of_entering_and_nothing_else_before_the_agent_and_import_forms() {
     let leads = Entered::VARIANTS.iter().map(ToString::to_string).collect::<Vec<String>>().join(", ");
-    let refusal = "retry".parse::<Provenance>().err().map_or_default(|refusal| refusal.to_string());
+    let refusal = Refusal::of("retry");
     assert!(refusal.contains(&format!(" is no provenance: one of {leads}, agent- and a run number")), "{refusal}");
 }

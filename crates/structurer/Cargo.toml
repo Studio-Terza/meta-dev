@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+invariants = { path = "../invariants" }
 design-model = { path = "../design-model" }
 dispatch-ports = { path = "../dispatch-ports" }
 grammar-cited = { path = "../grammar-cited" }

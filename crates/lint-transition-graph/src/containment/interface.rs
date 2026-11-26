@@ -23,7 +23,7 @@ impl<'view, 'found> Interface<'view, 'found> {
         let exports = cut.exports();
         let sharing = Containment::adjacency(cut.outgoing().iter().copied());
         let links = sharing.values().flat_map(Link::star);
-        let groups = Groups::linked(exports, links).split()?;
+        let groups = Groups::split(exports, links)?;
         Some(Interface { cluster: judged, exports, groups })
     }
 }

@@ -6,8 +6,9 @@ use named_derive::Named;
 use text_lines::Lines;
 
 use crate::cli::command::failure::Failure;
-use crate::cli::command::step::Arguments;
+use crate::cli::command::step::{Argument, Arguments, Location};
 use crate::cli::ports::{Invocation, Ports, Text};
+use grammar_output::Parsed;
 
 #[derive(Debug)]
 pub(in super::super) struct Tested {
@@ -22,6 +23,14 @@ pub(in super::super) enum Reaching {
     ConsumedBy,
 }
 
+impl Argument for Reaching {
+    type Value = Reaching;
+
+    fn read(word: OsString) -> Result<Reaching, Failure<'static>> {
+        word.to_str().ok_or(Failure::Usage)?.parse::<Reaching>().map_err(|_unreached| Failure::Usage)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(in super::super) enum Reach {
     Changed,
@@ -29,10 +38,13 @@ pub(in super::super) enum Reach {
 }
 
 impl Reach {
-    pub(in super::super) fn taken(reaching: Reaching, arguments: &mut Arguments) -> Result<Reach, Failure<'static>> {
+    pub(in super::super) fn taken(
+        reaching: Reaching,
+        arguments: Arguments,
+    ) -> Result<Parsed<Reach, Arguments>, Failure<'static>> {
         match reaching {
-            Reaching::Changed => Ok(Reach::Changed),
-            Reaching::ConsumedBy => Ok(Reach::ConsumedBy(PathBuf::from(arguments.taken()?))),
+            Reaching::Changed => Ok(Parsed::new(Reach::Changed, arguments)),
+            Reaching::ConsumedBy => arguments.field::<Location>().map(|read| read.map(Reach::ConsumedBy)),
         }
     }
 

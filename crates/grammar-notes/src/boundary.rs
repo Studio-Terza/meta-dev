@@ -3,6 +3,7 @@ use std::fmt;
 use std::iter;
 
 use grammar::logos::Logos;
+use grammar::{Ignoring, Unlexed};
 use newtype::{Arbitrary, Display, Newtype};
 
 use super::{Cite, Date, Ending, Quote, Unclosed};
@@ -76,8 +77,6 @@ enum Lexeme {
 
 pub trait Reading {
     type Output;
-
-    fn layout(self, line: &Line) -> Self::Output;
 
     fn entry(self, line: &Line, entry: &Entry, marking: Marking) -> Self::Output;
 }
@@ -249,11 +248,11 @@ impl Line {
         self.number
     }
 
-    pub fn read_by<Reader: Reading>(&self, reader: Reader) -> Reader::Output {
+    pub fn read_by<Reader: Reading>(&self, reader: Reader) -> Option<Reader::Output> {
         match &self.form {
-            Form::Layout(_) => reader.layout(self),
-            Form::Content(Content::Heading(entry)) => reader.entry(self, entry, Marking::Heading),
-            Form::Content(Content::Entry(entry)) => reader.entry(self, entry, entry.kind.marking()),
+            Form::Layout(_) => None,
+            Form::Content(Content::Heading(entry)) => Some(reader.entry(self, entry, Marking::Heading)),
+            Form::Content(Content::Entry(entry)) => Some(reader.entry(self, entry, entry.kind.marking())),
         }
     }
 }
@@ -271,7 +270,10 @@ impl Content {
     fn read(text: &str) -> Content {
         let lexed: Vec<Lexed<'_>> = Lexeme::lexer(text)
             .spanned()
-            .map(|(lexeme, range)| Lexed { lexeme: lexeme.ok(), text: text.get(range).unwrap_or_default() })
+            .map(|(lexeme, range)| Lexed {
+                lexeme: lexeme.ignoring(Unlexed::NotThisGrammar),
+                text: text.get(range).unwrap_or_default(),
+            })
             .collect();
         lexed.first().map_or(Opening::Prose, |first| first.opening()).content(&lexed)
     }
@@ -430,9 +432,11 @@ impl Piece {
     fn read(lexed: Lexed<'_>) -> Piece {
         match lexed.lexeme {
             Some(Lexeme::Cite) => Piece::Cited(Cite::new(lexed.text.to_owned())),
-            Some(Lexeme::Marker(Marker::Date)) => {
-                lexed.text.parse::<Date>().map_or_else(|_unspelled| Piece::Text(lexed.text.to_owned()), Piece::Dated)
-            }
+            Some(Lexeme::Marker(Marker::Date)) => lexed
+                .text
+                .parse::<Date>()
+                .ignoring(Unlexed::NotThisGrammar)
+                .map_or_else(|| Piece::Text(lexed.text.to_owned()), Piece::Dated),
             Some(
                 Lexeme::Hash
                 | Lexeme::Marker(

@@ -3,6 +3,7 @@
 #[path = "generated/laws.rs"]
 mod generated_laws;
 
+use grammar::{Ignoring, Unlexed};
 use grammar_notes::{Date, Ending, Entry, Line, Marking, Notes, Quote, Reading, Unclosed};
 use laws::proptest::collection::vec;
 use laws::proptest::prelude::{Strategy, any, prop_assert_eq, prop_oneof};
@@ -31,7 +32,7 @@ laws::law!(
     quote,
     {
         let line = format!("RULING (owner): \"{quote}\", as said");
-        prop_assert_eq!(Line::read(1, &line).read_by(Named), Ok([vec![quote], vec![], vec![]]));
+        prop_assert_eq!(Line::read(1, &line).named(), Ok([vec![quote], vec![], vec![]]));
     }
 );
 
@@ -54,8 +55,8 @@ laws::law!(
     {
         let ((opening, kind), quote, after) = said;
         let line = Line::read(1, &format!("{opening}(owner, 0a1b2c3d): \"{quote}\"{after}"));
-        prop_assert_eq!(line.read_by(Shaped), kind);
-        prop_assert_eq!(line.read_by(Named), Ok([vec![quote], vec!["0a1b2c3d".to_owned()], vec![]]));
+        prop_assert_eq!(line.shaped(), kind);
+        prop_assert_eq!(line.named(), Ok([vec![quote], vec!["0a1b2c3d".to_owned()], vec![]]));
     }
 );
 
@@ -74,8 +75,8 @@ laws::law!(
         let (bullet, day, clock, (word, kind)) = said;
         let text = format!("{bullet}{day}{clock} {word} (owner): \"yes\"");
         let line = Line::read(1, &text);
-        prop_assert_eq!(line.read_by(Shaped), kind);
-        prop_assert_eq!(line.read_by(Named), Ok([vec!["yes".to_owned()], vec![], vec![day]]));
+        prop_assert_eq!(line.shaped(), kind);
+        prop_assert_eq!(line.named(), Ok([vec!["yes".to_owned()], vec![], vec![day]]));
         prop_assert_eq!(line.to_string(), text);
     }
 );
@@ -123,7 +124,7 @@ laws::law!(
     {
         let (markup, (word, kind)) = said;
         let line = Line::read(1, &format!("{} {word} (owner): x", markup.concat()));
-        prop_assert_eq!(line.read_by(Shaped), kind);
+        prop_assert_eq!(line.shaped(), kind);
     }
 );
 
@@ -138,7 +139,7 @@ laws::law!(
     {
         let (before, opener, after) = said;
         let line = Line::read(1, &format!("{} {opener}{} RULING (owner): \"yes\"", before.concat(), after.concat()));
-        prop_assert_eq!(line.read_by(Shaped), "remark");
+        prop_assert_eq!(line.shaped(), "remark");
     }
 );
 
@@ -149,7 +150,7 @@ laws::law!(
     {
         let (before, number, after) = said;
         let line = Line::read(1, &format!("{} {number} {} RULING (owner): \"yes\"", before.concat(), after.concat()));
-        prop_assert_eq!(line.read_by(Shaped), "remark");
+        prop_assert_eq!(line.shaped(), "remark");
     }
 );
 
@@ -160,8 +161,8 @@ laws::law!(
     {
         let (before, after) = said;
         let line = Line::read(1, &format!("RULING:{before} '0a1b2c3d' on '2026-11-05'{after}"));
-        prop_assert_eq!(line.read_by(Shaped), "ruling");
-        prop_assert_eq!(line.read_by(Named), Ok([vec![], vec!["0a1b2c3d".to_owned()], vec!["2026-11-05".to_owned()]]));
+        prop_assert_eq!(line.shaped(), "ruling");
+        prop_assert_eq!(line.named(), Ok([vec![], vec!["0a1b2c3d".to_owned()], vec!["2026-11-05".to_owned()]]));
     }
 );
 
@@ -180,8 +181,8 @@ laws::law!(
         let words: String = said.iter().flat_map(|(word, cite, after)| [" ", word, " ", cite, after]).collect();
         let cites: Vec<String> = said.into_iter().map(|(_word, cite, _after)| cite).collect();
         let line = Line::read(1, &format!("RULING (owner):{words}"));
-        prop_assert_eq!(line.read_by(Shaped), "ruling");
-        prop_assert_eq!(line.read_by(Named), Ok([vec![], cites, vec![]]));
+        prop_assert_eq!(line.shaped(), "ruling");
+        prop_assert_eq!(line.named(), Ok([vec![], cites, vec![]]));
     }
 );
 
@@ -207,22 +208,34 @@ laws::law!(
         let content = notes
             .lines()
             .iter()
-            .filter(|line| line.read_by(Shaped) != "layout")
+            .filter(|line| line.shaped() != "layout")
             .map(|line| Line::read(line.number(), &line.to_string()))
             .collect::<Vec<Line>>();
         prop_assert_eq!(Notes::gathered(content, ending).to_string(), laid);
     }
 );
 
+trait Reads {
+    fn shaped(&self) -> &'static str;
+
+    fn named(&self) -> Said;
+}
+
+impl Reads for Line {
+    fn shaped(&self) -> &'static str {
+        self.read_by(Shaped).unwrap_or("layout")
+    }
+
+    fn named(&self) -> Said {
+        self.read_by(Named).unwrap_or_else(|| Ok(<[Vec<String>; 3]>::default()))
+    }
+}
+
 #[derive(Clone, Copy)]
 struct Shaped;
 
 impl Reading for Shaped {
     type Output = &'static str;
-
-    fn layout(self, _line: &Line) -> &'static str {
-        "layout"
-    }
 
     fn entry(self, _line: &Line, _entry: &Entry, marking: Marking) -> &'static str {
         match marking {
@@ -256,10 +269,6 @@ impl Named {
 impl Reading for Named {
     type Output = Said;
 
-    fn layout(self, _line: &Line) -> Said {
-        Ok(<[Vec<String>; 3]>::default())
-    }
-
     fn entry(self, _line: &Line, entry: &Entry, _standing: Marking) -> Said {
         Named::words(entry)
     }
@@ -267,7 +276,7 @@ impl Reading for Named {
 
 laws::table!(
     a_notes_line_is_layout_a_heading_or_an_entry_whose_kind_is_its_first_alphabetic_word,
-    |text: &&str| Line::read(1, text).read_by(Shaped),
+    |text: &&str| Line::read(1, text).shaped(),
     [
         "" => "layout",
         "  \t" => "layout",
@@ -351,7 +360,7 @@ laws::table!(
 
 laws::table!(
     an_entry_names_its_quotes_cites_and_dates,
-    |text: &&str| Line::read(1, text).read_by(Named),
+    |text: &&str| Line::read(1, text).named(),
     [
         "RULING (owner, explicit, 2026-11-05): \"the new trellis is approved.\" (approved)" => Ok([
             vec!["the new trellis is approved.".to_owned()],
@@ -399,7 +408,7 @@ laws::table!(
     a_single_quote_never_swallows_a_cite_or_date_after_its_close,
     |text: &&str| {
         let line = Line::read(1, text);
-        (line.read_by(Shaped), line.read_by(Named))
+        (line.shaped(), line.named())
     },
     [
         "RULING 'ship it' (0a1b2c3d), the owners' call" => ("ruling", Ok([vec![], vec!["0a1b2c3d".to_owned()], vec![]])),
@@ -434,7 +443,7 @@ laws::table!(
     a_carriage_return_blank_line_is_layout,
     |text: &&str| {
         let notes = Notes::read(text);
-        (notes.lines().iter().map(|line| line.read_by(Shaped)).collect::<Vec<&str>>(), notes.to_string() == *text)
+        (notes.lines().iter().map(Reads::shaped).collect::<Vec<&str>>(), notes.to_string() == *text)
     },
     [
         "# Notes\r\n\r\n  \r\n\t\r\nRULING (owner, 0a1b2c3d): kept\r\n" => (
@@ -479,7 +488,7 @@ laws::table!(
 
 laws::table!(
     a_date_is_exactly_four_digits_then_two_then_two_joined_by_dashes,
-    |day: &&str| Date::try_new((*day).to_owned()).ok().map(Date::into_inner),
+    |day: &&str| Date::try_new((*day).to_owned()).ignoring(Unlexed::NotThisGrammar).map(Date::into_inner),
     [
         "2026-11-05" => Some("2026-11-05".to_owned()),
         "" => None,
@@ -495,7 +504,7 @@ laws::table!(
 
 laws::table!(
     a_date_parses_from_text_only_when_it_is_spelled_as_one,
-    |day: &&str| day.parse::<Date>().ok().map(|date| date.to_string()),
+    |day: &&str| day.parse::<Date>().ignoring(Unlexed::NotThisGrammar).map(|date| date.to_string()),
     [
         "1999-12-31" => Some("1999-12-31".to_owned()),
         "1999-12" => None,
@@ -508,13 +517,13 @@ laws::roundtrip!(
     a_date_is_displayed_and_parsed_back,
     any::<Date>(),
     |date: &Date| date.to_string(),
-    |text: &String| text.parse::<Date>().ok().map(|date| date.to_string()),
+    |text: &String| text.parse::<Date>().ignoring(Unlexed::NotThisGrammar).map(|date| date.to_string()),
     |date: Date| Some(date.to_string())
 );
 
 laws::table!(
     a_date_is_any_year_month_day_wherever_it_stands_and_whatever_follows_it,
-    |text: &&str| Line::read(1, text).read_by(Named),
+    |text: &&str| Line::read(1, text).named(),
     [
         "ruled 2026-11-05\"rain delay\" (0a1b2c3d)" => Ok([
             vec!["rain delay".to_owned()],

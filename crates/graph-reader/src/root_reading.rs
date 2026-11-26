@@ -6,7 +6,9 @@ use syntax::{File, Item, ItemMod};
 use graph::{CrateExports, CrateRoots, Implementation, Model, Origin, Root};
 use lint_layout::{CrateSource, Crates, Dependencies, Name, PackageName};
 
+use crate::ignored::Ignored;
 use crate::namespace::{Entries, Visibility};
+use invariants::Ignoring;
 
 #[derive(Debug)]
 pub(crate) struct RootReading;
@@ -52,7 +54,10 @@ impl RootFile {
     }
 
     fn parsed(source: &CrateSource) -> Option<Root> {
-        let exports = Self::exports(&syntax::parse::parse_file(source.root().as_ref()).ok()?, source.dependencies());
+        let exports = Self::exports(
+            &syntax::parse::parse_file(source.root().as_ref()).ignoring(Ignored::Unparsed)?,
+            source.dependencies(),
+        );
         Some(Root::formed(source.form(), exports))
     }
 

@@ -67,7 +67,7 @@ enum Naming {
 
 impl Naming {
     fn erased_by(equivalence: Equivalence) -> Naming {
-        equivalence.erases(Erased::Names).map_or(Naming::Local, |_| Naming::Every)
+        equivalence.unerased(Erased::Names, Naming::Local).unwrap_or(Naming::Every)
     }
 }
 
@@ -88,9 +88,9 @@ struct Template {
 
 impl fmt::Display for Template {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.holes.none() {
-            Some(_) => write!(formatter, "identical up to {}", self.naming),
-            None => write!(formatter, "differing literals: {}", self.holes),
+        match self.holes.differing() {
+            Some(differing) => write!(formatter, "differing literals: {differing}"),
+            None => write!(formatter, "identical up to {}", self.naming),
         }
     }
 }

@@ -1,7 +1,7 @@
 mod reading;
 
 use syntax::TokenStream;
-use syntax::{Data, DataStruct, DeriveInput, Error, Fields, Ident};
+use syntax::{Data, DataStruct, DeriveInput, Error, Fields, Ident, Type};
 use syntax::{format_ident, quote};
 
 use reading::Reading;
@@ -9,6 +9,7 @@ use reading::Reading;
 #[derive(Debug)]
 pub struct Record {
     ident: Ident,
+    source: Type,
     readings: Vec<Reading>,
 }
 
@@ -22,13 +23,38 @@ impl TryFrom<DeriveInput> for Record {
         let named = Record::named(&input.data)
             .ok_or_else(|| Error::new_spanned(&input.ident, "a record is a struct with named fields"))?;
         let readings = named.iter().map(Reading::declared).collect::<syntax::Result<Vec<Reading>>>()?;
-        Ok(Record { ident: input.ident, readings })
+        let declared = input.attrs.iter().find(|attribute| attribute.path().is_ident("record"));
+        let source = declared.map_or_else(
+            || Ok(syntax::parse::parse_quote!(::grammar_output::Fields)),
+            |attribute| Sourced::try_from(attribute).map(|sourced| sourced.source),
+        )?;
+        Ok(Record { ident: input.ident, source, readings })
     }
 }
 
 impl From<&Record> for TokenStream {
     fn from(record: &Record) -> TokenStream {
         record.generated()
+    }
+}
+
+#[derive(Debug)]
+struct Sourced {
+    source: Type,
+}
+
+impl TryFrom<&syntax::Attribute> for Sourced {
+    type Error = Error;
+
+    fn try_from(attribute: &syntax::Attribute) -> syntax::Result<Sourced> {
+        attribute.parse_args_with(|input: syntax::parse::ParseStream| {
+            let key: Ident = input.parse()?;
+            Some(())
+                .filter(|()| key == "source")
+                .ok_or_else(|| Error::new_spanned(&key, "the only option is source = Type"))?;
+            input.parse::<syntax::Token![=]>()?;
+            Ok(Sourced { source: input.parse()? })
+        })
     }
 }
 
@@ -50,16 +76,17 @@ impl Record {
         let start = stages.first();
         let fields: Vec<&Ident> = self.readings.iter().map(Reading::ident).collect();
         let advances = self.readings.iter().map(|_| quote!(.step()?));
+        let source = &self.source;
         quote! {
             const _: () = {
                 #(#declarations)*
                 #(#steps)*
-                impl ::grammar_output::Record for #name {
+                impl ::grammar_output::Record<#source> for #name {
                     fn read(
-                        fields: ::grammar_output::Fields,
+                        fields: #source,
                     ) -> ::core::result::Result<
-                        ::grammar_output::Parsed<Self, ::grammar_output::Fields>,
-                        ::grammar_output::Unread,
+                        ::grammar_output::Parsed<Self, #source>,
+                        <#source as ::grammar_output::Source>::Unread,
                     > {
                         let __last = #start { __fields: fields } #(#advances)*;
                         ::core::result::Result::Ok(::grammar_output::Parsed::new(
@@ -76,19 +103,21 @@ impl Record {
         let held = self.readings.iter().take(stage);
         let names = held.clone().map(Reading::ident);
         let types = held.map(Reading::field_type);
+        let source = &self.source;
         quote! {
             struct #ident {
                 #(#names: #types,)*
-                __fields: ::grammar_output::Fields,
+                __fields: #source,
             }
         }
     }
 
     fn step(&self, from: &Ident, into: &Ident, stage: usize, reading: &Reading) -> TokenStream {
         let stepped = reading.stepped(into, self.readings.iter().take(stage).map(Reading::ident));
+        let source = &self.source;
         quote! {
             impl #from {
-                fn step(self) -> ::core::result::Result<#into, ::grammar_output::Unread> {
+                fn step(self) -> ::core::result::Result<#into, <#source as ::grammar_output::Source>::Unread> {
                     #stepped
                 }
             }

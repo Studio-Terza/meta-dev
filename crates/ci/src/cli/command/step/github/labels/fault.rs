@@ -20,8 +20,8 @@ impl<'change> Owed<'change> {
         Owed { fault, failing }
     }
 
-    pub(crate) fn outstanding(&self) -> Option<&Owed<'change>> {
-        self.failing.first().map(|_| self)
+    pub(crate) fn outstanding(&self) -> Option<&'change Change> {
+        self.failing.first().copied()
     }
 }
 

@@ -2,7 +2,6 @@ use std::iter::Sum;
 
 use syntax::{UseLeaf, UseTree, Visibility};
 
-use lint_core::Bound;
 use lint_core::Syntax;
 use lint_layout::Length;
 use newtype::Display;
@@ -20,15 +19,14 @@ impl ReexportCount {
             .sum()
     }
 
-    pub fn beyond(self, most: Bound) -> Option<ReexportCount> {
-        match most.allows(Length::new(self.0)) {
-            Some(_) => None,
-            None => Some(self),
-        }
-    }
-
     fn leaves(tree: &UseTree) -> ReexportCount {
         ReexportCount(UseLeaf::of_tree(tree).len())
+    }
+}
+
+impl From<ReexportCount> for Length {
+    fn from(count: ReexportCount) -> Length {
+        Length::new(count.0)
     }
 }
 

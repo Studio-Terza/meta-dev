@@ -9,8 +9,10 @@ use lint_layout::Name;
 use newtype::Newtype;
 
 use super::{LoweredOperation, LoweredOwner, LoweredRoute};
+use crate::ignored::Ignored;
 use crate::lowering::signature::InScope;
 use closure::Closure;
+use invariants::Ignoring;
 
 #[derive(Newtype, Clone, Copy, Debug)]
 pub(super) struct Reading<'scope> {
@@ -38,7 +40,10 @@ impl Reading<'_> {
     const CHECKED_FROM: usize = 2;
 
     pub(super) fn routes(self, invocation: &Macro, kind: LawKind) -> Vec<LoweredRoute> {
-        let arguments = invocation.parse_body_with(Punctuated::<Expr, Token![,]>::parse_terminated).unwrap_or_default();
+        let arguments = invocation
+            .parse_body_with(Punctuated::<Expr, Token![,]>::parse_terminated)
+            .ignoring(Ignored::Unparsed)
+            .unwrap_or_default();
         let generated =
             arguments.iter().nth(Self::GENERATOR).and_then(|found| Generator { scope: self.scope }.operand(found));
         arguments

@@ -17,6 +17,7 @@ syntax = { path = "../syntax" }
 syntax-lexer = { path = "../syntax-lexer" }
 
 [dev-dependencies]
+invariants = { path = "../invariants" }
 laws = { path = "../laws" }
 
 [lints]

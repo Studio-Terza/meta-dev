@@ -100,13 +100,13 @@ impl<'found> WorkspaceTypes<'found> {
         let resolved = declaring.map(|crates| Node::resolved(crates, from, name));
         resolved.map_or(End::placed(Place::External, name), |found| {
             found
-                .and_then(|node| self.unambiguous(node))
+                .filter(|node| self.ambiguity(node).is_none())
                 .map_or(End::placed(Place::Shared, name), |node| End::domain(node, endpoint.arguments()))
         })
     }
 
-    fn unambiguous(&self, node: Node<'found>) -> Option<Node<'found>> {
+    fn ambiguity(&self, node: &Node<'found>) -> Option<&'found Name> {
         let twice = self.ambiguous.get(node.krate());
-        twice.and_then(|names| names.get(AsRef::<Name>::as_ref(&node))).map_or(Some(node), |_| None)
+        twice.and_then(|names| names.get(AsRef::<Name>::as_ref(node))).copied()
     }
 }

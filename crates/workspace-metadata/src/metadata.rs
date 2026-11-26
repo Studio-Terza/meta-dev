@@ -122,8 +122,9 @@ impl Metadata {
         self.packages
             .iter()
             .filter(|package| package.package_id().and_then(|id| members.get(id)).is_some())
-            .filter_map(|package| package.test_support(&shipped))
+            .filter(|package| package.binary().is_none())
             .map(AsRef::<CrateName>::as_ref)
+            .filter_map(|name| shipped.get(name).map_or(Some(name), |_| None))
             .collect()
     }
 

@@ -12,7 +12,10 @@ use std::time::Duration;
 use ci::Cli;
 use ci::ports::{Exit, Invocation, Ports, Run, Tee};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
+use ignored::{Ignored, Invariant};
+use invariants::{Ignoring, invariant};
 
+mod ignored;
 mod incremental;
 
 const METADATA: &str = include_str!("../../../reach/tests/metadata/workspace.json");
@@ -252,7 +255,7 @@ impl Sample {
 
     fn libtest_line(output: &&str) -> Recorded {
         let scratch = Scratch::fresh();
-        scratch.write("out.txt", output).ok();
+        scratch.write("out.txt", output).ignoring(Ignored::Unseeded);
         let answer = scratch.answer(
             &Script::new(),
             &["libtest-seconds", &scratch.file("m.toml"), "test-run", &scratch.file("out.txt")],
@@ -1432,7 +1435,9 @@ impl Exits {
             });
         let arguments =
             ["mutants-changed", &scratch.file("d.diff"), &scratch.file("out"), "3/8", "--test-package=leaf"];
-        seeded.map_or(ExitCode::from(u8::MAX), |()| scratch.answer(&Script::exiting(code.0), &arguments).exit)
+        seeded
+            .ignoring(Ignored::Unseeded)
+            .map_or(ExitCode::from(u8::MAX), |()| scratch.answer(&Script::exiting(code.0), &arguments).exit)
     }
 }
 
@@ -2611,7 +2616,7 @@ impl Scratch {
     }
 
     fn fresh() -> Scratch {
-        Scratch::new().unwrap_or_else(|_| unreachable!("an empty memory takes a directory"))
+        invariant!(holding Scratch::new(), Invariant::MemoryTakesADirectory, detailed)
     }
 
     fn answer<Argument: AsRef<str>>(&self, script: &Script, arguments: &[Argument]) -> Answer {
@@ -2632,7 +2637,7 @@ impl Scratch {
     }
 
     fn read(&self, name: &str) -> String {
-        self.files.read_text(&self.root.join(name)).map_or_default(|text| text.to_string())
+        self.files.read_text(&self.root.join(name)).ignoring(Ignored::Unread).map_or_default(|text| text.to_string())
     }
 
     fn write(&self, name: &str, text: &str) -> Result<(), FileFailure> {

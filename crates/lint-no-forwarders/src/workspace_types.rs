@@ -17,7 +17,7 @@ pub struct TypeGathering {
 
 impl From<&SourceFile> for TypeGathering {
     fn from(file: &SourceFile) -> TypeGathering {
-        let kinds = file.shipped().map_or(&[][..], |_| &[Kind::ItemStruct, Kind::ItemEnum, Kind::ItemTrait][..]);
+        let kinds = file.head().shipped().map_or(&[][..], |_| &[Kind::ItemStruct, Kind::ItemEnum, Kind::ItemTrait][..]);
         TypeGathering { kinds }
     }
 }

@@ -20,6 +20,7 @@ use filler::Filler;
 use method::Method;
 use names::{CallerName, FillerName, OpsName};
 use ops::Ops;
+use syntax::Compiled;
 
 pub trait Rendered {
     fn rendered(declared: &Declared) -> TokenStream;
@@ -52,7 +53,8 @@ impl Declared {
         syntax::parse::parse2::<Nothing>(attributes)
             .and_then(|Nothing| syntax::parse::parse2::<ItemTrait>(item))
             .map(Declared::parsed)
-            .map_or_else(|error| error.to_compile_error(), |declared| Self::expansion(&declared))
+            .map(|declared| Self::expansion(&declared))
+            .compiled()
     }
 
     pub fn expansion(&self) -> TokenStream {

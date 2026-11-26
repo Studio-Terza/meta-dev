@@ -6,11 +6,24 @@ use graph_reader::Reader;
 use std::ffi::OsString;
 
 use graph_query::{Query, QueryFailure, Role, Term};
+use invariants::{Ignoring, ignored, invariant, invariants};
 use lint_core::SourceFile;
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_layout::Name;
 use lint_transition_graph::{Extraction, Transitions, TypeSystem};
 use text_lines::Lines;
+
+invariants! {
+    enum Invariant {
+        QueryReads => "each query the tests ask is well formed, so it reads",
+    }
+}
+
+ignored! {
+    enum Ignored {
+        Refused => "a role text that does not parse is the None the row expects",
+    }
+}
 
 const SEARCH: &str = "pub trait Index {\n    fn insert(&mut self, item: Item);\n    fn search(&self, query: &Query) -> Vec<Hit>;\n}\npub struct TextIndex;\nimpl Index for TextIndex {\n    fn insert(&mut self, item: Item) {}\n    fn search(&self, query: &Query) -> Vec<Hit> {}\n}\npub struct Plain;\nimpl Plain {\n    pub fn search_text(&self) {}\n}\nimpl<T: Index> Lookup for T {\n    fn find(&self, query: &Query) -> Vec<Hit> {}\n}\nmod store {\n    pub struct Records;\n    impl Records {\n        pub fn insert(&mut self, record: Record) {}\n        pub fn all(&self) -> Vec<Record> {}\n    }\n}\nimpl<T> Holder<T> {\n    pub fn get(&self) -> Option<T> {}\n}\n";
 const FILES: &str = "pub trait Files {\n    fn read(&self, path: &Path) -> Result<Contents, Failure>;\n}\npub struct Disk;\nimpl Files for Disk {\n    fn read(&self, path: &Path) -> Result<Contents, Failure> {}\n}\n";
@@ -90,7 +103,7 @@ impl Asked {
         let model = Reader::read_files(&files);
         let transitions = Transitions::from(&model);
         let system = TypeSystem::built_from(&extraction, &transitions);
-        let query = Self::query(words).unwrap_or_else(|failure| unreachable!("the query reads: {failure}"));
+        let query = invariant!(holding Self::query(words), Invariant::QueryReads, detailed);
         query.reply(&system).to_string().parse::<Lines>().into_iter().flatten().collect()
     }
 
@@ -98,7 +111,7 @@ impl Asked {
         let files = Self::tree();
         let model = Reader::read_files(&files);
         let transitions = Transitions::from(&model);
-        let query = Self::query(words).unwrap_or_else(|failure| unreachable!("the query reads: {failure}"));
+        let query = invariant!(holding Self::query(words), Invariant::QueryReads, detailed);
         query.matches(&transitions).to_string().parse::<Lines>().into_iter().flatten().collect()
     }
 }
@@ -177,7 +190,7 @@ fn a_role_agrees_on_receiver_arity_self_arguments_and_return_shape() {
 
 laws::table!(
     a_role_reads_through_references_parentheses_tuples_sequences_and_iterators,
-    |text: &&str| text.parse::<Role>().map(|parsed| AsRef::<MethodShape>::as_ref(&parsed).to_string()).ok(),
+    |text: &&str| text.parse::<Role>().map(|parsed| AsRef::<MethodShape>::as_ref(&parsed).to_string()).ignoring(Ignored::Refused),
     [
         "fn f(other: (Self)) -> (Self)" => Some("fn(Self) -> Self".to_owned()),
         "fn f() -> &Self" => Some("fn() -> Self".to_owned()),
@@ -343,7 +356,7 @@ fn crate_sizes_count_files_and_lines_and_place_each_crate_on_the_compile_chain()
         Source::new(Located::new("crates/shop/src/till.rs"), Text::new("pub struct Line;\npub struct Till;\n")),
         Source::new(Located::new("crates/bank/src/lib.rs"), Text::new("pub struct Ledger;\n")),
     ]);
-    let query = Asked::query(&["--crates"]).unwrap_or_else(|failure| unreachable!("the query reads: {failure}"));
+    let query = invariant!(holding Asked::query(&["--crates"]), Invariant::QueryReads, detailed);
     let answer = query.answered(&files, std::slice::from_ref(&metadata)).to_string();
     assert_eq!(
         answer.parse::<Lines>().into_iter().flatten().collect::<Vec<String>>(),
@@ -368,8 +381,7 @@ fn a_method_naming_its_own_type_is_shaped_as_taking_and_giving_itself() {
     let files = Sources::parsed(&CART);
     let model = Reader::read_files(&files);
     let transitions = Transitions::from(&model);
-    let query = Asked::query(&["--role", "fn combine(&self, other: Self) -> Self"])
-        .unwrap_or_else(|failure| unreachable!("the query reads: {failure}"));
+    let query = invariant!(holding Asked::query(&["--role", "fn combine(&self, other: Self) -> Self"]), Invariant::QueryReads, detailed);
     let found: Vec<String> = query.matches(&transitions).to_string().parse::<Lines>().into_iter().flatten().collect();
     assert_eq!(
         found,
@@ -393,8 +405,7 @@ const FACADE: [Source; 4] = [
 #[test]
 fn a_test_file_consumes_the_crate_that_declares_what_it_names_through_a_re_export() {
     let files = Sources::parsed(&FACADE);
-    let query = Asked::query(&["--consumed-by", "crates/facade/tests/behaviour.rs"])
-        .unwrap_or_else(|failure| unreachable!("the query reads: {failure}"));
+    let query = invariant!(holding Asked::query(&["--consumed-by", "crates/facade/tests/behaviour.rs"]), Invariant::QueryReads, detailed);
     let answered = query.answered(&files, &[]).to_string();
     let roots: Vec<String> = answered.parse::<Lines>().into_iter().flatten().collect();
     assert_eq!(roots, ["crates/inner/src/lib.rs"]);
@@ -402,9 +413,9 @@ fn a_test_file_consumes_the_crate_that_declares_what_it_names_through_a_re_expor
 
 laws::table!(
     a_consumer_flag_needs_a_file,
-    |words: &&[&str]| Asked::query(words).err(),
+    |words: &&[&str]| Asked::query(words).map(drop),
     [
-        &["--consumed-by"][..] => Some(QueryFailure::Unfinished),
-        &["--consumed-by", "a.rs"][..] => None,
+        &["--consumed-by"][..] => Err(QueryFailure::Unfinished),
+        &["--consumed-by", "a.rs"][..] => Ok(()),
     ]
 );

@@ -1,3 +1,4 @@
+use syntax::Compiled;
 use syntax::TokenStream;
 use syntax::parse::Parse;
 
@@ -10,8 +11,6 @@ pub struct Expanded;
 
 impl Expanded {
     pub fn parsed<Input: Expanding>(tokens: TokenStream) -> TokenStream {
-        syntax::parse::parse2::<Input>(tokens)
-            .and_then(Input::expansion)
-            .unwrap_or_else(|error| error.to_compile_error())
+        syntax::parse::parse2::<Input>(tokens).and_then(Input::expansion).compiled()
     }
 }
