@@ -45,7 +45,7 @@ pub struct Joined<Head, Tail> {
 pub struct Unjoined;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Alive(u128);
+pub struct Alive(u64);
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Entered {

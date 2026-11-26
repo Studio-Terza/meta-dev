@@ -104,6 +104,10 @@ const JOINED: &str = "fn f() {\n    {\n        let a = 1 + 2;\n        m!({ 3 + 
 #[derive(Debug)]
 struct Positions;
 
+impl Positions {
+    const SCOPES: [Scope; 1] = [Scope::new(Kind::Ident)];
+}
+
 impl Contribute for Positions {
     type Open = ();
     type Part = Vec<String>;
@@ -112,8 +116,16 @@ impl Contribute for Positions {
         &[Kind::Block, Kind::ExprBinary, Kind::Macro, Kind::Ident]
     }
 
+    fn scopes(&self) -> &'static [Scope] {
+        &Positions::SCOPES
+    }
+
     fn on_ident(&self, _: &Ident, name: &Name, around: &Around<'_, ()>) -> Contributed<(), Vec<String>> {
         Contributed::parted(vec![format!("{name} at {:?}", around.position())])
+    }
+
+    fn off_ident(&self, found: &Ident, inner: Contribution<(), Vec<String>>) -> Vec<String> {
+        inner.concluded(|(), heard| heard.into_iter().chain([format!("left {found}")]).collect())
     }
 
     fn on_block(&self, _: &Block, _: &Facts<'_, Block>, around: &Around<'_, ()>) -> Contributed<(), Vec<String>> {
