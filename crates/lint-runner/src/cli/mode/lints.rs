@@ -15,7 +15,6 @@ use lint_sweep::{Found, Founds, Gathers, Joined, Joint, Unjoined};
 use timer_ports::Timer;
 
 use lint_bool_methods::BoolMethods;
-use lint_enum_predicates::EnumPredicates;
 use lint_expression_flow::ExpressionFlow;
 use lint_manual_iteration::ManualIteration;
 use lint_named_lifetimes::NamedLifetimes;
@@ -80,7 +79,6 @@ type Registry = registry![
     Swept<NoFreeFns>,
     Swept<VecOutParams>,
     Swept<NamedLifetimes>,
-    Judged<EnumPredicates>,
     Swept<TypeShape>,
     Swept<ExpressionFlow>,
     Swept<ManualIteration>,

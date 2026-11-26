@@ -574,19 +574,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lint-enum-predicates"
-version = "0.1.0"
-dependencies = [
- "lint-core",
- "lint-file",
- "lint-fixtures",
- "lint-layout",
- "lint-placement",
- "lint-sweep",
- "syntax",
-]
-
-[[package]]
 name = "lint-expression-flow"
 version = "0.1.0"
 dependencies = [
@@ -795,7 +782,6 @@ dependencies = [
  "invariants",
  "lint-bool-methods",
  "lint-core",
- "lint-enum-predicates",
  "lint-expression-flow",
  "lint-file",
  "lint-fixtures",

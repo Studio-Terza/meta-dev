@@ -20,7 +20,6 @@ lint-file = { path = "../lint-file" }
 lint-reader = { path = "../lint-reader" }
 lint-layout = { path = "../lint-layout" }
 lint-bool-methods = { path = "../lint-bool-methods" }
-lint-enum-predicates = { path = "../lint-enum-predicates" }
 lint-expression-flow = { path = "../lint-expression-flow" }
 lint-manual-iteration = { path = "../lint-manual-iteration" }
 lint-named-lifetimes = { path = "../lint-named-lifetimes" }

@@ -1,7 +1,6 @@
 use super::gathering::Gathering;
 use lint_core::SourceFile;
 use lint_core::{Parsed, Unwalked};
-use lint_enum_predicates::EnumPredicates;
 use lint_file::ContextLint;
 use lint_no_test_only_api::NoTestOnlyApi;
 use lint_public_api_tests::PublicApiTests;
@@ -73,7 +72,6 @@ macro_rules! contexts {
 
 contexts! {
     public_surface: PublicSurface,
-    enum_predicates: EnumPredicates,
     public_api_tests: PublicApiTests,
     no_test_only_api: NoTestOnlyApi,
 }
