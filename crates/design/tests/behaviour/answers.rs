@@ -121,7 +121,7 @@ impl Tasked {
 
     fn placed(asking: &Asking, name: &str, text: &str, [born, touched]: [i64; 2]) -> Result<(), laws::Unmet> {
         let path = Path::new(Tasked::FOLDER).join(name);
-        asking.files.create_directories(Path::new(Tasked::FOLDER))?;
+        asking.files.create_directories(path.parent().unwrap_or(Path::new(Tasked::FOLDER)))?;
         asking.files.write(&path, Bytes::from(text))?;
         let ago = |minutes: i64| Epoch::new(Tasked::NOW - minutes * Tasked::MINUTE);
         asking.files.stamped(&path, Stamps::new(ago(born), ago(touched)));
@@ -291,6 +291,21 @@ fn a_stop_while_an_agent_works_is_not_stalled_whether_it_waits_on_a_tool_result_
         assert_eq!(trail, ["s\t0\t1\tlive\t2\t0\t0\tpassed\t37\t0"]);
         Ok::<(), laws::Unmet>(())
     })
+}
+
+#[test]
+fn a_stop_while_a_teammate_agent_works_is_not_stalled() -> Result<(), laws::Unmet> {
+    let asking = Asking::over(&[Asking::NONE])?;
+    Tasked::placed(
+        &asking,
+        "/home/tester/.claude/projects/-work/s/subagents/agent-a2.jsonl",
+        Tasked::CALLING,
+        [40, 2],
+    )?;
+    let Stop { asked, trail, .. } = Tasked::stopped(&asking)?;
+    assert_eq!(asked.outcome?, Outcome::Hooked(HookEvent::Stop));
+    assert_eq!(trail, ["s\t0\t1\tlive\t2\t0\t0\tpassed\t37\t0"]);
+    Ok(())
 }
 
 #[test]
