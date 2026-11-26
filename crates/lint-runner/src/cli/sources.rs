@@ -60,13 +60,7 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
         shared: &'run SharedRead<'run>,
         heads: &'run OnceLock<Vec<FileHead>>,
     ) -> Sources<'run, F, C, T> {
-        Sources {
-            wired,
-            staged,
-            shared,
-            located: OnceLock::new(),
-            gathering: Gathering::new(heads),
-        }
+        Sources { wired, staged, shared, located: OnceLock::new(), gathering: Gathering::new(heads) }
     }
 
     pub(crate) fn wired(&self) -> &'run Wired<'run, F, C, T> {

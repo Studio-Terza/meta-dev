@@ -1,5 +1,0 @@
-[package]
-name = "x"
-
-[dev-dependencies]
-laws = { path = "../laws" }

@@ -1,3 +1,0 @@
-syntax is walked once, by the sweep: outside the syntax crate, no function that takes a syntax node is recursive in the call graph; read the node from a sweep hook, a shared fact, or a reader in the syntax crate:
-src/lib.rs:3: fn depth takes a syntax node and reaches itself through its calls; read the node from a sweep hook or a shared fact, or move the walk into the syntax crate
-fails

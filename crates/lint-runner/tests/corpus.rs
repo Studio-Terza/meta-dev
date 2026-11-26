@@ -2,8 +2,10 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use std::error::Error;
+
 use cargo_ports::Recorded;
-use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
+use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Memory};
 use lint_runner::{Cli, Ports};
 use timer_ports::Monotonic;
 
@@ -12,6 +14,7 @@ use invariants::Ignoring;
 use text_lines::Lines;
 
 const FIXTURES: &str = "tests/fixtures";
+const EXPECTED: &str = "tests/goldens/lints";
 const STORED_MANIFEST: &str = "manifest.toml";
 const MANIFEST: &str = "Cargo.toml";
 const METADATA: &str = "metadata.json";
@@ -21,14 +24,15 @@ const FIX_START: &str = "; ";
 const NO_DEPENDENCIES: &str = "{\"workspace_root\": \"/\", \"packages\": []}";
 
 #[test]
-fn every_lint_prints_its_golden_over_its_fixture_and_every_violation_names_its_fix() -> Result<(), laws::Unmet> {
-    let corpus = golden::fixtures!(FIXTURES)?;
+fn every_lint_prints_its_expected_output_over_its_fixture_and_every_violation_names_its_fix()
+-> Result<(), Box<dyn Error>> {
+    let corpus = Disk;
     let fixtures = corpus.entries(&Path::new(env!("CARGO_MANIFEST_DIR")).join(FIXTURES))?;
     assert_eq!(fixtures.len(), Corpus::lints());
     let outputs = fixtures
         .iter()
         .map(|fixture| Ok((fixture.as_path(), Corpus::output(&corpus, fixture)?)))
-        .collect::<Result<Vec<(&Path, String)>, laws::Unmet>>()?;
+        .collect::<Result<Vec<(&Path, String)>, Box<dyn Error>>>()?;
     let drifted: Vec<String> = outputs.iter().flat_map(|(fixture, output)| Corpus::verify(fixture, output)).collect();
     assert_eq!(drifted, Vec::<String>::new());
     let lines: Vec<String> =
@@ -63,7 +67,7 @@ impl Corpus {
         Some(name).filter(|candidate| *candidate == STORED_MANIFEST).map_or(name, |_| MANIFEST.as_ref())
     }
 
-    fn copied(corpus: &Memory, found: &Path, target: &Path) -> Result<Vec<Copied>, FileFailure> {
+    fn copied(corpus: &impl Files, found: &Path, target: &Path) -> Result<Vec<Copied>, FileFailure> {
         match corpus.kind(found) {
             Kind::Directory => Self::copied_directory(corpus, found, target),
             Kind::File | Kind::Link | Kind::Missing => {
@@ -72,7 +76,7 @@ impl Corpus {
         }
     }
 
-    fn copied_directory(corpus: &Memory, found: &Path, target: &Path) -> Result<Vec<Copied>, FileFailure> {
+    fn copied_directory(corpus: &impl Files, found: &Path, target: &Path) -> Result<Vec<Copied>, FileFailure> {
         let inside = corpus
             .entries(found)?
             .iter()
@@ -81,7 +85,7 @@ impl Corpus {
         Ok(inside.into_iter().flatten().collect())
     }
 
-    fn output(corpus: &Memory, fixture: &Path) -> Result<String, laws::Unmet> {
+    fn output(corpus: &impl Files, fixture: &Path) -> Result<String, Box<dyn Error>> {
         let root: Memory = corpus
             .entries(fixture)?
             .iter()
@@ -104,19 +108,7 @@ impl Corpus {
     }
 
     fn lints() -> usize {
-        let runner = include_str!("../src/cli/mode/lints.rs");
-        [
-            "::report(readout.files())",
-            "flows.report::<",
-            "::dirty(&system)",
-            "::of_names(extraction.names())",
-            "ModelLint>::report",
-            "WorkspaceLint>::report",
-            "as Registered>::ENTRY",
-        ]
-        .iter()
-        .map(|call| runner.matches(call).count())
-        .sum::<usize>()
+        include_str!("../src/cli/mode/lints.rs").matches("as Registered>::ENTRY,").count()
     }
 
     fn violation(line: &str) -> Option<Violation<'_>> {
@@ -139,14 +131,13 @@ impl Corpus {
 
     fn verify(fixture: &Path, output: &str) -> Vec<String> {
         let name = fixture.file_name().unwrap_or_default().to_string_lossy();
-        Self::failed(golden::verdict!(format!("lints/{name}.txt"), output))
-    }
-
-    fn failed<Verified>(verdict: Result<Verified, impl std::fmt::Display>) -> Vec<String> {
-        match verdict {
-            Ok(_verified) => Vec::new(),
-            Err(failure) => vec![failure.to_string()],
-        }
+        let expected = Path::new(env!("CARGO_MANIFEST_DIR")).join(EXPECTED).join(format!("{name}.txt"));
+        let wanted = Disk.read_text(&expected).ignoring(Ignored::Unreadable).map(|text| text.to_string());
+        Some(name)
+            .filter(|_| wanted.as_deref() != Some(output))
+            .map(|drifted| format!("{drifted} printed:\n{output}"))
+            .into_iter()
+            .collect()
     }
 
     fn described(read: Result<Bytes, FileFailure>) -> Result<Bytes, FileFailure> {

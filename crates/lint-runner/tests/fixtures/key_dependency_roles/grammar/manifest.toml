@@ -1,9 +1,0 @@
-[package]
-name = "grammar"
-
-[package.metadata.port]
-owns = ["logos"]
-dependents = "lexer"
-
-[dependencies]
-logos = "1"

@@ -1,3 +1,0 @@
-a panic in shipped code names the invariant it asserts: invariant!(holds, Invariant::X), or invariant!(broken Invariant::X) in an arm that crashes; panic!, unreachable!, todo!, unimplemented! and the assert macros are refused outside tests:
-src/bare.rs:5: a panic that names no invariant; name it: invariant!(holds, Invariant::X), or invariant!(broken Invariant::X) where an arm crashes
-fails

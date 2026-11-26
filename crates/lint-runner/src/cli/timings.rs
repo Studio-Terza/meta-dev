@@ -58,9 +58,13 @@ impl Step {
     pub(crate) fn waited(self) -> Step {
         match self {
             Step::Judged(worker) => Step::Waited(worker),
-            Step::Total | Step::Stage | Step::Locate | Step::Read(_) | Step::Lower(_) | Step::Contexts | Step::Waited(_) => {
-                self
-            }
+            Step::Total
+            | Step::Stage
+            | Step::Locate
+            | Step::Read(_)
+            | Step::Lower(_)
+            | Step::Contexts
+            | Step::Waited(_) => self,
         }
     }
 }

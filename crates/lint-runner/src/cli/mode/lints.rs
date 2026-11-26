@@ -10,7 +10,9 @@ use cargo_ports::Cargo;
 
 use file_ports::Files;
 use lint_core::{Headline, Readout, SourceFile, Violation};
-use lint_file::{FileLint, Filed, Judged, Lead, Leader, Reads, Ruled, RuledLint, Start, Swept, SweptLint, WatchingLint};
+use lint_file::{
+    FileLint, Filed, Judged, Lead, Leader, Reads, Ruled, RuledLint, Start, Swept, SweptLint, WatchingLint,
+};
 use lint_reader::{Described, Unlocated};
 use lint_sweep::{Finds, Found, Gathers};
 use timer_ports::Timer;
@@ -359,18 +361,16 @@ impl<Lint: WatchingLint + 'static> Registered for Judged<Lint>
 where
     Judged<Lint>: Judges,
 {
-    const ENTRY: Entry = Entry {
-        work: Work::Judged(Judging { headline: Lint::HEADLINE, reads: Lint::READS, pend: Self::pending }),
-    };
+    const ENTRY: Entry =
+        Entry { work: Work::Judged(Judging { headline: Lint::HEADLINE, reads: Lint::READS, pend: Self::pending }) };
 }
 
 impl<Lint: RuledLint + 'static> Registered for Ruled<Lint>
 where
     Ruled<Lint>: Concluded,
 {
-    const ENTRY: Entry = Entry {
-        work: Work::Ruled(Rules { headline: Lint::HEADLINE, reads: Lint::READS, conclude: Self::concluding }),
-    };
+    const ENTRY: Entry =
+        Entry { work: Work::Ruled(Rules { headline: Lint::HEADLINE, reads: Lint::READS, conclude: Self::concluding }) };
 }
 
 trait Concluded {

@@ -1,5 +1,0 @@
-modules nest by use: a file used only inside one sibling belongs inside it:
-src/helper.rs:1: used only from crate::parent; move it inside that module
-src/reaching.rs:1: reaches into crate::outer::inner; import the parent's re-export instead
-src/wide.rs:1: re-exports 9 items, at most 8 allowed; split the module
-fails

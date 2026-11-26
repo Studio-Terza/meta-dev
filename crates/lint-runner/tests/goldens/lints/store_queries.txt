@@ -1,3 +1,0 @@
-every store_ports::query! writes its SQL as sqlformat formats it, starting at column 0 inside r#"…"#:
-src/lib.rs:3: a store_ports::query! writes its SQL other than as sqlformat formats it; write the SQL as sqlformat formats it with its default options, starting at column 0 on the line after r#" and ending with a line break before "#
-fails

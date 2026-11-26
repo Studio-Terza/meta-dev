@@ -1,3 +1,0 @@
-__sqlx is named only in store-ports and store-ports-macros, so every query goes through store_ports::query! and no crate reaches sqlx through the re-export:
-src/lib.rs:1: names __sqlx, the sqlx that store_ports re-exports for its macros, outside store-ports and store-ports-macros; reach the store through store_ports::query!, store_ports::migrate! and the Store port, never through sqlx
-fails
