@@ -5,7 +5,8 @@ pub use design_graph::{
     Refusal, Refused, Remit, Resolved, Resolving, Restaged, Seen, Sees, ShownNode, Spoken, Started, Unpaid, Unseen,
 };
 pub use design_messages::{
-    Asked, AskedEarlier, Cursors, EarlierLines, Hit, Holding, ImportedEnding, ImportedNotes, LastSaid, LinkRow, Noted,
-    OwnerHistory, Prefixes, Quote, Quoted, QuotedSegments, Said, Scope, SearchSegments, SessionCursors, SessionRecords,
-    Shortest, ShownMessage, Stored, StreamSchema, Unabridged,
+    Asked, AskedEarlier, Cursors, EarlierLines, HeardEvent, Hit, Holding, ImportedEnding, ImportedNotes, LastSaid,
+    LinkRow, Noted, OwnerHistory, Prefixes, Quote, Quoted, QuotedSegments, Said, Scope, SearchSegments, SessionCursors,
+    SessionEvents, SessionRecords, Shortest, ShownMessage, StopRow, StopTrail, Stopped, Stored, StreamSchema, Tally,
+    Unabridged,
 };

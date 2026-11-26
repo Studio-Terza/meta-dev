@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT\n  OR IGNORE INTO events (uuid, session, at, happening, body)\nVALUES\n  (?1, ?2, ?3, ?4, ?5)\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "efb7b732439d725ef657170806885e336c5966f3f5fae984ebb652f30333cf25"
+}

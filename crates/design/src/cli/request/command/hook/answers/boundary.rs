@@ -2,13 +2,13 @@ use std::collections::BTreeSet;
 use std::fmt;
 use std::ops::Not;
 
-use design_model::{NodeId, Outline, Stage, Title};
-use design_store::{Quote, Said, Unabridged};
+use design_model::{Gist, NodeId, Outline, Stage, Title};
+use design_store::{Quote, Said, StopRow, Tally, Unabridged};
 use dispatch_ports::{Prompt, Reply};
 use newtype::Wrapping;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
-use transcript_ports::{Body, Uuid};
+use transcript_ports::{Body, SessionId, Uuid};
 
 use crate::cli::request::ignored::Ignored;
 use invariants::Ignoring;
@@ -161,6 +161,13 @@ impl Traced {
             Traced::Question(question) => question.answers,
         }
     }
+
+    pub fn heard(&self, session: SessionId) -> StopRow {
+        match self {
+            Traced::Statement => StopRow::heard(session, Gist::Statement, [Tally::default(); 3]),
+            Traced::Question(question) => question.heard(session),
+        }
+    }
 }
 
 impl fmt::Display for Traced {
@@ -175,6 +182,11 @@ impl fmt::Display for Traced {
 impl Question {
     pub fn new(asked: Asked, read: usize, quoted: usize, answers: Option<Answers>) -> Question {
         Question { asked, read, quoted, answers }
+    }
+
+    fn heard(&self, session: SessionId) -> StopRow {
+        let kept = self.answers.as_ref().map_or(0, |answers| answers.0.len());
+        StopRow::heard(session, Gist::Question, [self.read, self.quoted, kept].map(Tally::from))
     }
 }
 
@@ -249,6 +261,12 @@ impl Reading<'_> {
 impl AsRef<Body> for Asked {
     fn as_ref(&self) -> &Body {
         &self.question
+    }
+}
+
+impl<'reply> From<&'reply Reply> for Replied<'reply> {
+    fn from(reply: &'reply Reply) -> Replied<'reply> {
+        Replied(reply)
     }
 }
 

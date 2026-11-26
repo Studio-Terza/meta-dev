@@ -8,6 +8,7 @@ mod printed;
 mod rendering;
 mod retry;
 mod search;
+mod stops;
 mod structure;
 mod subject;
 mod view;
@@ -17,7 +18,7 @@ use std::str::FromStr;
 
 use console_ports::Environment;
 use design_store::Scope;
-use design_store::StreamSchema;
+use design_store::{StopTrail, StreamSchema};
 use dispatch_ports::{Clock, Dispatch};
 use file_ports::Files;
 use grammar_search::Terms;
@@ -38,6 +39,7 @@ use lifecycle::{Move, Moving, Recast};
 use printed::Lines;
 use retry::Retry;
 use search::Search;
+use stops::Trail;
 pub use structure::Crew;
 use structure::Structure;
 use subject::Subject;
@@ -56,6 +58,7 @@ pub enum Command {
     Move(Move),
     Recast(Recast),
     Structure,
+    Stops,
     Hook(Hook),
     View(View),
     Import(PathBuf),
@@ -74,6 +77,7 @@ pub enum Verb {
     Move(Moving),
     Role,
     Structure,
+    Stops,
     Hook,
     View,
     Import,
@@ -89,7 +93,7 @@ impl FromStr for Verb {
 }
 
 impl Verb {
-    const NAMED: [(&'static str, Verb); 17] = [
+    const NAMED: [(&'static str, Verb); 18] = [
         ("ingest", Verb::Ingest),
         ("show", Verb::Show),
         ("search", Verb::Search),
@@ -103,6 +107,7 @@ impl Verb {
         ("drop", Verb::Move(Moving::Drop)),
         ("role", Verb::Role),
         ("structure", Verb::Structure),
+        ("stops", Verb::Stops),
         ("hook", Verb::Hook),
         ("view", Verb::View),
         ("import-notes", Verb::Import),
@@ -124,6 +129,7 @@ impl Verb {
             | Verb::Move(Moving::Refine | Moving::Reopen)
             | Verb::Role
             | Verb::Structure
+            | Verb::Stops
             | Verb::View
             | Verb::Import
             | Verb::Retry => &[],
@@ -154,6 +160,7 @@ impl Verb {
             Verb::Move(moving) => Move::read(moving, rest).map(Command::Move),
             Verb::Role => Recast::read(rest).map(Command::Recast),
             Verb::Structure => rest.first().map_or(Ok(Command::Structure), |_extra| Err(Failure::Usage)),
+            Verb::Stops => rest.first().map_or(Ok(Command::Stops), |_extra| Err(Failure::Usage)),
             Verb::Hook => <&[Token; 1]>::try_from(rest)
                 .map_err(|_count| Failure::Usage)
                 .and_then(|[token]| token.hook())
@@ -184,6 +191,7 @@ impl Command {
             | Command::Move(_)
             | Command::Recast(_)
             | Command::Structure
+            | Command::Stops
             | Command::Hook(_)
             | Command::View(_)
             | Command::Import(_)
@@ -220,6 +228,11 @@ impl Command {
             Command::Move(moving) => moving.written(ground.store()),
             Command::Recast(recast) => recast.written(ground.store()),
             Command::Structure => Structure::new(ground.store(), crew).worked().map(structure::Structured::reported),
+            Command::Stops => ground
+                .store()
+                .read(StopTrail)
+                .map(|rows| Uttered::new(Shown::said(Trail::from(rows)), Ok(Outcome::Trailed)))
+                .map_err(Failure::from),
             Command::Hook(hook) => hook.answered(environment, ground, crew),
             Command::View(view) => view.written(&ground),
             Command::Import(path) => Import::written(&ground, &path),

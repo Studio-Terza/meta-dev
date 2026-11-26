@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE events SET session = ?1, at = ?2, happening = ?3, body = ?4 WHERE uuid = ?5",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "1763706d412e8a7d3514d4c217ca0388a6ef09b232c1fac1bffd1750addacdd5"
+}

@@ -35,6 +35,7 @@ impl Torn {
     fn kind(line: &Line) -> String {
         match line {
             Line::Said(_) => String::from("said"),
+            Line::Happened(_) => String::from("happened"),
             Line::Skipped(_) => String::from("skipped"),
             Line::Unrecognised(unrecognised) => unrecognised.kind().to_string(),
         }

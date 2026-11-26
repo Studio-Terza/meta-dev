@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE stops SET session = ?1, at = ?2, gist = ?3, read = ?4, quoted = ?5, kept = ?6, awaited = ?7, halt = ?8, fate = ?9 WHERE id = ?10",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": []
+  },
+  "hash": "5d6cade70b5e608bf750a1d4f4977d939417b28e4a0e19aca222952a6d9c97a7"
+}
