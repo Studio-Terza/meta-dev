@@ -369,3 +369,9 @@ fn each_stall_names_its_own_cause() -> Result<(), laws::Unmet> {
     assert_eq!(causes, [Cause::Errored, Cause::Unreadable, Cause::Overdue, Cause::Unspawned, Cause::Failed]);
     Ok(())
 }
+
+#[test]
+fn a_moment_counts_the_milliseconds_since_an_earlier_one_and_back_to_a_later_one() {
+    let [early, late] = [Wall::new(2), Wall::new(5)].map(dispatch_ports::Moment::from);
+    assert_eq!([late.since(early), early.since(late), late.since(late)], [3000, -3000, 0]);
+}

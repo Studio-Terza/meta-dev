@@ -5,7 +5,7 @@ use console_ports::{Heard, Variables};
 use design::{Agents, Failure, HookEvent, Outcome};
 use design_store::{StopTrail, StreamSchema};
 use dispatch_fakes::{Scripted, Stepped};
-use dispatch_ports::{Finished, Model, Output, Pause, Prompt, Reply, Tokens, Usage, Wall};
+use dispatch_ports::{Errored, Finished, Model, Output, Pause, Prompt, Reply, Tokens, Told, Usage, Wall};
 use file_ports::{Bytes, Epoch, Files, Memory, Stamps};
 use newtype::Wrapping;
 use port_core::Run;
@@ -38,7 +38,11 @@ impl Asking {
     const NONE: &str = "[]";
 
     fn over(replies: &[&str]) -> Result<Asking, Failure> {
-        Asking::spoken(
+        Asking::outputs(replies.iter().map(|reply| Some(Output::Finished(Asking::finished(reply)))).collect())
+    }
+
+    fn outputs(outputs: Vec<Option<Output>>) -> Result<Asking, Failure> {
+        Asking::scripted(
             [
                 Session::line(Speaker::Owner, "o1", "null", Asking::RULED),
                 Session::line(Speaker::Lead, "l1", "\"o1\"", "should the queue keep its order"),
@@ -46,16 +50,20 @@ impl Asking {
                 Session::line(Speaker::Lead, "l2", "\"o2\"", "noted"),
             ]
             .concat(),
-            replies,
+            outputs,
         )
     }
 
     fn spoken(lines: String, replies: &[&str]) -> Result<Asking, Failure> {
+        Asking::scripted(lines, replies.iter().map(|reply| Some(Output::Finished(Asking::finished(reply)))).collect())
+    }
+
+    fn scripted(lines: String, outputs: Vec<Option<Output>>) -> Result<Asking, Failure> {
         let session = Session::working(lines);
         let asking = Asking {
             store: Sqlite::in_memory::<StreamSchema>(),
             files: session.files(),
-            script: Scripted::replying(replies.iter().map(|reply| Some(Output::Finished(Asking::finished(reply))))),
+            script: Scripted::replying(outputs),
         };
         Invocation::within(&asking.store, FakeLent::new(&asking.files), &["ingest"])?;
         Ok(asking)
@@ -330,5 +338,41 @@ fn a_stop_with_no_transcript_path_makes_no_stall_claim() -> Result<(), laws::Unm
     let stopping = "{\"hook_event_name\":\"Stop\",\"stop_hook_active\":false,\"session_id\":\"s\",\"last_assistant_message\":\"done\"}";
     let stopped = asking.asked(stopping, &["hook", "stop"]);
     assert_eq!(stopped.outcome?, Outcome::Hooked(HookEvent::Stop));
+    Ok(())
+}
+
+#[test]
+fn a_chunk_call_that_errors_still_counts_its_tokens_and_one_never_answering_is_cut_off_with_the_wait_in_millis()
+-> Result<(), laws::Unmet> {
+    let refused = Errored::new(Told::try_new("overloaded".to_owned())?, Asking::finished("").usage());
+    let asking = Asking::outputs(vec![Some(Output::Errored(refused)), None])?;
+    Tasked::stopped(&asking)?;
+    let Stop { asked, trail, .. } = Tasked::stopped(&asking)?;
+    assert_eq!(asked.outcome?, Outcome::Blocked);
+    assert_eq!(trail, ["s\t0\t0\tstalled\t2\t0\t0\tblocked\t37\t0", "s\t0\t0\tstalled\t2\t0\t0\tblocked\t0\t120000"]);
+    Ok(())
+}
+
+#[test]
+fn an_agent_whose_last_of_many_lines_ends_its_turn_is_finished_and_the_stop_stalls() -> Result<(), laws::Unmet> {
+    let asking = Asking::over(&[Asking::NONE])?;
+    let lines = [Tasked::CALLING, Tasked::WORKING, Tasked::ENDED].concat();
+    Tasked::placed(&asking, "a1.output", &lines, [40, 2])?;
+    let Stop { asked, trail, .. } = Tasked::stopped(&asking)?;
+    assert_eq!(asked.outcome?, Outcome::Blocked);
+    assert_eq!(trail, ["s\t0\t0\tstalled\t2\t0\t0\tblocked\t37\t0"]);
+    Ok(())
+}
+
+#[test]
+fn every_live_shell_counts_and_a_trailer_printed_long_before_a_shell_s_tail_does_not_end_it() -> Result<(), laws::Unmet>
+{
+    let asking = Asking::over(&[Asking::NONE])?;
+    let earlier = [Tasked::EXITED, &"still waiting on checks\n".repeat(20)].concat();
+    Tasked::placed(&asking, "b1.output", &earlier, [4, 1])?;
+    Tasked::placed(&asking, "b2.output", "polling\n", [3, 1])?;
+    let Stop { asked, trail, .. } = Tasked::stopped(&asking)?;
+    assert_eq!(asked.outcome?, Outcome::Hooked(HookEvent::Stop));
+    assert_eq!(trail, ["s\t2\t0\tlive\t2\t0\t0\tpassed\t37\t0"]);
     Ok(())
 }

@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use design_model::Halt;
 use design_store::Tally;
 use file_ports::{Bytes, Epoch, Offset, Size, Stamp, Stamps, Tail};
+use grammar_lines::Lines;
 use invariants::Ignoring;
 use newtype::Wrapping;
 use serde::Deserialize;
@@ -153,11 +154,8 @@ impl From<Runner> for Stamp {
 
 impl Last {
     fn parsed(text: &str) -> Option<Last> {
-        let breaks: Vec<usize> = text.match_indices('\n').map(|(at, _found)| at).collect();
-        let closed = breaks.last().copied().filter(|last| last + 1 == text.len());
-        let end = closed.unwrap_or(text.len());
-        let start = breaks.iter().rev().find(|at| **at < end).map_or(0, |at| at + 1);
-        text.get(start..end).and_then(|line| serde_json::from_str::<Last>(line).ignoring(Ignored::Untasked))
+        let last = text.parse::<Lines>().ignoring(Ignored::Untasked)?.into_iter().last()?;
+        serde_json::from_str::<Last>(&last).ignoring(Ignored::Untasked)
     }
 
     fn ending(self) -> Option<Ended> {
