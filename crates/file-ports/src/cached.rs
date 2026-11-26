@@ -21,19 +21,36 @@ pub struct Cached<'files, F> {
     kinds: Memo<Kind>,
 }
 
+type Slot<Value> = Arc<OnceLock<Recall<Value>>>;
+
 #[derive(Debug)]
-struct Memo<Value>(Mutex<HashMap<PathBuf, Arc<OnceLock<Recall<Value>>>>>);
+struct Memo<Value>(Mutex<HashMap<PathBuf, Slot<Value>>>);
 
 impl<Value: Clone> Memo<Value> {
-    fn empty() -> Memo<Value> {
-        Memo(Mutex::new(HashMap::new()))
-    }
-
     fn recalled(&self, path: &Path, fresh: impl Fn() -> Result<Value, FileFailure>) -> Result<Value, FileFailure> {
         self.slot(path).get_or_init(|| Recall::remembered(fresh())).replayed(fresh)
     }
 
-    fn slot(&self, path: &Path) -> Arc<OnceLock<Recall<Value>>> {
+    fn recalled_many(
+        &self,
+        paths: &[impl AsRef<Path>],
+        fresh: impl Fn(&Path) -> Result<Value, FileFailure>,
+        batch: impl FnOnce(&[&Path]) -> Vec<Result<Value, FileFailure>>,
+    ) -> Vec<Result<Value, FileFailure>> {
+        let held: Vec<&Path> = paths.iter().map(AsRef::as_ref).collect();
+        let slots: Vec<Slot<Value>> = held.iter().map(|path| self.slot(path)).collect();
+        let (missing, open): (Vec<&Path>, Vec<&Slot<Value>>) =
+            held.iter().copied().zip(&slots).filter(|(_, slot)| slot.get().is_none()).unzip();
+        open.into_iter().zip(batch(&missing)).for_each(|(slot, found)| {
+            slot.get_or_init(|| Recall::remembered(found));
+        });
+        held.into_iter()
+            .zip(slots)
+            .map(|(path, slot)| slot.get_or_init(|| Recall::remembered(fresh(path))).replayed(|| fresh(path)))
+            .collect()
+    }
+
+    fn slot(&self, path: &Path) -> Slot<Value> {
         let mut slots = self.0.lock().unpoisoned();
         let found = slots.get(path).map(Arc::clone);
         found.unwrap_or_else(|| Arc::clone(slots.entry(path.to_path_buf()).or_default()))
@@ -49,11 +66,11 @@ impl<'files, F: Files> Cached<'files, F> {
     pub fn new(files: &'files F) -> Cached<'files, F> {
         Cached {
             files,
-            reads: Memo::empty(),
-            texts: Memo::empty(),
-            listings: Memo::empty(),
-            canonicals: Memo::empty(),
-            kinds: Memo::empty(),
+            reads: Memo(Mutex::default()),
+            texts: Memo(Mutex::default()),
+            listings: Memo(Mutex::default()),
+            canonicals: Memo(Mutex::default()),
+            kinds: Memo(Mutex::default()),
         }
     }
 
@@ -117,5 +134,38 @@ impl<F: Files> Files for Cached<'_, F> {
 
     fn size(&self, path: &Path) -> Result<Size, FileFailure> {
         self.files.size(path)
+    }
+
+    fn read_many(&self, paths: &[impl AsRef<Path>]) -> Vec<Result<Bytes, FileFailure>> {
+        self.reads.recalled_many(paths, |path| self.files.read(path), |missing| self.files.read_many(missing))
+    }
+
+    fn entries_many(&self, directories: &[impl AsRef<Path>]) -> Vec<Result<Vec<PathBuf>, FileFailure>> {
+        self.listings.recalled_many(
+            directories,
+            |directory| self.files.entries(directory),
+            |missing| self.files.entries_many(missing),
+        )
+    }
+
+    fn canonical_many(&self, paths: &[impl AsRef<Path>]) -> Vec<Result<PathBuf, FileFailure>> {
+        self.canonicals.recalled_many(
+            paths,
+            |path| self.files.canonical(path),
+            |missing| self.files.canonical_many(missing),
+        )
+    }
+
+    fn kinds(&self, paths: &[impl AsRef<Path>]) -> Vec<Kind> {
+        let recalled = self.kinds.recalled_many(
+            paths,
+            |path| Ok(self.files.kind(path)),
+            |missing| self.files.kinds(missing).into_iter().map(Ok).collect(),
+        );
+        paths
+            .iter()
+            .zip(recalled)
+            .map(|(path, kind)| kind.ignoring(Ignored::KindRecalled).unwrap_or_else(|| self.files.kind(path.as_ref())))
+            .collect()
     }
 }

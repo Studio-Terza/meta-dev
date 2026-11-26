@@ -4,7 +4,10 @@ use std::path::{Path, PathBuf};
 
 use invariants::Ignoring;
 
+mod spread;
+
 use crate::{Bytes, FileFailure, Files, Ignored, Kind, Offset, Size, Text};
+use spread::Spread;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Disk;
@@ -59,5 +62,21 @@ impl Files for Disk {
 
     fn size(&self, path: &Path) -> Result<Size, FileFailure> {
         Ok(Size::new(fs::symlink_metadata(path)?.len()))
+    }
+
+    fn read_many(&self, paths: &[impl AsRef<Path>]) -> Vec<Result<Bytes, FileFailure>> {
+        Spread::mapped(paths, |path| self.read(path))
+    }
+
+    fn entries_many(&self, directories: &[impl AsRef<Path>]) -> Vec<Result<Vec<PathBuf>, FileFailure>> {
+        Spread::mapped(directories, |directory| self.entries(directory))
+    }
+
+    fn canonical_many(&self, paths: &[impl AsRef<Path>]) -> Vec<Result<PathBuf, FileFailure>> {
+        Spread::mapped(paths, |path| self.canonical(path))
+    }
+
+    fn kinds(&self, paths: &[impl AsRef<Path>]) -> Vec<Kind> {
+        Spread::mapped(paths, |path| self.kind(path))
     }
 }

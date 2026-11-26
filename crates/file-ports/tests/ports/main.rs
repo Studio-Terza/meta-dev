@@ -323,3 +323,56 @@ fn read_from_returns_the_bytes_after_the_offset() -> Result<(), laws::Unmet> {
     assert_eq!(Tails::of(&memory, Path::new("/scratch"), Offset::try_new(7)?)?, Bytes::from("789"));
     Ok(())
 }
+
+struct Wide;
+
+impl Wide {
+    const EACH: usize = 14;
+
+    fn paths(root: &Path) -> Result<Vec<PathBuf>, FileFailure> {
+        let named = |kind: &str| (0..Self::EACH).map(|at| root.join(format!("{kind}{at}"))).collect::<Vec<PathBuf>>();
+        let (written, made, absent) = (named("file"), named("directory"), named("absent"));
+        written.iter().try_for_each(|path| Disk.write(path, Bytes::from(path.to_string_lossy().as_ref())))?;
+        made.iter().try_for_each(|path| Disk.create_directories(&path.join("inner")))?;
+        Ok(written
+            .into_iter()
+            .zip(made)
+            .zip(absent)
+            .flat_map(|((file, directory), gone)| [file, directory, gone])
+            .collect())
+    }
+
+    fn answered(files: &impl Files, paths: &[PathBuf]) -> [String; 5] {
+        [
+            format!("{:?}", files.kinds(paths)),
+            format!("{:?}", files.read_many(paths)),
+            format!("{:?}", files.read_text_many(paths)),
+            format!("{:?}", files.canonical_many(paths)),
+            format!("{:?}", files.entries_many(paths)),
+        ]
+    }
+
+    fn one_by_one(files: &impl Files, paths: &[PathBuf]) -> [String; 5] {
+        [
+            format!("{:?}", paths.iter().map(|path| files.kind(path)).collect::<Vec<Kind>>()),
+            format!("{:?}", paths.iter().map(|path| files.read(path)).collect::<Vec<_>>()),
+            format!("{:?}", paths.iter().map(|path| files.read_text(path)).collect::<Vec<_>>()),
+            format!("{:?}", paths.iter().map(|path| files.canonical(path)).collect::<Vec<_>>()),
+            format!("{:?}", paths.iter().map(|path| files.entries(path)).collect::<Vec<_>>()),
+        ]
+    }
+}
+
+#[test]
+fn a_batch_wider_than_one_thread_answers_in_order_as_path_by_path_reads_do() -> Result<(), FileFailure> {
+    let scratch = tempfile::tempdir().map_err(FileFailure::from)?;
+    let paths = Wide::paths(scratch.path())?;
+    let expected = Wide::one_by_one(&Disk, &paths);
+    let cached = Cached::new(&Disk);
+    let batched_through_the_cache = Wide::answered(&cached, &paths);
+    assert_eq!(Wide::answered(&Disk, &paths), expected);
+    assert_eq!(batched_through_the_cache, expected);
+    assert_eq!(Wide::one_by_one(&cached, &paths), expected);
+    assert_eq!(Wide::answered(&cached, &paths), expected);
+    Ok(())
+}
