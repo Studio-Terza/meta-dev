@@ -16,7 +16,7 @@ use crate::cli::ports::{Exit, Invocation, Ports, Text};
 use boundary::Shards;
 use grammar_output::Record;
 use incremental::{Choice, Prior};
-use tested::{Reach, Reaching, Tested};
+use tested::Tested;
 
 #[derive(Debug)]
 struct Planned {
@@ -27,7 +27,6 @@ struct Planned {
 #[derive(Debug)]
 pub struct MutantsPlan {
     diff: Journal,
-    reach: Reach,
     output: Journal,
     prior: Option<Prior>,
     scope: Vec<OsString>,
@@ -38,11 +37,10 @@ impl MutantsPlan {
     const PRIOR: Flag = Flag::new("--prior");
 
     fn planned(&self, ports: &impl Ports) -> Result<Planned, Failure<'_>> {
-        let changed =
-            Tested::asked(ports, &self.reach, OsStr::new(Tested::PULL_BASE), OsStr::new(Tested::HEAD))?.diff(ports)?;
+        let changed = Tested::asked(ports, OsStr::new(Tested::PULL_BASE), OsStr::new(Tested::HEAD))?.diff(ports)?;
         self.diff.replace(ports.files(), &changed)?;
         let diff: &Path = self.diff.as_ref();
-        let choice = self.prior.as_ref().map(|prior| prior.chosen(ports, &self.reach, diff)).transpose()?;
+        let choice = self.prior.as_ref().map(|prior| prior.chosen(ports, diff)).transpose()?;
         let shards = choice.as_ref().and_then(Choice::shards).map_or_else(|| self.listed(ports), Ok)?;
         Ok(Planned { shards, choice })
     }
@@ -57,19 +55,15 @@ impl MutantsPlan {
         Ok(Shards::for_mutants(mutants.iter().map(|mutant| costs.per_mutant(mutant)).collect()))
     }
 
-    fn reached(head: PlanHead, given: Arguments) -> Result<MutantsPlan, Failure<'static>> {
-        let reached = Reach::taken(head.reaching, given)?;
-        reached.concluded(|reach, following| {
-            let directory = following.flagged::<Location>(Self::PRIOR)?;
-            let read = directory.concluded(Prior::following)?;
-            Ok(read.concluded(|prior, rest| MutantsPlan {
-                diff: head.diff,
-                reach,
-                output: head.output,
-                prior,
-                scope: rest.rest(),
-            }))
-        })
+    fn headed(head: PlanHead, given: Arguments) -> Result<MutantsPlan, Failure<'static>> {
+        let directory = given.flagged::<Location>(Self::PRIOR)?;
+        let read = directory.concluded(Prior::following)?;
+        Ok(read.concluded(|prior, rest| MutantsPlan {
+            diff: head.diff,
+            output: head.output,
+            prior,
+            scope: rest.rest(),
+        }))
     }
 }
 
@@ -80,13 +74,11 @@ struct PlanHead {
     diff: Journal,
     #[field(Journaled)]
     output: Journal,
-    #[field(Reaching)]
-    reaching: Reaching,
 }
 
 impl Step for MutantsPlan {
     fn from_arguments(given: Vec<OsString>) -> Result<MutantsPlan, Failure<'static>> {
-        PlanHead::read(Arguments::from(given))?.concluded(MutantsPlan::reached)
+        PlanHead::read(Arguments::from(given))?.concluded(MutantsPlan::headed)
     }
 
     fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {

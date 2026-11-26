@@ -23,7 +23,7 @@ pub struct InstallTools {
 }
 
 impl InstallTools {
-    pub(crate) const PROGRAMS: [Tool; 3] = [Tool::REACH, Tool::LINT, Tool::CI];
+    const PROGRAMS: [Tool; 2] = [Tool::LINT, Tool::CI];
 
     fn build_invocation() -> Invocation {
         Invocation::new(

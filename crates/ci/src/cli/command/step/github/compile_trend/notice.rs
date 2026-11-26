@@ -4,8 +4,6 @@ mod range;
 use std::cmp::Ordering;
 use std::fmt;
 
-use algebra::Semigroup;
-
 use super::Pace;
 use super::build::Build;
 use super::fortnight::Fortnight;

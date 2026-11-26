@@ -2,14 +2,10 @@ use std::collections::BTreeSet;
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
-use newtype::Listed;
-use strum::{Display, IntoStaticStr, VariantArray};
 use text_lines::Lines;
 
 use crate::cli::command::failure::Failure;
-use crate::cli::command::step::{Argument, Arguments, Location};
 use crate::cli::ports::{Invocation, Ports, Text};
-use grammar_output::Parsed;
 
 #[derive(Debug)]
 pub(in super::super) struct Tested {
@@ -17,50 +13,8 @@ pub(in super::super) struct Tested {
     base: OsString,
 }
 
-#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
-#[strum(serialize_all = "kebab-case")]
-pub(in super::super) enum Reaching {
-    Changed,
-    ConsumedBy,
-}
-
-impl Argument for Reaching {
-    type Value = Reaching;
-
-    fn read(word: OsString) -> Result<Reaching, Failure<'static>> {
-        word.to_str().ok_or(Failure::Usage)?.parse::<Reaching>().map_err(|_unreached| Failure::Usage)
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(in super::super) enum Reach {
-    Changed,
-    ConsumedBy(PathBuf),
-}
-
-impl Reach {
-    pub(in super::super) fn taken(
-        reaching: Reaching,
-        arguments: Arguments,
-    ) -> Result<Parsed<Reach, Arguments>, Failure<'static>> {
-        match reaching {
-            Reaching::Changed => Ok(Parsed::new(Reach::Changed, arguments)),
-            Reaching::ConsumedBy => arguments.field::<Location>().map(|read| read.map(Reach::ConsumedBy)),
-        }
-    }
-
-    fn consumed(&self, ports: &impl Ports, files: &[String]) -> Result<Vec<String>, Failure<'static>> {
-        match self {
-            Reach::Changed => Ok(Vec::new()),
-            Reach::ConsumedBy(lint) => Tested::consumed(ports, lint, files),
-        }
-    }
-}
-
 impl Tested {
     const MARKS: [&'static str; 2] = ["src", "tests"];
-    const QUERY: [&'static str; 3] = ["query", "--in", "."];
-    const CONSUMED_BY: &'static str = "--consumed-by";
     const EMPTY_TREE: &'static str = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
     const CHANGED: [&'static str; 2] = ["diff", "--no-renames"];
     const CHANGED_PATHS: [&'static str; 3] = ["HEAD", "--", "*.rs"];
@@ -69,32 +23,19 @@ impl Tested {
     pub(in super::super) const HEAD: &'static str = "HEAD";
     pub(in super::super) const PULL_BASE: &'static str = "HEAD^1";
 
-    pub(in super::super) fn asked(
-        ports: &impl Ports,
-        reach: &Reach,
-        base: &OsStr,
-        head: &OsStr,
-    ) -> Result<Tested, Failure<'static>> {
+    pub(in super::super) fn asked(ports: &impl Ports, base: &OsStr, head: &OsStr) -> Result<Tested, Failure<'static>> {
         let mut arguments = Self::around(&Self::NAMED, base, &[]);
         arguments.push(head.to_owned());
         arguments.extend(Self::NAMED_PATHS.map(OsString::from));
         let invocation = Invocation::new("git", arguments);
         let named = ports.output(&invocation).map_err(Failure::starting(&invocation))?;
         let files: Vec<String> = named.as_ref().parse::<Lines>().into_iter().flatten().collect();
-        let consumed = files.first().map_or(Ok(Vec::new()), |_| reach.consumed(ports, &files))?;
-        let homes = files.iter().chain(&consumed).filter_map(|path| Self::home(Path::new(path))).collect();
+        let homes = files.iter().filter_map(|path| Self::home(Path::new(path))).collect();
         Ok(Tested { homes, base: base.to_owned() })
     }
 
     pub(in super::super) fn without(self, earlier: &Tested) -> Tested {
         Tested { homes: self.homes.difference(&earlier.homes).cloned().collect(), ..self }
-    }
-
-    fn consumed(ports: &impl Ports, lint: &Path, files: &[String]) -> Result<Vec<String>, Failure<'static>> {
-        let asked = files.iter().flat_map(|file| [OsString::from(Self::CONSUMED_BY), OsString::from(file)]);
-        let invocation = Invocation::new(lint, Self::QUERY.map(OsString::from).into_iter().chain(asked));
-        let answer = ports.output(&invocation).map_err(Failure::starting(&invocation))?;
-        Ok(answer.as_ref().parse::<Lines>().into_iter().flatten().collect())
     }
 
     fn home(path: &Path) -> Option<PathBuf> {
