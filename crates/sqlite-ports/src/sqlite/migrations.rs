@@ -3,9 +3,8 @@ mod ledger;
 use std::any::TypeId;
 use std::collections::BTreeSet;
 
-use newtype::Counter;
 use rusqlite::Connection;
-use store_ports::{Batch, Schema, StoreFailure, Version, Written};
+use store_ports::{Batch, Schema, StoreFailure, Version};
 
 use super::opened::Connected;
 use ledger::Ledger;
@@ -14,7 +13,7 @@ use ledger::Ledger;
 pub(super) struct Migrations {
     schema: TypeId,
     declared: &'static store_ports::Migrator,
-    rewritten: fn(Version, &mut Connected<'_>) -> Result<Written, StoreFailure>,
+    rewritten: fn(Version, &mut Connected<'_>) -> Result<(), StoreFailure>,
 }
 
 impl Migrations {
@@ -34,15 +33,11 @@ impl Migrations {
         self,
         pending: &BTreeSet<Version>,
         statements: &mut Connected<'_>,
-    ) -> Result<Written, StoreFailure> {
-        let written = pending
-            .iter()
-            .map(|version| (self.rewritten)(*version, statements))
-            .collect::<Result<Vec<Written>, StoreFailure>>()?;
-        Ok(Written::total(written.into_iter()))
+    ) -> Result<(), StoreFailure> {
+        pending.iter().try_for_each(|version| (self.rewritten)(*version, statements))
     }
 
-    fn rewritten_by<S: Schema>(pending: Version, statements: &mut Connected<'_>) -> Result<Written, StoreFailure> {
-        S::rewrite(pending).map_or_else(|| Ok(Written::zero()), |rewrite| rewrite.written(statements))
+    fn rewritten_by<S: Schema>(pending: Version, statements: &mut Connected<'_>) -> Result<(), StoreFailure> {
+        S::rewrite(pending).map_or(Ok(()), |rewrite| rewrite.written(statements))
     }
 }

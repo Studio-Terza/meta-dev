@@ -1,6 +1,6 @@
 use rusqlite::types::{Value as Stored, ValueRef};
 use rusqlite::{Connection, Row, params_from_iter};
-use store_ports::{Argument, Bind, ColumnFailure, Execute, StoreFailure, Value, Written};
+use store_ports::{Argument, Bind, ColumnFailure, Done, Execute, StoreFailure, Value};
 
 use super::super::failed::Unexecuted;
 
@@ -80,9 +80,9 @@ impl Execute for Connected<'_> {
         rows.map(|row| row.map_err(Unexecuted::from).map_err(StoreFailure::from).and_then(|values| values)).collect()
     }
 
-    fn executed(&mut self, sql: &'static str, arguments: Vec<Argument>) -> Result<Written, StoreFailure> {
+    fn executed<D: Done>(&mut self, sql: &'static str, arguments: Vec<Argument>) -> Result<D, StoreFailure> {
         let mut statement = self.connection.prepare_cached(sql).map_err(Unexecuted::from)?;
         let changed = statement.execute(params_from_iter(Bound::arguments(arguments)?)).map_err(Unexecuted::from)?;
-        Ok(Written::new(changed))
+        Ok(D::changed(changed))
     }
 }

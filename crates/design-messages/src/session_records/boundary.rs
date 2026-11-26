@@ -1,8 +1,7 @@
 use std::collections::BTreeSet;
 
 use design_model::Segment;
-use newtype::Counter;
-use store_ports::{Batch, Execute, Query, StoreFailure, Written};
+use store_ports::{Batch, Counts, Done, Execute, Query, StoreFailure};
 use stream::Message;
 use transcript_ports::{Record, Uuid};
 
@@ -10,8 +9,8 @@ use super::{Anchoring, Held, Holding, SessionRecords};
 use crate::boundary::{LinkRow, MessageRow, Row, SegmentRow};
 
 impl SessionRecords {
-    fn all(rows: &[impl Row], statements: &mut impl Execute) -> Result<Written, StoreFailure> {
-        statements.written_all(rows.iter().map(Row::inserted))
+    fn all<D: Done>(rows: &[impl Row], statements: &mut impl Execute) -> Result<D, StoreFailure> {
+        statements.counted_all(rows.iter().map(Row::inserted))
     }
 }
 
@@ -45,7 +44,15 @@ impl Query for Holding {
 impl Batch for Held {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
+        self.counted(statements)
+    }
+}
+
+impl Counts for Held {
+    fn counted<D: Done>(self, statements: &mut impl Execute) -> Result<D, StoreFailure> {
         let Held(records) = self;
         let written = [
             SessionRecords::all(&records.messages, statements)?,
@@ -54,6 +61,6 @@ impl Batch for Held {
             SessionRecords::all(&records.edges, statements)?,
             records.cursor.written(statements)?,
         ];
-        Ok(Written::total(written.into_iter()))
+        Ok(D::total(written.into_iter()))
     }
 }

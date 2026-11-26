@@ -24,7 +24,7 @@ use newtype::Wrapping;
 use port_core::Run;
 use port_core::{Calls, Snapshot};
 use serde_json::Value;
-use store_ports::{Store, Written};
+use store_ports::Store;
 use structurer::{Briefing, Lapse, SegmentRef, Uncovered};
 use text_lines::Lines;
 use transcript_ports::transcripts_ops::ReadFrom;
@@ -133,7 +133,7 @@ impl Structuring {
         Ok(run.port(self.applying.store.clone()).read(Unstructured)?.len())
     }
 
-    fn stored_run(&self, pid: u32, started: &str) -> Result<Written, Failure> {
+    fn stored_run(&self, pid: u32, started: &str) -> Result<(), Failure> {
         let run = Run::root();
         let store = run.port(self.applying.store.clone());
         store.write(JobOpened::from(JobId::new(1)))?;

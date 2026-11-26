@@ -4,7 +4,7 @@ use newtype::Enumerated;
 use port_core::{Op, Port, Run};
 use sqlite_ports::SqliteOpener;
 use store_ports::{
-    Batch, Column, Execute, IntoArgument, Migrator, Prepared, Schema, Staged, Store, StoreFailure, Version, Written,
+    Batch, Column, Execute, IntoArgument, Migrator, Prepared, Schema, Staged, Store, StoreFailure, Version,
 };
 
 states::states! {
@@ -27,7 +27,9 @@ enum Rewriteless {}
 impl Batch for Rewriteless {
     type Failure = StoreFailure;
 
-    fn written(self, _statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, _statements: &mut impl Execute) -> Result<(), StoreFailure> {
         match self {}
     }
 }

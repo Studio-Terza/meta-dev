@@ -1,7 +1,7 @@
 use port_core::{Held, port};
 
 use crate::store_lock::StoreLock;
-use crate::{Batch, Busy, Created, Query, Record, StoreFailure, Written};
+use crate::{Batch, Busy, Created, Query, Record, StoreFailure};
 
 #[port]
 pub trait Store {
@@ -9,7 +9,7 @@ pub trait Store {
     fn read<Q: Query>(&self, query: Q) -> Result<Q::Rows, StoreFailure>;
 
     #[op(Q)]
-    fn write<Q: Batch>(&self, batch: Q) -> Result<Written, Q::Failure>;
+    fn write<Q: Batch>(&self, batch: Q) -> Result<Q::Done, Q::Failure>;
 
     #[op(Created<R>)]
     fn create<R: Record>(&self, created: Created<R>) -> Result<R, StoreFailure>;

@@ -2,8 +2,7 @@ use design_model::{
     Confidence, Explicitness, Node, NodeId, NodeRelation, Ordinal, Provenance, Segment, SegmentRelation, Sense,
     SenseKind, SpanRelation, Specificity, Supersession, Vague,
 };
-use newtype::Counter;
-use store_ports::{Batch, Columns as Row, Execute, StoreFailure, Written};
+use store_ports::{Batch, Columns as Row, Counts, Done, Execute, StoreFailure};
 use transcript_ports::Uuid;
 
 use super::Directions;
@@ -51,17 +50,25 @@ impl From<&Segment> for Columns {
 impl Batch for Directions {
     type Failure = Refusal;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, Refusal> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), Refusal> {
+        self.counted(statements)
+    }
+}
+
+impl Counts for Directions {
+    fn counted<D: Done>(self, statements: &mut impl Execute) -> Result<D, Refusal> {
         let mut annotating = Annotating { provenance: self.provenance, statements };
         let written = self
             .directed
             .iter()
             .map(|directed| directed.written(&mut annotating))
-            .collect::<Result<Vec<Written>, Refusal>>()?;
+            .collect::<Result<Vec<D>, Refusal>>()?;
         let recorded = self.file.written(annotating.provenance, annotating.statements)?;
         let closed = self.remit.paid(annotating.statements)?.closed(JobState::Applied, annotating.statements)?;
         let unflailed = Annotating::unflailed(annotating.statements)?;
-        Ok(Written::total(written.into_iter().chain([recorded, closed, unflailed])))
+        Ok(Done::total(written.into_iter().chain([recorded, closed, unflailed])))
     }
 }
 
@@ -70,8 +77,8 @@ impl<'held, E: Execute> Annotating<'held, E> {
         Annotating { provenance, statements }
     }
 
-    pub(crate) fn unflailed(statements: &mut E) -> Result<Written, StoreFailure> {
-        statements.written(store_ports::query!(
+    pub(crate) fn unflailed<D: Done>(statements: &mut E) -> Result<D, StoreFailure> {
+        statements.done(store_ports::query!(
             r#"
 DELETE FROM
   flailed
@@ -89,15 +96,15 @@ WHERE
         ))
     }
 
-    pub(super) fn placed(
+    pub(super) fn placed<D: Done>(
         &mut self,
         segment: &Segment,
         node: NodeId,
         relation: SpanRelation,
-    ) -> Result<Written, Refusal> {
+    ) -> Result<D, Refusal> {
         let Columns { message, ordinal } = Columns::from(segment);
         let provenance = self.provenance;
-        Ok(self.statements.written(store_ports::query!(
+        Ok(self.statements.done(store_ports::query!(
             r#"
 INSERT
   OR IGNORE INTO span_edges (message, ordinal, relation, node, provenance)
@@ -112,14 +119,14 @@ VALUES
         ))?)
     }
 
-    pub(super) fn sensed(&mut self, segment: &Segment, sense: Sense) -> Result<Written, Refusal> {
+    pub(super) fn sensed<D: Done>(&mut self, segment: &Segment, sense: Sense) -> Result<D, Refusal> {
         let Columns { message, ordinal } = Columns::from(segment);
         let kind = sense.kind();
         let specificity = sense.specificity();
         let confidence = sense.confidence();
         let explicitness = sense.explicitness();
         let provenance = self.provenance;
-        Ok(self.statements.written(store_ports::query!(
+        Ok(self.statements.done(store_ports::query!(
             r#"
 INSERT INTO
   senses (
@@ -170,34 +177,34 @@ VALUES
         ))?)
     }
 
-    pub(super) fn related(
+    pub(super) fn related<D: Done>(
         &mut self,
         source: &Segment,
         target: &Segment,
         relation: SegmentRelation,
-    ) -> Result<Written, Refusal> {
+    ) -> Result<D, Refusal> {
         Linking { source, target, relation, provenance: self.provenance }.closed(self.statements)
     }
 
-    pub(super) fn proposed(&mut self, node: &Node<Vague>, parent: NodeId) -> Result<Written, Refusal> {
+    pub(super) fn proposed<D: Done>(&mut self, node: &Node<Vague>, parent: NodeId) -> Result<D, Refusal> {
         let planted = NodeRow::proposed(node, self.statements)?;
         let child = Resolved::read(node.identity(), self.statements)?;
         let refined = Resolved::read(parent, self.statements)?;
-        let linked = Linked::new(child, NodeRelation::Refines, refined, self.provenance).written(self.statements)?;
-        Ok(planted.plus(linked))
+        let linked = Linked::new(child, NodeRelation::Refines, refined, self.provenance).linked(self.statements)?;
+        Ok(Done::joined(planted, linked))
     }
 
-    pub(super) fn superseded(&mut self, supersession: Supersession) -> Result<Written, Refusal> {
+    pub(super) fn superseded<D: Done>(&mut self, supersession: Supersession) -> Result<D, Refusal> {
         let [old, by] = supersession.ends();
         let replaced = Resolved::read(old, self.statements)?;
         let replacing = Resolved::read(by, self.statements)?;
-        Linked::new(replacing, NodeRelation::Supersedes, replaced, self.provenance).written(self.statements)
+        Linked::new(replacing, NodeRelation::Supersedes, replaced, self.provenance).linked(self.statements)
     }
 
-    pub(super) fn cited(&mut self, node: NodeId, uuid: &Uuid) -> Result<Written, Refusal> {
+    pub(super) fn cited<D: Done>(&mut self, node: NodeId, uuid: &Uuid) -> Result<D, Refusal> {
         let message = uuid.clone();
         let provenance = self.provenance;
-        Ok(self.statements.written(store_ports::query!(
+        Ok(self.statements.done(store_ports::query!(
             r#"
 INSERT
   OR IGNORE INTO node_cites (node, message, provenance)
@@ -210,10 +217,10 @@ VALUES
         ))?)
     }
 
-    pub(super) fn conversational(&mut self, segment: &Segment) -> Result<Written, Refusal> {
+    pub(super) fn conversational<D: Done>(&mut self, segment: &Segment) -> Result<D, Refusal> {
         let Columns { message, ordinal } = Columns::from(segment);
         let provenance = self.provenance;
-        Ok(self.statements.written(store_ports::query!(
+        Ok(self.statements.done(store_ports::query!(
             r#"
 INSERT
   OR IGNORE INTO conversational (message, ordinal, provenance)
@@ -228,7 +235,7 @@ VALUES
 }
 
 impl Linking<'_> {
-    fn closed(self, statements: &mut impl Execute) -> Result<Written, Refusal> {
+    fn closed<D: Done>(self, statements: &mut impl Execute) -> Result<D, Refusal> {
         match self.relation {
             SegmentRelation::Supersedes => Closing::<SegmentSupersedes>::new(self.source.clone(), self.target.clone())
                 .written(statements, |linked| LinkColumns::from(self).written(linked)),
@@ -251,11 +258,11 @@ impl From<Linking<'_>> for LinkColumns {
 }
 
 impl LinkColumns {
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    fn written<D: Done>(self, statements: &mut impl Execute) -> Result<D, StoreFailure> {
         let LinkColumns { source, relation, target, provenance } = self;
         let Columns { message: source_message, ordinal: source_ordinal } = source;
         let Columns { message: target_message, ordinal: target_ordinal } = target;
-        statements.written(store_ports::query!(
+        statements.done(store_ports::query!(
             r#"
 INSERT
   OR IGNORE INTO segment_links (

@@ -3,7 +3,7 @@ mod count;
 use design_model::{Ordinal, Prefix};
 use design_store::{Cursors, EarlierLines, Holding, LinkRow, SessionCursors, SessionRecords};
 use newtype::{Counter, Wrapping};
-use store_ports::{Store, Written};
+use store_ports::{Counted, Store, Written};
 use stream::{Anchors, Message, Relation, SegmentId, Shape, Stream};
 use structurer::SegmentRef;
 use transcript_ports::{Authorship, Cursor, Kind, Line, Session, SessionId, Transcripts, Unrecognised, Uuid};
@@ -71,7 +71,7 @@ impl<'ports, T: Transcripts, S: Store> Ingest<'ports, T, S> {
         let stream = earlier.unwrap_or_default().resumed(lines);
         let records = self.store.read(Holding::from(SessionRecords::read(&end.session, end.cursor, &stream)))?;
         let refused = records.refused().to_vec();
-        let written = self.store.write(records)?;
+        let written = self.store.write(Counted::new(records))?;
         Ok(Ingested { end, stream, refused, written })
     }
 }

@@ -1,4 +1,3 @@
-use newtype::{Arbitrary, Newtype};
+mod boundary;
 
-#[derive(Newtype, Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Written(usize);
+pub use boundary::{Done, Written};
