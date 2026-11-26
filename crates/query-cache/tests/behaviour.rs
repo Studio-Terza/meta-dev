@@ -23,42 +23,40 @@ impl Binding {
     }
 }
 
-laws::table!(
-    a_cached_query_binds_only_as_many_values_as_it_takes,
-    Binding::refused,
-    [
-        Binding(2) => None,
-        Binding(3) => Some(String::from("the query takes 2 parameters but 3 are bound")),
-        Binding(1) => Some(String::from("the query takes 2 parameters but 1 are bound")),
-    ]
-);
+#[test]
+fn a_cached_query_binds_only_as_many_values_as_it_takes() {
+    assert_eq!(Binding(2).refused(), None);
+    assert_eq!(Binding(3).refused().as_deref(), Some("the query takes 2 parameters but 3 are bound"));
+    assert_eq!(Binding(1).refused().as_deref(), Some("the query takes 2 parameters but 1 are bound"));
+}
 
-laws::table!(
-    a_record_table_spells_its_four_statements,
-    Table::statements,
-    [
-        Table::named("r").column("id", Origin::GeneratedKey).column("body", Origin::Given).column("at", Origin::Generated) => [
+#[test]
+fn a_record_table_spells_its_four_statements() {
+    let full = Table::named("r").column("id", Origin::GeneratedKey).column("body", Origin::Given).column("at", Origin::Generated);
+    assert_eq!(
+        full.statements(),
+        [
             String::from(r#"INSERT INTO r (body) VALUES (?1) RETURNING id AS "id!", body AS "body!", at AS "at!""#),
             String::from(r#"SELECT id AS "id!", body AS "body!", at AS "at!" FROM r WHERE id = ?1"#),
             String::from("UPDATE r SET body = ?1, at = ?2 WHERE id = ?3"),
             String::from("DELETE FROM r WHERE id = ?1"),
             String::from(r#"SELECT id AS "id!", body AS "body!", at AS "at!" FROM r"#),
-        ],
-        Table::named("s").column("id", Origin::GeneratedKey) => [
+        ]
+    );
+    assert_eq!(
+        Table::named("s").column("id", Origin::GeneratedKey).statements(),
+        [
             String::from(r#"INSERT INTO s DEFAULT VALUES RETURNING id AS "id!""#),
             String::from(r#"SELECT id AS "id!" FROM s WHERE id = ?1"#),
             String::from("UPDATE s SET id = id WHERE id = ?1"),
             String::from("DELETE FROM s WHERE id = ?1"),
             String::from(r#"SELECT id AS "id!" FROM s"#),
-        ],
-    ]
-);
+        ]
+    );
+}
 
-laws::table!(
-    a_record_table_overwrites_one_column,
-    |column: &&str| Table::named("r").overwrite(column),
-    [
-        "id" => String::from("UPDATE r SET id = ?1"),
-        "body" => String::from("UPDATE r SET body = ?1"),
-    ]
-);
+#[test]
+fn a_record_table_overwrites_one_column() {
+    assert_eq!(Table::named("r").overwrite("id"), "UPDATE r SET id = ?1");
+    assert_eq!(Table::named("r").overwrite("body"), "UPDATE r SET body = ?1");
+}

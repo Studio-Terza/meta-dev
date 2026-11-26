@@ -1,6 +1,3 @@
-#[path = "generated/laws.rs"]
-mod generated_laws;
-
 use std::sync::Mutex;
 
 use invariants::{Ignoring, Unpoisoned, ignored};

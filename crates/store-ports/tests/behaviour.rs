@@ -1,6 +1,3 @@
-#[path = "generated/laws.rs"]
-mod generated_laws;
-
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::sync::LazyLock;

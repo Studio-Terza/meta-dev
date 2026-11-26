@@ -1,6 +1,3 @@
-#[path = "generated/laws.rs"]
-mod generated_laws;
-
 use workspace_metadata::CrateName;
 
 use workspace_metadata::{Graph, Library, Metadata};

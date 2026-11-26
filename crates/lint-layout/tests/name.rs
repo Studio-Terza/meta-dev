@@ -1,30 +1,42 @@
-#[path = "generated/laws.rs"]
-mod generated_laws;
-
-use laws::proptest::prop_assert;
 use lint_layout::{Casing, Lowered, Name};
+use proptest::prelude::{prop_assert, proptest};
+use proptest::test_runner::{Config, RngSeed};
 
-laws::law!(a_name_displays_the_text_it_was_made_from, "[a-zA-Z_]{1,12}", text, {
-    let name = Name::from(text.as_str());
-    prop_assert!(name.to_string() == text);
-});
+proptest! {
+    #![proptest_config(Config { failure_persistence: None, rng_seed: RngSeed::Fixed(0), ..Config::default() })]
+    #[test]
+    fn a_name_displays_the_text_it_was_made_from(text in "[a-zA-Z_]{1,12}") {
+        let name = Name::from(text.as_str());
+        prop_assert!(name.to_string() == text);
+    }
 
-laws::law!(lowering_a_name_ignores_its_case, "[a-zA-Z_]{1,12}", text, {
-    let lower: String = text.chars().flat_map(char::to_lowercase).collect();
-    let lowered: Lowered = Name::from(text.as_str()).lowered();
-    prop_assert!(lowered == Name::from(lower.as_str()).lowered());
-});
+    #[test]
+    fn lowering_a_name_ignores_its_case(text in "[a-zA-Z_]{1,12}") {
+        let lower: String = text.chars().flat_map(char::to_lowercase).collect();
+        let lowered: Lowered = Name::from(text.as_str()).lowered();
+        prop_assert!(lowered == Name::from(lower.as_str()).lowered());
+    }
+}
 
-laws::table!(a_name_is_cased_by_its_letters, |text: &&str| Name::from(*text).casing(), [
-    "snake_case" => Casing::Lower,
-    "CamelCase" => Casing::Camel,
-    "A1" => Casing::Camel,
-    "SHOUTING" => Casing::Shouting,
-    "_hidden" => Casing::Other,
-]);
+#[test]
+fn a_name_is_cased_by_its_letters() {
+    [
+        ("snake_case", Casing::Lower),
+        ("CamelCase", Casing::Camel),
+        ("A1", Casing::Camel),
+        ("SHOUTING", Casing::Shouting),
+        ("_hidden", Casing::Other),
+    ]
+    .into_iter()
+    .for_each(|(text, want)| assert_eq!(Name::from(text).casing(), want, "{text}"));
+}
 
-laws::table!(a_name_splits_into_lowered_humps, |text: &&str| Name::from(*text).humps().map(|hump| hump.to_string()).collect::<Vec<_>>().join(" "), [
-    "PortTrait" => "port trait".to_owned(),
-    "read_all_files" => "read all files".to_owned(),
-    "HTTPServer" => "http server".to_owned(),
-]);
+#[test]
+fn a_name_splits_into_lowered_humps() {
+    [("PortTrait", "port trait"), ("read_all_files", "read all files"), ("HTTPServer", "http server")]
+        .into_iter()
+        .for_each(|(text, want)| {
+            let humps: Vec<String> = Name::from(text).humps().map(|hump| hump.to_string()).collect();
+            assert_eq!(humps.join(" "), want, "{text}");
+        });
+}
