@@ -1,5 +1,4 @@
 use std::collections::BTreeSet;
-use std::fmt;
 
 use lint_layout::Name;
 
@@ -27,10 +26,13 @@ pub enum LawKind {
     Property(Property),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(strum::Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Side {
+    #[strum(serialize = "input side")]
     Input,
+    #[strum(serialize = "output side")]
     Output,
+    #[strum(serialize = "edge function")]
     Edge,
 }
 
@@ -157,16 +159,6 @@ impl Law {
 impl AsRef<Name> for Law {
     fn as_ref(&self) -> &Name {
         &self.title
-    }
-}
-
-impl fmt::Display for Side {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Side::Input => formatter.write_str("input side"),
-            Side::Output => formatter.write_str("output side"),
-            Side::Edge => formatter.write_str("edge function"),
-        }
     }
 }
 

@@ -59,24 +59,17 @@ impl lint_core::Finding for Finding<'_> {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(strum::Display, Clone, Copy, Debug)]
 enum Naming {
+    #[strum(serialize = "local names")]
     Local,
+    #[strum(serialize = "names")]
     Every,
 }
 
 impl Naming {
     fn erased_by(equivalence: Equivalence) -> Naming {
         equivalence.unerased(Erased::Names, Naming::Local).unwrap_or(Naming::Every)
-    }
-}
-
-impl fmt::Display for Naming {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Naming::Local => write!(formatter, "local names"),
-            Naming::Every => write!(formatter, "names"),
-        }
     }
 }
 

@@ -16,7 +16,7 @@ dispatch-ports = { path = "../dispatch-ports" }
 grammar-cited = { path = "../grammar-cited" }
 grammar-directive = { path = "../grammar-directive" }
 grammar-output = { path = "../grammar-output" }
-named-derive = { path = "../named-derive" }
+strum.workspace = true
 newtype = { path = "../newtype" }
 text-lines = { path = "../text-lines" }
 thiserror.workspace = true

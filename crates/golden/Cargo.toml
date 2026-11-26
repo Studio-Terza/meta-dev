@@ -20,6 +20,7 @@ console-ports = { path = "../console-ports" }
 file-ports = { path = "../file-ports" }
 newtype = { path = "../newtype" }
 text-lines = { path = "../text-lines" }
+strum.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]

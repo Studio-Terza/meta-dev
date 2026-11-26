@@ -1,16 +1,8 @@
-use std::fmt;
+use strum::Display;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Display, Clone, Copy, Debug)]
+#[strum(serialize_all = "snake_case")]
 pub enum Document {
     Limits,
     Measured,
-}
-
-impl fmt::Display for Document {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Document::Limits => formatter.write_str("limits"),
-            Document::Measured => formatter.write_str("measured"),
-        }
-    }
 }

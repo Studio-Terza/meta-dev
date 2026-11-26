@@ -27,7 +27,7 @@ grammar-timing-page = { path = "../grammar-timing-page" }
 grammar-unit-label = { path = "../grammar-unit-label" }
 newtype = { path = "../newtype" }
 mutation-report = { path = "../mutation-report" }
-named-derive = { path = "../named-derive" }
+strum.workspace = true
 reach = { path = "../reach" }
 text-lines = { path = "../text-lines" }
 serde.workspace = true

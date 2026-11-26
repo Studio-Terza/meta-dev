@@ -3,22 +3,25 @@ mod extensions;
 mod fix;
 
 use std::ffi::OsStr;
-use std::fmt;
 use std::path::Path;
 
 use content::Content;
 use extensions::Extensions;
 pub(crate) use fix::Fix;
 use lint_core::RepoFile;
+use strum::{Display, VariantArray};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Language {
     Python,
+    #[strum(serialize = "shell")]
     Shell,
+    #[strum(serialize = "batch")]
     Batch,
     PowerShell,
     Perl,
     Ruby,
+    #[strum(serialize = "PHP")]
     Php,
     Lua,
     Go,
@@ -26,9 +29,12 @@ pub enum Language {
     Kotlin,
     Scala,
     Swift,
+    #[strum(serialize = "Objective-C")]
     ObjectiveC,
     C,
+    #[strum(serialize = "C++")]
     Cpp,
+    #[strum(serialize = "C#")]
     CSharp,
     Dart,
     Haskell,
@@ -36,6 +42,7 @@ pub enum Language {
     Erlang,
     Clojure,
     OCaml,
+    #[strum(serialize = "F#")]
     FSharp,
     R,
     Julia,
@@ -43,23 +50,32 @@ pub enum Language {
     Zig,
     JavaScript,
     TypeScript,
+    #[strum(serialize = "HTML")]
     Html,
+    #[strum(serialize = "CSS")]
     Css,
     Vue,
     Svelte,
+    #[strum(serialize = "awk")]
     Awk,
+    #[strum(serialize = "sed")]
     Sed,
     Tcl,
     Nix,
+    #[strum(serialize = "make")]
     Make,
+    #[strum(serialize = "notebook")]
     Notebook,
+    #[strum(serialize = "Vim script")]
     Vim,
     Lisp,
     Scheme,
     Racket,
     Nim,
+    #[strum(serialize = "Visual Basic")]
     VisualBasic,
     Solidity,
+    #[strum(serialize = "assembly")]
     Assembly,
     D,
     Pascal,
@@ -69,70 +85,11 @@ pub enum Language {
     Arduino,
     Starlark,
     Astro,
+    #[strum(serialize = "interpreted script")]
     Script,
 }
 
 impl Language {
-    const ALL: &'static [Language] = &[
-        Language::Python,
-        Language::Shell,
-        Language::Batch,
-        Language::PowerShell,
-        Language::Perl,
-        Language::Ruby,
-        Language::Php,
-        Language::Lua,
-        Language::Go,
-        Language::Java,
-        Language::Kotlin,
-        Language::Scala,
-        Language::Swift,
-        Language::ObjectiveC,
-        Language::C,
-        Language::Cpp,
-        Language::CSharp,
-        Language::Dart,
-        Language::Haskell,
-        Language::Elixir,
-        Language::Erlang,
-        Language::Clojure,
-        Language::OCaml,
-        Language::FSharp,
-        Language::R,
-        Language::Julia,
-        Language::Groovy,
-        Language::Zig,
-        Language::JavaScript,
-        Language::TypeScript,
-        Language::Html,
-        Language::Css,
-        Language::Vue,
-        Language::Svelte,
-        Language::Awk,
-        Language::Sed,
-        Language::Tcl,
-        Language::Nix,
-        Language::Make,
-        Language::Notebook,
-        Language::Vim,
-        Language::Lisp,
-        Language::Scheme,
-        Language::Racket,
-        Language::Nim,
-        Language::VisualBasic,
-        Language::Solidity,
-        Language::Assembly,
-        Language::D,
-        Language::Pascal,
-        Language::Fortran,
-        Language::Crystal,
-        Language::V,
-        Language::Arduino,
-        Language::Starlark,
-        Language::Astro,
-        Language::Script,
-    ];
-
     const RUST: &'static str = "rs";
 
     #[must_use]
@@ -148,7 +105,7 @@ impl Language {
     }
 
     fn by_extension(extension: &OsStr) -> Option<Language> {
-        Self::ALL.iter().copied().find(|language| language.extensions().holding(extension).is_some())
+        Self::VARIANTS.iter().copied().find(|language| language.extensions().holding(extension).is_some())
     }
 
     #[must_use]
@@ -224,70 +181,6 @@ impl Language {
             Language::Starlark => Extensions::new(&["bzl"]),
             Language::Astro => Extensions::new(&["astro"]),
             Language::Script => Extensions::new(&[]),
-        }
-    }
-}
-
-impl fmt::Display for Language {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Language::Python => formatter.write_str("Python"),
-            Language::Shell => formatter.write_str("shell"),
-            Language::Batch => formatter.write_str("batch"),
-            Language::PowerShell => formatter.write_str("PowerShell"),
-            Language::Perl => formatter.write_str("Perl"),
-            Language::Ruby => formatter.write_str("Ruby"),
-            Language::Php => formatter.write_str("PHP"),
-            Language::Lua => formatter.write_str("Lua"),
-            Language::Go => formatter.write_str("Go"),
-            Language::Java => formatter.write_str("Java"),
-            Language::Kotlin => formatter.write_str("Kotlin"),
-            Language::Scala => formatter.write_str("Scala"),
-            Language::Swift => formatter.write_str("Swift"),
-            Language::ObjectiveC => formatter.write_str("Objective-C"),
-            Language::C => formatter.write_str("C"),
-            Language::Cpp => formatter.write_str("C++"),
-            Language::CSharp => formatter.write_str("C#"),
-            Language::Dart => formatter.write_str("Dart"),
-            Language::Haskell => formatter.write_str("Haskell"),
-            Language::Elixir => formatter.write_str("Elixir"),
-            Language::Erlang => formatter.write_str("Erlang"),
-            Language::Clojure => formatter.write_str("Clojure"),
-            Language::OCaml => formatter.write_str("OCaml"),
-            Language::FSharp => formatter.write_str("F#"),
-            Language::R => formatter.write_str("R"),
-            Language::Julia => formatter.write_str("Julia"),
-            Language::Groovy => formatter.write_str("Groovy"),
-            Language::Zig => formatter.write_str("Zig"),
-            Language::JavaScript => formatter.write_str("JavaScript"),
-            Language::TypeScript => formatter.write_str("TypeScript"),
-            Language::Html => formatter.write_str("HTML"),
-            Language::Css => formatter.write_str("CSS"),
-            Language::Vue => formatter.write_str("Vue"),
-            Language::Svelte => formatter.write_str("Svelte"),
-            Language::Awk => formatter.write_str("awk"),
-            Language::Sed => formatter.write_str("sed"),
-            Language::Tcl => formatter.write_str("Tcl"),
-            Language::Nix => formatter.write_str("Nix"),
-            Language::Make => formatter.write_str("make"),
-            Language::Notebook => formatter.write_str("notebook"),
-            Language::Vim => formatter.write_str("Vim script"),
-            Language::Lisp => formatter.write_str("Lisp"),
-            Language::Scheme => formatter.write_str("Scheme"),
-            Language::Racket => formatter.write_str("Racket"),
-            Language::Nim => formatter.write_str("Nim"),
-            Language::VisualBasic => formatter.write_str("Visual Basic"),
-            Language::Solidity => formatter.write_str("Solidity"),
-            Language::Assembly => formatter.write_str("assembly"),
-            Language::D => formatter.write_str("D"),
-            Language::Pascal => formatter.write_str("Pascal"),
-            Language::Fortran => formatter.write_str("Fortran"),
-            Language::Crystal => formatter.write_str("Crystal"),
-            Language::V => formatter.write_str("V"),
-            Language::Arduino => formatter.write_str("Arduino"),
-            Language::Starlark => formatter.write_str("Starlark"),
-            Language::Astro => formatter.write_str("Astro"),
-            Language::Script => formatter.write_str("interpreted script"),
         }
     }
 }

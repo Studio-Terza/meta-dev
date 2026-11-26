@@ -16,6 +16,7 @@ newtype = { path = "../newtype" }
 text-lines = { path = "../text-lines" }
 serde.workspace = true
 serde_json.workspace = true
+strum.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]

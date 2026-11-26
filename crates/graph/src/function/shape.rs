@@ -9,19 +9,27 @@ use crate::type_ref::{Bounds, Callable, Element, Grouped, Named, Outline, Projec
 
 use super::{Function, Input, Receiver};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(strum::Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Taken {
+    #[strum(serialize = "Self")]
     Itself,
+    #[strum(serialize = "_")]
     Other,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(strum::Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Returned {
+    #[strum(serialize = "")]
     Nothing,
+    #[strum(serialize = " -> Self")]
     Itself,
+    #[strum(serialize = " -> Option")]
     Optional,
+    #[strum(serialize = " -> Result")]
     Fallible,
+    #[strum(serialize = " -> many")]
     Many,
+    #[strum(serialize = " -> _")]
     Value,
 }
 
@@ -143,28 +151,6 @@ impl From<&Function> for MethodShape {
             receiver: signature.inputs().iter().find_map(Input::receiver),
             takes: signature.inputs().iter().filter_map(Input::typed).map(|ty| selfhood.taken(ty)).collect(),
             returned: signature.output().written().map_or(Returned::Nothing, |ty| ty.outlined(selfhood)),
-        }
-    }
-}
-
-impl fmt::Display for Taken {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Taken::Itself => formatter.write_str("Self"),
-            Taken::Other => formatter.write_str("_"),
-        }
-    }
-}
-
-impl fmt::Display for Returned {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Returned::Nothing => formatter.write_str(""),
-            Returned::Itself => formatter.write_str(" -> Self"),
-            Returned::Optional => formatter.write_str(" -> Option"),
-            Returned::Fallible => formatter.write_str(" -> Result"),
-            Returned::Many => formatter.write_str(" -> many"),
-            Returned::Value => formatter.write_str(" -> _"),
         }
     }
 }

@@ -1,13 +1,14 @@
 mod boundary;
 
 use design_model::{NodeId, NodeRelation, Segment, SegmentRelation};
-use named_derive::Named;
+use newtype::Listed;
 use store_ports::{Execute, StoreFailure};
+use strum::{Display, IntoStaticStr, VariantArray};
 
 pub use boundary::{Closing, Keyed};
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
-#[named(kebab)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "kebab-case")]
 pub enum Closed {
     Refines,
     Supersedes,

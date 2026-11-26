@@ -13,19 +13,12 @@ enum Cargo {
     Workspace,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(strum::Display, Debug, Clone, Copy, PartialEq, Eq)]
 enum Flag {
+    #[strum(serialize = "-p ")]
     Cargo,
+    #[strum(serialize = "--test-package=")]
     Mutants,
-}
-
-impl fmt::Display for Flag {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Flag::Cargo => formatter.write_str("-p "),
-            Flag::Mutants => formatter.write_str("--test-package="),
-        }
-    }
 }
 
 #[derive(Debug)]

@@ -238,12 +238,7 @@ impl Reading for Shaped {
     type Output = &'static str;
 
     fn entry(self, _line: &Line, _entry: &Entry, marking: Marking) -> &'static str {
-        match marking {
-            Marking::Heading => "heading",
-            Marking::Ruling => "ruling",
-            Marking::Lead => "lead",
-            Marking::Remark => "remark",
-        }
+        marking.into()
     }
 }
 

@@ -16,6 +16,7 @@ use file_ports::Files;
 use invariants::Ignoring;
 use lint_layout::{Name, Whole, Word};
 use source_directory::SourceDirectory;
+use strum::{EnumString, IntoStaticStr};
 use target_directory::TargetDirectory;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -28,9 +29,8 @@ pub struct Placement {
 
 impl Placement {
     const TARGET_DIRECTORIES: [&'static str; 3] = ["tests", "examples", "benches"];
-    const SOURCE_DIRECTORY: &'static str = "src";
+    const SOURCE_DIRECTORY: &'static str = PackageDirectory::Source.into_str();
     const LIBRARY_FILE: &'static str = "lib.rs";
-    const BUILD_FILE: &'static str = "build.rs";
 
     #[must_use]
     pub fn locate(files: &impl Files, path: &Path) -> Placement {
@@ -112,37 +112,26 @@ impl Placement {
         let first = inside.components().next()?;
         let rest = inside.strip_prefix(first).ignoring(Ignored::Outside)?;
         let directory = first.as_os_str().to_str()?;
-        PackageDirectory::from(directory).placed(root, &package.join(directory), rest)
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum PackageDirectory {
-    Source,
-    Build,
-    Target,
-    Other,
-}
-
-impl PackageDirectory {
-    const NAMED: [(&'static str, PackageDirectory); 2] =
-        [(Placement::SOURCE_DIRECTORY, PackageDirectory::Source), (Placement::BUILD_FILE, PackageDirectory::Build)];
-}
-
-impl From<&str> for PackageDirectory {
-    fn from(directory: &str) -> PackageDirectory {
-        PackageDirectory::NAMED
-            .iter()
-            .find(|(name, _)| *name == directory)
-            .map(|(_, named)| *named)
-            .or_else(|| {
-                Placement::TARGET_DIRECTORIES
-                    .iter()
-                    .find(|target| **target == directory)
-                    .map(|_| PackageDirectory::Target)
-            })
+        directory
+            .parse::<PackageDirectory>()
+            .ignoring(Ignored::Unnamed)
+            .or_else(|| Self::TARGET_DIRECTORIES.contains(&directory).then_some(PackageDirectory::Target))
             .unwrap_or(PackageDirectory::Other)
+            .placed(root, &package.join(directory), rest)
     }
+}
+
+#[derive(EnumString, IntoStaticStr, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(const_into_str)]
+enum PackageDirectory {
+    #[strum(serialize = "src")]
+    Source,
+    #[strum(serialize = "build.rs")]
+    Build,
+    #[strum(disabled)]
+    Target,
+    #[strum(disabled)]
+    Other,
 }
 
 impl PackageDirectory {

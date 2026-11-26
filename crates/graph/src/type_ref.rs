@@ -348,19 +348,12 @@ impl<From, Into, Resolve: Fn(&From) -> Into> Rebuild<From> for Mapping<Resolve> 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Brief<'ty>(&'ty TypeRef);
 
-#[derive(Clone, Copy, Debug)]
+#[derive(strum::Display, Clone, Copy, Debug)]
 enum Separator {
+    #[strum(serialize = ", ")]
     Comma,
+    #[strum(serialize = " + ")]
     Plus,
-}
-
-impl fmt::Display for Separator {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Separator::Comma => formatter.write_str(", "),
-            Separator::Plus => formatter.write_str(" + "),
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug)]

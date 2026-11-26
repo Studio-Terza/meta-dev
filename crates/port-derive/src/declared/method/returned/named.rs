@@ -1,8 +1,16 @@
+use strum::{IntoStaticStr, VariantArray};
 use syntax::{AngleBracketedGenericArguments, GenericArgument, PathArguments, PathSegment, Type, TypePath};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Spine {
     Wrapper,
+    Held,
+}
+
+#[derive(IntoStaticStr, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
+enum Spelled {
+    Option,
+    Result,
     Held,
 }
 
@@ -17,11 +25,17 @@ pub struct Slot<'tree> {
 }
 
 impl Spine {
-    const NAMES: [(&'static str, Spine); 3] =
-        [("Option", Spine::Wrapper), ("Result", Spine::Wrapper), ("Held", Spine::Held)];
-
     pub fn named(segment: &PathSegment) -> Option<Spine> {
-        Self::NAMES.iter().find(|(name, _)| segment.ident == name).map(|(_, spine)| *spine)
+        Spelled::VARIANTS.iter().find(|spelled| segment.ident == <&str>::from(**spelled)).map(|spelled| spelled.spine())
+    }
+}
+
+impl Spelled {
+    fn spine(self) -> Spine {
+        match self {
+            Spelled::Option | Spelled::Result => Spine::Wrapper,
+            Spelled::Held => Spine::Held,
+        }
     }
 }
 

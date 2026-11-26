@@ -7,9 +7,9 @@ use design_model::{
 };
 use grammar_output::field::{Id, Phrase, Quoted, Word};
 use grammar_output::{Fields, Mapped, Parsed, Record, Unread};
-use named_derive::Named;
 use newtype::Enumerated;
 use newtype::Wrapping;
+use strum::{Display, IntoStaticStr, VariantArray};
 use text_lines::Lines;
 
 use crate::ignored::Ignored;
@@ -33,7 +33,8 @@ enum Brief {
     Retry(Lapse),
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, IntoStaticStr, VariantArray, newtype::Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
 enum Key {
     Rule,
     Form,
@@ -45,48 +46,48 @@ enum Key {
     Retry,
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, IntoStaticStr, VariantArray, newtype::Listed, Clone, Copy, Debug, PartialEq, Eq)]
 enum Rule {
-    #[name("You structure a project owner's words into a design graph.")]
+    #[strum(serialize = "You structure a project owner's words into a design graph.")]
     Role,
-    #[name(
-        "Reply with directive lines only, one directive per line, with no prose, numbering or code fences; each line takes one of the forms below."
+    #[strum(
+        serialize = "Reply with directive lines only, one directive per line, with no prose, numbering or code fences; each line takes one of the forms below."
     )]
     Reply,
-    #[name("A choices line lists the words that one slot of the forms takes.")]
+    #[strum(serialize = "A choices line lists the words that one slot of the forms takes.")]
     Choose,
-    #[name(
-        "Sense as a question only a design question the owner has yet to decide; sense as an ask a request to the lead for status, explanation or analysis, which the lead's reply settles; sense an opinion, argument or instruction phrased as a question as an opinion, remark or instruction."
+    #[strum(
+        serialize = "Sense as a question only a design question the owner has yet to decide; sense as an ask a request to the lead for status, explanation or analysis, which the lead's reply settles; sense an opinion, argument or instruction phrased as a question as an opinion, remark or instruction."
     )]
     Kinds,
-    #[name(
-        "Give every segment below at least one directive: mark chatter conversational; otherwise place it on the node it is about, proposing a node that refines the closest listed node when none fits, and sense it. A link is a directive for its first segment only, so a segment below that it links to needs its own; an asked line needs none. The listed nodes span every project; a node line names its project, and a segment goes under the project it is about."
+    #[strum(
+        serialize = "Give every segment below at least one directive: mark chatter conversational; otherwise place it on the node it is about, proposing a node that refines the closest listed node when none fits, and sense it. A link is a directive for its first segment only, so a segment below that it links to needs its own; an asked line needs none. The listed nodes span every project; a node line names its project, and a segment goes under the project it is about."
     )]
     Cover,
-    #[name(
-        "Write a segment exactly as listed, its message id, a dot and its index; write a node as n and its number, or as the label of a node proposed earlier in your reply."
+    #[strum(
+        serialize = "Write a segment exactly as listed, its message id, a dot and its index; write a node as n and its number, or as the label of a node proposed earlier in your reply."
     )]
     Refer,
-    #[name(
-        "An asked line shows a question still open from earlier in the session; it is a link target only and is never given a directive of its own, whether place, sense or any other: when a segment answers or decides it, link that segment to it as answers, and place and sense that segment as usual."
+    #[strum(
+        serialize = "An asked line shows a question still open from earlier in the session; it is a link target only and is never given a directive of its own, whether place, sense or any other: when a segment answers or decides it, link that segment to it as answers, and place and sense that segment as usual."
     )]
     Link,
-    #[name(
-        "Your previous reply could not be used, for the reason on the retry line; reply again, following the forms exactly."
+    #[strum(
+        serialize = "Your previous reply could not be used, for the reason on the retry line; reply again, following the forms exactly."
     )]
     Again,
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, IntoStaticStr, VariantArray, newtype::Listed, Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Sample {
-    #[name("topic")]
+    #[strum(serialize = "topic")]
     Label,
-    #[name("what the segment is about")]
+    #[strum(serialize = "what the segment is about")]
     Title,
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
-#[named(kebab)]
+#[derive(Display, IntoStaticStr, VariantArray, newtype::Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "kebab-case")]
 enum Choice {
     SpanRelation,
     SegmentRelation,
@@ -112,10 +113,6 @@ impl Rule {
     const CLOSING: [Rule; 4] = [Rule::Kinds, Rule::Cover, Rule::Refer, Rule::Link];
 }
 
-impl Listing {
-    const ALL: [Listing; 2] = [Listing::Segment, Listing::Asked];
-}
-
 impl From<Listing> for Key {
     fn from(listing: Listing) -> Key {
         match listing {
@@ -125,21 +122,7 @@ impl From<Listing> for Key {
     }
 }
 
-impl Form {
-    const ALL: [Form; 6] = [Form::Place, Form::Sense, Form::Link, Form::Propose, Form::Supersede, Form::Conversational];
-}
-
 impl Choice {
-    const ALL: [Choice; 7] = [
-        Choice::SpanRelation,
-        Choice::SegmentRelation,
-        Choice::Kind,
-        Choice::Specificity,
-        Choice::Confidence,
-        Choice::Explicitness,
-        Choice::Facet,
-    ];
-
     fn read(self, fields: Fields) -> Result<Parsed<Choice, Fields>, Unread> {
         match self {
             Choice::SpanRelation => fields.passing(SpanRelation::VARIANTS, self),
@@ -178,12 +161,12 @@ impl Job {
             Rule::OPENING
                 .into_iter()
                 .map(Brief::Rule)
-                .chain(Form::ALL.into_iter().map(Brief::Form))
-                .chain(Choice::ALL.into_iter().map(Brief::Choices))
+                .chain(Form::VARIANTS.iter().copied().map(Brief::Form))
+                .chain(Choice::VARIANTS.iter().copied().map(Brief::Choices))
                 .chain(Rule::CLOSING.into_iter().map(Brief::Rule))
                 .chain(Briefing::examples(self).into_iter().map(Brief::Example))
                 .chain(
-                    Listing::ALL.into_iter().flat_map(|listing| {
+                    Listing::VARIANTS.iter().copied().flat_map(|listing| {
                         self.said(listing).iter().cloned().map(move |said| Brief::Said(listing, said))
                     }),
                 )
