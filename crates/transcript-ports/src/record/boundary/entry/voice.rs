@@ -1,8 +1,8 @@
 use serde::Deserialize;
 
-use super::said::Hears;
+use super::said::{Hears, Launch, Sent};
 use super::stamp::Stamp;
-use crate::{Authorship, Body, Line, Skipped, Unrecognised};
+use crate::{Authorship, Body, Happening, Line, Skipped, Unrecognised};
 
 #[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
@@ -32,11 +32,11 @@ impl Source {
     fn spoke(self, stamp: Stamp, text: Body) -> Line {
         match self {
             Source::Human => stamp.said(Authorship::Owner, text),
-            Source::TaskNotification
-            | Source::Unclassified
-            | Source::Coordinator
-            | Source::Peer
-            | Source::AutoContinuation => Line::Skipped(Skipped::from(stamp)),
+            Source::TaskNotification => stamp.happened(Happening::Notice, text),
+            Source::Peer => stamp.happened(Happening::Relayed, text),
+            Source::Unclassified | Source::Coordinator | Source::AutoContinuation => {
+                Line::Skipped(Skipped::from(stamp))
+            }
         }
     }
 }
@@ -67,8 +67,16 @@ impl Hears for Listener {
     fn text(self, text: Body) -> Line {
         match self.origin {
             Some(origin) => origin.spoke(self.stamp, text),
-            None => Line::Skipped(Skipped::from(self.stamp)),
+            None => self.stamp.happened(Happening::Relayed, text),
         }
+    }
+
+    fn launched(self, _launch: Launch) -> Line {
+        self.silence()
+    }
+
+    fn sent(self, _sent: Sent) -> Line {
+        self.silence()
     }
 
     fn silence(self) -> Line {

@@ -1,20 +1,25 @@
+mod waits;
+
 use std::collections::BTreeMap;
 
 use console_ports::{Heard, Shown};
+use design_model::{Awaited, Fate};
 use design_runs::{Account, FailuresReported, UnreportedFailures};
-use design_store::LastSaid;
+use design_store::{LastSaid, SessionEvents, Stopped};
 use dispatch_ports::{Clock, Dispatch};
 use newtype::Wrapping;
 use serde::{Deserialize, Serialize};
 use store_ports::Store;
 use transcript_ports::{Body, SessionId};
 
-use super::answers::{Answering, Answers, Recollection, Remembered};
+use super::super::structure::Crew;
+use super::answers::{Answering, Answers, Recollection, Remembered, Traced};
 use crate::cli::failure::Failure;
 use crate::cli::output::Count;
 use crate::cli::request::ignored::Ignored;
 use crate::{HookEvent, Outcome, Uttered};
 use invariants::Ignoring;
+use waits::{Snapshot, Stall, Wait};
 
 #[derive(Debug, Serialize)]
 pub struct Settings {
@@ -120,21 +125,43 @@ impl Stopping {
         &self,
         concluded: Result<Count, Failure>,
         store: &S,
-        answering: &Answering<'_, S, D, C>,
+        crew: &Crew<'_, D, C>,
     ) -> Result<Uttered, Failure> {
         match self.continuation.0 {
             Some(Continuing) => Self::continued(concluded),
-            None => Decision::told(store, HookEvent::Stop, &[], self.answered(store, answering).as_ref()),
+            None => self.checked(store, crew),
         }
     }
 
-    fn answered<S: Store, D: Dispatch, C: Clock>(
-        &self,
-        store: &S,
-        answering: &Answering<'_, S, D, C>,
-    ) -> Option<Answers> {
+    fn checked<S: Store, D: Dispatch, C: Clock>(&self, store: &S, crew: &Crew<'_, D, C>) -> Result<Uttered, Failure> {
+        let answering = Answering::new(store, crew);
         let last = self.said.clone().or_else(|| self.stored(store));
-        last.and_then(|said| answering.answered(&said).ignoring(Ignored::Unanswered)).flatten()
+        let traced = last.as_ref().and_then(|said| answering.traced(said).ignoring(Ignored::Unanswered));
+        let events = self
+            .session
+            .clone()
+            .and_then(|session| store.read(SessionEvents::from(session)).ignoring(Ignored::Unanswered));
+        let wait = last
+            .as_ref()
+            .zip(events)
+            .and_then(|(said, read)| Snapshot::from(read).waited(said, crew).ignoring(Ignored::Unanswered))
+            .unwrap_or(Wait::from(Awaited::Unchecked));
+        let trail = self.session.clone().map(|session| {
+            traced
+                .as_ref()
+                .map_or_else(|| Traced::Statement.heard(session.clone()), |heard| heard.heard(session.clone()))
+        });
+        let stopped: Vec<String> = traced
+            .and_then(Traced::answers)
+            .iter()
+            .map(Answers::to_string)
+            .chain(wait.stall().map(Stall::to_string))
+            .collect();
+        let fate = stopped.first().map_or(Fate::Passed, |_first| Fate::Blocked);
+        trail
+            .map(|row| store.write(Stopped::from(row.waited(wait.awaited(), wait.halt()).ended(fate))))
+            .and_then(|written| written.ignoring(Ignored::Unanswered));
+        Decision::told(store, HookEvent::Stop, &[], stopped)
     }
 
     fn stored(&self, store: &impl Store) -> Option<Body> {
@@ -163,7 +190,7 @@ impl Decision {
         store: &impl Store,
         event: HookEvent,
         recalled: &[Remembered],
-        answers: Option<&Answers>,
+        stopped: Vec<String>,
     ) -> Result<Uttered, Failure> {
         let unreported = store.read(UnreportedFailures)?;
         let accounts = unreported.iter().map(|failure| AsRef::<Account>::as_ref(failure).to_string());
@@ -172,7 +199,7 @@ impl Decision {
             .map(|_first| Self::RECALLED.to_owned())
             .into_iter()
             .chain(recalled.iter().map(Remembered::to_string));
-        let told: Vec<String> = accounts.chain(nodes).chain(answers.map(ToString::to_string)).collect();
+        let told: Vec<String> = accounts.chain(nodes).chain(stopped).collect();
         told.first().map(|_first| told.join("\n")).map_or(Ok(Uttered::silent(Ok(Outcome::Hooked(event)))), |joined| {
             let decision = Decision::telling(event, joined);
             let said = decision.said()?;

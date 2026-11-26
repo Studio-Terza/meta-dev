@@ -22,6 +22,7 @@ pub enum Outcome {
     Noticed,
     Told,
     Viewed,
+    Trailed,
     Imported,
     Retried { segments: Count },
 }

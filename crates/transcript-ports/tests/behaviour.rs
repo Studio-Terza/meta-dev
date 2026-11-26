@@ -13,8 +13,8 @@ use laws::proptest::test_runner::TestCaseError;
 use port_core::{Calls, Run};
 use transcript_ports::transcripts_ops::{ReadFrom, Sessions};
 use transcript_ports::{
-    Authorship, ClaudeCodeDir, Cursor, Instant, Kind, Read, Record, Session, SessionId, Skipped, Transcripts,
-    Unrecognised,
+    Authorship, Body, ClaudeCodeDir, Cursor, Event, Happening, Instant, Kind, Read, Record, Session, SessionId,
+    Skipped, Transcripts, Unrecognised,
 };
 
 ignored! {
@@ -152,6 +152,15 @@ impl From<Skipped> for Gathered {
             classes: Gathered::edge(&skipped).into_iter().collect(),
             skipped: vec![skipped],
         }
+    }
+}
+
+impl From<Event> for Gathered {
+    fn from(event: Event) -> Gathered {
+        let text: &Body = event.as_ref();
+        let skipped = Skipped::from(&event);
+        let classes = [format!("{:?} {text}", event.happening())].into_iter().chain(Gathered::edge(&skipped)).collect();
+        Gathered { records: Vec::new(), skipped: vec![skipped], classes }
     }
 }
 
@@ -414,24 +423,24 @@ laws::table!(
         r#""origin":{"kind":"human"},"message":{"content":[{"type":"image","source":{}},{"type":"text","text":"look"}]}"# => ["Owner look"],
         r#""origin":{"kind":"human"},"message":{"content":[{"type":"tool_result","content":"out"}]}"# => ["8 after 1"],
         r#""origin":{"kind":"human"},"isSidechain":true,"isMeta":true,"message":{"content":"relayed"}"# => ["8 after 1"],
-        r#""origin":{"kind":"task-notification"},"message":{"content":"finished"}"# => ["8 after 1"],
+        r#""origin":{"kind":"task-notification"},"message":{"content":"finished"}"# => ["Notice finished", "8 after 1"],
         r#""origin":{"kind":"task-notification"},"isSidechain":true,"isMeta":true,"message":{"content":"finished"}"# => ["8 after 1"],
         r#""origin":{"kind":"coordinator"},"isSidechain":true,"isMeta":true,"message":{"content":"go"}"# => ["8 after 1"],
-        r#""origin":{"kind":"peer"},"isMeta":true,"message":{"content":"hello"}"# => ["8 after 1"],
+        r#""origin":{"kind":"peer"},"isMeta":true,"message":{"content":"hello"}"# => ["Relayed hello", "8 after 1"],
         r#""origin":{"kind":"peer"},"isSidechain":true,"isMeta":true,"message":{"content":"hello"}"# => ["8 after 1"],
         r#""origin":{"kind":"unclassified"},"isSidechain":true,"message":{"content":[{"type":"tool_result","content":"out"}]}"# => ["8 after 1"],
         r#""origin":{"kind":"unclassified"},"isSidechain":true,"message":{"content":"brief"}"# => ["8 after 1"],
         r#""origin":{"kind":"auto-continuation"},"isMeta":true,"message":{"content":"continue"}"# => ["8 after 1"],
         r#""origin":null,"message":{"content":[{"type":"tool_result","content":"out"}]}"# => ["8 after 1"],
         r#""isSidechain":true,"message":{"content":[{"type":"tool_result","content":"out"}]}"# => ["8 after 1"],
-        r#""message":{"content":"<command-name>/compact</command-name>"}"# => ["8 after 1"],
-        r#""isMeta":true,"message":{"content":"caveat"}"# => ["8 after 1"],
+        r#""message":{"content":"<command-name>/compact</command-name>"}"# => ["Relayed <command-name>/compact</command-name>", "8 after 1"],
+        r#""isMeta":true,"message":{"content":"caveat"}"# => ["Relayed caveat", "8 after 1"],
         r#""isSidechain":true,"message":{"content":"brief"}"# => ["8 after 1"],
         r#""isSidechain":true,"isMeta":true,"message":{"content":"brief"}"# => ["8 after 1"],
-        r#""message":{"content":[{"type":"text","text":"[Request interrupted by user]"}]}"# => ["8 after 1"],
-        r#""isMeta":true,"message":{"content":[{"type":"text","text":"skill"}]}"# => ["8 after 1"],
+        r#""message":{"content":[{"type":"text","text":"[Request interrupted by user]"}]}"# => ["Relayed [Request interrupted by user]", "8 after 1"],
+        r#""isMeta":true,"message":{"content":[{"type":"text","text":"skill"}]}"# => ["Relayed skill", "8 after 1"],
         r#""isSidechain":true,"message":{"content":[{"type":"text","text":"a"},{"type":"tool_result","content":"b"}]}"# => ["8 after 1"],
-        r#""isCompactSummary":true,"isVisibleInTranscriptOnly":true,"message":{"content":"summary"}"# => ["8 after 1"],
+        r#""isCompactSummary":true,"isVisibleInTranscriptOnly":true,"message":{"content":"summary"}"# => ["Relayed summary", "8 after 1"],
         r#""origin":{"kind":"brand-new-kind"},"message":{"content":"hello"}"# => ["unrecognised brand-new-kind", "8 after 1"],
         r#""origin":{"kind":"brand-new-kind"},"message":{"content":[{"type":"tool_result","content":"out"}]}"# => ["unrecognised brand-new-kind", "8 after 1"],
         r#""origin":{"kind":"human"},"message":{"content":[{"type":"document"},{"type":"text","text":"a"}]}"# => ["unrecognised document", "8 after 1"],
@@ -445,6 +454,10 @@ laws::table!(
         r#""message":{"model":"claude","content":[{"type":"text","text":"said"}]}"# => ["Lead said"],
         r#""message":{"model":"claude","content":[{"type":"thinking","thinking":"hmm"}]}"# => ["8 after 1"],
         r#""message":{"model":"claude","content":[{"type":"tool_use","name":"Bash"}]}"# => ["8 after 1"],
+        r#""message":{"model":"claude","content":[{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"run_in_background":true}}]}"# => ["Launch toolu_1", "8 after 1"],
+        r#""message":{"model":"claude","content":[{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"run_in_background":false}}]}"# => ["8 after 1"],
+        r#""message":{"model":"claude","content":[{"type":"tool_use","id":"toolu_2","name":"SendMessage","input":{"to":"nodyn","message":"go on"}}]}"# => ["Sent nodyn", "8 after 1"],
+        r#""message":{"model":"claude","content":[{"type":"tool_use","name":"Bash","input":{"run_in_background":true}}]}"# => ["8 after 1"],
         r#""isSidechain":true,"message":{"model":"claude","content":[{"type":"text","text":"subagent words"}]}"# => ["8 after 1"],
         r#""isSidechain":true,"message":{"model":"claude","content":[{"type":"thinking","thinking":"hmm"}]}"# => ["8 after 1"],
         r#""isSidechain":true,"message":{"model":"claude","content":[{"type":"tool_use","name":"Bash"}]}"# => ["8 after 1"],
@@ -462,10 +475,10 @@ laws::table!(
     [
         r#"{"type":"queued_command","prompt":"typed while busy","origin":{"kind":"human"}}"# => ["Owner typed while busy"],
         r#"{"type":"queued_command","prompt":[{"type":"text","text":"see"},{"type":"image"}],"origin":{"kind":"human"}}"# => ["Owner see"],
-        r#"{"type":"queued_command","prompt":"finished","origin":{"kind":"task-notification"}}"# => ["8 after 1"],
+        r#"{"type":"queued_command","prompt":"finished","origin":{"kind":"task-notification"}}"# => ["Notice finished", "8 after 1"],
         r#"{"type":"queued_command","prompt":"go","origin":{"kind":"coordinator"}}"# => ["8 after 1"],
-        r#"{"type":"queued_command","prompt":"hello","origin":{"kind":"peer"}}"# => ["8 after 1"],
-        r#"{"type":"queued_command","prompt":"finished"}"# => ["8 after 1"],
+        r#"{"type":"queued_command","prompt":"hello","origin":{"kind":"peer"}}"# => ["Relayed hello", "8 after 1"],
+        r#"{"type":"queued_command","prompt":"finished"}"# => ["Relayed finished", "8 after 1"],
         r#"{"type":"queued_command","prompt":"hello","origin":{"kind":"brand-new-kind"}}"# => ["unrecognised brand-new-kind", "8 after 1"],
         r#"{"type":"brand_new_attachment"}"# => ["unrecognised brand_new_attachment", "8 after 1"],
     ]
@@ -519,6 +532,14 @@ laws::roundtrip!(
     select(vec![Authorship::Owner, Authorship::Lead]),
     |author: &Authorship| author.to_string(),
     |name: &String| name.parse::<Authorship>().ignoring(Ignored::Refused),
+    Some,
+);
+
+laws::roundtrip!(
+    a_happening_is_read_back_from_its_display,
+    select(vec![Happening::Notice, Happening::Relayed, Happening::Launch, Happening::Sent]),
+    |happening: &Happening| happening.to_string(),
+    |name: &String| name.parse::<Happening>().ignoring(Ignored::Refused),
     Some,
 );
 

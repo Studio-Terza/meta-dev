@@ -1,86 +1,74 @@
 {
   "db_name": "SQLite",
-  "query": "\nSELECT\n  uuid,\n  session,\n  parent,\n  at,\n  author,\n  body\nFROM\n  messages\nWHERE\n  session = ?1\n  AND author = 'lead'\n  AND at < ?2\nORDER BY\n  at DESC\nLIMIT\n  1\n",
+  "query": "SELECT uuid AS \"uuid!\", session AS \"session!\", at AS \"at!\", happening AS \"happening!\", body AS \"body!\" FROM events WHERE uuid = ?1",
   "describe": {
     "columns": [
       {
-        "name": "uuid",
+        "name": "uuid!",
         "ordinal": 0,
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "messages",
+            "table": "events",
             "name": "uuid"
           }
         }
       },
       {
-        "name": "session",
+        "name": "session!",
         "ordinal": 1,
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "messages",
+            "table": "events",
             "name": "session"
           }
         }
       },
       {
-        "name": "parent",
+        "name": "at!",
         "ordinal": 2,
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "messages",
-            "name": "parent"
-          }
-        }
-      },
-      {
-        "name": "at",
-        "ordinal": 3,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "messages",
+            "table": "events",
             "name": "at"
           }
         }
       },
       {
-        "name": "author",
-        "ordinal": 4,
+        "name": "happening!",
+        "ordinal": 3,
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "messages",
-            "name": "author"
+            "table": "events",
+            "name": "happening"
           }
         }
       },
       {
-        "name": "body",
-        "ordinal": 5,
+        "name": "body!",
+        "ordinal": 4,
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "messages",
+            "table": "events",
             "name": "body"
           }
         }
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 1
     },
     "nullable": [
       false,
       false,
-      true,
       false,
       false,
       false
     ]
   },
-  "hash": "0b408e0cfcd243cae38201755857170a073e00aecd72d9bae169d26e396a43ac"
+  "hash": "0e024228dc7d62a280ecea80a18fae1833edfae6803a915bbdc1f52b92b5053e"
 }

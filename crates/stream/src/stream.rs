@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 
 use algebra::Semigroup;
 use newtype::{Arbitrary, Display, Newtype, Wrapping};
-use transcript_ports::{Line, Record, Skipped, Unrecognised, Uuid};
+use transcript_ports::{Event, Line, Record, Skipped, Unrecognised, Uuid};
 
 use crate::{Earlier, MechanicalLink, Message};
 use links::Links;
@@ -22,6 +22,7 @@ struct Resumed {
 pub struct Stream {
     messages: Vec<Message>,
     skipped: Vec<Skipped>,
+    events: Vec<Event>,
     unrecognised: Vec<Unrecognised>,
     resumed: Resumed,
 }
@@ -37,6 +38,7 @@ impl Semigroup for Stream {
         Stream {
             messages: self.messages.combine(later.messages),
             skipped: self.skipped.combine(later.skipped),
+            events: self.events.combine(later.events),
             unrecognised: self.unrecognised.combine(later.unrecognised),
             resumed: self.resumed,
         }
@@ -52,6 +54,12 @@ impl From<Record> for Stream {
 impl From<Skipped> for Stream {
     fn from(skipped: Skipped) -> Stream {
         Stream { skipped: vec![skipped], ..Stream::default() }
+    }
+}
+
+impl From<Event> for Stream {
+    fn from(event: Event) -> Stream {
+        Stream { skipped: vec![Skipped::from(&event)], events: vec![event], ..Stream::default() }
     }
 }
 
@@ -74,7 +82,7 @@ impl AsRef<[Message]> for Stream {
 impl Stream {
     pub(crate) fn after(messages: Vec<Message>, skipped: Vec<Skipped>) -> Stream {
         let resumed = Resumed { messages: Earliest::new(messages.len()), skipped: Earliest::new(skipped.len()) };
-        Stream { messages, skipped, unrecognised: Vec::new(), resumed }
+        Stream { messages, skipped, events: Vec::new(), unrecognised: Vec::new(), resumed }
     }
 
     #[must_use]
@@ -90,6 +98,11 @@ impl Stream {
     #[must_use]
     pub fn skipped(&self) -> &[Skipped] {
         self.skipped.get(self.resumed.skipped.into_inner()..).unwrap_or_default()
+    }
+
+    #[must_use]
+    pub fn events(&self) -> &[Event] {
+        &self.events
     }
 
     #[must_use]

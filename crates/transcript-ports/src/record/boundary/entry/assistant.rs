@@ -1,9 +1,9 @@
 use serde::Deserialize;
 
 use super::classified::Classified;
-use super::said::{Hears, Said};
+use super::said::{Hears, Launch, Said, Sent};
 use super::stamp::Stamp;
-use crate::{Authorship, Body, Line, Skipped, Unrecognised};
+use crate::{Authorship, Body, Happening, Line, Skipped, Unrecognised};
 
 #[derive(Clone, Copy, Debug)]
 struct Failed;
@@ -19,12 +19,34 @@ struct Delivery(Option<Failed>);
 #[serde(from = "String")]
 struct Model(Option<Synthetic>);
 
+#[derive(Clone, Copy, Debug)]
+struct Background;
+
+#[derive(Clone, Copy, Debug, Default, Deserialize)]
+#[serde(from = "bool")]
+struct Running(Option<Background>);
+
+#[derive(Debug, Default, Deserialize)]
+struct Input {
+    #[serde(default)]
+    run_in_background: Running,
+    #[serde(default)]
+    to: Option<Body>,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum Written {
-    Text { text: Body },
+    Text {
+        text: Body,
+    },
     Thinking,
-    ToolUse,
+    ToolUse {
+        #[serde(default)]
+        id: Option<Body>,
+        #[serde(default)]
+        input: Input,
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -62,6 +84,30 @@ impl From<bool> for Delivery {
     }
 }
 
+impl From<bool> for Running {
+    fn from(background: bool) -> Running {
+        Running(background.then_some(Background))
+    }
+}
+
+impl Running {
+    fn said(self, tool: Option<Body>) -> Said {
+        match self.0.zip(tool) {
+            Some((Background, id)) => Said::Launched(Launch::from(id)),
+            None => Said::Silent,
+        }
+    }
+}
+
+impl Input {
+    fn said(self, tool: Option<Body>) -> Said {
+        match self.to {
+            Some(to) => Said::Sent(Sent::from(to)),
+            None => self.run_in_background.said(tool),
+        }
+    }
+}
+
 impl From<String> for Model {
     fn from(name: String) -> Model {
         Model((name == Model::SYNTHETIC).then_some(Synthetic))
@@ -92,7 +138,8 @@ impl From<Block> for Said {
     fn from(block: Block) -> Said {
         match block {
             Block::Known(Written::Text { text }) => Said::Text(text),
-            Block::Known(Written::Thinking | Written::ToolUse) => Said::Silent,
+            Block::Known(Written::ToolUse { id, input }) => input.said(id),
+            Block::Known(Written::Thinking) => Said::Silent,
             Block::Unknown(unrecognised) => Said::Unrecognised(unrecognised),
         }
     }
@@ -101,6 +148,14 @@ impl From<Block> for Said {
 impl Hears for Answer {
     fn text(self, text: Body) -> Line {
         self.delivery.spoke(self.model, self.stamp, text)
+    }
+
+    fn launched(self, launch: Launch) -> Line {
+        self.stamp.happened(Happening::Launch, Body::from(launch))
+    }
+
+    fn sent(self, sent: Sent) -> Line {
+        self.stamp.happened(Happening::Sent, Body::from(sent))
     }
 
     fn silence(self) -> Line {

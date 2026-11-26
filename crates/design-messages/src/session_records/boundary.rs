@@ -49,6 +49,7 @@ impl Batch for Held {
         let Held(records) = self;
         let written = [
             SessionRecords::all(&records.messages, statements)?,
+            SessionRecords::all(&records.events, statements)?,
             SessionRecords::all(&records.segments, statements)?,
             SessionRecords::all(&records.links, statements)?,
             SessionRecords::all(&records.edges, statements)?,

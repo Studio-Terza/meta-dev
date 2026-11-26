@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  stops (\n    session,\n    gist,\n    read,\n    quoted,\n    kept,\n    awaited,\n    halt,\n    fate\n  )\nVALUES\n  (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "d6d4bec01226c5b9c83b6c205eea0c7be7f0e55a68c3db9d7777ae9d30f6efae"
+}

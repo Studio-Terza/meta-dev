@@ -47,7 +47,7 @@ impl Hook {
         let store = ground.store();
         Ingest::read(store, &ground.transcripts())?;
         let recalled = prompting.recalled(&Answering::new(store, crew));
-        Decision::told(store, HookEvent::UserPromptSubmit, recalled.as_ref(), None)
+        Decision::told(store, HookEvent::UserPromptSubmit, recalled.as_ref(), Vec::new())
     }
 
     fn stopped<F: Files, S: Store, D: Dispatch, C: Clock>(
@@ -58,6 +58,6 @@ impl Hook {
         let store = ground.store();
         Ingest::read(store, &ground.transcripts())?;
         let concluded = Structure::new(store, crew).worked()?.concluded();
-        stopping.decided(concluded, store, &Answering::new(store, crew))
+        stopping.decided(concluded, store, crew)
     }
 }
