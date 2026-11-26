@@ -3,9 +3,15 @@
 mod ignored;
 mod ports;
 
+use std::error::Error;
 use std::iter;
+use std::ops::Range;
 use std::sync::Mutex;
 use std::time::Duration;
+
+use proptest::prelude::{Strategy, prop_assert_eq, proptest};
+use proptest::sample::select;
+use proptest::test_runner::{Config, RngSeed};
 
 use dispatch_ports::{
     AgentRun, Bell, ClockFiller, Deadline, Dispatch, DispatchFailure, DispatchFiller, Due, Ended, Errored, Fault,
@@ -13,10 +19,6 @@ use dispatch_ports::{
     Unreadable, Usage, Wall, Watch, Watched, Woke, clock_ops, dispatch_ops,
 };
 use invariants::{Ignoring, Unpoisoned};
-use laws::proptest::prelude::prop_assert_eq;
-use laws::proptest::sample::select;
-use laws::proptest::strategy::Strategy;
-use laws::proptest::test_runner::TestCaseError;
 use port_core::{Calls, Pass, Port, Released, Run, Snapshot};
 
 use ignored::Ignored;
@@ -53,21 +55,37 @@ impl Envelope {
     }
 }
 
-laws::table!(
-    an_agent_result_is_read_as_its_reply_and_usage_or_its_error,
-    |text: &&'static str| Envelope::read(text),
+#[test]
+fn an_agent_result_is_read_as_its_reply_and_usage_or_its_error() {
     [
-        r#"{"type":"result","subtype":"success","is_error":false,"result":"conversational(a.0)","usage":{"input_tokens":4,"output_tokens":9,"cache_creation_input_tokens":2,"cache_read_input_tokens":7,"service_tier":"standard"}}"# => Envelope::replied("conversational(a.0)", [4, 9, 2, 7]),
-        r#"{"subtype":"success","result":"x","usage":{"input_tokens":1,"output_tokens":2}}"# => Envelope::replied("x", [1, 2, 0, 0]),
-        r#"{"type":"result","subtype":"success","is_error":true,"result":"Invalid API key","usage":{"input_tokens":0,"output_tokens":0}}"# => Envelope::errored("Invalid API key"),
-        r#"{"subtype":"error_during_execution","is_error":true,"usage":{"input_tokens":1,"output_tokens":2}}"# => Envelope::unsuccessful(),
-        r#"{"subtype":"error_max_turns","result":"x","usage":{"input_tokens":1,"output_tokens":2}}"# => Envelope::unsuccessful(),
-        r#"{"subtype":"success","usage":{"input_tokens":1,"output_tokens":2}}"# => Envelope::unsuccessful(),
-        r#"{"subtype":"success","result":"  ","usage":{"input_tokens":1,"output_tokens":2}}"# => Envelope::Garbled,
-        r#"{"subtype":"success","result":"x"}"# => Envelope::Garbled,
-        "not json" => Envelope::Garbled,
+        (
+            r#"{"type":"result","subtype":"success","is_error":false,"result":"conversational(a.0)","usage":{"input_tokens":4,"output_tokens":9,"cache_creation_input_tokens":2,"cache_read_input_tokens":7,"service_tier":"standard"}}"#,
+            Envelope::replied("conversational(a.0)", [4, 9, 2, 7]),
+        ),
+        (
+            r#"{"subtype":"success","result":"x","usage":{"input_tokens":1,"output_tokens":2}}"#,
+            Envelope::replied("x", [1, 2, 0, 0]),
+        ),
+        (
+            r#"{"type":"result","subtype":"success","is_error":true,"result":"Invalid API key","usage":{"input_tokens":0,"output_tokens":0}}"#,
+            Envelope::errored("Invalid API key"),
+        ),
+        (
+            r#"{"subtype":"error_during_execution","is_error":true,"usage":{"input_tokens":1,"output_tokens":2}}"#,
+            Envelope::unsuccessful(),
+        ),
+        (
+            r#"{"subtype":"error_max_turns","result":"x","usage":{"input_tokens":1,"output_tokens":2}}"#,
+            Envelope::unsuccessful(),
+        ),
+        (r#"{"subtype":"success","usage":{"input_tokens":1,"output_tokens":2}}"#, Envelope::unsuccessful()),
+        (r#"{"subtype":"success","result":"  ","usage":{"input_tokens":1,"output_tokens":2}}"#, Envelope::Garbled),
+        (r#"{"subtype":"success","result":"x"}"#, Envelope::Garbled),
+        ("not json", Envelope::Garbled),
     ]
-);
+    .into_iter()
+    .for_each(|(text, want)| assert_eq!(Envelope::read(text), want, "{text}"));
+}
 
 #[derive(Clone, Copy, Debug)]
 struct Sleep {
@@ -212,7 +230,7 @@ impl Watching {
     const LAPSED: Wait = Wait { pause: Watching::PAUSE, woke: Woke::Lapsed };
     const RUNG: Wait = Wait { pause: Watching::PAUSE, woke: Woke::Rung };
 
-    fn watched(self) -> Result<Observed, laws::Unmet> {
+    fn watched(self) -> Result<Observed, Box<dyn Error>> {
         let waits = Waits::default();
         let run = Run::root();
         let watched = {
@@ -227,39 +245,49 @@ impl Watching {
     }
 }
 
-laws::law!(a_deadline_that_passes_during_a_sleep_kills_the_run_on_the_next_check, (20..200_u32, 0..9_usize), drawn, {
-    let (timeout, sleeping_after) = drawn;
-    let watching = Watching { timeout, sleeping_after, finishing: None };
-    let checks = Calls::new(sleeping_after.saturating_add(1));
-    let watched = watching.watched().map_err(|failure| TestCaseError::fail(format!("{failure:?}")))?;
-    prop_assert_eq!(
-        watched,
-        Observed {
-            watched: Watched::Stalled(Stall::Overdue),
-            calls: [checks, checks, Calls::new(1)],
-            waits: vec![Watching::LAPSED; sleeping_after.saturating_add(1)],
-        }
-    );
-});
+impl Watching {
+    fn drawn(counts: Range<usize>) -> impl Iterator<Item = (u32, usize)> {
+        (20..200_u32).step_by(30).flat_map(move |timeout| counts.clone().map(move |count| (timeout, count)))
+    }
+}
 
-laws::law!(a_run_that_replies_before_its_deadline_is_finished_and_released_once, (20..200_u32, 1..9_usize), drawn, {
-    let (timeout, finishing) = drawn;
-    let watching = Watching { timeout, sleeping_after: 9, finishing: Some(finishing) };
-    let watched = watching.watched().map_err(|failure| TestCaseError::fail(format!("{failure:?}")))?;
-    prop_assert_eq!(
-        watched,
-        Observed {
-            watched: Watched::Finished(FakeDispatch::finished()),
-            calls: [Calls::new(finishing), Calls::new(finishing.saturating_sub(1)), Calls::new(1)],
-            waits: vec![Watching::LAPSED; finishing.saturating_sub(1)],
-        }
-    );
-});
+#[test]
+fn a_deadline_that_passes_during_a_sleep_kills_the_run_on_the_next_check() -> Result<(), Box<dyn Error>> {
+    Watching::drawn(0..9).try_for_each(|(timeout, sleeping_after)| {
+        let watching = Watching { timeout, sleeping_after, finishing: None };
+        let checks = Calls::new(sleeping_after.saturating_add(1));
+        assert_eq!(
+            watching.watched()?,
+            Observed {
+                watched: Watched::Stalled(Stall::Overdue),
+                calls: [checks, checks, Calls::new(1)],
+                waits: vec![Watching::LAPSED; sleeping_after.saturating_add(1)],
+            }
+        );
+        Ok(())
+    })
+}
+
+#[test]
+fn a_run_that_replies_before_its_deadline_is_finished_and_released_once() -> Result<(), Box<dyn Error>> {
+    Watching::drawn(1..9).try_for_each(|(timeout, finishing)| {
+        let watching = Watching { timeout, sleeping_after: 9, finishing: Some(finishing) };
+        assert_eq!(
+            watching.watched()?,
+            Observed {
+                watched: Watched::Finished(FakeDispatch::finished()),
+                calls: [Calls::new(finishing), Calls::new(finishing.saturating_sub(1)), Calls::new(1)],
+                waits: vec![Watching::LAPSED; finishing.saturating_sub(1)],
+            }
+        );
+        Ok(())
+    })
+}
 
 struct Lingering;
 
 impl Lingering {
-    fn watched(timeout: Timeout) -> Result<Observed, laws::Unmet> {
+    fn watched(timeout: Timeout) -> Result<Observed, Box<dyn Error>> {
         let waits = Waits::default();
         let run = Run::root();
         let watched = {
@@ -292,11 +320,13 @@ impl Lingering {
     }
 }
 
-laws::law!(a_ring_left_on_the_bell_neither_cuts_a_run_short_nor_carries_it_past_its_deadline, 1..200_u32, drawn, {
-    let timeout = Timeout::new(drawn);
-    let watched = Lingering::watched(timeout).map_err(|failure| TestCaseError::fail(format!("{failure:?}")))?;
-    prop_assert_eq!(watched, Lingering::observed(timeout));
-});
+#[test]
+fn a_ring_left_on_the_bell_neither_cuts_a_run_short_nor_carries_it_past_its_deadline() -> Result<(), Box<dyn Error>> {
+    (1..200_u32).step_by(7).map(Timeout::new).try_for_each(|timeout| {
+        assert_eq!(Lingering::watched(timeout)?, Lingering::observed(timeout));
+        Ok(())
+    })
+}
 
 struct Starts;
 
@@ -319,22 +349,19 @@ impl Starts {
     }
 }
 
-laws::roundtrip!(
-    a_start_time_reads_back_as_it_is_rendered,
-    Starts::any(),
-    |started: &Started| started.to_string(),
-    |text: &String| text.parse::<Started>().ignoring(Ignored::Unparsed),
-    Some
-);
+proptest! {
+    #![proptest_config(Config { failure_persistence: None, rng_seed: RngSeed::Fixed(0), ..Config::default() })]
+    #[test]
+    fn a_start_time_reads_back_as_it_is_rendered(started in Starts::any()) {
+        prop_assert_eq!(started.to_string().parse::<Started>().ignoring(Ignored::Unparsed), Some(started));
+    }
+}
 
-laws::table!(
-    a_pause_lasts_its_whole_seconds,
-    |seconds: &u32| Duration::from(Pause::new(*seconds)),
-    [
-        3 => Duration::from_secs(3),
-        0 => Duration::ZERO,
-    ]
-);
+#[test]
+fn a_pause_lasts_its_whole_seconds() {
+    assert_eq!(Duration::from(Pause::new(3)), Duration::from_secs(3));
+    assert_eq!(Duration::from(Pause::new(0)), Duration::ZERO);
+}
 
 #[derive(Debug, PartialEq, Eq)]
 enum Cause {
@@ -354,7 +381,7 @@ impl Stalled for Cause {
 }
 
 #[test]
-fn each_stall_names_its_own_cause() -> Result<(), laws::Unmet> {
+fn each_stall_names_its_own_cause() -> Result<(), Box<dyn Error>> {
     let fault = || Fault::from(DispatchFailure::Spawn(std::io::Error::from_raw_os_error(2)));
     let stalls = [
         Stall::Errored(Errored::new(Told::try_new("refused".to_owned())?, Usage::default())),
