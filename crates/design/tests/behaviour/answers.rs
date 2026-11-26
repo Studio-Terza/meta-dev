@@ -211,3 +211,110 @@ fn a_stop_already_held_by_its_hook_asks_nothing() -> Result<(), Failure> {
     assert_eq!((stopped.outcome?, stopped.prompts.len()), (Outcome::Hooked(HookEvent::Stop), 1));
     Ok(())
 }
+
+struct Waits;
+
+impl Waits {
+    const LIVE: &str = "{\"waiting_on\":\"shell\",\"deadlock\":false}";
+    const IDLE: &str = "{\"waiting_on\":\"agent\",\"deadlock\":true}";
+    const NOTHING: &str = "{\"waiting_on\":\"nothing\",\"deadlock\":true}";
+    const TEAMMATE: &str = "<teammate-message teammate_id=\"eval-owner\">idle</teammate-message>";
+
+    fn entry(kind: &str, uuid: &str, at: &str, body: &Value) -> String {
+        let mut entry =
+            serde_json::json!({"type": kind, "uuid": uuid, "parentUuid": null, "sessionId": "s", "timestamp": at});
+        entry
+            .as_object_mut()
+            .into_iter()
+            .for_each(|fields| fields.extend(body.as_object().cloned().unwrap_or_default()));
+        format!("{entry}\n")
+    }
+
+    fn launched(at: &str) -> String {
+        let tool = serde_json::json!({"type": "tool_use", "id": "toolu_1", "name": "Bash", "input": {"run_in_background": true}});
+        Waits::entry("assistant", "t1", at, &serde_json::json!({"message": {"model": "claude", "content": [tool]}}))
+    }
+
+    fn ended() -> String {
+        let notice =
+            "<task-notification><tool-use-id>toolu_1</tool-use-id><status>completed</status></task-notification>";
+        let queued =
+            serde_json::json!({"type": "queued_command", "prompt": notice, "origin": {"kind": "task-notification"}});
+        let relayed = serde_json::json!({"message": {"content": Waits::TEAMMATE}});
+        [
+            Waits::entry("attachment", "n1", "2027-01-15T07:40:00Z", &serde_json::json!({"attachment": queued})),
+            Waits::entry("user", "r1", "2027-01-15T07:41:00Z", &relayed),
+        ]
+        .concat()
+    }
+
+    fn stopped(extra: &str, replies: &[&str]) -> Result<Asked, Failure> {
+        let base = [
+            Session::line(Speaker::Owner, "o1", "null", Asking::RULED),
+            Session::line(Speaker::Lead, "l1", "\"o1\"", "should the queue keep its order"),
+            Session::line(Speaker::Owner, "o2", "\"l1\"", Asking::QUEUED),
+            Session::line(Speaker::Lead, "l2", "\"o2\"", "noted"),
+        ];
+        let asking = Asking::spoken([base.concat(), extra.to_owned()].concat(), replies)?;
+        let stopping = serde_json::json!({"hook_event_name": "Stop", "stop_hook_active": false, "session_id": "s",
+            "last_assistant_message": "I'll merge it once CI is green."});
+        Ok(asking.asked(&stopping.to_string(), &["hook", "stop"]))
+    }
+
+    fn reason(asked: &Asked) -> String {
+        serde_json::from_str::<Value>(&asked.text)
+            .into_iter()
+            .find_map(|decision| decision.get("reason").and_then(Value::as_str).map(str::to_owned))
+            .unwrap_or_default()
+    }
+
+    fn deadlocked(reply: &str, named: &str) -> Result<(), Box<dyn Error>> {
+        let transcript = [Waits::launched("2027-01-15T07:30:00Z"), Waits::ended()].concat();
+        let stopped = Waits::stopped(&transcript, &[Asking::COVERED, Asking::STATEMENT, reply])?;
+        let asked = stopped.prompts.last().cloned().unwrap_or_default();
+        let reason = Waits::reason(&stopped);
+        assert_eq!(stopped.outcome?, Outcome::Blocked);
+        assert!(reason.contains(&format!("STALLED: you ended your turn waiting on {named}, and nothing")), "{reason}");
+        assert!(asked.contains("Background tasks still running (launch id):\n- none\n"), "{asked}");
+        assert!(
+            asked.contains(&format!("- relayed 2027-01-15T07:41:00Z (19 min ago): {}", Waits::TEAMMATE)),
+            "{asked}"
+        );
+        assert!(asked.contains("- notice 2027-01-15T07:40:00Z (20 min ago): <task-notification>"), "{asked}");
+        Ok(())
+    }
+}
+
+#[test]
+fn a_stop_with_a_background_task_past_an_hour_blocks_as_overrun_without_asking_haiku() -> Result<(), Box<dyn Error>> {
+    let stopped = Waits::stopped(&Waits::launched("2027-01-15T06:30:00Z"), &[Asking::COVERED, Asking::STATEMENT])?;
+    let reason = Waits::reason(&stopped);
+    assert_eq!(stopped.outcome?, Outcome::Blocked);
+    assert!(
+        reason.contains("OVERRUN: background task toolu_1 has run 90 minutes, past the 60-minute limit"),
+        "{reason}"
+    );
+    assert_eq!(stopped.prompts.len(), 2);
+    Ok(())
+}
+
+#[test]
+fn a_stop_waiting_on_a_live_task_shows_haiku_the_task_and_passes() -> Result<(), Box<dyn Error>> {
+    let stopped =
+        Waits::stopped(&Waits::launched("2027-01-15T07:30:00Z"), &[Asking::COVERED, Asking::STATEMENT, Waits::LIVE])?;
+    let asked = stopped.prompts.last().cloned().unwrap_or_default();
+    assert_eq!(stopped.outcome?, Outcome::Hooked(HookEvent::Stop));
+    assert!(asked.contains("running (launch id):\n- launch 2027-01-15T07:30:00Z (30 min ago): toolu_1\n"), "{asked}");
+    assert!(asked.contains("The lead's final message:\nI'll merge it once CI is green."), "{asked}");
+    Ok(())
+}
+
+#[test]
+fn a_stop_waiting_on_an_idle_agent_blocks_as_deadlocked() -> Result<(), Box<dyn Error>> {
+    Waits::deadlocked(Waits::IDLE, "an agent")
+}
+
+#[test]
+fn a_stop_waiting_on_nothing_blocks_as_deadlocked() -> Result<(), Box<dyn Error>> {
+    Waits::deadlocked(Waits::NOTHING, "nothing")
+}

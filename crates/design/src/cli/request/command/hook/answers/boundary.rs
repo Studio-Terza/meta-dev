@@ -252,6 +252,12 @@ impl AsRef<Body> for Asked {
     }
 }
 
+impl<'reply> From<&'reply Reply> for Replied<'reply> {
+    fn from(reply: &'reply Reply) -> Replied<'reply> {
+        Replied(reply)
+    }
+}
+
 impl Replied<'_> {
     pub fn object<T: DeserializeOwned>(self) -> Result<T, serde_json::Error> {
         serde_json::from_str(&self.braced('{', '}'))

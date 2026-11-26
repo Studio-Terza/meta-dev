@@ -7,7 +7,7 @@ use transcript_ports::Body;
 
 use super::super::structure::Crew;
 use crate::cli::failure::Failure;
-pub use boundary::{Answers, Asked, Reading, Recollection, Remembered, Role, Traced};
+pub use boundary::{Answers, Asked, Reading, Recollection, Remembered, Replied, Role, Traced};
 use boundary::{Question, Recalling};
 
 #[derive(Debug)]

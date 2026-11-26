@@ -1,0 +1,57 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  at,\n  happening,\n  body,\n  CAST(strftime('%s', at) AS INTEGER) AS began\nFROM\n  events\nWHERE\n  session = ?1\nORDER BY\n  at\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "at",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "at"
+          }
+        }
+      },
+      {
+        "name": "happening",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "happening"
+          }
+        }
+      },
+      {
+        "name": "body",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "body"
+          }
+        }
+      },
+      {
+        "name": "began",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "72911561b1bf4fcf83c27e90b9d2c6ec3b509c27e4a866d30d7bbb19af2d944a"
+}
