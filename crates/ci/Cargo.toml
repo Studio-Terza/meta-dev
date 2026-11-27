@@ -24,8 +24,8 @@ thiserror.workspace = true
 toml.workspace = true
 
 [dev-dependencies]
+fixture = { path = "../fixture" }
 tempfile.workspace = true
-test-failure = { path = "../test-failure" }
 
 [lints]
 workspace = true

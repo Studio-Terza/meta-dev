@@ -1,154 +1,154 @@
-# Each case runs the ci binary in a fresh directory holding `files`, then expects its exit code, the
+# Each run starts the ci command line in a fresh directory holding `files`, then expects its exit, the
 # start of its standard output and error, and the whole of every file in `written`.
 
-[[case]]
+[[Run]]
 arguments = ["timed", "limits.toml", "lint", "true"]
 files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 0\n" }
-code = 0
+exit = "Passed"
 out = "lint: within warn 0 s and block 0 s, took 0.0 s\n"
 
-[[case]]
+[[Run]]
 arguments = ["timed", "limits.toml", "lint", "sleep", "0.21"]
 files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 1000\n" }
-code = 0
+exit = "Passed"
 out = "::warning::lint: above warn 0 s, within block 1000 s, took 0."
 
-[[case]]
+[[Run]]
 arguments = ["timed", "limits.toml", "lint", "sleep", "0.21"]
 files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 0\n" }
-code = 1
+exit = "Failed"
 out = "::error::lint: above block 0 s, took 0."
 
-[[case]]
+[[Run]]
 arguments = ["timed", "limits.toml", "lint", "false"]
 files = { "limits.toml" = "[lint]\nwarn = 0.5\nblock = 3.5\n" }
-code = 1
+exit = "Failed"
 out = "::error::lint failed: exit status: 1\nlint: within warn 0.5 s and block 3.5 s, took "
 
-[[case]]
+[[Run]]
 arguments = ["timed", "limits.toml", "lint", "absent-program"]
 files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 0\n" }
-code = 1
+exit = "Failed"
 err = "cannot start absent-program: No such file or directory"
 
-[[case]]
+[[Run]]
 arguments = ["timed", "limits.toml", "lint", "true"]
 files = { "limits.toml" = "[lint]\nwarn = -1\nblock = 0\n" }
-code = 1
+exit = "Failed"
 err = "a limit is not a number of seconds: "
 
-[[case]]
+[[Run]]
 arguments = ["timed", "limits.toml", "lint", "true"]
 files = { "limits.toml" = "[lint]\nwarn = 0\n" }
-code = 1
+exit = "Failed"
 err = "cannot read the limits: "
 
-[[case]]
+[[Run]]
 arguments = ["timed", "limits.toml", "lint", "true"]
 files = { "limits.toml" = "[clippy]\nwarn = 0\nblock = 0\n" }
-code = 1
+exit = "Failed"
 err = "the limits hold no stage named lint\n"
 
-[[case]]
+[[Run]]
 arguments = ["timed", "limits.toml", "lint", "true"]
-code = 1
+exit = "Failed"
 err = "cannot read limits.toml: "
 
-[[case]]
+[[Run]]
 arguments = ["timed", "limits.toml", "lint", "sh", "-c", "exit 0"]
 files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 0\n" }
-code = 0
+exit = "Passed"
 out = "lint: within warn 0 s and block 0 s, took 0.0 s\n"
 
-[[case]]
+[[Run]]
 arguments = ["timed", "limits.toml", "lint", "--since", "mark", "true"]
 files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 1000\n", "mark" = "0\n" }
-code = 1
+exit = "Failed"
 out = "::error::lint: above block 1000 s, took 1"
 
-[[case]]
+[[Run]]
 arguments = ["timed", "limits.toml", "lint", "--since", "mark", "true"]
 files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 0\n", "mark" = "99999999999\n" }
-code = 1
+exit = "Failed"
 err = "mark does not hold a start time in seconds since 1970, before now\n"
 
-[[case]]
+[[Run]]
 arguments = ["timed", "limits.toml", "lint", "--since", "mark", "true"]
 files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 0\n", "mark" = "soon" }
-code = 1
+exit = "Failed"
 err = "mark does not hold a start time in seconds since 1970, before now\n"
 
-[[case]]
+[[Run]]
 arguments = ["timed"]
-code = 1
+exit = "Failed"
 err = "usage: ci timed "
 
-[[case]]
+[[Run]]
 arguments = ["plan", "a", "b", "c", "d", "e", "f"]
-code = 1
+exit = "Failed"
 err = "usage: ci timed "
 
-[[case]]
+[[Run]]
 arguments = ["mutants-plan", "workspace.json", "diff.json", "changed", "reused.json", "caught.txt", "output"]
-code = 0
+exit = "Passed"
 out = """
 mutants: no earlier run to reuse
 mutants: every one in the crates whose tests changed: []
 mutants: 5 of 7 selected, 5 in the diff; 0 reused, 5 to test in 1 shards
 """
-[case.files]
+[Run.files]
 "workspace.json" = '[{"name":"a.rs:1:1: x","file":"a.rs"},{"name":"b.rs:1:1: y","file":"b.rs"},{"name":"b.rs:2:1: z","file":"b.rs"},{"name":"c.rs:1:1: v","file":"c.rs"},{"name":"d.rs:1:1: n","file":"d.rs"},{"name":"k/src/x.rs:1:1: k","file":"k/src/x.rs"},{"name":"j/src/y.rs:1:1: j","file":"j/src/y.rs"}]'
 "diff.json" = '[{"name":"a.rs:1:1: x","file":"a.rs"},{"name":"b.rs:1:1: y","file":"b.rs"},{"name":"b.rs:2:1: z","file":"b.rs"},{"name":"c.rs:1:1: v","file":"c.rs"},{"name":"d.rs:1:1: n","file":"d.rs"}]'
 "changed" = ""
 "output" = "earlier=1\n"
-[case.written]
+[Run.written]
 "reused.json" = '{"outcomes":[]}'
 "caught.txt" = "k/src/x.rs:1:1: k\nj/src/y.rs:1:1: j\n"
 "output" = "earlier=1\nshards=[0]\n"
 
-[[case]]
+[[Run]]
 arguments = ["mutants-plan", "workspace.json", "diff.json", "changed", "reused.json", "caught.txt", "output", "numstat", "outcomes.json"]
-code = 0
+exit = "Passed"
 out = """
 mutants: reusing the earlier run's 3 caught, outside the 2 files changed since
 mutants: every one in the crates whose tests changed: [k]
 mutants: 6 of 7 selected, 5 in the diff; 2 reused, 4 to test in 1 shards
 """
-[case.files]
+[Run.files]
 "workspace.json" = '[{"name":"a.rs:1:1: x","file":"a.rs"},{"name":"b.rs:1:1: y","file":"b.rs"},{"name":"b.rs:2:1: z","file":"b.rs"},{"name":"c.rs:1:1: v","file":"c.rs"},{"name":"d.rs:1:1: n","file":"d.rs"},{"name":"k/src/x.rs:1:1: k","file":"k/src/x.rs"},{"name":"j/src/y.rs:1:1: j","file":"j/src/y.rs"}]'
 "diff.json" = '[{"name":"a.rs:1:1: x","file":"a.rs"},{"name":"b.rs:1:1: y","file":"b.rs"},{"name":"b.rs:2:1: z","file":"b.rs"},{"name":"c.rs:1:1: v","file":"c.rs"},{"name":"d.rs:1:1: n","file":"d.rs"}]'
 "changed" = "2\t0\tk/tests/t.rs\n0\t0\tj/src/y.rs\n"
 "numstat" = "1\t1\ta.rs\n3\t0\ttests/t.rs\n"
 "outcomes.json" = '{"outcomes":[{"scenario":"Baseline","summary":"Success"},{"scenario":{"Mutant":{"name":"a.rs:1:1: x","file":"a.rs"}},"summary":"CaughtMutant"},{"scenario":{"Mutant":{"name":"b.rs:1:1: y","file":"b.rs"}},"summary":"CaughtMutant"},{"scenario":{"Mutant":{"name":"b.rs:2:1: z","file":"b.rs"}},"summary":"MissedMutant"},{"scenario":{"Mutant":{"name":"c.rs:1:1: v","file":"c.rs"}},"summary":"Unviable"}]}'
 "output" = "earlier=1\n"
-[case.written]
+[Run.written]
 "reused.json" = '{"outcomes":[{"scenario":{"Mutant":{"name":"b.rs:1:1: y","file":"b.rs"}},"summary":"CaughtMutant"},{"scenario":{"Mutant":{"name":"c.rs:1:1: v","file":"c.rs"}},"summary":"CaughtMutant"}]}'
 "caught.txt" = "j/src/y.rs:1:1: j\nb.rs:1:1: y\nc.rs:1:1: v\n"
 "output" = "earlier=1\nshards=[0]\n"
 
-[[case]]
+[[Run]]
 arguments = ["mutants-plan", "workspace.json", "diff.json", "changed", "reused.json", "caught.txt", "output", "numstat", "outcomes.json"]
-code = 0
+exit = "Passed"
 out = """
 mutants: reusing nothing, since test code lost lines in tests/t.rs
 mutants: every one in the crates whose tests changed: []
 mutants: 5 of 7 selected, 5 in the diff; 0 reused, 5 to test in 1 shards
 """
-[case.files]
+[Run.files]
 "workspace.json" = '[{"name":"a.rs:1:1: x","file":"a.rs"},{"name":"b.rs:1:1: y","file":"b.rs"},{"name":"b.rs:2:1: z","file":"b.rs"},{"name":"c.rs:1:1: v","file":"c.rs"},{"name":"d.rs:1:1: n","file":"d.rs"},{"name":"k/src/x.rs:1:1: k","file":"k/src/x.rs"},{"name":"j/src/y.rs:1:1: j","file":"j/src/y.rs"}]'
 "diff.json" = '[{"name":"a.rs:1:1: x","file":"a.rs"},{"name":"b.rs:1:1: y","file":"b.rs"},{"name":"b.rs:2:1: z","file":"b.rs"},{"name":"c.rs:1:1: v","file":"c.rs"},{"name":"d.rs:1:1: n","file":"d.rs"}]'
 "changed" = ""
 "numstat" = "0\t2\ttests/t.rs\n"
 "outcomes.json" = '{"outcomes":[{"scenario":{"Mutant":{"name":"b.rs:1:1: y","file":"b.rs"}},"summary":"CaughtMutant"}]}'
 "output" = "earlier=1\n"
-[case.written]
+[Run.written]
 "reused.json" = '{"outcomes":[]}'
 "caught.txt" = "k/src/x.rs:1:1: k\nj/src/y.rs:1:1: j\n"
 "output" = "earlier=1\nshards=[0]\n"
 
-[[case]]
+[[Run]]
 arguments = ["mutants-plan", "workspace.json", "diff.json", "changed", "reused.json", "caught.txt", "output"]
-code = 0
+exit = "Passed"
 out = """
 mutants: no earlier run to reuse
 mutants: every one in the crates whose tests changed: []
@@ -157,21 +157,21 @@ mutants: 0 of 0 selected, 0 in the diff; 0 reused, 0 to test in 1 shards
 files = { "workspace.json" = "", "diff.json" = "", "changed" = "" }
 written = { "reused.json" = '{"outcomes":[]}', "caught.txt" = "", "output" = "shards=[0]\n" }
 
-[[case]]
+[[Run]]
 arguments = ["mutants-plan", "workspace.json", "diff.json", "changed", "reused.json", "caught.txt", "output", "numstat"]
-code = 1
+exit = "Failed"
 err = "a numstat row is not added, deleted and path separated by tabs: 1 a.rs\n"
 files = { "workspace.json" = "[]", "diff.json" = "[]", "changed" = "", "numstat" = "1 a.rs\n" }
 
-[[case]]
+[[Run]]
 arguments = ["mutants-plan", "workspace.json", "diff.json", "changed", "reused.json", "caught.txt", "output"]
-code = 1
+exit = "Failed"
 err = "cannot read the mutants: "
 files = { "workspace.json" = "{", "diff.json" = "[]", "changed" = "" }
 
-[[case]]
+[[Run]]
 arguments = ["mutants-plan", "workspace.json", "diff.json", "changed", "reused.json", "caught.txt", "output"]
-code = 0
+exit = "Passed"
 out = """
 mutants: no earlier run to reuse
 mutants: every one in the crates whose tests changed: []

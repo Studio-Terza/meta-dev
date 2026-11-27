@@ -5,15 +5,8 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{env, fmt, fs};
 
-use invariants::Ignoring;
 use serde::de::DeserializeOwned;
 use test_failure::Failed;
-
-invariants::ignored! {
-    enum Ignored {
-        Outside => "a story found outside the manifest directory is read from where it was found",
-    }
-}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Story {
@@ -37,7 +30,7 @@ pub struct Drift {
     printed: String,
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, serde::Deserialize)]
+#[derive(Clone, Default, PartialEq, Eq, PartialOrd, Ord, serde::Deserialize)]
 #[serde(transparent)]
 pub struct Spelled(String);
 
@@ -131,19 +124,22 @@ impl Story {
     fn path(&self) -> Result<PathBuf, Failed> {
         let manifest = Path::new(self.manifest);
         let found = manifest.ancestors().map(|above| above.join(self.file)).find(|path| path.is_file());
-        found
-            .map(|path| {
-                path.strip_prefix(manifest).ignoring(Ignored::Outside).map_or_else(|| path.clone(), Path::to_path_buf)
-            })
-            .ok_or_else(|| Failed::from(Unread::Unanchored { story: self.file, manifest: self.manifest }))
+        found.ok_or_else(|| Failed::from(Unread::Unanchored { story: self.file, manifest: self.manifest }))
     }
 
     pub(crate) fn rows<Row: DeserializeOwned>(&self) -> Result<BTreeMap<CaseName, Row>, Failed> {
         let table = self.path()?.with_extension(Story::TABLE);
         let text = fs::read_to_string(&table).or_else(Story::absent)?;
         let mut parsed: toml::Table = toml::from_str(&text)?;
-        let rows: BTreeMap<String, Row> =
-            parsed.remove(self.name).map_or(Ok(BTreeMap::new()), toml::Value::try_into)?;
+        let rows: BTreeMap<String, Row> = match parsed.remove(self.name) {
+            Some(toml::Value::Array(listed)) => listed
+                .into_iter()
+                .enumerate()
+                .map(|(at, row)| Ok((at.to_string(), row.try_into()?)))
+                .collect::<Result<_, toml::de::Error>>()?,
+            Some(keyed) => keyed.try_into()?,
+            None => BTreeMap::new(),
+        };
         Ok(rows.into_iter().map(|(name, row)| (CaseName(name), row)).collect())
     }
 

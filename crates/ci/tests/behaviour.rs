@@ -1,71 +1,67 @@
 use std::collections::BTreeMap;
-use std::fs;
-use std::path::Path;
+use std::ffi::OsString;
+use std::path::PathBuf;
+use std::process::ExitCode;
+use std::{env, fs};
 
+use ci::Cli;
+use fixture::{Failed, Fixture, Rows, Spelled};
 use serde::Deserialize;
 use tempfile::TempDir;
-use test_failure::Failed;
 
-const CASES: &str = "tests/cases.toml";
-
-#[derive(Debug, Deserialize)]
-struct Cases {
-    case: Vec<Case>,
+#[derive(Fixture, Deserialize, Debug)]
+struct Run {
+    arguments: Vec<Spelled>,
+    #[serde(default)]
+    files: BTreeMap<PathBuf, Spelled>,
+    exit: Exit,
+    #[serde(default)]
+    out: Spelled,
+    #[serde(default)]
+    err: Spelled,
+    #[serde(default)]
+    written: BTreeMap<PathBuf, Spelled>,
 }
 
-#[derive(Debug, Deserialize)]
-struct Case {
-    arguments: Vec<String>,
-    #[serde(default)]
-    files: BTreeMap<String, String>,
-    code: i32,
-    #[serde(default)]
-    out: String,
-    #[serde(default)]
-    err: String,
-    #[serde(default)]
-    written: BTreeMap<String, String>,
-}
-
-mod ports {
-    use std::io;
-    use std::path::Path;
-    use std::process::{Command, Output};
-
-    #[derive(Debug)]
-    pub(crate) struct Binary;
-
-    impl Binary {
-        pub(crate) fn ran(directory: &Path, arguments: &[String]) -> io::Result<Output> {
-            Command::new(env!("CARGO_BIN_EXE_ci")).args(arguments).current_dir(directory).output()
-        }
-    }
+#[derive(Deserialize, Clone, Copy, Debug)]
+enum Exit {
+    Passed,
+    Failed,
 }
 
 #[test]
-fn every_case_exits_prints_and_writes_as_expected() -> Result<(), Failed> {
-    let cases: Cases = toml::from_str(&fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(CASES))?)?;
-    let drifted: Vec<Option<String>> = cases.case.iter().map(Case::drifted).collect::<Result<_, Failed>>()?;
-    assert_eq!(drifted.into_iter().flatten().collect::<Vec<String>>(), Vec::<String>::new());
-    Ok(())
-}
-
-impl Case {
-    fn drifted(&self) -> Result<Option<String>, Failed> {
+fn every_run_exits_prints_and_writes_as_its_row_says() -> Result<(), Failed> {
+    Rows::<Run>::read()?.iter().try_for_each(|run| {
         let directory = TempDir::new()?;
-        self.files.iter().try_for_each(|(path, text)| fs::write(directory.path().join(path), text))?;
-        let ran = ports::Binary::ran(directory.path(), &self.arguments)?;
-        let [printed, complained] = [ran.stdout, ran.stderr].map(String::from_utf8);
-        let [out, err] = [printed?, complained?];
-        let written: BTreeMap<String, String> = self
+        run.files.iter().try_for_each(|(path, text)| fs::write(directory.path().join(path), text.as_str()))?;
+        env::set_current_dir(directory.path())?;
+        let arguments: Vec<OsString> = run.arguments.iter().map(|argument| OsString::from(argument.as_str())).collect();
+        let mut out = Vec::new();
+        let mut err = Vec::new();
+        let code = Cli::from_args(&arguments).exit(&mut out, &mut err);
+        let printed = String::from_utf8(out)?;
+        let complained = String::from_utf8(err)?;
+        let written: BTreeMap<PathBuf, String> = run
             .written
             .keys()
             .map(|path| Ok((path.clone(), fs::read_to_string(directory.path().join(path))?)))
             .collect::<Result<_, Failed>>()?;
-        let held = ran.status.code() == Some(self.code)
-            && out.get(..self.out.len()) == Some(self.out.as_str())
-            && err.get(..self.err.len()) == Some(self.err.as_str())
-            && written == self.written;
-        Ok((!held).then(|| format!("{:?}: exit {:?}\n{out}{err}{written:?}", self.arguments, ran.status.code())))
-    }
+        let expected = match run.exit {
+            Exit::Passed => ExitCode::SUCCESS,
+            Exit::Failed => ExitCode::FAILURE,
+        };
+        let wanted: BTreeMap<PathBuf, String> =
+            run.written.iter().map(|(path, text)| (path.clone(), text.as_str().to_owned())).collect();
+        assert_eq!(
+            (
+                &run.arguments,
+                code,
+                printed.get(..run.out.as_str().len()),
+                complained.get(..run.err.as_str().len()),
+                written
+            ),
+            (&run.arguments, expected, Some(run.out.as_str()), Some(run.err.as_str()), wanted)
+        );
+        Ok(())
+    })
 }
