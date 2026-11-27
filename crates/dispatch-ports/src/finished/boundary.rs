@@ -12,7 +12,8 @@ pub struct Told(String);
 #[serde(transparent)]
 pub struct Tokens(u32);
 
-#[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
+#[derive(Newtype, Arbitrary, Display, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(transparent)]
 pub struct Reply(String);
 
 impl From<Told> for Reply {

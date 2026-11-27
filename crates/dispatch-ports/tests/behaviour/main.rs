@@ -4,17 +4,21 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
+use proptest::char::range;
 use proptest::collection::vec;
 use proptest::prelude::{any, prop_assert, prop_assert_eq, proptest};
+use proptest::test_runner::Config;
+use serde::Deserialize;
+use serde::de::IgnoredAny;
 use test_failure::Failed;
 
 use dispatch_ports::{
-    Agent, AgentRun, AnsweringShell, Call, Clock, Deadline, Dispatch, DispatchFailure, Ended, Finished, HeadlessClaude,
-    Job, MemoryClock, Model, Moment, Output, Pause, Pid, Printed, Prompt, Ran, ReplayedDispatch, Reply, Shell, Spoken,
-    Stall, Started, Stderr, SystemClock, SystemShell, Timeout, Tokens, Usage, Wall, Watch, Watched, Woke, clock_ops,
-    dispatch_ops, shell_ops,
+    AgentRun, AnsweringShell, Call, Clock, Deadline, Dispatch, DispatchFailure, Ended, Finished, HeadlessClaude, Job,
+    MemoryClock, Model, Moment, Output, Pause, Pid, Printed, Program, Prompt, Ran, ReplayedDispatch, Reply, Shell,
+    Spoken, Stall, Started, Stderr, SystemClock, SystemShell, Timeout, Tokens, Usage, Wall, Watch, Watched, Woke,
+    clock_ops, dispatch_ops, shell_ops,
 };
 use newtype::Counter;
 use port_core::{Released, Run};
@@ -28,26 +32,18 @@ fn each_envelope_reads_as_its_reply_and_usage_or_its_stall() -> Result<(), Faile
         .map(|directory| directory.join(&table))
         .find(|candidate| candidate.is_file())
         .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let rows: Vec<Vec<String>> = serde_json::from_slice(&fs::read(found)?)?;
-    let [envelopes, ..] = rows.as_slice() else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
-    let [fixture, golden, space, newline] = envelopes.as_slice() else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
+    let bytes = fs::read(found)?;
+    let mut rows = serde_json::Deserializer::from_slice(&bytes);
+    let (fixture, golden) = <(PathBuf, PathBuf)>::deserialize(&mut rows)?;
     let texts: Vec<String> = serde_json::from_slice(&fs::read(fixture)?)?;
-    let read: Vec<String> = texts
+    let read: Vec<Result<(Reply, Vec<Tokens>), String>> = texts
         .iter()
         .map(|text| match Watched::from(Output::read(text, Stderr::Silent)) {
-            Watched::Finished(finished) => [finished.reply().to_string()]
-                .into_iter()
-                .chain(finished.usage().spent().iter().map(Tokens::to_string))
-                .collect::<Vec<String>>()
-                .join(space),
-            Watched::Stalled(stall) => stall.to_string(),
+            Watched::Finished(finished) => Ok((finished.reply().clone(), finished.usage().spent().to_vec())),
+            Watched::Stalled(stall) => Err(stall.to_string()),
         })
         .collect();
-    assert_eq!([read.join(newline), newline.clone()].concat(), fs::read_to_string(golden)?);
+    assert_eq!(read, serde_json::from_slice::<Vec<_>>(&fs::read(golden)?)?);
     Ok(())
 }
 
@@ -60,25 +56,18 @@ fn each_start_time_is_rendered_as_it_reads_or_is_refused() -> Result<(), Failed>
         .map(|directory| directory.join(&table))
         .find(|candidate| candidate.is_file())
         .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let rows: Vec<Vec<String>> = serde_json::from_slice(&fs::read(found)?)?;
-    let [_, starts, ..] = rows.as_slice() else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
-    let [fixture, golden, newline] = starts.as_slice() else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
+    let bytes = fs::read(found)?;
+    let mut rows = serde_json::Deserializer::from_slice(&bytes);
+    IgnoredAny::deserialize(&mut rows)?;
+    let (fixture, golden) = <(PathBuf, PathBuf)>::deserialize(&mut rows)?;
     let texts: Vec<String> = serde_json::from_slice(&fs::read(fixture)?)?;
-    let read: Vec<String> = texts
-        .iter()
-        .map(|text| match text.parse::<Started>() {
-            Ok(started) => started.to_string(),
-            Err(unstarted) => unstarted.to_string(),
-        })
-        .collect();
-    let started: Vec<Started> = texts.iter().flat_map(|text| text.parse::<Started>()).collect();
-    let reread: Vec<Started> = started.iter().flat_map(|start| start.to_string().parse::<Started>()).collect();
-    assert_eq!([read.join(newline), newline.clone()].concat(), fs::read_to_string(golden)?);
-    assert_eq!(reread, started);
+    let read: Vec<Result<Started, String>> =
+        texts.iter().map(|text| text.parse::<Started>().map_err(|refused| refused.to_string())).collect();
+    let rendered: Vec<Result<String, String>> =
+        read.iter().map(|started| started.as_ref().map(ToString::to_string).map_err(Clone::clone)).collect();
+    let reread: Vec<Started> = read.iter().flatten().flat_map(|start| start.to_string().parse::<Started>()).collect();
+    assert_eq!((read.clone(), rendered), serde_json::from_slice(&fs::read(golden)?)?);
+    assert_eq!(reread, read.into_iter().flatten().collect::<Vec<Started>>());
     Ok(())
 }
 
@@ -91,21 +80,16 @@ fn a_live_process_group_has_a_start_time_until_it_is_killed() -> Result<(), Fail
         .map(|directory| directory.join(&table))
         .find(|candidate| candidate.is_file())
         .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let rows: Vec<Vec<String>> = serde_json::from_slice(&fs::read(found)?)?;
-    let [_, _, sleeper, ..] = rows.as_slice() else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
-    let [program, flag, script, seconds, letter] = sleeper.as_slice() else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
-    let arguments = Vec::leak(vec![&*String::leak(flag.clone()), &*String::leak(script.clone())]);
-    let agent = Agent::new(String::leak(program.clone()), arguments);
+    let bytes = fs::read(found)?;
+    let mut rows = serde_json::Deserializer::from_slice(&bytes);
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    let (program, timeout, prompt) = <(Program, Timeout, Prompt)>::deserialize(&mut rows)?;
     let run = Run::root();
     let (before, killed, after, again) = {
-        let claude = run.port(HeadlessClaude::new(std::env::current_dir()?, agent));
+        let claude = run.port(HeadlessClaude::new(std::env::current_dir()?, program));
         let clock = run.port(SystemClock);
-        let deadline = Deadline::after(clock.now(), Timeout::new(seconds.parse()?));
-        let sleeping = claude.dispatch(&Job::due_by(deadline, Model::Haiku), &Prompt::new(letter.clone()))?;
+        let sleeping = claude.dispatch(&Job::due_by(Deadline::after(clock.now(), timeout), Model::Haiku), &prompt)?;
         let pid = sleeping.pid();
         let before = claude.started(pid)?;
         let killed = claude.kill(pid)?;
@@ -128,25 +112,22 @@ fn an_agent_that_prints_its_result_is_watched_to_what_the_result_reads_as() -> R
         .map(|directory| directory.join(&table))
         .find(|candidate| candidate.is_file())
         .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let rows: Vec<Vec<String>> = serde_json::from_slice(&fs::read(found)?)?;
-    let [_, _, _, echoing, ..] = rows.as_slice() else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
-    let [program, flag, script, seconds, printed] = echoing.as_slice() else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
-    let arguments = Vec::leak(vec![&*String::leak(flag.clone()), &*String::leak(script.clone())]);
-    let agent = Agent::new(String::leak(program.clone()), arguments);
+    let bytes = fs::read(found)?;
+    let mut rows = serde_json::Deserializer::from_slice(&bytes);
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    let (program, timeout, printed) = <(Program, Timeout, Prompt)>::deserialize(&mut rows)?;
     let run = Run::root();
     let watched = {
-        let echo = run.port(HeadlessClaude::new(std::env::current_dir()?, agent));
+        let echo = run.port(HeadlessClaude::new(std::env::current_dir()?, program));
         let clock = run.port(SystemClock);
-        let deadline = Deadline::after(clock.now(), Timeout::new(seconds.parse()?));
-        let held = echo.dispatch(&Job::due_by(deadline, Model::Haiku), &Prompt::new(printed.clone()))?;
+        let held = echo.dispatch(&Job::due_by(Deadline::after(clock.now(), timeout), Model::Haiku), &printed)?;
         Watch::over(&echo, &clock).watched(held)?
     };
     run.finish().settled()?;
-    assert_eq!(watched, Watched::from(Output::read(printed, Stderr::Silent)));
+    let envelope = String::from_utf8(printed.as_ref().to_vec())?;
+    assert_eq!(watched, Watched::from(Output::read(&envelope, Stderr::Silent)));
     Ok(())
 }
 
@@ -159,81 +140,71 @@ fn an_agent_is_told_the_model_its_job_names() -> Result<(), Failed> {
         .map(|directory| directory.join(&table))
         .find(|candidate| candidate.is_file())
         .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let rows: Vec<Vec<String>> = serde_json::from_slice(&fs::read(found)?)?;
-    let [_, _, _, _, modelled, ..] = rows.as_slice() else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
-    let [program, flag, script, seconds, golden, newline] = modelled.as_slice() else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
-    let arguments = Vec::leak(vec![&*String::leak(flag.clone()), &*String::leak(script.clone())]);
-    let agent = Agent::new(String::leak(program.clone()), arguments);
-    let timeout = Timeout::new(seconds.parse()?);
+    let bytes = fs::read(found)?;
+    let mut rows = serde_json::Deserializer::from_slice(&bytes);
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    let (program, timeout, golden) = <(Program, Timeout, PathBuf)>::deserialize(&mut rows)?;
     let directory = std::env::current_dir()?;
     let run = Run::root();
-    let watched = [Model::Haiku, Model::Sonnet]
+    let replies = [Model::Haiku, Model::Sonnet]
         .into_iter()
         .map(|model| {
-            let echo = run.port(HeadlessClaude::new(directory.clone(), agent));
+            let echo = run.port(HeadlessClaude::new(directory.clone(), program.clone()));
             let clock = run.port(SystemClock);
-            let deadline = Deadline::after(clock.now(), timeout);
-            let held = echo.dispatch(&Job::due_by(deadline, model), &Prompt::new(String::new()))?;
-            Watch::over(&echo, &clock).watched(held)
+            let held =
+                echo.dispatch(&Job::due_by(Deadline::after(clock.now(), timeout), model), &Prompt::new(String::new()))?;
+            Watch::over(&echo, &clock).watched(held).map(|watched| match watched {
+                Watched::Finished(finished) => Ok(finished.reply().clone()),
+                Watched::Stalled(stall) => Err(stall.to_string()),
+            })
         })
-        .collect::<Result<Vec<Watched>, DispatchFailure>>()?;
+        .collect::<Result<Vec<Result<Reply, String>>, DispatchFailure>>()?;
     run.finish().settled()?;
-    let replies: Vec<String> = watched
-        .iter()
-        .map(|each| match each {
-            Watched::Finished(finished) => finished.reply().to_string(),
-            Watched::Stalled(stall) => stall.to_string(),
-        })
-        .collect();
-    assert_eq!([replies.join(newline), newline.clone()].concat(), fs::read_to_string(golden)?);
+    assert_eq!(replies, serde_json::from_slice::<Vec<_>>(&fs::read(golden)?)?);
     Ok(())
 }
 
-#[test]
-fn an_agent_that_leaves_a_large_prompt_unread_is_killed_and_reaped_at_its_deadline() -> Result<(), Failed> {
-    let source = Path::new(file!());
-    let table = source.with_file_name(source.file_stem().unwrap_or_default());
-    let found = std::env::current_dir()?
-        .ancestors()
-        .map(|directory| directory.join(&table))
-        .find(|candidate| candidate.is_file())
-        .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let rows: Vec<Vec<String>> = serde_json::from_slice(&fs::read(found)?)?;
-    let [_, _, _, _, _, stalling, ..] = rows.as_slice() else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
-    let [shell, dash, sleeping, deaf, seconds, letter, size] = stalling.as_slice() else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
-    let prompt = Prompt::new(letter.repeat(size.parse()?));
-    let timeout = Timeout::new(seconds.parse()?);
-    let directory = std::env::current_dir()?;
-    let program: &'static str = String::leak(shell.clone());
-    let flag: &'static str = String::leak(dash.clone());
-    let ended = [sleeping, deaf]
-        .into_iter()
-        .map(|script| {
-            let agent = Agent::new(program, Vec::leak(vec![flag, &*String::leak(script.clone())]));
+proptest! {
+    #![proptest_config(Config { cases: 2, ..Config::default() })]
+    #[test]
+    fn an_agent_that_leaves_a_large_prompt_unread_is_killed_and_reaped_at_its_deadline(
+        letters in vec(range('a', 'z'), 0x0001_0000..0x0002_0000),
+    ) {
+        let source = Path::new(file!());
+        let table = source.with_file_name(source.file_stem().unwrap_or_default());
+        let found = std::env::current_dir()?
+            .ancestors()
+            .map(|directory| directory.join(&table))
+            .find(|candidate| candidate.is_file())
+            .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
+        let bytes = fs::read(found)?;
+        let mut rows = serde_json::Deserializer::from_slice(&bytes);
+        IgnoredAny::deserialize(&mut rows)?;
+        IgnoredAny::deserialize(&mut rows)?;
+        IgnoredAny::deserialize(&mut rows)?;
+        IgnoredAny::deserialize(&mut rows)?;
+        IgnoredAny::deserialize(&mut rows)?;
+        let (programs, timeout) = <(Vec<Program>, Timeout)>::deserialize(&mut rows)?;
+        let prompt = Prompt::new(letters.into_iter().collect());
+        let directory = std::env::current_dir()?;
+        for program in programs {
             let run = Run::root();
             let ended = {
-                let dispatch = run.port(HeadlessClaude::new(directory.clone(), agent));
-                let clock = run.port(MemoryClock::starting(Wall::from(std::time::SystemTime::now())));
+                let dispatch = run.port(HeadlessClaude::new(directory.clone(), program));
+                let clock = run.port(MemoryClock::starting(Wall::from(SystemTime::now())));
                 let deadline = Deadline::after(clock.now(), timeout);
                 let held = dispatch.dispatch(&Job::due_by(deadline, Model::Haiku), &prompt)?;
                 let pid = held.pid();
                 let watched = Watch::over(&dispatch, &clock).watched(held)?;
                 (watched, dispatch.started(pid)?)
             };
-            run.finish().settled().map_err(|failure| io::Error::other(failure.to_string()))?;
-            Ok(ended)
-        })
-        .collect::<Result<Vec<(Watched, Option<Started>)>, Failed>>()?;
-    assert_eq!(ended, [(Watched::Stalled(Stall::Overdue), None), (Watched::Stalled(Stall::Overdue), None)]);
-    Ok(())
+            run.finish().settled()?;
+            prop_assert_eq!(ended, (Watched::Stalled(Stall::Overdue), None));
+        }
+    }
 }
 
 #[test]
@@ -245,25 +216,23 @@ fn a_wait_nobody_rings_lasts_its_full_pause() -> Result<(), Failed> {
         .map(|directory| directory.join(&table))
         .find(|candidate| candidate.is_file())
         .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let rows: Vec<Vec<String>> = serde_json::from_slice(&fs::read(found)?)?;
-    let [_, _, _, _, _, _, silent, ..] = rows.as_slice() else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
-    let [program, flag, script, seconds, letter, paused] = silent.as_slice() else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
-    let pause = Pause::new(paused.parse()?);
-    let start = Wall::from(std::time::SystemTime::now());
-    let arguments = Vec::leak(vec![&*String::leak(flag.clone()), &*String::leak(script.clone())]);
-    let agent = Agent::new(String::leak(program.clone()), arguments);
+    let bytes = fs::read(found)?;
+    let mut rows = serde_json::Deserializer::from_slice(&bytes);
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    let (program, timeout, prompt, pause) = <(Program, Timeout, Prompt, Pause)>::deserialize(&mut rows)?;
+    let start = Wall::from(SystemTime::now());
     let run = Run::root();
     let waited = {
-        let dispatch = run.port(HeadlessClaude::new(std::env::current_dir()?, agent));
+        let dispatch = run.port(HeadlessClaude::new(std::env::current_dir()?, program));
         let clock = run.port(MemoryClock::starting(start));
-        let deadline = Deadline::after(clock.now(), Timeout::new(seconds.parse()?));
-        let silent_run = dispatch.dispatch(&Job::due_by(deadline, Model::Haiku), &Prompt::new(letter.clone()))?;
-        let waited = clock.waited(pause, silent_run.bell());
-        silent_run.end()?;
+        let silent = dispatch.dispatch(&Job::due_by(Deadline::after(clock.now(), timeout), Model::Haiku), &prompt)?;
+        let waited = clock.waited(pause, silent.bell());
+        silent.end()?;
         waited
     };
     run.finish().settled()?;
@@ -280,20 +249,22 @@ fn a_quiet_bell_waits_out_its_pause() -> Result<(), Failed> {
         .map(|directory| directory.join(&table))
         .find(|candidate| candidate.is_file())
         .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let rows: Vec<Vec<String>> = serde_json::from_slice(&fs::read(found)?)?;
-    let [_, _, _, _, _, _, _, quiet, ..] = rows.as_slice() else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
-    let [millis, seconds] = quiet.as_slice() else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
-    let pause = Duration::from_millis(millis.parse()?);
-    let deadline = Deadline::after(Wall::from(std::time::SystemTime::now()), Timeout::new(seconds.parse()?));
-    let quiet_run = AgentRun::new(Pid::new(std::process::id()), deadline);
+    let bytes = fs::read(found)?;
+    let mut rows = serde_json::Deserializer::from_slice(&bytes);
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    let (pause, timeout) = <(Pause, Timeout)>::deserialize(&mut rows)?;
+    let deadline = Deadline::after(Wall::from(SystemTime::now()), timeout);
+    let quiet = AgentRun::new(Pid::new(std::process::id()), deadline);
     let started = Instant::now();
-    let woke = quiet_run.bell().waited(pause);
+    let woke = quiet.bell().waited(Duration::from(pause));
     assert_eq!(woke, Woke::Lapsed);
-    assert!(started.elapsed() >= pause);
+    assert!(started.elapsed() >= Duration::from(pause));
     Ok(())
 }
 
@@ -306,22 +277,23 @@ fn a_dispatched_agent_rings_its_own_bell_when_it_finishes() -> Result<(), Failed
         .map(|directory| directory.join(&table))
         .find(|candidate| candidate.is_file())
         .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let rows: Vec<Vec<String>> = serde_json::from_slice(&fs::read(found)?)?;
-    let [_, _, _, _, _, _, _, _, ringing, ..] = rows.as_slice() else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
-    let [program, flag, script, seconds, letter, waiting] = ringing.as_slice() else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
-    let arguments = Vec::leak(vec![&*String::leak(flag.clone()), &*String::leak(script.clone())]);
-    let agent = Agent::new(String::leak(program.clone()), arguments);
+    let bytes = fs::read(found)?;
+    let mut rows = serde_json::Deserializer::from_slice(&bytes);
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    let (program, timeout, prompt, waiting) = <(Program, Timeout, Prompt, Pause)>::deserialize(&mut rows)?;
     let run = Run::root();
     let woke = {
-        let dispatch = run.port(HeadlessClaude::new(std::env::current_dir()?, agent));
-        let clock = run.port(MemoryClock::starting(Wall::from(std::time::SystemTime::now())));
-        let deadline = Deadline::after(clock.now(), Timeout::new(seconds.parse()?));
-        let finished = dispatch.dispatch(&Job::due_by(deadline, Model::Haiku), &Prompt::new(letter.clone()))?;
-        let woke = finished.bell().waited(Duration::from_secs(waiting.parse()?));
+        let dispatch = run.port(HeadlessClaude::new(std::env::current_dir()?, program));
+        let clock = run.port(MemoryClock::starting(Wall::from(SystemTime::now())));
+        let finished = dispatch.dispatch(&Job::due_by(Deadline::after(clock.now(), timeout), Model::Haiku), &prompt)?;
+        let woke = finished.bell().waited(Duration::from(waiting));
         finished.end()?;
         woke
     };
@@ -339,33 +311,34 @@ fn a_shell_call_returns_its_printing_and_whether_it_succeeded_failed_or_ran_past
         .map(|directory| directory.join(&table))
         .find(|candidate| candidate.is_file())
         .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let rows: Vec<Vec<String>> = serde_json::from_slice(&fs::read(found)?)?;
-    let [_, _, _, _, _, _, _, _, _, shelled, ..] = rows.as_slice() else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
-    let [shell_program, flag, succeeding, failing, refused, sleeping, seconds, overdue, newline] = shelled.as_slice()
-    else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
+    let bytes = fs::read(found)?;
+    let mut rows = serde_json::Deserializer::from_slice(&bytes);
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    IgnoredAny::deserialize(&mut rows)?;
+    let calls = Vec::<(Program, Timeout, Ran)>::deserialize(&mut rows)?;
     let directory = std::env::current_dir()?;
-    let program: &'static str = String::leak(shell_program.clone());
     let run = Run::root();
     let ran = {
         let shell = run.port(SystemShell);
         let clock = run.port(SystemClock);
-        [(succeeding, seconds), (failing, seconds), (sleeping, overdue)]
-            .into_iter()
-            .map(|(script, timeout)| {
-                let deadline = Deadline::after(clock.now(), Timeout::new(timeout.parse()?));
-                let call = Call::new(program, vec![flag.clone(), script.clone()], directory.clone(), deadline);
-                Ok(shell.ran(&call)?)
+        calls
+            .iter()
+            .map(|(program, timeout, _)| {
+                let call = Call::new(program.clone(), directory.clone(), Deadline::after(clock.now(), *timeout));
+                shell.ran(&call)
             })
-            .collect::<Result<Vec<Ran>, Failed>>()?
+            .collect::<Result<Vec<Ran>, DispatchFailure>>()?
     };
-    let calls = run.finish().settled()?.calls::<shell_ops::Ran>();
-    let printed = [directory.to_string_lossy().into_owned(), newline.clone()].concat();
-    assert_eq!(ran, [Ran::Succeeded(Printed::new(printed)), Ran::Failed(Printed::new(refused.clone())), Ran::Overdue]);
-    assert_eq!(calls.count(), ran.len());
+    let counted = run.finish().settled()?.calls::<shell_ops::Ran>();
+    assert_eq!(ran, calls.iter().map(|(_, _, expected)| expected.clone()).collect::<Vec<Ran>>());
+    assert_eq!(counted.count(), ran.len());
     Ok(())
 }
 
@@ -394,11 +367,14 @@ proptest! {
     #[test]
     fn a_run_that_replies_is_finished_on_its_first_poll_and_released_once(
         reply in any::<Reply>(),
-        spent in any::<[Tokens; 4]>(),
+        spent in vec(any::<Tokens>(), 4),
         seconds in 1..120_u32,
     ) {
-        let [input, output, written, read] = spent;
-        let finished = Finished::new(reply, Usage::new(input, output, written, read));
+        let usage = match spent.as_slice() {
+            [input, output, written, read] => Usage::new(*input, *output, *written, *read),
+            _ => Usage::default(),
+        };
+        let finished = Finished::new(reply, usage);
         let replayed = ReplayedDispatch::replaying([Some(Output::Finished(finished.clone()))]);
         let run = Run::root();
         let watched = {
@@ -423,16 +399,15 @@ proptest! {
         let outputs: Vec<Output> =
             replies.iter().map(|reply| Output::Finished(Finished::new(reply.clone(), Usage::default()))).collect();
         let replayed = ReplayedDispatch::replaying(outputs.iter().cloned().map(Some));
+        let fanned = prompts.len().min(outputs.len());
         let run = Run::root();
         let watched = {
             let dispatch = run.port(&replayed);
             let clock = run.port(MemoryClock::starting(Wall::new(i64::default())));
-            let deadline = Deadline::after(clock.now(), Timeout::new(u32::MAX));
-            let fanned = prompts.len().min(outputs.len());
-            Watch::over(&dispatch, &clock).fanned(&Job::due_by(deadline, Model::Haiku), prompts.get(..fanned).unwrap_or_default())?
+            let job = Job::due_by(Deadline::after(clock.now(), Timeout::new(u32::MAX)), Model::Haiku);
+            Watch::over(&dispatch, &clock).fanned(&job, prompts.get(..fanned).unwrap_or_default())?
         };
         run.finish().settled()?;
-        let fanned = prompts.len().min(outputs.len());
         prop_assert_eq!(watched, outputs.into_iter().take(fanned).map(Watched::from).collect::<Vec<Watched>>());
         prop_assert_eq!(replayed.prompts(), prompts.into_iter().take(fanned).collect::<Vec<Prompt>>());
     }
@@ -442,12 +417,11 @@ proptest! {
         arguments in vec("[a-z]{1,8}", 0..4),
         unknown in vec("[A-Z]{1,8}", 1..4),
         printed in ".*",
-        spelled in "[a-z]{1,8}",
+        name in "[a-z]{1,8}",
     ) {
-        let program: &'static str = String::leak(spelled);
         let deadline = Deadline::after(Wall::new(i64::default()), Timeout::new(u32::default()));
-        let held = Call::new(program, arguments, PathBuf::new(), deadline);
-        let other = Call::new(program, unknown, PathBuf::new(), deadline);
+        let held = Call::new(Program::new(&name, arguments), PathBuf::new(), deadline);
+        let other = Call::new(Program::new(&name, unknown), PathBuf::new(), deadline);
         let answer = Ran::Succeeded(Printed::new(printed));
         let shell = AnsweringShell::answering(BTreeMap::from([(Spoken::from(&held), answer.clone())]));
         let run = Run::root();

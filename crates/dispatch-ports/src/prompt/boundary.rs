@@ -2,7 +2,8 @@ use std::fmt::Display;
 
 use newtype::{Arbitrary, Newtype};
 
-#[derive(Newtype, Arbitrary, Clone, Debug, PartialEq, Eq)]
+#[derive(Newtype, Arbitrary, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(transparent)]
 pub struct Prompt(String);
 
 impl<Shown: Display> From<&Shown> for Prompt {

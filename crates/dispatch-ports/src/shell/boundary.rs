@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use newtype::{Display, Newtype};
 use serde::Deserialize;
 
-use crate::Deadline;
+use crate::{Deadline, Program};
 
 #[derive(Newtype, Display, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 #[serde(transparent)]
@@ -16,9 +16,9 @@ pub struct Spoken(String);
 impl From<&Call> for Spoken {
     fn from(call: &Call) -> Spoken {
         Spoken(
-            [call.program]
+            [call.program()]
                 .into_iter()
-                .chain(call.arguments.iter().map(String::as_str))
+                .chain(call.arguments().iter().map(String::as_str))
                 .collect::<Vec<&str>>()
                 .join(" "),
         )
@@ -33,30 +33,26 @@ impl AsRef<str> for Printed {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Call {
-    program: &'static str,
-    arguments: Vec<String>,
+    program: Program,
     directory: PathBuf,
     deadline: Deadline,
 }
 
 impl Call {
     #[must_use]
-    pub fn new(program: &'static str, arguments: Vec<String>, directory: PathBuf, deadline: Deadline) -> Call {
-        Call { program, arguments, directory, deadline }
+    pub fn new(program: Program, directory: PathBuf, deadline: Deadline) -> Call {
+        Call { program, directory, deadline }
     }
 
-    #[must_use]
-    pub fn program(&self) -> &'static str {
-        self.program
+    pub(crate) fn program(&self) -> &str {
+        self.program.name()
     }
 
-    #[must_use]
-    pub fn arguments(&self) -> &[String] {
-        &self.arguments
+    pub(crate) fn arguments(&self) -> &[String] {
+        self.program.arguments()
     }
 
-    #[must_use]
-    pub fn directory(&self) -> &Path {
+    pub(crate) fn directory(&self) -> &Path {
         &self.directory
     }
 

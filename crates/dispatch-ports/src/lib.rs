@@ -1,6 +1,5 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
-mod agent;
 mod agent_run;
 mod bell;
 mod clock;
@@ -11,6 +10,7 @@ mod headless_claude;
 mod job;
 mod memory_clock;
 mod pid;
+mod program;
 mod prompt;
 mod replayed_dispatch;
 mod shell;
@@ -21,7 +21,6 @@ mod system_shell;
 mod wall;
 mod watch;
 
-pub use agent::Agent;
 pub use agent_run::AgentRun;
 pub(crate) use bell::Bell;
 pub use bell::Woke;
@@ -35,6 +34,7 @@ pub use headless_claude::HeadlessClaude;
 pub use job::{Job, Model};
 pub use memory_clock::MemoryClock;
 pub use pid::{Ended, Pid};
+pub use program::Program;
 pub use prompt::Prompt;
 pub use replayed_dispatch::ReplayedDispatch;
 pub use shell::{AnsweringShell, Call, Printed, Ran, Shell, ShellFiller, Spoken, shell_ops};

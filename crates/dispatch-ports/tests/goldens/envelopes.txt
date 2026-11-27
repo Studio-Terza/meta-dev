@@ -1,9 +1,0 @@
-conversational(a.0) 4 9 2 7
-x 1 2 0 0
-the agent's run ended in error: Invalid API key
-the agent's output was unreadable: the agent ended without a successful result; it wrote nothing on stderr
-the agent's output was unreadable: the agent ended without a successful result; it wrote nothing on stderr
-the agent's output was unreadable: the agent ended without a successful result; it wrote nothing on stderr
-the agent's output was unreadable: the agent's output is not its JSON result: "  " holds no ink or holds a NUL at line 1 column 34; it wrote nothing on stderr
-the agent's output was unreadable: the agent's output is not its JSON result: missing field `usage` at line 1 column 34; it wrote nothing on stderr
-the agent's output was unreadable: the agent's output is not its JSON result: expected ident at line 1 column 2; it wrote nothing on stderr

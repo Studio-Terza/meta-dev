@@ -1,4 +1,4 @@
-use dispatch_ports::{Call, Clock, Deadline, Dispatch, Ran, Shell, Timeout};
+use dispatch_ports::{Call, Clock, Deadline, Dispatch, Program, Ran, Shell, Timeout};
 use invariants::Ignoring;
 
 use super::super::boundary::JobId;
@@ -15,7 +15,7 @@ impl<D: Dispatch, C: Clock, G: Shell> Hub<'_, D, C, G> {
     pub(super) fn ran(&self, arguments: &[&str], timeout: Timeout) -> Option<Ran> {
         let spoken = arguments.iter().map(|word| (*word).to_owned()).collect();
         let deadline = Deadline::after(self.crew.now(), timeout);
-        let call = Call::new(Hub::<D, C, G>::PROGRAM, spoken, self.directory.to_path_buf(), deadline);
+        let call = Call::new(Program::new(Hub::<D, C, G>::PROGRAM, spoken), self.directory.to_path_buf(), deadline);
         self.crew.ran(&call).ignoring(Ignored::Unrun)
     }
 

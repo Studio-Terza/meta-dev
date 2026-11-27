@@ -1,12 +1,31 @@
+["tests/fixtures/envelopes", "tests/goldens/envelopes.json"]
+
+["tests/fixtures/starts", "tests/goldens/starts.json"]
+
+[{"name": "sh", "arguments": ["-c", "exec sleep 30"]}, 60, "x"]
+
 [
-  ["tests/fixtures/envelopes", "tests/goldens/envelopes.txt", " ", "\n"],
-  ["tests/fixtures/starts", "tests/goldens/starts.txt", "\n"],
-  ["sh", "-c", "exec sleep 30", "60", "x"],
-  ["sh", "-c", "cat", "5", "{\"subtype\":\"success\",\"result\":\"conversational(a.0)\",\"usage\":{\"input_tokens\":4,\"output_tokens\":9,\"cache_creation_input_tokens\":2,\"cache_read_input_tokens\":7}}"],
-  ["sh", "-c", "cat >/dev/null; printf '{\"subtype\":\"success\",\"result\":\"%s %s\",\"usage\":{\"input_tokens\":1,\"output_tokens\":1}}' \"$0\" \"$1\"", "5", "tests/goldens/models.txt", "\n"],
-  ["sh", "-c", "exec sleep 30", "exec 0<&-; exec sleep 30", "1", "x", "262144"],
-  ["sh", "-c", "exec sleep 30", "60", "x", "1"],
-  ["50", "5"],
-  ["sh", "-c", "echo spoken", "60", "x", "20"],
-  ["sh", "-c", "pwd", "printf refused; exit 3", "refused", "exec sleep 30", "5", "0", "\n"]
+  {"name": "sh", "arguments": ["-c", "cat"]},
+  5,
+  "{\"subtype\":\"success\",\"result\":\"conversational(a.0)\",\"usage\":{\"input_tokens\":4,\"output_tokens\":9,\"cache_creation_input_tokens\":2,\"cache_read_input_tokens\":7}}"
+]
+
+[
+  {"name": "sh", "arguments": ["-c", "cat >/dev/null; printf '{\"subtype\":\"success\",\"result\":\"%s %s\",\"usage\":{\"input_tokens\":1,\"output_tokens\":1}}' \"$0\" \"$1\""]},
+  5,
+  "tests/goldens/models.json"
+]
+
+[[{"name": "sh", "arguments": ["-c", "exec sleep 30"]}, {"name": "sh", "arguments": ["-c", "exec 0<&-; exec sleep 30"]}], 1]
+
+[{"name": "sh", "arguments": ["-c", "exec sleep 30"]}, 60, "x", 1]
+
+[1, 5]
+
+[{"name": "sh", "arguments": ["-c", "echo spoken"]}, 60, "x", 20]
+
+[
+  [{"name": "sh", "arguments": ["-c", "printf done"]}, 5, {"Succeeded": "done"}],
+  [{"name": "sh", "arguments": ["-c", "printf refused; exit 3"]}, 5, {"Failed": "refused"}],
+  [{"name": "sh", "arguments": ["-c", "exec sleep 30"]}, 0, "Overdue"]
 ]

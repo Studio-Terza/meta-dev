@@ -11,10 +11,12 @@ pub struct Wall(i64);
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Moment(i64);
 
-#[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Newtype, Arbitrary, serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(transparent)]
 pub struct Timeout(u32);
 
-#[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Newtype, Arbitrary, serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(transparent)]
 pub struct Pause(u32);
 use crate::Ignored;
 

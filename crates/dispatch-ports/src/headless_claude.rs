@@ -9,14 +9,14 @@ use port_core::Pass;
 
 use crate::agent_run::Exchange;
 use crate::{
-    Agent, AgentRun, Bell, DispatchFailure, DispatchFiller, Ended, Ignored, Job, Model, Output, Pid, Prompt, Started,
+    AgentRun, Bell, DispatchFailure, DispatchFiller, Ended, Ignored, Job, Model, Output, Pid, Program, Prompt, Started,
     dispatch_ops,
 };
 
 #[derive(Clone, Debug)]
 pub struct HeadlessClaude {
     scratch: PathBuf,
-    agent: Agent,
+    agent: Program,
 }
 
 impl HeadlessClaude {
@@ -25,8 +25,13 @@ impl HeadlessClaude {
     const LOCALE: [&'static str; 2] = ["LC_ALL", "C"];
 
     #[must_use]
-    pub fn new(scratch: PathBuf, agent: Agent) -> HeadlessClaude {
+    pub fn new(scratch: PathBuf, agent: Program) -> HeadlessClaude {
         HeadlessClaude { scratch, agent }
+    }
+
+    #[must_use]
+    pub fn claude(scratch: PathBuf) -> HeadlessClaude {
+        HeadlessClaude::new(scratch, Program::claude())
     }
 }
 
@@ -43,7 +48,7 @@ impl DispatchFiller for HeadlessClaude {
         let (complaints, agent_err) = io::pipe().map_err(DispatchFailure::Pipe)?;
         let bell = Bell::hung();
         let exchange = Exchange::begun(prompt, prompting, [replies, complaints], bell.ringer());
-        Command::new(self.agent.program())
+        Command::new(self.agent.name())
             .args(self.agent.arguments())
             .args(AsRef::<Model>::as_ref(job).spelled())
             .current_dir(&self.scratch)
