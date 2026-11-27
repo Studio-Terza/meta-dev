@@ -53,8 +53,15 @@ jobs:
         with:
           path: target
           key: target-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
-      - run: '"$TIMER" timed ci/limits.toml test-compile --since ../test-compile.start cargo test --locked --workspace --no-run'
+          restore-keys: target-${{ runner.os }}-
+      - run: '"$TIMER" timed ci/limits.toml test-compile --since ../test-compile.start cargo test --locked --workspace --no-run --timings'
       - run: '"$TIMER" timed ci/limits.toml test-run cargo test --locked --workspace'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-compile-timings
+          path: target/cargo-timings/cargo-timing.html
+          if-no-files-found: ignore
       - uses: actions/cache/save@v4
         if: always()
         with:
