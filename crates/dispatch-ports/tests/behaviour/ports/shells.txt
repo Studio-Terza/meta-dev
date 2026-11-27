@@ -1,0 +1,18 @@
+(
+    [
+        Succeeded(
+            Printed(
+                "ports\n",
+            ),
+        ),
+        Failed(
+            Printed(
+                "refused",
+            ),
+        ),
+        Overdue,
+    ],
+    Calls(
+        3,
+    ),
+)

@@ -1,25 +1,31 @@
-#[derive(Clone, Copy, Debug)]
+use serde::Deserialize;
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct Agent {
-    program: &'static str,
-    arguments: &'static [&'static str],
+    program: String,
+    arguments: Vec<String>,
 }
 
 impl Agent {
-    pub const CLAUDE: Agent = Agent::new(
-        "claude",
-        &["-p", "--output-format", "json", "--setting-sources", "user", "--strict-mcp-config", "--tools", ""],
-    );
+    const CLAUDE: &'static str = "claude";
+    const HEADLESS: [&'static str; 8] =
+        ["-p", "--output-format", "json", "--setting-sources", "user", "--strict-mcp-config", "--tools", ""];
 
     #[must_use]
-    pub const fn new(program: &'static str, arguments: &'static [&'static str]) -> Agent {
-        Agent { program, arguments }
+    pub fn claude() -> Agent {
+        Agent::new(Agent::CLAUDE, &Agent::HEADLESS)
     }
 
-    pub(crate) fn program(self) -> &'static str {
-        self.program
+    #[must_use]
+    pub fn new(program: &str, arguments: &[&str]) -> Agent {
+        Agent { program: program.to_owned(), arguments: arguments.iter().map(|word| (*word).to_owned()).collect() }
     }
 
-    pub(crate) fn arguments(self) -> &'static [&'static str] {
-        self.arguments
+    pub(crate) fn program(&self) -> &str {
+        &self.program
+    }
+
+    pub(crate) fn arguments(&self) -> &[String] {
+        &self.arguments
     }
 }

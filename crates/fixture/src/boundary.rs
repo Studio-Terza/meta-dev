@@ -102,14 +102,6 @@ enum Unread {
     Unanchored { story: &'static str, manifest: &'static str },
     #[error("case {0} has no golden file beside it")]
     Unpaired(CaseName),
-    #[error("case {0} has no row in the story's table")]
-    Unrowed(CaseName),
-}
-
-impl CaseName {
-    pub(crate) fn unrowed(&self) -> Failed {
-        Failed::from(Unread::Unrowed(self.clone()))
-    }
 }
 
 impl Story {
@@ -143,8 +135,12 @@ impl Story {
         Ok(rows.into_iter().map(|(name, row)| (CaseName(name), row)).collect())
     }
 
+    pub(crate) fn cases(&self) -> Result<PathBuf, Failed> {
+        Ok(self.path()?.with_extension(OsString::new()))
+    }
+
     pub(crate) fn entries(&self) -> Result<BTreeMap<CaseName, Entry>, Failed> {
-        let directory = self.path()?.with_extension(OsString::new());
+        let directory = self.cases()?;
         let listed = fs::read_dir(&directory)?
             .map(|entry| entry.map(|found| found.path()))
             .collect::<io::Result<Vec<PathBuf>>>()?;

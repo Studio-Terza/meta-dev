@@ -1,0 +1,120 @@
+[
+    (
+        "Fri Nov  6 01:16:00 2026",
+        Some(
+            Started {
+                weekday: Friday,
+                month: November,
+                day: 6,
+                hour: 1,
+                minute: 16,
+                second: 0,
+                year: 2026,
+            },
+        ),
+        Some(
+            Some(
+                Started {
+                    weekday: Friday,
+                    month: November,
+                    day: 6,
+                    hour: 1,
+                    minute: 16,
+                    second: 0,
+                    year: 2026,
+                },
+            ),
+        ),
+    ),
+    (
+        "Mon Jan  1 00:00:00 1970",
+        Some(
+            Started {
+                weekday: Monday,
+                month: January,
+                day: 1,
+                hour: 0,
+                minute: 0,
+                second: 0,
+                year: 1970,
+            },
+        ),
+        Some(
+            Some(
+                Started {
+                    weekday: Monday,
+                    month: January,
+                    day: 1,
+                    hour: 0,
+                    minute: 0,
+                    second: 0,
+                    year: 1970,
+                },
+            ),
+        ),
+    ),
+    (
+        "Sun Dec 31 23:59:59 2199",
+        Some(
+            Started {
+                weekday: Sunday,
+                month: December,
+                day: 31,
+                hour: 23,
+                minute: 59,
+                second: 59,
+                year: 2199,
+            },
+        ),
+        Some(
+            Some(
+                Started {
+                    weekday: Sunday,
+                    month: December,
+                    day: 31,
+                    hour: 23,
+                    minute: 59,
+                    second: 59,
+                    year: 2199,
+                },
+            ),
+        ),
+    ),
+    (
+        "Wed Feb 29 12:30:45 2028",
+        Some(
+            Started {
+                weekday: Wednesday,
+                month: February,
+                day: 29,
+                hour: 12,
+                minute: 30,
+                second: 45,
+                year: 2028,
+            },
+        ),
+        Some(
+            Some(
+                Started {
+                    weekday: Wednesday,
+                    month: February,
+                    day: 29,
+                    hour: 12,
+                    minute: 30,
+                    second: 45,
+                    year: 2028,
+                },
+            ),
+        ),
+    ),
+    (
+        "not a start",
+        None,
+        None,
+    ),
+    (
+        "",
+        None,
+        None,
+    ),
+]

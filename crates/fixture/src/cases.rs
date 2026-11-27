@@ -10,20 +10,22 @@ pub struct Cases<Row>(PhantomData<Row>);
 #[derive(Debug)]
 pub struct Case<Row> {
     name: CaseName,
-    directory: Option<PathBuf>,
-    row: Option<Row>,
+    directory: PathBuf,
+    row: Row,
 }
 
 impl<Row: Fixture> Cases<Row> {
     pub fn drifted<Printed: Display>(
         printing: impl Fn(Case<Row>) -> Result<Printed, Failed>,
     ) -> Result<Vec<Drift>, Failed> {
-        let mut rows = Row::STORY.rows::<Row>()?;
-        let entries = Row::STORY.entries()?;
-        let compared = entries.into_iter().map(|(name, entry)| {
+        let rows = Row::STORY.rows::<Row>()?;
+        let mut entries = Row::STORY.entries()?;
+        let cases = Row::STORY.cases()?;
+        let compared = rows.into_iter().map(|(name, row)| {
+            let entry = entries.remove(&name).unwrap_or_default();
             let golden = entry.golden(&name)?;
-            let row = rows.remove(&name);
-            let case = Case { row, directory: entry.directory().map(Path::to_path_buf), name: name.clone() };
+            let directory = entry.directory().map_or_else(|| cases.clone(), Path::to_path_buf);
+            let case = Case { row, directory, name: name.clone() };
             golden.compared(&name, printing(case)?)
         });
         compared.filter_map(Result::transpose).collect()
@@ -37,15 +39,17 @@ impl<Row> Case<Row> {
     }
 
     #[must_use]
-    pub fn directory(&self) -> Option<&Path> {
-        self.directory.as_deref()
+    pub fn directory(&self) -> &Path {
+        &self.directory
     }
 
-    pub fn row(&self) -> Result<&Row, Failed> {
-        self.row.as_ref().ok_or_else(|| self.name.unrowed())
+    #[must_use]
+    pub fn row(&self) -> &Row {
+        &self.row
     }
 
-    pub fn into_row(self) -> Result<Row, Failed> {
-        self.row.ok_or_else(|| self.name.unrowed())
+    #[must_use]
+    pub fn into_row(self) -> Row {
+        self.row
     }
 }

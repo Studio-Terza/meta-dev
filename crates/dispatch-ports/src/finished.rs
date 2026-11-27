@@ -2,7 +2,7 @@ mod boundary;
 
 use serde::Deserialize;
 
-pub use boundary::{Errored, Output, Reply, Tokens, Told, Unreadable};
+pub use boundary::{Errored, Output, Reply, Tokens, Unreadable};
 
 #[derive(Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Usage {

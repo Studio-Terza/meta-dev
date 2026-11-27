@@ -7,7 +7,7 @@ use invariants::Unpoisoned;
 pub struct Bell(Arc<Peal>);
 
 #[derive(Debug)]
-pub struct Ringer(Arc<Peal>);
+pub(crate) struct Ringer(Arc<Peal>);
 
 #[derive(Debug, Default)]
 struct Peal {
@@ -35,7 +35,7 @@ impl Bell {
     }
 
     #[must_use]
-    pub fn ringer(&self) -> Ringer {
+    pub(crate) fn ringer(&self) -> Ringer {
         Ringer(Arc::clone(&self.0))
     }
 
@@ -50,7 +50,7 @@ impl Bell {
 }
 
 impl Ringer {
-    pub fn ring(&self) {
+    pub(crate) fn ring(&self) {
         *self.0.chime.lock().unpoisoned() = Chime::Rung;
         self.0.heard.notify_all();
     }

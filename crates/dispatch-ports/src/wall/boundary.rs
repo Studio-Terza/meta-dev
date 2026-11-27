@@ -1,21 +1,21 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use invariants::Ignoring;
-use newtype::{Arbitrary, Newtype};
+use newtype::{Arbitrary, Deserialize, Newtype};
 
 use super::Deadline;
 use crate::Ignored;
 
-#[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Newtype, Arbitrary, Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Wall(i64);
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Moment(i64);
 
-#[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Newtype, Arbitrary, Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Timeout(u32);
 
-#[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Newtype, Arbitrary, Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Pause(u32);
 
 impl Deadline {

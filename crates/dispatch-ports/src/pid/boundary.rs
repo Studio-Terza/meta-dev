@@ -1,11 +1,11 @@
 use std::ffi::{OsStr, OsString};
 use std::process::ExitStatus;
 
-use newtype::{Arbitrary, Display, Newtype};
+use newtype::{Arbitrary, Deserialize, Display, Newtype};
 
 use super::Ended;
 
-#[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Newtype, Arbitrary, Display, Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Pid(u32);
 
 #[derive(Debug)]

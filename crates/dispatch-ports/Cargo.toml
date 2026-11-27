@@ -20,7 +20,7 @@ serde_json.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-test-failure = { path = "../test-failure" }
+fixture = { path = "../fixture" }
 proptest.workspace = true
 
 [lints]

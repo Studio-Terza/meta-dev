@@ -1,0 +1,20 @@
+(
+    (
+        Wall(
+            1800000001,
+        ),
+        (
+            Lapsed,
+            true,
+        ),
+        Rung,
+    ),
+    [
+        Wait {
+            pause: Pause(
+                1,
+            ),
+            woke: Lapsed,
+        },
+    ],
+)

@@ -1,0 +1,26 @@
+[
+    (
+        Haiku,
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        4,
+                    ),
+                    output: Tokens(
+                        9,
+                    ),
+                    cache_written: Tokens(
+                        2,
+                    ),
+                    cache_read: Tokens(
+                        7,
+                    ),
+                },
+            },
+        ),
+    ),
+]

@@ -15,7 +15,7 @@ struct Texts {
 #[test]
 fn every_lexer_reads_its_fixture_texts_as_its_golden_says() -> Result<(), Failed> {
     let drifted = Cases::<Texts>::drifted(|case| {
-        let texts = case.row()?;
+        let texts = case.row();
         let lines: Vec<_> = texts
             .lines
             .iter()

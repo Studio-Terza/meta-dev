@@ -1,0 +1,50 @@
+[
+    (
+        Haiku,
+        Finished(
+            Finished {
+                reply: Reply(
+                    "--model haiku",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        1,
+                    ),
+                    output: Tokens(
+                        1,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+    ),
+    (
+        Sonnet,
+        Finished(
+            Finished {
+                reply: Reply(
+                    "--model sonnet",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        1,
+                    ),
+                    output: Tokens(
+                        1,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+    ),
+]

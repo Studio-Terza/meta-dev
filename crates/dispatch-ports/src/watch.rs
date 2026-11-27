@@ -50,26 +50,7 @@ impl Watched {
     }
 }
 
-pub trait Stalled {
-    const ERRORED: Self;
-    const UNREADABLE: Self;
-    const OVERDUE: Self;
-    const UNSPAWNED: Self;
-    const FAILED: Self;
-}
-
 impl Stall {
-    #[must_use]
-    pub fn stalled<S: Stalled>(&self) -> S {
-        match self {
-            Stall::Errored(_) => S::ERRORED,
-            Stall::Unreadable(_) => S::UNREADABLE,
-            Stall::Overdue => S::OVERDUE,
-            Stall::Unspawned(_) => S::UNSPAWNED,
-            Stall::Failed(_) => S::FAILED,
-        }
-    }
-
     #[must_use]
     pub fn usage(&self) -> Option<Usage> {
         match self {
@@ -80,7 +61,7 @@ impl Stall {
 }
 
 impl<'ports, D: Dispatch, C: Clock> Watch<'ports, D, C> {
-    pub const PAUSE: Pause = Pause::new(2);
+    const PAUSE: Pause = Pause::new(2);
 
     pub fn over(dispatch: &'ports D, clock: &'ports C) -> Watch<'ports, D, C> {
         Watch { dispatch, clock }

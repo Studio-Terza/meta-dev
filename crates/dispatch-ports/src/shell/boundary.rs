@@ -6,7 +6,7 @@ use crate::Deadline;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Call {
-    program: &'static str,
+    program: String,
     arguments: Vec<String>,
     directory: PathBuf,
     deadline: Deadline,
@@ -17,13 +17,13 @@ pub struct Printed(String);
 
 impl Call {
     #[must_use]
-    pub fn new(program: &'static str, arguments: Vec<String>, directory: PathBuf, deadline: Deadline) -> Call {
-        Call { program, arguments, directory, deadline }
+    pub fn new(program: &str, arguments: Vec<String>, directory: PathBuf, deadline: Deadline) -> Call {
+        Call { program: program.to_owned(), arguments, directory, deadline }
     }
 
     #[must_use]
-    pub fn program(&self) -> &'static str {
-        self.program
+    pub fn program(&self) -> &str {
+        &self.program
     }
 
     #[must_use]

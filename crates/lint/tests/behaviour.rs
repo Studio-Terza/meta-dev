@@ -25,7 +25,7 @@ enum Out {
 #[test]
 fn every_case_prints_its_golden_output_and_reaches_its_verdict() -> Result<(), Failed> {
     let drifted = Cases::<Lint>::drifted(|case| {
-        let lint = case.row()?;
+        let lint = case.row();
         let cli = Cli::from_args(lint.arguments.iter().map(|argument| argument.clone().into_os_string()));
         let mut kept = Vec::new();
         let mut err = Vec::new();

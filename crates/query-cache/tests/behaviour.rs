@@ -25,7 +25,7 @@ struct Column {
 #[test]
 fn every_cached_query_binds_what_it_takes_and_every_record_table_spells_its_statements() -> Result<(), Failed> {
     let drifted = Cases::<Cached>::drifted(|case| {
-        let cached = case.into_row()?;
+        let cached = case.into_row();
         let bound: Vec<u8> =
             (u8::MIN..=u8::MAX).filter(|given| cached.entry.bound(usize::from(*given)).is_ok()).collect();
         let refused = cached.entry.bound(usize::from(u8::MAX)).map_err(|refusal| refusal.to_string());

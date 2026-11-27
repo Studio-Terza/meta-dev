@@ -1,0 +1,1364 @@
+[
+    (
+        Timeout(
+            20,
+        ),
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        0,
+                    ),
+                    output: Tokens(
+                        0,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+        [
+            Calls(
+                1,
+            ),
+            Calls(
+                0,
+            ),
+            Calls(
+                1,
+            ),
+        ],
+        [],
+    ),
+    (
+        Timeout(
+            20,
+        ),
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        0,
+                    ),
+                    output: Tokens(
+                        0,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+        [
+            Calls(
+                2,
+            ),
+            Calls(
+                1,
+            ),
+            Calls(
+                1,
+            ),
+        ],
+        [
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+        ],
+    ),
+    (
+        Timeout(
+            20,
+        ),
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        0,
+                    ),
+                    output: Tokens(
+                        0,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+        [
+            Calls(
+                5,
+            ),
+            Calls(
+                4,
+            ),
+            Calls(
+                1,
+            ),
+        ],
+        [
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+        ],
+    ),
+    (
+        Timeout(
+            20,
+        ),
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        0,
+                    ),
+                    output: Tokens(
+                        0,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+        [
+            Calls(
+                8,
+            ),
+            Calls(
+                7,
+            ),
+            Calls(
+                1,
+            ),
+        ],
+        [
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+        ],
+    ),
+    (
+        Timeout(
+            50,
+        ),
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        0,
+                    ),
+                    output: Tokens(
+                        0,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+        [
+            Calls(
+                1,
+            ),
+            Calls(
+                0,
+            ),
+            Calls(
+                1,
+            ),
+        ],
+        [],
+    ),
+    (
+        Timeout(
+            50,
+        ),
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        0,
+                    ),
+                    output: Tokens(
+                        0,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+        [
+            Calls(
+                2,
+            ),
+            Calls(
+                1,
+            ),
+            Calls(
+                1,
+            ),
+        ],
+        [
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+        ],
+    ),
+    (
+        Timeout(
+            50,
+        ),
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        0,
+                    ),
+                    output: Tokens(
+                        0,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+        [
+            Calls(
+                5,
+            ),
+            Calls(
+                4,
+            ),
+            Calls(
+                1,
+            ),
+        ],
+        [
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+        ],
+    ),
+    (
+        Timeout(
+            50,
+        ),
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        0,
+                    ),
+                    output: Tokens(
+                        0,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+        [
+            Calls(
+                8,
+            ),
+            Calls(
+                7,
+            ),
+            Calls(
+                1,
+            ),
+        ],
+        [
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+        ],
+    ),
+    (
+        Timeout(
+            80,
+        ),
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        0,
+                    ),
+                    output: Tokens(
+                        0,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+        [
+            Calls(
+                1,
+            ),
+            Calls(
+                0,
+            ),
+            Calls(
+                1,
+            ),
+        ],
+        [],
+    ),
+    (
+        Timeout(
+            80,
+        ),
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        0,
+                    ),
+                    output: Tokens(
+                        0,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+        [
+            Calls(
+                2,
+            ),
+            Calls(
+                1,
+            ),
+            Calls(
+                1,
+            ),
+        ],
+        [
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+        ],
+    ),
+    (
+        Timeout(
+            80,
+        ),
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        0,
+                    ),
+                    output: Tokens(
+                        0,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+        [
+            Calls(
+                5,
+            ),
+            Calls(
+                4,
+            ),
+            Calls(
+                1,
+            ),
+        ],
+        [
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+        ],
+    ),
+    (
+        Timeout(
+            80,
+        ),
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        0,
+                    ),
+                    output: Tokens(
+                        0,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+        [
+            Calls(
+                8,
+            ),
+            Calls(
+                7,
+            ),
+            Calls(
+                1,
+            ),
+        ],
+        [
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+        ],
+    ),
+    (
+        Timeout(
+            110,
+        ),
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        0,
+                    ),
+                    output: Tokens(
+                        0,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+        [
+            Calls(
+                1,
+            ),
+            Calls(
+                0,
+            ),
+            Calls(
+                1,
+            ),
+        ],
+        [],
+    ),
+    (
+        Timeout(
+            110,
+        ),
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        0,
+                    ),
+                    output: Tokens(
+                        0,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+        [
+            Calls(
+                2,
+            ),
+            Calls(
+                1,
+            ),
+            Calls(
+                1,
+            ),
+        ],
+        [
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+        ],
+    ),
+    (
+        Timeout(
+            110,
+        ),
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        0,
+                    ),
+                    output: Tokens(
+                        0,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+        [
+            Calls(
+                5,
+            ),
+            Calls(
+                4,
+            ),
+            Calls(
+                1,
+            ),
+        ],
+        [
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+        ],
+    ),
+    (
+        Timeout(
+            110,
+        ),
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        0,
+                    ),
+                    output: Tokens(
+                        0,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+        [
+            Calls(
+                8,
+            ),
+            Calls(
+                7,
+            ),
+            Calls(
+                1,
+            ),
+        ],
+        [
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+        ],
+    ),
+    (
+        Timeout(
+            140,
+        ),
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        0,
+                    ),
+                    output: Tokens(
+                        0,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+        [
+            Calls(
+                1,
+            ),
+            Calls(
+                0,
+            ),
+            Calls(
+                1,
+            ),
+        ],
+        [],
+    ),
+    (
+        Timeout(
+            140,
+        ),
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        0,
+                    ),
+                    output: Tokens(
+                        0,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+        [
+            Calls(
+                2,
+            ),
+            Calls(
+                1,
+            ),
+            Calls(
+                1,
+            ),
+        ],
+        [
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+        ],
+    ),
+    (
+        Timeout(
+            140,
+        ),
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        0,
+                    ),
+                    output: Tokens(
+                        0,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+        [
+            Calls(
+                5,
+            ),
+            Calls(
+                4,
+            ),
+            Calls(
+                1,
+            ),
+        ],
+        [
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+        ],
+    ),
+    (
+        Timeout(
+            140,
+        ),
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        0,
+                    ),
+                    output: Tokens(
+                        0,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+        [
+            Calls(
+                8,
+            ),
+            Calls(
+                7,
+            ),
+            Calls(
+                1,
+            ),
+        ],
+        [
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+        ],
+    ),
+    (
+        Timeout(
+            170,
+        ),
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        0,
+                    ),
+                    output: Tokens(
+                        0,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+        [
+            Calls(
+                1,
+            ),
+            Calls(
+                0,
+            ),
+            Calls(
+                1,
+            ),
+        ],
+        [],
+    ),
+    (
+        Timeout(
+            170,
+        ),
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        0,
+                    ),
+                    output: Tokens(
+                        0,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+        [
+            Calls(
+                2,
+            ),
+            Calls(
+                1,
+            ),
+            Calls(
+                1,
+            ),
+        ],
+        [
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+        ],
+    ),
+    (
+        Timeout(
+            170,
+        ),
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        0,
+                    ),
+                    output: Tokens(
+                        0,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+        [
+            Calls(
+                5,
+            ),
+            Calls(
+                4,
+            ),
+            Calls(
+                1,
+            ),
+        ],
+        [
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+        ],
+    ),
+    (
+        Timeout(
+            170,
+        ),
+        Finished(
+            Finished {
+                reply: Reply(
+                    "conversational(a.0)",
+                ),
+                usage: Usage {
+                    input: Tokens(
+                        0,
+                    ),
+                    output: Tokens(
+                        0,
+                    ),
+                    cache_written: Tokens(
+                        0,
+                    ),
+                    cache_read: Tokens(
+                        0,
+                    ),
+                },
+            },
+        ),
+        [
+            Calls(
+                8,
+            ),
+            Calls(
+                7,
+            ),
+            Calls(
+                1,
+            ),
+        ],
+        [
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+            Wait {
+                pause: Pause(
+                    2,
+                ),
+                woke: Lapsed,
+            },
+        ],
+    ),
+]

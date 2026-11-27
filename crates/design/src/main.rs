@@ -14,7 +14,7 @@ fn main() -> ExitCode {
             &Process,
             Disk,
             SqliteOpener,
-            Agents::new(|scratch| HeadlessClaude::new(scratch, Agent::CLAUDE), SystemClock, SystemShell),
+            Agents::new(|scratch| HeadlessClaude::new(scratch, Agent::claude()), SystemClock, SystemShell),
         )
         .rooted(arguments.into_iter());
         let shown = AsRef::<Shown>::as_ref(&uttered).clone();

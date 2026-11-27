@@ -19,7 +19,7 @@ ignored! {
 }
 
 #[derive(Fixture, Deserialize, Debug)]
-struct Outcomes;
+struct Outcomes {}
 
 #[test]
 fn invariants_hold_quietly_and_break_loudly_with_their_text_and_detail() -> Result<(), Failed> {

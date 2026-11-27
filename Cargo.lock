@@ -190,6 +190,7 @@ dependencies = [
 name = "dispatch-ports"
 version = "0.1.0"
 dependencies = [
+ "fixture",
  "grammar",
  "invariants",
  "newtype",
@@ -198,7 +199,6 @@ dependencies = [
  "serde",
  "serde_json",
  "strum",
- "test-failure",
  "thiserror",
 ]
 

@@ -1,7 +1,6 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
 use std::collections::BTreeSet;
-use std::path::Path;
 
 use file_ports::{Bytes, Disk, Files, Memory};
 use fixture::{Cases, Debugged, Failed, Fixture, Properties, Spelled};
@@ -38,8 +37,8 @@ enum Check {
 #[test]
 fn every_transcript_case_reads_as_its_golden_says() -> Result<(), Failed> {
     let drifted = Cases::<Transcript>::drifted(|case| {
-        let directory = case.directory().map_or_default(Path::to_path_buf);
-        let transcript = case.into_row()?;
+        let directory = case.directory().to_path_buf();
+        let transcript = case.into_row();
         match transcript.check {
             Check::Classified => {
                 let run = Run::root();
