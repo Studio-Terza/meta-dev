@@ -44,13 +44,20 @@ jobs:
       - uses: rui314/setup-mold@v1
       - name: the timer, built apart from the stage it times
         run: cargo build --locked -q --bin ci --target-dir ../timer
+      - name: the target key, from what decides the third-party builds
+        id: target
+        run: |
+          {
+            grep -B2 '^source = ' Cargo.lock
+            cat rust-toolchain.toml Cargo.toml
+            env | grep -E '^(RUSTFLAGS|RUSTC_WRAPPER|CARGO_[A-Z_]+)=' | sort
+          } | sha256sum | cut -c1-64 | sed 's/^/key=target-${{ runner.os }}-/' >> "$GITHUB_OUTPUT"
       - name: test-compile starts here, before target/ is restored
         run: date +%s.%N > ../test-compile.start
       - uses: actions/cache/restore@v4
         with:
           path: target
-          key: target-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'Cargo.toml', '.github/workflows/ci.yml') }}
-          restore-keys: target-${{ runner.os }}-
+          key: ${{ steps.target.outputs.key }}
       - run: '"$TIMER" timed ci/limits.toml test-compile --since ../test-compile.start cargo test --locked --workspace --no-run --timings'
       - run: '"$TIMER" timed ci/limits.toml test-run cargo test --locked --workspace'
       - uses: actions/upload-artifact@v4
@@ -63,7 +70,7 @@ jobs:
         if: always()
         with:
           path: target
-          key: target-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'Cargo.toml', '.github/workflows/ci.yml') }}
+          key: ${{ steps.target.outputs.key }}
 
   lint:
     runs-on: ubuntu-latest
