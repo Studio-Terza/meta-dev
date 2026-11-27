@@ -14,8 +14,20 @@ pub const LIMIT: u8 = 1;
 pub static NAME: &str = "library";
 pub type Alias = Used;
 pub mod open {}
-pub fn called() {}
-pub fn uncalled() {}
+pub fn called() -> Returned {
+    Returned { kept: Kept }
+}
+pub fn uncalled() -> Stranded {
+    Stranded
+}
+pub struct Returned {
+    pub kept: Kept,
+    hidden: Hidden,
+}
+pub struct Kept;
+pub struct Hidden;
+pub struct Stranded;
+pub struct Refused;
 impl Used {
     pub fn method(&self) {}
     pub fn idle(&self) {}
@@ -23,6 +35,12 @@ impl Used {
     fn private(&self) {}
 }
 impl Shared for Used {}
+impl std::str::FromStr for Used {
+    type Err = Refused;
+    fn from_str(_: &str) -> Result<Used, Refused> {
+        Ok(Used)
+    }
+}
 #[cfg(test)]
 pub fn gated() {}
 macro_rules! listed {
