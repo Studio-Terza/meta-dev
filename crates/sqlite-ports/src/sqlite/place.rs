@@ -1,4 +1,4 @@
-use std::fs::{self, File};
+use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -15,7 +15,6 @@ pub(super) enum Place {
 
 impl Place {
     const LOCK: &'static str = "lock";
-    const SIDECARS: [&'static str; 2] = ["-wal", "-shm"];
 
     pub(super) fn opened(
         &self,
@@ -25,7 +24,7 @@ impl Place {
         match self {
             Place::File(path) => {
                 Self::filed(path, prepare)?;
-                Opened::filed(path, schema)?.map_or_else(|| Self::rebuilt(path, schema), Ok)
+                Opened::filed(path, schema)
             }
             Place::Memory => Opened::fresh(schema),
         }
@@ -44,24 +43,5 @@ impl Place {
 
     fn filed(path: &Path, prepare: impl FnOnce(&Path) -> io::Result<()>) -> Result<(), StoreFailure> {
         path.parent().map(prepare).transpose().map(|_prepared| ()).map_err(StoreFailure::Directory)
-    }
-
-    fn rebuilt(path: &Path, schema: Stamped) -> Result<Opened, StoreFailure> {
-        let files = [path.to_path_buf()].into_iter().chain(Self::SIDECARS.map(|suffix| Self::sidecar(path, suffix)));
-        files.into_iter().try_for_each(|file| Self::removed(&file)).map_err(StoreFailure::Stale)?;
-        Opened::built(path, schema)
-    }
-
-    fn sidecar(path: &Path, suffix: &str) -> PathBuf {
-        let mut named = path.as_os_str().to_owned();
-        named.push(suffix);
-        PathBuf::from(named)
-    }
-
-    fn removed(path: &Path) -> io::Result<()> {
-        fs::remove_file(path).or_else(|failed| match failed.kind() {
-            io::ErrorKind::NotFound => Ok(()),
-            _other => Err(failed),
-        })
     }
 }

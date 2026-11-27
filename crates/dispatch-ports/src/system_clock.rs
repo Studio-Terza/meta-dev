@@ -1,6 +1,7 @@
 use std::thread;
 use std::time::{Duration, SystemTime};
 
+use newtype::Wrapping;
 use port_core::Pass;
 
 use crate::{ClockFiller, Pause, Wall, clock_ops};
@@ -14,7 +15,7 @@ impl ClockFiller for SystemClock {
     }
 
     fn paused(&self, _pass: Pass<'_, clock_ops::Paused>, pause: Pause) -> Wall {
-        thread::sleep(Duration::from(pause));
+        thread::sleep(Duration::from_secs(u64::from(pause.into_inner())));
         Wall::from(SystemTime::now())
     }
 }

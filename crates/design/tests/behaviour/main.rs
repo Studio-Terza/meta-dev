@@ -2,7 +2,7 @@
 
 use std::ffi::OsString;
 use std::fs::{self, File};
-use std::io::Write;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
@@ -98,6 +98,7 @@ struct Script<'story> {
     answers: Vec<&'story Scripted>,
     asked: Mutex<Vec<Asked>>,
     at: SystemTime,
+    files: Rerooted,
 }
 
 #[derive(Debug)]
@@ -154,6 +155,8 @@ impl Script<'_> {
         let key = format!("{spoken}{fed}");
         let earlier = log.iter().filter(|before| before.spoken == key).count();
         log.push(Asked { spoken: key, line });
+        let homeless = call.input().filter(|_fed| self.files.kind(call.directory()) == Kind::Missing);
+        homeless.map_or(Ok(()), |_fed| Err(DispatchFailure::Spawn(io::Error::from(io::ErrorKind::NotFound))))?;
         matching.get(earlier).or(matching.last()).map(|answer| answer.ran()).ok_or(DispatchFailure::Unjoined)
     }
 
@@ -513,6 +516,7 @@ impl Story {
                     answers: step.answers.iter().chain(&self.answers).collect(),
                     asked: Mutex::default(),
                     at: home.at,
+                    files: home.files(),
                 };
                 let said = home.heard(&words, &input, &script);
                 Ok(format!("$ {} < {input}\n{said}{}", words.join(" "), script.timeline()))

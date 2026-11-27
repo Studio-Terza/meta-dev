@@ -4,8 +4,6 @@ use std::io;
 pub enum DispatchFailure {
     #[error("cannot start the program: {0}")]
     Spawn(#[source] io::Error),
-    #[error("cannot hand the program its input: {0}")]
-    Fed(#[source] io::Error),
     #[error("cannot read the program's output: {0}")]
     Collect(#[source] io::Error),
     #[error("a thread exchanging input and output with the program ended abnormally")]

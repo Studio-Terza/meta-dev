@@ -8,8 +8,6 @@ pub enum StoreFailure {
     Directory(#[source] io::Error),
     #[error("cannot open the store: {0}")]
     Open(#[source] Cause),
-    #[error("cannot delete a store built for another schema: {0}")]
-    Stale(#[source] io::Error),
     #[error("cannot build the store's schema: {0}")]
     Rebuild(#[source] Cause),
     #[error("a store statement failed: {0}")]

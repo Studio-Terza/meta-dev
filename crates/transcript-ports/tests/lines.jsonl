@@ -126,3 +126,4 @@
 {"type":"assistant","uuid":"9","parentUuid":"8","sessionId":"s1","timestamp":"2026-01-01T00:00:09Z","message":{"model":"claude","content":[{"type":"tool_use","id":"toolu_1","name":"TaskStop","input":{"task_id":"noskip"}}]}}
 {"type":"assistant","uuid":"9","parentUuid":"8","sessionId":"s1","timestamp":"2026-01-01T00:00:09Z","message":{"model":"claude","content":[{"type":"text","text":"stopping it"},{"type":"tool_use","id":"toolu_2","name":"TaskStop","input":{"task_id":"unroll"}}]}}
 {"type":"assistant","uuid":"9","parentUuid":"8","sessionId":"s1","timestamp":"2026-01-01T00:00:09Z","message":{"model":"claude","content":[{"type":"tool_use","id":"toolu_3","name":"TaskStop","input":{}}]}}
+{"type":"assistant","uuid":"9","parentUuid":"8","sessionId":"s1","timestamp":"2026-01-01T00:00:09Z","message":{"model":"claude","content":[{"type":"tool_use","id":"toolu_4","name":"TaskStop","input":{"task_id":""}}]}}

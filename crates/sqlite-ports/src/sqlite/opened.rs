@@ -3,6 +3,7 @@ mod connected;
 use std::path::Path;
 
 use rusqlite::Connection;
+use rusqlite::config::DbConfig;
 use sha2::{Digest, Sha256};
 use store_ports::{Batch, Created, Query, Record, Schema, StoreFailure};
 
@@ -31,18 +32,23 @@ impl Stamped {
 impl Opened {
     const SETTINGS: &'static str = "PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = OFF;";
     const STAMP: &'static str = "user_version";
+    const EMPTIED: &'static str = "VACUUM;";
     const BUSY: std::time::Duration = std::time::Duration::from_secs(5);
     const STATEMENTS: usize = 100;
 
-    pub(super) fn filed(path: &Path, schema: Stamped) -> Result<Option<Opened>, StoreFailure> {
+    pub(super) fn filed(path: &Path, schema: Stamped) -> Result<Opened, StoreFailure> {
         let opened = Opened::configured(Connection::open(path).map_err(Unopened::from)?)?;
         let stamp: i32 =
             opened.connection.pragma_query_value(None, Self::STAMP, |row| row.get(0)).map_err(Unopened::from)?;
-        Ok((stamp == schema.stamp).then_some(opened))
+        if stamp == schema.stamp { Ok(opened) } else { opened.emptied(schema) }
     }
 
-    pub(super) fn built(path: &Path, schema: Stamped) -> Result<Opened, StoreFailure> {
-        Opened::configured(Connection::open(path).map_err(Unopened::from)?)?.stamped(schema)
+    fn emptied(self, schema: Stamped) -> Result<Opened, StoreFailure> {
+        let connection = &self.connection;
+        connection.set_db_config(DbConfig::SQLITE_DBCONFIG_RESET_DATABASE, true).map_err(Unbuilt::from)?;
+        connection.execute_batch(Self::EMPTIED).map_err(Unbuilt::from)?;
+        connection.set_db_config(DbConfig::SQLITE_DBCONFIG_RESET_DATABASE, false).map_err(Unbuilt::from)?;
+        self.stamped(schema)
     }
 
     pub(super) fn fresh(schema: Stamped) -> Result<Opened, StoreFailure> {

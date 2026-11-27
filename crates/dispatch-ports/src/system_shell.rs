@@ -5,9 +5,10 @@ use std::process::{Child, ChildStdin, ChildStdout, Command, ExitStatus, Stdio};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, SystemTime};
 
+use invariants::Ignoring;
 use port_core::Pass;
 
-use crate::{Call, Deadline, DispatchFailure, Due, Printed, Ran, ShellFiller, Wall, shell_ops};
+use crate::{Call, Deadline, DispatchFailure, Due, Ignored, Printed, Ran, ShellFiller, Wall, shell_ops};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SystemShell;
@@ -16,7 +17,6 @@ pub struct SystemShell;
 struct Running {
     child: Child,
     deadline: Deadline,
-    feeding: Option<JoinHandle<io::Result<()>>>,
     reading: Option<JoinHandle<io::Result<String>>>,
 }
 
@@ -42,13 +42,16 @@ impl SystemShell {
             .stderr(Stdio::null())
             .spawn()
             .map_err(DispatchFailure::Spawn)?;
-        let feeding = call.input().zip(child.stdin.take()).map(|(fed, stdin)| SystemShell::fed(fed.to_owned(), stdin));
+        call.input()
+            .zip(child.stdin.take())
+            .into_iter()
+            .for_each(|(fed, stdin)| SystemShell::fed(fed.to_owned(), stdin));
         let reading = child.stdout.take().map(SystemShell::read);
-        Ok(Running { child, deadline: call.deadline(), feeding, reading })
+        Ok(Running { child, deadline: call.deadline(), reading })
     }
 
-    fn fed(input: String, mut stdin: ChildStdin) -> JoinHandle<io::Result<()>> {
-        thread::spawn(move || stdin.write_all(input.as_bytes()))
+    fn fed(input: String, mut stdin: ChildStdin) {
+        thread::spawn(move || stdin.write_all(input.as_bytes()).ignoring(Ignored::Unfed));
     }
 
     fn read(mut stdout: ChildStdout) -> JoinHandle<io::Result<String>> {
@@ -65,7 +68,6 @@ impl SystemShell {
     fn finished(mut running: Running) -> Result<Ran, DispatchFailure> {
         match SystemShell::waited(&mut running.child, running.deadline)? {
             Waited::Exited(status) => {
-                SystemShell::joined(running.feeding)?;
                 let printed = SystemShell::collected(running.reading)?;
                 Ok(if status.success() { Ran::Succeeded(printed) } else { Ran::Failed(printed) })
             }
@@ -86,15 +88,6 @@ impl SystemShell {
             thread::sleep(SystemShell::POLL);
             None
         }))
-    }
-
-    fn joined(feeding: Option<JoinHandle<io::Result<()>>>) -> Result<(), DispatchFailure> {
-        feeding
-            .map(|handle| handle.join().map_err(|_panicked| DispatchFailure::Unjoined))
-            .transpose()?
-            .transpose()
-            .map(|_fed| ())
-            .map_err(DispatchFailure::Fed)
     }
 
     fn collected(reading: Option<JoinHandle<io::Result<String>>>) -> Result<Printed, DispatchFailure> {

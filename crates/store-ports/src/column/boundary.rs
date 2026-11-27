@@ -3,7 +3,7 @@ use std::fmt::Display;
 use std::num::{NonZeroU32, TryFromIntError};
 use std::str::FromStr;
 
-use newtype::{Guarded, Inner, Listed, Newtype, Optional, Spelled, Stored, Validated};
+use newtype::{Guarded, Inner, Newtype, Optional, Spelled, Stored, Validated};
 
 use crate::Cause;
 
@@ -77,18 +77,6 @@ impl<Value: Display + FromStr<Err: Error + Send + Sync + 'static>> Encoding<Valu
     }
 }
 
-impl<Value: Display + FromStr<Err: Error + Send + Sync + 'static>> Encoding<Value> for Listed {
-    type Raw = String;
-
-    fn raw(value: &Value) -> String {
-        <Spelled as Encoding<Value>>::raw(value)
-    }
-
-    fn from_raw(raw: String) -> Result<Value, ColumnFailure> {
-        <Spelled as Encoding<Value>>::from_raw(raw)
-    }
-}
-
 impl<Value: Column> Encoding<Option<Value>> for Optional {
     type Raw = Option<Value::Raw>;
 
@@ -122,18 +110,6 @@ impl Primitive for String {
 
     fn from_raw(raw: String) -> Result<String, ColumnFailure> {
         Ok(raw)
-    }
-}
-
-impl Primitive for u32 {
-    type Raw = i64;
-
-    fn into_raw(self) -> i64 {
-        i64::from(self)
-    }
-
-    fn from_raw(raw: i64) -> Result<u32, ColumnFailure> {
-        u32::try_from(raw).map_err(ColumnFailure::Unfit)
     }
 }
 

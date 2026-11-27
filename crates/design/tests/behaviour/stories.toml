@@ -158,7 +158,7 @@ stop = {}
 [[story]]
 name = "short owner replies carry the lead question they answered"
 transcript = [
-  ["assistant", "a1", "I checked CI.\nShall I merge #12 now? Nothing else is waiting on this answer."],
+  ["assistant", "a1", "I checked CI\nShall I merge #12 now? Nothing else is waiting on this answer."],
   ["user", "a2", "yes"],
   ["assistant", "a3", "Merged."],
   ["user", "a4", "Next, port the hook and keep every quote it reads exactly as it is today."],
@@ -166,10 +166,12 @@ transcript = [
   ["user", "a6", "sure"],
   ["assistant", "a7", "Anything else"],
   ["user", "a8", "no"],
+  ["assistant", "a9", "What next?"],
+  ["user", "a10", "yes, merge it and then port the hook"],
 ]
 answers = [
-  { tool = "claude", asked = "Below are earlier messages", ran = "Succeeded", printed = '{"subtype":"success","result":"[{\"uuid\": \"a2\", \"quote\": \"yes\"}, {\"uuid\": \"a4\", \"quote\": \"Next, port the hook\"}, {\"uuid\": \"a6\", \"quote\": \"sure\"}, {\"uuid\": \"a8\", \"quote\": \"no\"}]"}' },
-  { tool = "claude", asked = "Below, numbered", ran = "Succeeded", printed = '{"subtype":"success","result":"[1, 2, 3, 4]"}' },
+  { tool = "claude", asked = "Below are earlier messages", ran = "Succeeded", printed = '{"subtype":"success","result":"[{\"uuid\": \"a2\", \"quote\": \"yes\"}, {\"uuid\": \"a4\", \"quote\": \"Next, port the hook\"}, {\"uuid\": \"a6\", \"quote\": \"sure\"}, {\"uuid\": \"a8\", \"quote\": \"no\"}, {\"uuid\": \"a10\", \"quote\": \"merge it\"}]"}' },
+  { tool = "claude", asked = "Below, numbered", ran = "Succeeded", printed = '{"subtype":"success","result":"[1, 2, 3, 4, 5]"}' },
 ]
 
 [[story.step]]
@@ -206,6 +208,10 @@ escalation = { pull = 42 }
 [[item]]
 said = "agent outcome: unread open on design/x"
 escalation = { branch = "design/x" }
+
+[[item]]
+said = "agent outcome: blocked on design/queue"
+escalation = { branch = "design/queue" }
 
 [[item]]
 said = "worktree kept: dirty after merging #40"

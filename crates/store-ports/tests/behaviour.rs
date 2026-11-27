@@ -123,7 +123,7 @@ fn reopening_a_store_under_its_own_schema_keeps_its_rows() -> Result<(), Failed>
 }
 
 #[test]
-fn a_store_built_for_another_schema_is_deleted_and_rebuilt_empty() -> Result<(), Failed> {
+fn a_store_built_for_another_schema_is_emptied_and_rebuilt() -> Result<(), Failed> {
     let place = Place::new()?;
     let run = Run::root();
     run.port(place.opened()).write(Resumed)?;

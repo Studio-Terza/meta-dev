@@ -283,7 +283,7 @@ Reply with JSON only, no prose and no code fence: a list of passage numbers, suc
 
 ## short owner replies carry the lead question they answered
 $ hook stop < {"hook_event_name":"Stop","last_assistant_message":"Shall I port the hook?","session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}
-{"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\nEarlier owner words bearing on this:\na2 2026-01-01T00:00:00Z: the lead said \"Shall I merge #12 now?\" and the owner replied \"yes\"\na4 2026-01-01T00:00:00Z: \"Next, port the hook\"\na6 2026-01-01T00:00:00Z: the lead said \"Ship it?\" and the owner replied \"sure\"\na8 2026-01-01T00:00:00Z: the lead said \"Anything else\" and the owner replied \"no\"\n"}
+{"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\nEarlier owner words bearing on this:\na2 2026-01-01T00:00:00Z: the lead said \"Shall I merge #12 now?\" and the owner replied \"yes\"\na4 2026-01-01T00:00:00Z: \"Next, port the hook\"\na6 2026-01-01T00:00:00Z: the lead said \"Ship it?\" and the owner replied \"sure\"\na8 2026-01-01T00:00:00Z: the lead said \"Anything else\" and the owner replied \"no\"\na10 2026-01-01T00:00:00Z: \"merge it\"\n"}
 Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 +120 claude -p --output-format json --setting-sources user --strict-mcp-config --tools  --model haiku in /home/work/.meta/agents fed:
 An AI agent just ended its turn with this message to its owner:
@@ -292,6 +292,8 @@ Shall I port the hook?
 Below are earlier messages from the owner, each headed by [uuid timestamp].
 List every passage that bears on the message: an earlier answer to anything it asks, a decision, rule, preference or instruction it should follow, or the next step the owner set. A missed passage costs far more than an extra one, so when unsure, include it.
 Reply with JSON only, no prose and no code fence: a list of {"uuid": the full uuid from the header, "quote": an excerpt of that message copied exactly, character for character, one or two sentences}. Reply [] if none bear on it.
+
+[a10 2026-01-01T00:00:00Z] yes, merge it and then port the hook
 
 [a2 2026-01-01T00:00:00Z] (replying to the lead's "Shall I merge #12 now?") yes
 
@@ -313,11 +315,12 @@ Reply with JSON only, no prose and no code fence: a list of passage numbers, suc
 2. a4 2026-01-01T00:00:00Z: "Next, port the hook"
 3. a6 2026-01-01T00:00:00Z: the lead said "Ship it?" and the owner replied "sure"
 4. a8 2026-01-01T00:00:00Z: the lead said "Anything else" and the owner replied "no"
+5. a10 2026-01-01T00:00:00Z: "merge it"
 
 
 ## a stalled stop drains the queue in code and shows only what stays open
 $ hook stop < {"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}
-{"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\nOpen items in the queue:\n- process-rebuild D3: the queue drains itself (closes on the merge of process-rebuild#D3's pull request)\n- the lint additions (closes on #43 merging or closing)\n- an old pull request the listing no longer reaches (closes on #99 merging or closing)\n- worktree kept: unpushed after merging #41 (closes on /home/placed being removed)\n- altitude classification of owner messages (closes on an owner ruling's message id recorded as ruling.message)\n"}
+{"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\nOpen items in the queue:\n- process-rebuild D3: the queue drains itself (closes on the merge of process-rebuild#D3's pull request)\n- the lint additions (closes on #43 merging or closing)\n- an old pull request the listing no longer reaches (closes on #99 merging or closing)\n- agent outcome: blocked on design/queue (closes on a passing DONE on design/queue)\n- worktree kept: unpushed after merging #41 (closes on /home/placed being removed)\n- altitude classification of owner messages (closes on an owner ruling's message id recorded as ruling.message)\n"}
 Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 +120 claude -p --output-format json --setting-sources user --strict-mcp-config --tools  --model haiku in /home/work/.meta/agents fed:
 An AI agent just ended its turn with this message to its owner:
@@ -331,7 +334,7 @@ Reply with JSON only, no prose and no code fence: a list of {"uuid": the full uu
 
 +60 gh pr list --state all --limit 100 --json number,state,headRefName,body -R o/r in /home/work/.meta/agents
 $ hook stop < {"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}
-{"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\nOpen items in the queue:\n- process-rebuild D3: the queue drains itself (closes on the merge of process-rebuild#D3's pull request)\n- the lint additions (closes on #43 merging or closing)\n- an old pull request the listing no longer reaches (closes on #99 merging or closing)\n- worktree kept: unpushed after merging #41 (closes on /home/placed being removed)\n- altitude classification of owner messages (closes on an owner ruling's message id recorded as ruling.message)\n"}
+{"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\nOpen items in the queue:\n- process-rebuild D3: the queue drains itself (closes on the merge of process-rebuild#D3's pull request)\n- the lint additions (closes on #43 merging or closing)\n- an old pull request the listing no longer reaches (closes on #99 merging or closing)\n- agent outcome: blocked on design/queue (closes on a passing DONE on design/queue)\n- worktree kept: unpushed after merging #41 (closes on /home/placed being removed)\n- altitude classification of owner messages (closes on an owner ruling's message id recorded as ruling.message)\n"}
 Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 +120 claude -p --output-format json --setting-sources user --strict-mcp-config --tools  --model haiku in /home/work/.meta/agents fed:
 An AI agent just ended its turn with this message to its owner:
@@ -356,6 +359,12 @@ pull = 43
 [[item]]
 said = "an old pull request the listing no longer reaches"
 pull = 99
+
+[[item]]
+said = "agent outcome: blocked on design/queue"
+
+[item.escalation]
+branch = "design/queue"
 
 [[item]]
 said = "worktree kept: unpushed after merging #41"
