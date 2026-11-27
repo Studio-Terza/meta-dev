@@ -4,6 +4,7 @@ mod detail;
 mod prose;
 mod queue;
 mod report;
+mod repository;
 mod unlexed;
 
 pub use detail::{Cited, Heading};
@@ -12,4 +13,5 @@ pub use logos;
 pub use prose::Prose;
 pub use queue::Queue;
 pub use report::{AgentReport, BranchName, Ended, JobLink, Target};
+pub use repository::{RepositoryName, SpecTrailer};
 pub use unlexed::Unlexed;

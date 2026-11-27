@@ -4,8 +4,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use design_messages::PullNumber;
-use grammar::{AgentReport, BranchName, Ended, JobLink, Target};
-use grammar_lines::Lines;
+use grammar::{AgentReport, BranchName, Ended, JobLink, RepositoryName, SpecTrailer, Target};
 use grammar_spec_line::Attachment;
 use hex::FromHex;
 use invariants::Ignoring;
@@ -66,10 +65,42 @@ pub struct Branched {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Branch(String);
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(from = "String")]
 pub struct First {
     spec: Option<Attachment>,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct Compared {
+    commits: Vec<Committed>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Committed {
+    commit: Message,
+}
+
+#[derive(Debug, Deserialize)]
+struct Message {
+    message: First,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Local {
+    repository: Repository,
+}
+
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(try_from = "String")]
+pub struct Repository {
+    owner: String,
+    name: String,
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("not a repository of the form owner/name")]
+pub struct Unrepositoried;
 
 #[derive(Debug, Deserialize)]
 pub struct Opened {
@@ -152,16 +183,52 @@ impl Branched {
 }
 
 impl First {
-    pub fn read(printed: &str) -> Option<First> {
-        let trailer = match printed.parse::<Lines>() {
-            Ok(lines) => lines.into_iter().next(),
-            Err(unsplit) => match unsplit {},
-        }?;
-        Some(First { spec: Attachment::try_new(trailer).ignoring(Ignored::Unspecified) })
-    }
-
     pub fn spec(&self) -> Option<&Attachment> {
         self.spec.as_ref()
+    }
+}
+
+impl From<String> for First {
+    fn from(message: String) -> First {
+        let trailer = SpecTrailer::read(&message).map(|trailer| trailer.value().to_owned());
+        First { spec: trailer.and_then(|value| Attachment::try_new(value).ignoring(Ignored::Unspecified)) }
+    }
+}
+
+impl Compared {
+    pub fn first(self) -> Option<First> {
+        self.commits.into_iter().next().map(|committed| committed.commit.message)
+    }
+}
+
+impl Local {
+    pub fn repository(self) -> Repository {
+        self.repository
+    }
+}
+
+impl Repository {
+    pub fn owner(&self) -> &str {
+        &self.owner
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+impl TryFrom<String> for Repository {
+    type Error = Unrepositoried;
+
+    fn try_from(text: String) -> Result<Repository, Unrepositoried> {
+        let read = RepositoryName::read(&text).ok_or(Unrepositoried)?;
+        Ok(Repository { owner: read.owner().to_owned(), name: read.name().to_owned() })
+    }
+}
+
+impl fmt::Display for Repository {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}/{}", self.owner, self.name)
     }
 }
 

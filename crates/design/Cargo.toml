@@ -27,6 +27,7 @@ serde_json.workspace = true
 store-ports = { path = "../store-ports" }
 strum.workspace = true
 thiserror.workspace = true
+toml.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 
 [dev-dependencies]

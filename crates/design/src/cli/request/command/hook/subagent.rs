@@ -21,7 +21,7 @@ use crate::cli::request::ignored::Ignored;
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
 pub use boundary::Finishing;
-use boundary::{At, Branched, CommitSha, JobId, Pushed, Reminder, Report, Said};
+use boundary::{At, Branched, CommitSha, JobId, Local, Pushed, Reminder, Report, Said};
 use hub::{Hub, Unopened, Verdict};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -54,6 +54,7 @@ pub enum UnreadStep {
     Overdue,
     Checks,
     NoChecks,
+    NoRepository,
     Remote,
     Commits,
     Spec,
@@ -105,24 +106,28 @@ impl Finishing {
         ground: &Ground<'_, F, S>,
         crew: &Crew<'_, D, C, G>,
     ) -> Result<Uttered, Failure> {
-        let hub = Hub::new(crew, self.directory());
         match (self.said(), self.reminder()) {
-            (Said::Typed(report), _reminder) => self.reported(report, ground, &hub),
+            (Said::Typed(Report::Blocked(at)), _reminder) => {
+                self.escalated(ground, Some(at.clone()), Escalation::Blocked)
+            }
+            (Said::Typed(Report::Done(at)), _reminder) => match ground.configured::<Local>() {
+                Some(local) => self.landed(at, ground, &Hub::new(crew, self.directory(), &local.repository())),
+                None => self.escalated(ground, Some(at.clone()), Escalation::Unread(UnreadStep::NoRepository)),
+            },
             (Said::Untyped, Reminder::First) => Decision::blocked(Untyped.to_string()),
             (Said::Untyped, Reminder::Repeated) => self.escalated(ground, None, Escalation::Unread(UnreadStep::Ending)),
         }
     }
 
-    fn reported<F: Files, S: Store, D: Dispatch, C: Clock, G: Shell>(
+    fn landed<F: Files, S: Store, D: Dispatch, C: Clock, G: Shell>(
         &self,
-        report: &Report,
+        at: &At,
         ground: &Ground<'_, F, S>,
         hub: &Hub<'_, D, C, G>,
     ) -> Result<Uttered, Failure> {
-        match report {
-            Report::Blocked(at) => self.escalated(ground, Some(at.clone()), Escalation::Blocked),
-            Report::Done(At::Pull(pushed)) => self.done(*pushed, ground, hub),
-            Report::Done(At::Branch(branched)) => match hub.opened(branched, ground) {
+        match at {
+            At::Pull(pushed) => self.done(*pushed, ground, hub),
+            At::Branch(branched) => match hub.opened(branched, ground) {
                 Ok(pushed) => self.done(pushed, ground, hub),
                 Err(Unopened::Unpushed(held)) => Decision::blocked(Stale { branched, held }.to_string()),
                 Err(Unopened::Unread(step)) => {

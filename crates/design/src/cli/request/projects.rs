@@ -17,6 +17,7 @@ pub struct Projects;
 pub enum Kept {
     Store,
     Agents,
+    Local,
 }
 
 #[derive(Debug)]
@@ -31,6 +32,7 @@ impl Located {
     const META: &'static str = ".meta";
     const STORE: &'static str = "design.sqlite";
     const AGENTS: &'static str = "agents";
+    const LOCAL: &'static str = "local.toml";
     const QUEUE: &'static str = "studio-meta-dev/transcripts/queue.md";
     const SPECS: &'static str = "studio-meta-dev/transcripts/specs";
     const SPEC: &'static str = "md";
@@ -57,6 +59,7 @@ impl Kept {
         match self {
             Kept::Store => Path::new(Located::STORE),
             Kept::Agents => Path::new(Located::AGENTS),
+            Kept::Local => Path::new(Located::LOCAL),
         }
     }
 }

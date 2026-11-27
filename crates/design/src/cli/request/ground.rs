@@ -6,11 +6,12 @@ use grammar_lines::Lines;
 use grammar_spec_line::Attachment;
 use invariants::Ignoring;
 use port_core::{Port, Run};
+use serde::de::DeserializeOwned;
 use store_ports::Store;
 use transcript_ports::ClaudeCodeDir;
 
 use super::ignored::Ignored;
-use super::projects::Located;
+use super::projects::{Kept, Located};
 
 #[derive(Debug)]
 pub struct Ground<'run, F: Files, S: Store> {
@@ -51,6 +52,11 @@ impl<'run, F: Files, S: Store> Ground<'run, F, S> {
             Err(unsplit) => match unsplit {},
         };
         lines.into_iter().filter_map(|line| Heading::read(&line)).find(|heading| heading.detail() == cited.detail())
+    }
+
+    pub fn configured<T: DeserializeOwned>(&self) -> Option<T> {
+        let text = self.files.read_text(&self.located.kept(Kept::Local)).ignoring(Ignored::Unconfigured)?;
+        toml::from_str(text.as_ref()).ignoring(Ignored::Unconfigured)
     }
 
     pub fn transcripts(self) -> Port<'run, ClaudeCodeDir<F>> {

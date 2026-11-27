@@ -44,25 +44,25 @@ const STEP: i64 = 5;
 const AGENT: &str = "/work/agent";
 const SHA: &str = "0123456789abcdef0123456789abcdef01234567";
 const OTHER: &str = "fedcba9876543210fedcba9876543210fedcba98";
-const HEAD: &str = "pr view 12 --json headRefOid";
-const WATCH: &str = "pr checks 12 --watch --fail-fast";
-const CHECKS: &str = "pr checks 12 --json name,bucket,link";
-const LISTED: &str = "pr checks 12 --json name,state";
-const LOG: &str = "run view --job 456 --log-failed";
+const LOCAL: &str = "project = \"meta-dev\"\nrepository = \"o/r\"\n";
+const HEAD: &str = "pr view 12 --json headRefOid -R o/r";
+const WATCH: &str = "pr checks 12 --watch --fail-fast -R o/r";
+const CHECKS: &str = "pr checks 12 --json name,bucket,link -R o/r";
+const LISTED: &str = "pr checks 12 --json name,state -R o/r";
+const LOG: &str = "run view --job 456 --log-failed -R o/r";
 const UNTYPED: &str = "End your turn with exactly one line and nothing else: DONE <branch> <full sha> once that \
                        commit is the pushed head of a branch with no pull request yet, DONE #<pr> <full sha> once the \
                        pull request's head is that commit, or BLOCKED #<pr> <full sha> when you cannot go on.";
 const BRANCH: &str = "design/open-pr";
-const REMOTE: &str = "api graphql -F owner={owner} -F name={repo} -f ref=refs/heads/design/open-pr -f \
+const REMOTE: &str = "api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f \
                       query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(\
                       qualifiedName:$ref){target{oid}}}}";
-const FIRST: &str = "log --reverse --format=%(trailers:key=Spec,valueonly,separator=%x2c) \
-                     origin/main..0123456789abcdef0123456789abcdef01234567";
+const FIRST: &str = "api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567";
 const CREATE: &str = "pr create --head design/open-pr --base main --title D2 Typed agent outcomes --body spec: \
-                      tools-retirement#D2\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)";
+                      tools-retirement#D2\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code) -R o/r";
 const SPEC: &str = "# Tools retirement\n\nD1 Dropped until missed (D2 later): waits.\n\nD2 Typed agent outcomes (owner \
                     de7a042f): the hook refuses (with D3) other endings.\nD20 Later work (owner 1).\n";
-const VIEW: &str = "pr view design/open-pr --json number";
+const VIEW: &str = "pr view design/open-pr --json number -R o/r";
 
 #[derive(Debug)]
 struct Stepping {
@@ -179,10 +179,6 @@ struct Asked {
 impl Answer {
     fn new(asked: &str, ran: Ran) -> Answer {
         Answer { asked: format!("gh {asked}"), ran }
-    }
-
-    fn git(asked: &str, ran: Ran) -> Answer {
-        Answer { asked: format!("git {asked}"), ran }
     }
 }
 
@@ -313,8 +309,18 @@ struct Home {
 impl Home {
     fn new() -> Result<Home, Failed> {
         let home = Home { directory: TempDir::new()?, at: SystemTime::now() };
-        fs::create_dir_all(home.workspace())?;
+        fs::create_dir_all(home.workspace().join(".meta"))?;
+        home.configured(Some(LOCAL))?;
         Ok(home)
+    }
+
+    fn configured(&self, local: Option<&str>) -> Result<(), Failed> {
+        let path = self.workspace().join(".meta/local.toml");
+        match local {
+            Some(text) => fs::write(path, text)?,
+            None => fs::remove_file(path)?,
+        }
+        Ok(())
     }
 
     fn holding(lines: &[String]) -> Result<Home, Failed> {
@@ -569,14 +575,19 @@ impl GitHub {
         GitHub::remote(&format!("{{\"target\":{{\"oid\":\"{sha}\"}}}}"))
     }
 
-    fn first(trailer: &str) -> Answer {
-        let log = format!("{trailer}\nother#D9\n");
-        Answer::git(FIRST, Ran::Succeeded(Printed::new(log)))
+    fn first(trailers: &str) -> Answer {
+        let messages = [
+            format!("Open it\n\nSpec: none here\n\nWhy.\n\n{trailers}\nCo-Authored-By: A"),
+            "Spec: other#D9".to_owned(),
+        ];
+        let commits: Vec<Value> =
+            messages.iter().map(|message| serde_json::json!({"commit": {"message": message}})).collect();
+        Answer::new(FIRST, Ran::Succeeded(Printed::new(serde_json::json!({ "commits": commits }).to_string())))
     }
 
     fn opening(after: &[Answer]) -> GitHub {
         let created = Answer::new(CREATE, Ran::Succeeded(Printed::new("https://github.com/o/r/pull/12\n".to_owned())));
-        let before = [GitHub::pushed(SHA), GitHub::first("tools-retirement#D2"), created];
+        let before = [GitHub::pushed(SHA), GitHub::first("Spec: tools-retirement#D2"), created];
         GitHub::answering(&before.into_iter().chain(after.iter().cloned()).collect::<Vec<_>>())
     }
 }
@@ -653,7 +664,7 @@ fn a_done_on_red_checks_is_sent_back_with_each_failed_jobs_log_tail() -> Result<
     assert_eq!(said.reason()?, Some(Home::golden("subagent-failing.txt")?));
     assert_eq!(
         github.asked().get(4..).map(<[String]>::to_vec),
-        Some(vec![format!("gh {LOG}"), "gh run view --job 458 --log-failed".to_owned()])
+        Some(vec![format!("gh {LOG}"), "gh run view --job 458 --log-failed -R o/r".to_owned()])
     );
     Ok(())
 }
@@ -759,7 +770,7 @@ fn a_done_on_a_pushed_branch_opens_its_pull_request_from_the_first_commit_and_wa
     home.specified(SPEC)?;
     let said = home.finished(&format!("DONE {BRANCH} {SHA}"), false, &github);
     assert_eq!((said.shown.as_str(), said.ended), ("", Ok(Outcome::Hooked(HookEvent::SubagentStop))));
-    let asked = [format!("gh {REMOTE}"), format!("git {FIRST}"), format!("gh {CREATE}"), format!("gh {VIEW}")];
+    let asked = [format!("gh {REMOTE}"), format!("gh {FIRST}"), format!("gh {CREATE}"), format!("gh {VIEW}")];
     let checked = [HEAD, LISTED, WATCH, CHECKS].map(|step| format!("gh {step}"));
     assert_eq!(github.asked(), [&asked[..], &checked[..]].concat());
     Ok(())
@@ -795,12 +806,15 @@ fn a_branch_that_cannot_be_read_or_opened_is_escalated_on_the_branch() -> Result
         (format!("DONE {BRANCH} {SHA}"), GitHub::answering(&[GitHub::pushed(SHA)])),
         (
             format!("DONE {BRANCH} {SHA}"),
-            GitHub::answering(&[GitHub::pushed(SHA), Answer::git(FIRST, Ran::Succeeded(Printed::default()))]),
+            GitHub::answering(&[
+                GitHub::pushed(SHA),
+                Answer::new(FIRST, Ran::Succeeded(Printed::new("{\"commits\":[]}".to_owned()))),
+            ]),
         ),
         (format!("DONE {BRANCH} {SHA}"), GitHub::answering(&[GitHub::pushed(SHA), GitHub::first("")])),
         (
             format!("DONE {BRANCH} {SHA}"),
-            GitHub::answering(&[GitHub::pushed(SHA), GitHub::first("tools-retirement#D2")]),
+            GitHub::answering(&[GitHub::pushed(SHA), GitHub::first("Spec: tools-retirement#D2")]),
         ),
         (format!("DONE {BRANCH} {SHA}"), GitHub::opening(&[])),
         (format!("DONE {BRANCH} {SHA}"), GitHub::opening(&[unviewed])),
@@ -818,7 +832,7 @@ fn a_branch_whose_spec_detail_has_no_heading_is_escalated_and_never_opened() -> 
     let home = Home::new()?;
     home.queued("")?;
     let done = format!("DONE {BRANCH} {SHA}");
-    let cited = |trailer: &str| GitHub::answering(&[GitHub::pushed(SHA), GitHub::first(trailer)]);
+    let cited = |trailer: &str| GitHub::answering(&[GitHub::pushed(SHA), GitHub::first(&format!("Spec: {trailer}"))]);
     let unspecified = home.finished(&done, false, &cited("tools-retirement#D2"));
     home.specified("D1 Dropped (D2 later).\nD20 Later work (owner 1).\nD2\n D2 Indented (owner 2).\n")?;
     let cases = [cited("tools-retirement#D2"), cited("tools-retirement#D2, other#D3"), cited("owner 3c84f560")];
@@ -828,6 +842,26 @@ fn a_branch_whose_spec_detail_has_no_heading_is_escalated_and_never_opened() -> 
     assert_eq!(ended.collect::<Vec<_>>(), [("", true); 4]);
     assert!(cases.iter().all(|github| github.asked().len() == 2));
     assert_eq!(home.queue()?, Home::golden("escalated-detail-queue.md")?);
+    Ok(())
+}
+
+#[test]
+fn a_done_in_a_workspace_that_names_no_repository_is_escalated_without_calling_gh() -> Result<(), Failed> {
+    let home = Home::new()?;
+    home.queued("")?;
+    let github = GitHub::green();
+    let dones = [format!("DONE #12 {SHA}"), format!("DONE {BRANCH} {SHA}")];
+    let configs = [None, Some("project = \"meta-dev\"\n"), Some("repository = \"Studio-Terza\"\n")];
+    let ended = configs
+        .iter()
+        .map(|config| {
+            home.configured(*config)?;
+            Ok(dones.iter().map(|done| home.finished(done, false, &github).ended == Ok(Outcome::Escalated)).collect())
+        })
+        .collect::<Result<Vec<Vec<bool>>, Failed>>()?;
+    assert_eq!(ended.concat(), [true; 6]);
+    assert_eq!(github.asked(), Vec::<String>::new());
+    assert_eq!(home.queue()?, Home::golden("escalated-no-repository-queue.md")?);
     Ok(())
 }
 
