@@ -1,4 +1,6 @@
 Nothing is running: no background shell or agent will wake you, so the turn has stalled.
 Earlier owner words bearing on this:
-o2 2026-01-01T00:00:00Z: the lead said "Shall I merge #12 now?" and the owner replied "yes"
-o3 2026-01-01T00:00:00Z: "Next, port the hook"
+a2 2026-01-01T00:00:00Z: the lead said "Shall I merge #12 now?" and the owner replied "yes"
+a4 2026-01-01T00:00:00Z: "Next, port the hook"
+a6 2026-01-01T00:00:00Z: the lead said "Ship it?" and the owner replied "sure"
+a8 2026-01-01T00:00:00Z: "yes, merge it and then port the hook"

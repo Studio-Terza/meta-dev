@@ -528,17 +528,24 @@ fn a_stalled_stop_lists_the_open_queue_items_and_a_live_one_does_not() -> Result
 #[test]
 fn a_short_owner_reply_is_quoted_with_the_lead_sentence_it_answered() -> Result<(), Failed> {
     let home = Home::holding(&[
-        Home::line("assistant", "l0", "I checked CI. Shall I merge #12 now?"),
-        Home::line("user", "o2", "yes"),
-        Home::line("assistant", "p2", "Merged."),
-        Home::line("user", "o3", "Next, port the hook and keep every quote it reads exactly as it is today."),
+        Home::line("assistant", "a1", "I checked CI\\nShall I merge #12 now?"),
+        Home::line("user", "a2", "yes"),
+        Home::line("assistant", "a3", "Merged."),
+        Home::line("user", "a4", "Next, port the hook and keep every quote it reads exactly as it is today."),
+        Home::line("assistant", "a5", "Done. Ship it?"),
+        Home::line("user", "a6", "sure"),
+        Home::line("assistant", "a7", "Anything else?"),
+        Home::line("user", "a8", "yes, merge it and then port the hook"),
     ])?;
-    let picked = "[{\"uuid\": \"o2\", \"quote\": \"yes\"}, {\"uuid\": \"o3\", \"quote\": \"Next, port the hook\"}]";
-    let replies = Replies::quoting(picked, "[1, 2]");
+    let picked =
+        [("a2", "yes"), ("a4", "Next, port the hook"), ("a6", "sure"), ("a8", "yes, merge it and then port the hook")]
+            .map(|(uuid, quote)| format!("{{\"uuid\": \"{uuid}\", \"quote\": \"{quote}\"}}"))
+            .join(", ");
+    let replies = Replies::quoting(&format!("[{picked}]"), "[1, 2, 3, 4]");
     let said = home.said(&["hook", "stop"], &home.asking(), &replies);
     let prompts = replies.prompts();
     assert_eq!(said.reason()?, Some(Home::golden("short-reply.txt")?));
-    assert!(prompts.first().is_some_and(|prompt| prompt.contains("[o2 2026-01-01T00:00:00Z] yes\n")), "{prompts:?}");
+    assert!(prompts.first().is_some_and(|prompt| prompt.contains("[a2 2026-01-01T00:00:00Z] yes\n")), "{prompts:?}");
     Ok(())
 }
 
