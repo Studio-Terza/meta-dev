@@ -8,7 +8,6 @@ publish.workspace = true
 [package.metadata.port]
 owns = ["logos", "logos-codegen", "logos-derive"]
 shared = ["proc-macro2", "quote", "syn"]
-dependents = "lexer"
 
 [lib]
 test = false
@@ -17,6 +16,12 @@ doctest = false
 [dependencies]
 invariants = { path = "../invariants" }
 logos.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+serde.workspace = true
+test-failure = { path = "../test-failure" }
+toml.workspace = true
 
 [lints]
 workspace = true

@@ -54,7 +54,7 @@ name = "ci"
 version = "0.1.0"
 dependencies = [
  "console-ports",
- "grammar-lines",
+ "grammar",
  "invariants",
  "serde",
  "serde_json",
@@ -139,8 +139,7 @@ dependencies = [
  "design-messages",
  "dispatch-ports",
  "file-ports",
- "grammar-lines",
- "grammar-slug",
+ "grammar",
  "invariants",
  "newtype",
  "port-core",
@@ -163,7 +162,7 @@ dependencies = [
  "design",
  "dispatch-ports",
  "file-ports",
- "grammar-slug",
+ "grammar",
  "serde_json",
  "sqlite-ports",
  "tempfile",
@@ -198,8 +197,7 @@ dependencies = [
 name = "dispatch-ports"
 version = "0.1.0"
 dependencies = [
- "grammar-lstart",
- "grammar-reply",
+ "grammar",
  "invariants",
  "newtype",
  "port-core",
@@ -313,65 +311,10 @@ version = "0.1.0"
 dependencies = [
  "invariants",
  "logos",
-]
-
-[[package]]
-name = "grammar-ident"
-version = "0.1.0"
-dependencies = [
- "grammar",
-]
-
-[[package]]
-name = "grammar-lines"
-version = "0.1.0"
-dependencies = [
- "grammar",
+ "serde",
+ "test-failure",
  "thiserror",
-]
-
-[[package]]
-name = "grammar-lstart"
-version = "0.1.0"
-dependencies = [
- "grammar",
- "thiserror",
-]
-
-[[package]]
-name = "grammar-migration"
-version = "0.1.0"
-dependencies = [
- "grammar",
- "grammar-unspelled",
-]
-
-[[package]]
-name = "grammar-output"
-version = "0.1.0"
-dependencies = [
- "grammar",
-]
-
-[[package]]
-name = "grammar-reply"
-version = "0.1.0"
-dependencies = [
- "grammar",
-]
-
-[[package]]
-name = "grammar-slug"
-version = "0.1.0"
-dependencies = [
- "grammar",
-]
-
-[[package]]
-name = "grammar-unspelled"
-version = "0.1.0"
-dependencies = [
- "thiserror",
+ "toml",
 ]
 
 [[package]]
@@ -457,7 +400,7 @@ dependencies = [
  "proc-macro2",
  "ra-ap-rustc_lexer",
  "rayon",
- "syn 2.0.119",
+ "syn",
  "test-failure",
  "thiserror",
  "timer-ports",
@@ -490,7 +433,7 @@ dependencies = [
  "quote",
  "regex-automata",
  "regex-syntax",
- "syn 2.0.119",
+ "syn",
 ]
 
 [[package]]
@@ -507,15 +450,6 @@ name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
-
-[[package]]
-name = "message-id"
-version = "0.1.0"
-dependencies = [
- "grammar-output",
- "newtype",
- "thiserror",
-]
 
 [[package]]
 name = "newtype"
@@ -536,7 +470,7 @@ version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.119",
+ "syn",
 ]
 
 [[package]]
@@ -574,11 +508,11 @@ dependencies = [
 name = "port-derive"
 version = "0.1.0"
 dependencies = [
- "grammar-ident",
+ "grammar",
  "proc-macro2",
  "quote",
  "strum",
- "syn 2.0.119",
+ "syn",
 ]
 
 [[package]]
@@ -735,9 +669,9 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.229"
+version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4148590afebada386688f18773da617792bf2ef03ffc1e4cbd2b1d45b023e0ba"
+checksum = "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e"
 dependencies = [
  "serde_core",
  "serde_derive",
@@ -745,22 +679,22 @@ dependencies = [
 
 [[package]]
 name = "serde_core"
-version = "1.0.229"
+version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67dca2c9c51e58a4791a4b1ed58308b39c64224d349a935ab5039aa360942a48"
+checksum = "41d385c7d4ca58e59fc732af25c3983b67ac852c1a25000afe1175de458b67ad"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.229"
+version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7a5d71263a5a7d47b41f6b3f06ba276f10cc18b0931f1799f710578e2309348"
+checksum = "d540f220d3187173da220f885ab66608367b6574e925011a9353e4badda91d79"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.9",
+ "syn",
 ]
 
 [[package]]
@@ -837,13 +771,13 @@ dependencies = [
 name = "store-ports-macros"
 version = "0.1.0"
 dependencies = [
- "grammar-migration",
+ "grammar",
  "invariants",
  "proc-macro2",
  "query-cache",
  "quote",
  "serde",
- "syn 2.0.119",
+ "syn",
  "thiserror",
 ]
 
@@ -865,7 +799,7 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "syn 2.0.119",
+ "syn",
 ]
 
 [[package]]
@@ -873,17 +807,6 @@ name = "syn"
 version = "2.0.119"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "872831b642d1a07999a962a351ed35b955ea2cfc8f3862091e2a240a84f17297"
-dependencies = [
- "proc-macro2",
- "quote",
- "unicode-ident",
-]
-
-[[package]]
-name = "syn"
-version = "3.0.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d78c8dee4c7bf0e14673097256fed6142ce9d3b85a408189d07482442145823b"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -908,27 +831,23 @@ name = "test-failure"
 version = "0.1.0"
 
 [[package]]
-name = "text-lines"
-version = "0.1.0"
-
-[[package]]
 name = "thiserror"
-version = "2.0.21"
+version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09e52cb86a36cede5cb101bf8908837b3e4c6e5e59fe7fd85c23fb56200d189e"
+checksum = "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.21"
+version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe5197923287db20a58125f0bc85c062f7f2c892de97b18c356f9efb14b28524"
+checksum = "ebc4ee7f67670e9b64d05fa4253e753e016c6c95ff35b89b7941d6b856dec1d5"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.9",
+ "syn",
 ]
 
 [[package]]
@@ -982,9 +901,8 @@ name = "transcript-ports"
 version = "0.1.0"
 dependencies = [
  "file-ports",
- "grammar-lines",
+ "grammar",
  "invariants",
- "message-id",
  "newtype",
  "port-core",
  "proptest",
@@ -992,7 +910,6 @@ dependencies = [
  "serde_json",
  "strum",
  "test-failure",
- "text-lines",
  "thiserror",
 ]
 

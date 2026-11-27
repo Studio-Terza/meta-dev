@@ -4,7 +4,7 @@ use std::fmt;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
-use grammar_lines::{Fields, Lines};
+use grammar::{Fields, Lines};
 use serde::{Deserialize, Serialize};
 
 use crate::cli::Exit;

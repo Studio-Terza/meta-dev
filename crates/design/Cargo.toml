@@ -15,8 +15,7 @@ console-ports = { path = "../console-ports" }
 design-messages = { path = "../design-messages" }
 dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports" }
-grammar-lines = { path = "../grammar-lines" }
-grammar-slug = { path = "../grammar-slug" }
+grammar = { path = "../grammar" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 serde.workspace = true

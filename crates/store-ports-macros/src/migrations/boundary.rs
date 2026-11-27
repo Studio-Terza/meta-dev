@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::io;
 use std::path::PathBuf;
 
-use grammar_migration::MigrationFile;
+use grammar::MigrationFile;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::LitStr;

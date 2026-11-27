@@ -1,9 +1,9 @@
-use grammar::logos::Logos;
+use logos::Logos;
 
 use super::Letters;
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-#[logos(crate = grammar::logos)]
+#[logos(crate = logos)]
 enum Letter {
     #[regex(r"[A-Za-z0-9]+")]
     Kept,

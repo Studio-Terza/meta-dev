@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use test_failure::Failed;
 
 use file_ports::{Bytes, Disk, Files, Memory};
-use grammar_lines::KeptLines;
+use grammar::KeptLines;
 use invariants::{Ignoring, ignored};
 use port_core::{Calls, Run};
 use proptest::prelude::{any, prop_assert_eq, proptest};

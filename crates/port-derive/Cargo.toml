@@ -11,7 +11,7 @@ test = false
 doctest = false
 
 [dependencies]
-grammar-ident = { path = "../grammar-ident" }
+grammar = { path = "../grammar" }
 strum.workspace = true
 proc-macro2.workspace = true
 quote.workspace = true

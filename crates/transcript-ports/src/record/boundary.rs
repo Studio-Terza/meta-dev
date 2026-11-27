@@ -1,8 +1,8 @@
 mod entry;
 
-use grammar_lines::Lines;
+use crate::lossy_text::LossyText;
+use grammar::Lines;
 use invariants::Ignoring;
-use text_lines::LossyText;
 
 use crate::{Ignored, Line, Unrecognised};
 use entry::Entry;

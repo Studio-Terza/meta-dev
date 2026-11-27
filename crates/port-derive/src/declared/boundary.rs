@@ -1,4 +1,4 @@
-use grammar_ident::Words;
+use grammar::Words;
 use proc_macro2::{Ident, Span};
 use quote::{ToTokens, format_ident};
 use syn::LitStr;

@@ -1,11 +1,11 @@
 use std::str::FromStr;
 use std::vec::IntoIter;
 
-use grammar::logos::{Lexer, Logos};
-use grammar::{Ignoring, Unlexed};
+use crate::{Ignoring, Unlexed};
+use logos::{Lexer, Logos};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-#[logos(crate = grammar::logos)]
+#[logos(crate = logos)]
 enum Piece {
     #[regex("[^\n]+", allow_greedy = true)]
     Text,
@@ -14,7 +14,7 @@ enum Piece {
 }
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-#[logos(crate = grammar::logos)]
+#[logos(crate = logos)]
 enum Cell {
     #[regex("[^\t]+", allow_greedy = true)]
     Text,

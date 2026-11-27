@@ -5,7 +5,7 @@ use std::path::Path;
 use std::process::{Command, ExitStatus};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use grammar_lines::Lines;
+use grammar::Lines;
 
 use crate::failure::Failure;
 

@@ -15,7 +15,7 @@ doctest = false
 
 [dependencies]
 invariants = { path = "../invariants" }
-grammar-migration = { path = "../grammar-migration" }
+grammar = { path = "../grammar" }
 query-cache = { path = "../query-cache" }
 proc-macro2.workspace = true
 quote.workspace = true

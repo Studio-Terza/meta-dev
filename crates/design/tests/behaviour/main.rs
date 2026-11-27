@@ -16,7 +16,7 @@ use dispatch_ports::{
     Pid, Prompt, Reply, Started, Tokens, Told, Usage, Wall, clock_ops, dispatch_ops,
 };
 use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Offset, Size, Stamps, Text};
-use grammar_slug::Letters;
+use grammar::Letters;
 use invariants::Unpoisoned;
 use port_core::Pass;
 use serde_json::Value;

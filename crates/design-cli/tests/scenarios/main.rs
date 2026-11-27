@@ -5,7 +5,7 @@ mod ports;
 use test_failure::Failed;
 
 use design::Failure;
-use grammar_slug::Letters;
+use grammar::Letters;
 use ports::Design;
 use serde_json::Value;
 use tempfile::TempDir;

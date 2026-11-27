@@ -1,9 +1,9 @@
-use grammar::logos::Logos;
+use logos::Logos;
 
 use super::Words;
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-#[logos(crate = grammar::logos)]
+#[logos(crate = logos)]
 enum Hump {
     #[regex(r"[A-Z][^A-Z]*")]
     Capitalized,
@@ -12,7 +12,7 @@ enum Hump {
 }
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-#[logos(crate = grammar::logos)]
+#[logos(crate = logos)]
 enum Snake {
     #[regex(r"[^_]+")]
     Word,

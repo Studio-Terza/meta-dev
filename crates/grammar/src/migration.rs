@@ -1,12 +1,12 @@
 use std::str::FromStr;
 
-use grammar::logos::Logos;
-use grammar::{Ignoring, Unlexed};
+use crate::{Ignoring, Unlexed};
+use logos::Logos;
 
-use grammar_unspelled::Unspelled;
+use crate::Unspelled;
 
 #[derive(Logos, Clone, Debug, PartialEq, Eq)]
-#[logos(crate = grammar::logos)]
+#[logos(crate = logos)]
 enum Piece {
     #[regex("[0-9]+", |lexer| lexer.slice().parse().ignoring(Unlexed::OutOfRange), priority = 3)]
     Number(i64),
