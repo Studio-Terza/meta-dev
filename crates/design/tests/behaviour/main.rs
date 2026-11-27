@@ -11,7 +11,8 @@ use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::time::{Duration, SystemTime};
 use test_failure::Failed;
 
-use console_ports::{Complaint, Heard, Shown, Variables};
+use console_doubles::Variables;
+use console_ports::{Complaint, Heard, Shown};
 use design::{Agents, Cli, Failure, HookEvent, Outcome};
 use dispatch_ports::{
     AgentRun, Bell, Call, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Ended, Errored, Finished, Job,

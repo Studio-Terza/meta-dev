@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::ffi::{OsStr, OsString};
 use std::io;
 
-use crate::{Environment, Heard};
+use console_ports::{Environment, Heard};
 
 #[derive(Debug, Default)]
 pub struct Variables {

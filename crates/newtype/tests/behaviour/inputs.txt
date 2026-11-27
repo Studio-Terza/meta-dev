@@ -6,25 +6,10 @@
         2,
     ),
     Discriminant(
-        1,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
-        2,
+        3,
     ),
     Discriminant(
         0,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        3,
     ),
     Discriminant(
         0,
@@ -33,10 +18,16 @@
         3,
     ),
     Discriminant(
-        3,
+        4,
     ),
     Discriminant(
         0,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        4,
     ),
     Discriminant(
         4,
@@ -45,6 +36,15 @@
         3,
     ),
     Discriminant(
-        2,
+        4,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        1,
     ),
 ]

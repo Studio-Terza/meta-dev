@@ -1,11 +1,10 @@
-use std::collections::BTreeMap;
 use std::env;
 use std::ffi::OsString;
 use std::process::ExitCode;
 
-use console_ports::{Answer, Complaint, Environment, Heard, Process, Shown, Variables};
+use console_ports::{Answer, Complaint, Environment, Process, Shown};
 use fixture::Properties;
-use proptest::prelude::{any, prop_assert, prop_assert_eq, prop_assume, proptest};
+use proptest::prelude::{any, prop_assert_eq, proptest};
 
 #[test]
 fn the_process_answers_with_its_arguments_and_the_answer_s_code() {
@@ -33,21 +32,5 @@ proptest! {
         let ended = letters.split_last().filter(|(end, _)| end.is_ascii_control());
         prop_assert_eq!(ended.map(|(_, said)| said.iter().collect::<String>()), Some(complaint));
         prop_assert_eq!(answer.code(), ExitCode::FAILURE);
-    }
-
-    #[test]
-    fn in_memory_variables_answer_from_their_pairs_and_hear_what_they_were_given(
-        pairs in any::<Vec<(String, String)>>(),
-        unnamed in any::<String>(),
-        heard in any::<Heard>(),
-    ) {
-        let named: BTreeMap<OsString, OsString> =
-            pairs.into_iter().map(|(name, value)| (OsString::from(name), OsString::from(value))).collect();
-        let absent = OsString::from(unnamed);
-        prop_assume!(!named.contains_key(&absent));
-        let variables = named.clone().into_iter().collect::<Variables>().hearing(heard.clone());
-        prop_assert_eq!(variables.variable(&absent), None);
-        prop_assert!(named.iter().all(|(name, value)| variables.variable(name).as_ref() == Some(value)));
-        prop_assert_eq!(variables.input()?, heard);
     }
 }

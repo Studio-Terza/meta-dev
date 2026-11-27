@@ -65,6 +65,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "console-doubles"
+version = "0.1.0"
+dependencies = [
+ "console-ports",
+]
+
+[[package]]
 name = "console-ports"
 version = "0.1.0"
 dependencies = [
@@ -137,6 +144,7 @@ dependencies = [
 name = "design"
 version = "0.1.0"
 dependencies = [
+ "console-doubles",
  "console-ports",
  "design-messages",
  "dispatch-ports",

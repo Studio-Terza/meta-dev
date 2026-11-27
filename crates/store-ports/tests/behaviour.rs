@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 
 use design_messages::{CheckName, Fate, Halt, PullNumber, SessionCursors, SessionRecords, StreamSchema};
@@ -5,10 +6,14 @@ use dispatch_ports::{Pid, Tokens, Wall};
 use file_ports::Offset;
 use fixture::{Failed, Properties};
 use invariants::{Ignoring, ignored};
-use newtype::Enumerated;
+use newtype::{Counter, Enumerated};
 use port_core::Run;
+use proptest::collection::vec;
 use proptest::option;
-use proptest::prelude::{any, prop_assert, prop_assert_eq, proptest};
+use proptest::prelude::{any, prop_assert_eq, proptest};
+use proptest::sample::Index;
+use proptest::strategy::{Strategy, ValueTree};
+use proptest::test_runner::TestRunner;
 use sqlite_ports::SqliteOpener;
 use store_ports::{Busy, Column, Counted, Opens, Store, Written};
 use tempfile::TempDir;
@@ -20,23 +25,46 @@ ignored! {
     }
 }
 
+#[test]
+fn a_store_opens_on_its_first_op_and_keeps_each_session_s_last_cursor_when_reopened() -> Result<(), Failed> {
+    let settled = Properties::settled();
+    let drawn = usize::try_from(settled.cases)?;
+    let mut runner = TestRunner::new(settled);
+    let sessions = vec(any::<SessionId>(), drawn).new_tree(&mut runner)?.current();
+    let cursors = vec(any::<Cursor>(), drawn).new_tree(&mut runner)?.current();
+    let revisits = vec(any::<Index>(), drawn).new_tree(&mut runner)?.current();
+    let visits: Vec<(&SessionId, Cursor)> =
+        revisits.iter().map(|at| at.get(&sessions)).chain(&sessions).zip(cursors.iter().cycle().copied()).collect();
+    let scratch = TempDir::new()?;
+    let named = scratch.path().file_name().unwrap_or_default();
+    let place = scratch.path().join(named).join(named);
+    let run = Run::root();
+    let store = run.port(SqliteOpener.file::<StreamSchema>(place.clone()));
+    let before = place.exists();
+    let written = visits
+        .iter()
+        .map(|(session, cursor)| {
+            store.write::<Counted<SessionRecords>>(Counted::new(SessionRecords::read(session, *cursor, &[])))
+        })
+        .collect::<Result<Vec<Written>, _>>()?;
+    let last: BTreeMap<&SessionId, Cursor> = visits.iter().copied().collect();
+    let changes = visits.iter().enumerate().filter(|(at, (session, cursor))| {
+        visits
+            .get(..*at)
+            .and_then(|earlier| earlier.iter().rev().find(|(seen, _)| seen == session))
+            .map(|(_, kept)| kept)
+            != Some(cursor)
+    });
+    let reopened = run.port(SqliteOpener.file::<StreamSchema>(place.clone()));
+    let read = reopened.read(SessionCursors)?;
+    let unkept: Vec<_> = last.iter().filter(|(session, cursor)| read.resuming(session) != **cursor).collect();
+    assert!(!before && place.exists());
+    assert_eq!((Written::total(written.into_iter()).count(), unkept), (changes.count(), Vec::new()));
+    Ok(())
+}
+
 proptest! {
     #![proptest_config(Properties::settled())]
-
-    #[test]
-    fn a_store_opens_on_its_first_op_and_keeps_what_it_wrote_when_reopened(session in any::<SessionId>(), cursor in any::<Cursor>()) {
-        let scratch = TempDir::new()?;
-        let named = scratch.path().file_name().unwrap_or_default();
-        let place = scratch.path().join(named).join(named);
-        let run = Run::root();
-        let store = run.port(SqliteOpener.file::<StreamSchema>(place.clone()));
-        let before = place.exists();
-        let written: Written = store.write(Counted::new(SessionRecords::read(&session, cursor, &[])))?;
-        let reopened = run.port(SqliteOpener.file::<StreamSchema>(place.clone()));
-        prop_assert!(!before && place.exists() && written > Written::default());
-        prop_assert_eq!(reopened.read(SessionCursors)?.resuming(&session), cursor);
-        prop_assert_eq!(store.read(SessionCursors)?.resuming(&session), cursor);
-    }
 
     #[test]
     fn every_column_reads_back_what_it_wrote(uuid in any::<Uuid>(), session in any::<SessionId>(), instant in any::<Instant>(), body in any::<Body>(), offset in any::<Offset>(), optional in option::of(any::<Body>()), pid in any::<Pid>(), tokens in any::<Tokens>(), wall in any::<Wall>(), pull in any::<NonZeroU32>()) {

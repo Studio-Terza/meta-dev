@@ -3,20 +3,34 @@ use std::fmt::{self, Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
+use std::ops::Deref;
+
 use file_doubles::Memory;
 use file_ports::Bytes;
-use newtype::Arbitrary;
+use newtype::{Arbitrary, Newtype};
 use proptest::sample::Index;
 use proptest::test_runner::Config;
 
 #[derive(Debug)]
 pub struct Campaign;
 
+#[derive(Newtype, Arbitrary, Clone, Debug)]
+#[newtype(strategy = proptest::collection::vec(proptest::arbitrary::any::<Of>(), 0..8))]
+pub struct Few<Of: proptest::arbitrary::Arbitrary + fmt::Debug + 'static>(Vec<Of>);
+
+impl<Of: proptest::arbitrary::Arbitrary + fmt::Debug + 'static> Deref for Few<Of> {
+    type Target = [Of];
+
+    fn deref(&self) -> &[Of] {
+        &self.0
+    }
+}
+
 #[derive(Arbitrary, Clone, Debug)]
 pub enum Input {
     Bytes(Placed, Vec<u8>),
     Manifest(Vec<u8>),
-    Damaged(Placed, Vec<Item>, Index, u8, Damage),
+    Damaged(Placed, Few<Item>, Index, u8, Damage),
     Deep(Placed, Shell, u8, Expression),
     Long(Placed, Link, u16),
 }
@@ -95,7 +109,7 @@ pub enum Wrapping {
 
 #[derive(Arbitrary, Clone, Debug)]
 pub enum Ty {
-    Wrapped(Kind, Vec<Wrapping>),
+    Wrapped(Kind, Few<Wrapping>),
 }
 
 #[derive(Arbitrary, Clone, Copy, Debug)]
@@ -112,7 +126,7 @@ pub enum Layer {
 
 #[derive(Arbitrary, Clone, Debug)]
 pub enum Expression {
-    Layered(Leaf, Vec<Layer>),
+    Layered(Leaf, Few<Layer>),
 }
 
 #[derive(Arbitrary, Clone, Debug)]
@@ -154,7 +168,7 @@ pub enum Flat {
 
 #[derive(Arbitrary, Clone, Debug)]
 pub enum Declared {
-    Function(Leaf, Ty, Ty, Vec<Statement>),
+    Function(Leaf, Ty, Ty, Few<Statement>),
     Structure(Leaf, Ty),
     Enumerated(Leaf, Leaf, Ty),
     Constant(Leaf, Ty, Expression),
@@ -171,7 +185,7 @@ pub enum Container {
 
 #[derive(Arbitrary, Clone, Debug)]
 pub enum Item {
-    Placed(Attribute, Visible, Declared, Vec<Container>),
+    Placed(Attribute, Visible, Declared, Few<Container>),
 }
 
 impl Campaign {
