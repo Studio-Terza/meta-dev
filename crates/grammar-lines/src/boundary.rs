@@ -13,8 +13,20 @@ enum Piece {
     Break,
 }
 
+#[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
+#[logos(crate = grammar::logos)]
+enum Cell {
+    #[regex("[^\t]+", allow_greedy = true)]
+    Text,
+    #[token("\t")]
+    Tab,
+}
+
 #[derive(Debug)]
 struct Broken<'text>(Lexer<'text, Piece>);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Fields(Vec<String>);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Lines(Vec<String>);
@@ -68,6 +80,21 @@ impl FromStr for KeptLines {
 
     fn from_str(text: &str) -> Result<KeptLines, Unsplit> {
         Ok(KeptLines(Broken(Piece::lexer(text)).map(|line| line.kept).collect()))
+    }
+}
+
+impl FromStr for Fields {
+    type Err = Unsplit;
+
+    fn from_str(text: &str) -> Result<Fields, Unsplit> {
+        let cells = Cell::lexer(text).spanned().filter(|(cell, _)| *cell == Ok(Cell::Text));
+        Ok(Fields(cells.filter_map(|(_, span)| text.get(span)).map(str::to_owned).collect()))
+    }
+}
+
+impl AsRef<[String]> for Fields {
+    fn as_ref(&self) -> &[String] {
+        &self.0
     }
 }
 

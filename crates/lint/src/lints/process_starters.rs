@@ -10,15 +10,8 @@ use crate::use_leaf::UseLeaf;
 
 #[derive(Debug)]
 pub(crate) struct ProcessStarters {
-    scope: Scope,
     modules: Vec<Module>,
     open: Vec<usize>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Scope {
-    OutsidePorts,
-    Everywhere,
 }
 
 #[derive(Debug, Default)]
@@ -56,14 +49,8 @@ impl ProcessStarters {
     const STD: &'static str = "std";
     const OWN: &'static str = "self";
 
-    pub(crate) fn everywhere(file: &syn::File) -> usize {
-        let mut scan = ProcessStarters::scanning(Scope::Everywhere, None);
-        scan.visit_file(file);
-        scan.starts().len()
-    }
-
-    fn scanning(scope: Scope, ported: Option<()>) -> ProcessStarters {
-        ProcessStarters { scope, modules: vec![Module { ported, ..Module::default() }], open: vec![0] }
+    fn scanning(ported: Option<()>) -> ProcessStarters {
+        ProcessStarters { modules: vec![Module { ported, ..Module::default() }], open: vec![0] }
     }
 
     fn current(&mut self) -> Option<&mut Module> {
@@ -72,8 +59,7 @@ impl ProcessStarters {
     }
 
     fn admitted(&mut self) -> Option<&mut Module> {
-        let scope = self.scope;
-        self.current().filter(|module| scope == Scope::Everywhere || module.ported.is_none())
+        self.current().filter(|module| module.ported.is_none())
     }
 
     fn starts(&self) -> Vec<usize> {
@@ -199,7 +185,7 @@ impl<'file> Style<'file> for ProcessStarters {
     const READS: Reads = Reads::Every;
 
     fn new(source: &'file Source) -> ProcessStarters {
-        ProcessStarters::scanning(Scope::OutsidePorts, source.ported())
+        ProcessStarters::scanning(source.ported())
     }
 
     fn found(self) -> Vec<Found> {

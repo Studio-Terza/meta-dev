@@ -1,5 +1,6 @@
 Violations
 --- out
+test budget: 4 of 50 lines are tests, at most 18% may be
 --- err
 free functions are not allowed; make them associated functions or methods:
 provider/src/inner.rs:9: fn own; make it an associated function or a method

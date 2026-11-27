@@ -2,4 +2,4 @@
 
 mod boundary;
 
-pub use boundary::{KeptLines, Lines};
+pub use boundary::{Fields, KeptLines, Lines};

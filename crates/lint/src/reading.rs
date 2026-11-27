@@ -10,7 +10,7 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use syn::{Expr, ExprLit, Item, ItemMod, Lit, Meta};
 use timer_ports::Timer;
 
-use crate::budget::Budgets;
+use crate::budget::Budget;
 use crate::failure::Failure;
 use crate::finding::Finding;
 use crate::gate::Gate;
@@ -25,7 +25,7 @@ pub(crate) struct Read {
     pub failures: Vec<Failure>,
     pub findings: Vec<Finding>,
     pub facts: Facts,
-    pub budgets: Budgets,
+    pub budget: Budget,
     pub spent: Spent,
 }
 
@@ -39,7 +39,7 @@ impl Read {
             failures: self.failures.into_iter().chain(later.failures).collect(),
             findings: self.findings.into_iter().chain(later.findings).collect(),
             facts: self.facts.joined(later.facts),
-            budgets: self.budgets.joined(later.budgets),
+            budget: self.budget + later.budget,
             spent: self.spent.joined(later.spent),
         }
     }
@@ -137,8 +137,8 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
             declared.iter().map(|declaration| self.child(module, declaration)).collect();
         let gate = module.gate;
         let linted = gate.entered().map_or_default(|()| Lints::linted(source, file, self.timer, &mut spent));
-        let budgets = spent.timed(self.timer, Stage::Budget, || Budgets::of_file(source, file, gate));
-        let here = Read { failures: Vec::new(), findings: linted.found, facts: linted.facts, budgets, spent };
+        let budget = spent.timed(self.timer, Stage::Budget, || Budget::of_file(source, file, gate));
+        let here = Read { failures: Vec::new(), findings: linted.found, facts: linted.facts, budget, spent };
         let below = children
             .into_par_iter()
             .map(|child| match child {

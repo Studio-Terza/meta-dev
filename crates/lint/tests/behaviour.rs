@@ -15,6 +15,8 @@ const STORED_MANIFEST: &str = "manifest.toml";
 const MANIFEST: &str = "Cargo.toml";
 const RECORD: &str = "RECORD_GOLDENS";
 const DEPTH: usize = 5_000;
+const BUDGET_MET: &str = "Clean\n--- out\ntest budget: 9 of 50 lines are tests, at most 18% may be\n--- err\n";
+const BUDGET_PAST: &str = "Violations\n--- out\n--- err\ntest budget: 10 of 50 lines are tests, at most 18% may be; cut test lines or test through fewer, table-driven cases\n";
 const FREE_FN: &str = "free functions are not allowed; make them associated functions or methods:\nsrc/lib.rs:1: fn free; make it an associated function or a method\n";
 
 #[derive(Debug)]
@@ -57,18 +59,16 @@ const LINTS: [&str; 13] = [
     "vec_out_params",
 ];
 
-const CASES: [Case; 13] = [
+const CASES: [Case; 11] = [
     Case { golden: "workspace", fixture: "workspace", mount: ".", arguments: &["."] },
-    Case { golden: "workspace_report", fixture: "workspace", mount: ".", arguments: &["--report", "."] },
     Case { golden: "workspace_timings", fixture: "workspace", mount: ".", arguments: &["--timings", "."] },
-    Case { golden: "two_roots", fixture: "workspace", mount: ".", arguments: &["--report", "app", "store-ports"] },
+    Case { golden: "two_roots", fixture: "workspace", mount: ".", arguments: &["app", "store-ports"] },
     Case { golden: "mounted", fixture: "no_dyn", mount: "/corpus", arguments: &["/corpus"] },
     Case { golden: "flow", fixture: "flow", mount: ".", arguments: &["."] },
     Case { golden: "starters", fixture: "starters", mount: ".", arguments: &["."] },
     Case { golden: "surface", fixture: "surface", mount: ".", arguments: &["."] },
     Case { golden: "test_code", fixture: "test_code", mount: ".", arguments: &["."] },
     Case { golden: "broken", fixture: "broken", mount: ".", arguments: &["."] },
-    Case { golden: "broken_report", fixture: "broken", mount: ".", arguments: &["--report", "."] },
     Case { golden: "bad_manifest", fixture: "bad_manifest", mount: ".", arguments: &["."] },
     Case { golden: "unreadable", fixture: "bad_manifest", mount: "/corpus", arguments: &["/nowhere", "/corpus/notes"] },
 ];
@@ -125,16 +125,30 @@ fn deeply_nested_code_is_read_whole() -> Result<(), Failed> {
 }
 
 #[test]
+fn test_lines_past_eighteen_percent_of_all_lines_are_violations() {
+    let shown = [9, 10].map(|tested| Shown::ran(&Case::budgeted(tested), &[]).map(|shown| shown.to_string()));
+    assert_eq!(shown, [Ok(BUDGET_MET.to_owned()), Ok(BUDGET_PAST.to_owned())]);
+}
+
+#[test]
 fn output_that_cannot_be_written_refuses_the_run() -> Result<(), Failed> {
-    let files = Case::mounted("workspace", ".")?;
     let mut err = Vec::new();
-    let arguments = ["--report", "."].map(OsString::from);
-    let verdict = Cli::from_args(arguments).verdict(&files, Monotonic::default(), &mut Unwritable, &mut err);
+    let verdict = Cli::from_args([]).verdict(&Case::budgeted(9), Monotonic::default(), &mut Unwritable, &mut err);
     assert_eq!((verdict, String::from_utf8(err)?), (Verdict::Refused, "cannot write the output: refused\n".to_owned()));
     Ok(())
 }
 
 impl Case {
+    fn budgeted(tested: usize) -> Memory {
+        [
+            (PathBuf::from(MANIFEST), Bytes::new(b"[package]\nname = \"p\"\n".to_vec())),
+            (PathBuf::from("src/lib.rs"), Bytes::new("\n".repeat(50 - tested).into_bytes())),
+            (PathBuf::from("tests/t.rs"), Bytes::new("\n".repeat(tested).into_bytes())),
+        ]
+        .into_iter()
+        .collect()
+    }
+
     fn drifted(&self) -> Result<Option<String>, Failed> {
         let files = Case::mounted(self.fixture, self.mount)?;
         let shown = Shown::ran(&files, self.arguments)?.to_string();

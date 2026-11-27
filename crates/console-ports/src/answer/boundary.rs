@@ -84,39 +84,3 @@ impl AsRef<str> for Complaint {
         &self.0
     }
 }
-pub trait Tale: Iterator<Item = Shown> {
-    fn ended(self) -> Answer;
-}
-
-pub trait Teller {
-    type Told<'teller>: Tale
-    where
-        Self: 'teller;
-
-    fn told(&self) -> Self::Told<'_>;
-}
-
-#[derive(Debug)]
-pub struct Answered(Answer);
-
-impl Iterator for Answered {
-    type Item = Shown;
-
-    fn next(&mut self) -> Option<Shown> {
-        None
-    }
-}
-
-impl Tale for Answered {
-    fn ended(self) -> Answer {
-        self.0
-    }
-}
-
-impl Teller for Answer {
-    type Told<'teller> = Answered;
-
-    fn told(&self) -> Answered {
-        Answered(self.clone())
-    }
-}

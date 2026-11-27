@@ -26,7 +26,6 @@ pub struct Cli {
 enum Mode {
     Gate,
     Timings,
-    Report,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -37,24 +36,15 @@ pub enum Verdict {
 }
 
 impl Cli {
-    const REPORT: &'static str = "--report";
     const TIMINGS: &'static str = "--timings";
     const CURRENT: &'static str = ".";
     const STACK_BYTES: usize = 256 * 1024 * 1024;
 
     pub fn from_args(arguments: impl IntoIterator<Item = OsString>) -> Cli {
         let given: Vec<OsString> = arguments.into_iter().collect();
-        let flagged = |flag: &str| given.iter().any(|argument| argument == flag);
-        let mode = match (flagged(Cli::REPORT), flagged(Cli::TIMINGS)) {
-            (true, _) => Mode::Report,
-            (false, true) => Mode::Timings,
-            (false, false) => Mode::Gate,
-        };
-        let named: Vec<PathBuf> = given
-            .iter()
-            .filter(|argument| *argument != Cli::REPORT && *argument != Cli::TIMINGS)
-            .map(PathBuf::from)
-            .collect();
+        let mode = given.iter().find(|argument| *argument == Cli::TIMINGS).map_or(Mode::Gate, |_| Mode::Timings);
+        let named: Vec<PathBuf> =
+            given.iter().filter(|argument| *argument != Cli::TIMINGS).map(PathBuf::from).collect();
         let roots = match named.first() {
             Some(_) => named,
             None => vec![PathBuf::from(Cli::CURRENT)],
@@ -75,7 +65,7 @@ impl Cli {
             Ok(pool) => pool.install(|| self.read(files, &clock)),
             Err(failure) => Read::failed(Failure::Threads(failure)),
         };
-        let decided = Cli::decided(&read, self.mode);
+        let decided = Cli::decided(&read);
         match self.written(read, out, err) {
             Ok(()) => decided,
             Err(failure) => {
@@ -112,24 +102,22 @@ impl Cli {
         }
     }
 
-    fn decided(read: &Read, mode: Mode) -> Verdict {
+    fn decided(read: &Read) -> Verdict {
         let failed = read.failures.first().map(|_| Verdict::Refused);
-        let violated = read.findings.first().map(|_| Verdict::Violations).filter(|_| mode != Mode::Report);
-        failed.or(violated).unwrap_or(Verdict::Clean)
+        let violated = read.findings.first().map(|_| ()).or(read.budget.exceeded().map(|_| ()));
+        failed.or(violated.map(|()| Verdict::Violations)).unwrap_or(Verdict::Clean)
     }
 
     fn written(&self, read: Read, out: &mut impl Write, err: &mut impl Write) -> io::Result<()> {
-        let Read { failures, findings, budgets, spent, .. } = read;
+        let Read { failures, findings, budget, spent, .. } = read;
         let mut said: Vec<String> = failures.iter().map(ToString::to_string).collect();
         said.sort();
         said.iter().try_for_each(|failure| writeln!(err, "{failure}"))?;
+        findings.into_iter().collect::<Findings>().written(err)?;
+        budget.exceeded().map_or_else(|| writeln!(out, "{budget}"), |exceeded| writeln!(err, "{exceeded}"))?;
         match self.mode {
-            Mode::Report => budgets.written(out),
-            Mode::Timings => {
-                findings.into_iter().collect::<Findings>().written(err)?;
-                spent.written(out)
-            }
-            Mode::Gate => findings.into_iter().collect::<Findings>().written(err),
+            Mode::Timings => spent.written(out),
+            Mode::Gate => Ok(()),
         }
     }
 }

@@ -9,28 +9,22 @@ publish.workspace = true
 test = false
 doctest = false
 
+[[bin]]
+name = "ci"
+path = "src/main.rs"
+test = false
+
 [dependencies]
-invariants = { path = "../invariants" }
 console-ports = { path = "../console-ports" }
-file-ports = { path = "../file-ports" }
-gate-limits = { path = "../gate-limits" }
-grammar-cargo-option = { path = "../grammar-cargo-option" }
-grammar-output = { path = "../grammar-output" }
-grammar-hunk = { path = "../grammar-hunk" }
-grammar-shard = { path = "../grammar-shard" }
-grammar-spec-line = { path = "../grammar-spec-line" }
-grammar-test-summary = { path = "../grammar-test-summary" }
-grammar-timing-page = { path = "../grammar-timing-page" }
-grammar-unit-label = { path = "../grammar-unit-label" }
-newtype = { path = "../newtype" }
-strum.workspace = true
-text-lines = { path = "../text-lines" }
+grammar-lines = { path = "../grammar-lines" }
+invariants = { path = "../invariants" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 toml.workspace = true
 
 [dev-dependencies]
+tempfile.workspace = true
 test-failure = { path = "../test-failure" }
 
 [lints]

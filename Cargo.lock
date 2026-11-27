@@ -54,23 +54,12 @@ name = "ci"
 version = "0.1.0"
 dependencies = [
  "console-ports",
- "file-ports",
- "gate-limits",
- "grammar-cargo-option",
- "grammar-hunk",
- "grammar-output",
- "grammar-shard",
- "grammar-spec-line",
- "grammar-test-summary",
- "grammar-timing-page",
- "grammar-unit-label",
+ "grammar-lines",
  "invariants",
- "newtype",
  "serde",
  "serde_json",
- "strum",
+ "tempfile",
  "test-failure",
- "text-lines",
  "thiserror",
  "toml",
 ]
@@ -299,20 +288,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gate-limits"
-version = "0.1.0"
-dependencies = [
- "console-ports",
- "file-ports",
- "newtype",
- "serde",
- "strum",
- "text-lines",
- "thiserror",
- "toml",
-]
-
-[[package]]
 name = "generic-array"
 version = "0.14.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -340,32 +315,6 @@ version = "0.1.0"
 dependencies = [
  "invariants",
  "logos",
-]
-
-[[package]]
-name = "grammar-banner"
-version = "0.1.0"
-dependencies = [
- "grammar",
- "grammar-unspelled",
- "newtype",
- "proptest",
-]
-
-[[package]]
-name = "grammar-cargo-option"
-version = "0.1.0"
-dependencies = [
- "grammar",
- "grammar-unspelled",
-]
-
-[[package]]
-name = "grammar-hunk"
-version = "0.1.0"
-dependencies = [
- "grammar",
- "grammar-unspelled",
 ]
 
 [[package]]
@@ -404,9 +353,6 @@ name = "grammar-output"
 version = "0.1.0"
 dependencies = [
  "grammar",
- "proptest",
- "record-derive",
- "thiserror",
 ]
 
 [[package]]
@@ -417,53 +363,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "grammar-shard"
-version = "0.1.0"
-dependencies = [
- "grammar",
- "grammar-unspelled",
- "proptest",
-]
-
-[[package]]
 name = "grammar-slug"
 version = "0.1.0"
 dependencies = [
  "grammar",
-]
-
-[[package]]
-name = "grammar-spec-line"
-version = "0.1.0"
-dependencies = [
- "grammar",
- "grammar-unspelled",
- "newtype",
- "proptest",
- "thiserror",
-]
-
-[[package]]
-name = "grammar-test-summary"
-version = "0.1.0"
-dependencies = [
- "grammar",
-]
-
-[[package]]
-name = "grammar-timing-page"
-version = "0.1.0"
-dependencies = [
- "grammar",
-]
-
-[[package]]
-name = "grammar-unit-label"
-version = "0.1.0"
-dependencies = [
- "grammar",
- "newtype",
- "strum",
 ]
 
 [[package]]
@@ -791,16 +694,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "record-derive"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "strum",
- "syn 2.0.119",
-]
-
-[[package]]
 name = "regex-automata"
 version = "0.4.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1023,17 +916,6 @@ name = "test-failure"
 version = "0.1.0"
 
 [[package]]
-name = "test-log"
-version = "0.1.0"
-dependencies = [
- "grammar-banner",
- "invariants",
- "newtype",
- "serde",
- "text-lines",
-]
-
-[[package]]
 name = "text-lines"
 version = "0.1.0"
 dependencies = [
@@ -1115,7 +997,6 @@ version = "0.1.0"
 dependencies = [
  "file-ports",
  "grammar-lines",
- "grammar-output",
  "invariants",
  "message-id",
  "newtype",

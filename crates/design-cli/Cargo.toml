@@ -8,6 +8,7 @@ publish.workspace = true
 [[bin]]
 name = "design"
 path = "src/main.rs"
+test = false
 
 [dependencies]
 console-ports = { path = "../console-ports" }
