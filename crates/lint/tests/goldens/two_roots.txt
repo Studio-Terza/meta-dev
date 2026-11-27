@@ -1,6 +1,6 @@
 Clean
 --- out
 test budget, report only:
-app: 4 tests in 20 files, 30 of 63 lines, 1 process starts
+app: 6 tests in 20 files, 34 of 67 lines, 1 process starts
 store_ports: 0 tests in 1 files, 0 of 6 lines, 1 process starts
 --- err

@@ -94,14 +94,8 @@ impl Findings {
     }
 }
 
-impl Extend<Finding> for Findings {
-    fn extend<Found: IntoIterator<Item = Finding>>(&mut self, found: Found) {
-        self.0.extend(found);
-    }
-}
-
 impl FromIterator<Finding> for Findings {
-    fn from_iter<Found: IntoIterator<Item = Finding>>(found: Found) -> Findings {
+    fn from_iter<Many: IntoIterator<Item = Finding>>(found: Many) -> Findings {
         Findings(found.into_iter().collect())
     }
 }

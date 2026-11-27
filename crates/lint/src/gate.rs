@@ -1,5 +1,5 @@
 use invariants::Ignoring;
-use proc_macro2::{Delimiter, TokenStream, TokenTree};
+use proc_macro2::{TokenStream, TokenTree};
 use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 use syn::{Attribute, ItemImpl, Meta, MetaList, Token};
@@ -97,9 +97,7 @@ impl TestMark {
 
     fn attribute(mark: &TokenTree, body: &TokenTree) -> Option<Attribute> {
         match (mark, body) {
-            (TokenTree::Punct(hash), TokenTree::Group(group))
-                if hash.as_char() == '#' && group.delimiter() == Delimiter::Bracket =>
-            {
+            (TokenTree::Punct(hash), TokenTree::Group(_)) if hash.as_char() == '#' => {
                 let written = TokenStream::from_iter([mark.clone(), body.clone()]);
                 Attribute::parse_outer
                     .parse2(written)

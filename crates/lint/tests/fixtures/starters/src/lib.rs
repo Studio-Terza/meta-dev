@@ -4,6 +4,7 @@ mod globbed {
     use std::process::*;
     fn globbed() {
         Command::new("ls");
+        run!(Command::new("ls"));
     }
 }
 mod ports {

@@ -13,6 +13,7 @@ const GOLDENS: &str = "tests/goldens";
 const STORED_MANIFEST: &str = "manifest.toml";
 const MANIFEST: &str = "Cargo.toml";
 const RECORD: &str = "RECORD_GOLDENS";
+const DEPTH: usize = 5_000;
 const FREE_FN: &str = "free functions are not allowed; make them associated functions or methods:\nsrc/lib.rs:1: fn free; make it an associated function or a method\n";
 
 #[derive(Debug)]
@@ -99,6 +100,24 @@ fn no_argument_reads_the_current_directory() -> Result<(), Failed> {
     .collect();
     let packaged = Shown::ran(&manifested, &[])?;
     assert_eq!((packaged.verdict, packaged.err.as_str()), (Verdict::Violations, FREE_FN));
+    Ok(())
+}
+
+#[test]
+fn deeply_nested_code_is_read_whole() -> Result<(), Failed> {
+    let nested = format!(
+        "pub struct Deep;\nimpl Deep {{\n    pub fn deep() -> u8 {{\n        {}1{}\n    }}\n}}\n",
+        "(".repeat(DEPTH),
+        ")".repeat(DEPTH)
+    );
+    let files: Memory = [
+        (PathBuf::from(MANIFEST), Bytes::new(b"[package]\nname = \"deep\"\n".to_vec())),
+        (PathBuf::from("src/lib.rs"), Bytes::new(nested.into_bytes())),
+    ]
+    .into_iter()
+    .collect();
+    let shown = Shown::ran(&files, &[])?;
+    assert_eq!((shown.verdict, shown.err.as_str()), (Verdict::Clean, ""));
     Ok(())
 }
 

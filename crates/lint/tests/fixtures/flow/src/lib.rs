@@ -97,3 +97,25 @@ macro_rules! flows {
         while true {}
     };
 }
+impl Flow {
+    fn borrowed<'ab>(&self, given: &'ab u8) -> &'ab u8 {
+        given
+    }
+}
+impl PartialEq for Flow {
+    fn eq(&self, other: &Flow) -> bool {
+        true
+    }
+    fn ne(&self, other: &Flow) -> (bool, bool) {
+        (true, true)
+    }
+}
+#[cfg(test)]
+impl Flow {
+    pub fn probe() -> bool {
+        true
+    }
+}
+pub fn boxed() -> Vec<u8> {
+    vec![Box::new(1) as Box<dyn Fn()>, (dyn_named)]
+}

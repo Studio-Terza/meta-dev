@@ -35,8 +35,7 @@ impl<'file> Style<'file> for NoComments<'file> {
     fn found(self) -> Vec<Found> {
         let text = self.source.text();
         let shebang = strip_shebang(text).unwrap_or(0);
-        let start =
-            Lexed { offset: shebang, line: 1 + text.get(..shebang).map_or(0, |before| before.matches('\n').count()) };
+        let start = Lexed { offset: shebang, line: 1 };
         let tokens = tokenize(text.get(shebang..).unwrap_or_default(), FrontmatterAllowed::Yes);
         tokens
             .scan(start, |lexed, token| {

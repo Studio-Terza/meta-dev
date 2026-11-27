@@ -3,9 +3,9 @@ use globbed::*;
 pub struct Unseen;
 macro_rules! made {
     ($name:ident) => {
-        let $name = provider::Transcribed;
+        let $name = 1;
     };
     ($($item:expr),*) => {
-        $( $item; )*
+        $( provider::Transcribed::from($item) ),*
     };
 }

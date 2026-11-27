@@ -54,6 +54,10 @@ pub mod tests {
 pub struct Featured;
 #[cfg(all(unix, feature = "fast"))]
 pub struct Fast;
+#[cfg(all(test, unix))]
+pub struct AllGated;
+#[cfg(any(test))]
+pub struct AnyGated;
 pub fn probe() -> bool {
     cfg!(feature = "test-utils") || cfg!(not(feature = "speed"))
 }

@@ -231,13 +231,7 @@ impl Workspace {
             let roots = entries.into_iter().filter_map(|entry| Workspace::target_root(files, entry));
             roots.map(|root| CrateRoot::new(root, *kind, package)).collect::<Vec<CrateRoot>>()
         });
-        let present =
-            declared.into_iter().chain(fixed).chain(targets).filter(|root| files.kind(&root.path) == Kind::File);
-        present.fold(Vec::new(), |mut kept: Vec<CrateRoot>, root| {
-            let fresh = kept.iter().all(|earlier| earlier.path != root.path);
-            kept.extend(fresh.then_some(root));
-            kept
-        })
+        declared.into_iter().chain(fixed).chain(targets).filter(|root| files.kind(&root.path) == Kind::File).collect()
     }
 
     fn target_root(files: &impl Files, entry: PathBuf) -> Option<PathBuf> {
