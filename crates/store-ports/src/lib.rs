@@ -1,4 +1,5 @@
 mod batch;
+mod boundary;
 mod busy;
 mod cause;
 mod column;
@@ -12,10 +13,10 @@ mod store;
 mod store_failure;
 mod store_lock;
 mod value;
-mod version;
 mod written;
 
 pub use batch::{Batch, Counted, Counts};
+pub use boundary::Version;
 pub use busy::Busy;
 pub use cause::Cause;
 pub use column::{Column, ColumnFailure, Columns};
@@ -30,5 +31,4 @@ pub use store_failure::StoreFailure;
 pub use store_lock::{Claim, StoreLock, Unlock};
 pub use store_ports_macros::{Columns, Record, migrate, query};
 pub use value::{Argument, Bind, FromValue, IntoArgument, Value};
-pub use version::Version;
 pub use written::{Done, Written};

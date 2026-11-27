@@ -1,6 +1,6 @@
 mod entry;
 
-use crate::lossy_text::LossyText;
+use crate::boundary::LossyText;
 use grammar::Lines;
 use invariants::Ignoring;
 

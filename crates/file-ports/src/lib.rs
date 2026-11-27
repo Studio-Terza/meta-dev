@@ -1,5 +1,5 @@
 mod absent;
-mod bytes;
+mod boundary;
 mod cached;
 mod disk;
 mod file_failure;
@@ -7,13 +7,10 @@ mod files;
 mod kind;
 mod memory;
 mod offset;
-mod size;
-mod stamps;
 mod tail;
-mod text;
 
 pub use absent::Absent;
-pub use bytes::Bytes;
+pub use boundary::{Bytes, Epoch, Size, Stamp, Stamps, Text};
 pub use cached::Cached;
 pub use disk::Disk;
 pub use file_failure::FileFailure;
@@ -21,10 +18,7 @@ pub use files::Files;
 pub use kind::Kind;
 pub use memory::Memory;
 pub use offset::Offset;
-pub use size::Size;
-pub use stamps::{Epoch, Stamp, Stamps};
 pub use tail::Tail;
-pub use text::Text;
 
 invariants::ignored! {
     pub(crate) enum Ignored {

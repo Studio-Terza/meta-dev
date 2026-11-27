@@ -1,5 +1,5 @@
 use std::path::Path;
-mod extension;
+mod boundary;
 
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
@@ -12,7 +12,7 @@ use port_core::Pass;
 
 use crate::transcripts::{TranscriptsFiller, transcripts_ops};
 use crate::{Cursor, Read, ReadFailure, Session, SessionId};
-use extension::Extension;
+use boundary::Extension;
 
 ignored! {
     enum Ignored {

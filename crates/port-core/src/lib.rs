@@ -1,13 +1,13 @@
-mod calls;
+mod boundary;
 mod held;
 mod op;
 mod port;
 mod run;
 mod snapshot;
 
-pub use calls::Calls;
+pub use boundary::{Calls, OpName};
 pub use held::{Held, Release, ReleaseReceipt, Released, Resource};
-pub use op::{Op, OpName, Pass};
+pub use op::{Op, Pass};
 pub use port::{Metered, Port};
 pub use port_derive::{Op, Resource, port};
 pub use run::{Measured, ReleaseFailures, Run};

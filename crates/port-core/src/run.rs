@@ -7,8 +7,7 @@ use std::sync::Mutex;
 use invariants::Unpoisoned;
 use newtype::Counter;
 
-use super::calls::Calls;
-use super::op::OpName;
+use super::boundary::{Calls, OpName};
 use super::snapshot::Snapshot;
 use boundary::Told;
 

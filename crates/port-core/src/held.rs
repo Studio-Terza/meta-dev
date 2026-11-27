@@ -2,7 +2,8 @@ use std::error::Error;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
-use super::op::{Op, OpName, Pass};
+use super::boundary::OpName;
+use super::op::{Op, Pass};
 use super::run::Run;
 
 pub trait Resource: Sized {

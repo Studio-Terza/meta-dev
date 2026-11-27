@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use super::calls::Calls;
-use super::op::{Op, OpName};
+use super::boundary::{Calls, OpName};
+use super::op::Op;
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct Snapshot(BTreeMap<OpName, Calls>);
