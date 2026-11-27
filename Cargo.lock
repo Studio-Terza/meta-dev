@@ -54,12 +54,12 @@ name = "ci"
 version = "0.1.0"
 dependencies = [
  "console-ports",
+ "fixture",
  "grammar",
  "invariants",
  "serde",
  "serde_json",
  "tempfile",
- "test-failure",
  "thiserror",
  "toml",
 ]
@@ -68,8 +68,10 @@ dependencies = [
 name = "console-ports"
 version = "0.1.0"
 dependencies = [
+ "fixture",
  "invariants",
  "newtype",
+ "proptest",
 ]
 
 [[package]]
@@ -252,6 +254,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "fixture"
+version = "0.1.0"
+dependencies = [
+ "fixture-derive",
+ "proptest",
+ "serde",
+ "test-failure",
+ "thiserror",
+ "toml",
+]
+
+[[package]]
+name = "fixture-derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -300,12 +323,11 @@ dependencies = [
 name = "grammar"
 version = "0.1.0"
 dependencies = [
+ "fixture",
  "invariants",
  "logos",
  "serde",
- "test-failure",
  "thiserror",
- "toml",
 ]
 
 [[package]]
@@ -319,9 +341,11 @@ dependencies = [
 name = "grammar-spec-line"
 version = "0.1.0"
 dependencies = [
+ "fixture",
  "grammar",
  "newtype",
  "proptest",
+ "serde",
  "thiserror",
 ]
 
@@ -374,6 +398,10 @@ dependencies = [
 [[package]]
 name = "invariants"
 version = "0.1.0"
+dependencies = [
+ "fixture",
+ "serde",
+]
 
 [[package]]
 name = "itoa"
@@ -403,14 +431,15 @@ version = "0.1.0"
 dependencies = [
  "console-ports",
  "file-ports",
+ "fixture",
  "invariants",
  "port-core",
  "proc-macro2",
  "quote",
  "ra-ap-rustc_lexer",
  "rayon",
+ "serde",
  "syn",
- "test-failure",
  "thiserror",
  "timer-ports",
  "toml",
@@ -552,6 +581,7 @@ dependencies = [
 name = "query-cache"
 version = "0.1.0"
 dependencies = [
+ "fixture",
  "hex",
  "serde",
  "serde_json",
@@ -862,7 +892,9 @@ dependencies = [
 name = "timer-ports"
 version = "0.1.0"
 dependencies = [
+ "fixture",
  "port-core",
+ "proptest",
 ]
 
 [[package]]
@@ -909,6 +941,7 @@ name = "transcript-ports"
 version = "0.1.0"
 dependencies = [
  "file-ports",
+ "fixture",
  "grammar",
  "invariants",
  "newtype",
@@ -917,7 +950,6 @@ dependencies = [
  "serde",
  "serde_json",
  "strum",
- "test-failure",
  "thiserror",
 ]
 
