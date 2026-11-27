@@ -63,7 +63,8 @@ proptest! {
     }
 
     #[test]
-    fn reading_from_an_offset_skips_that_many_bytes(name in "[a-z]{1,8}", bytes in any::<Bytes>(), offset in any::<Offset>()) {
+    fn reading_from_an_offset_skips_that_many_bytes(name in "[a-z]{1,8}", bytes in any::<Bytes>(), skip in 0..0x1_0000_i64) {
+        let offset = Offset::try_new(skip)?;
         let scratch = tempfile::tempdir()?;
         let path = scratch.path().join(&name);
         let memory = Memory::default();

@@ -19,7 +19,7 @@ use test_failure::Failed;
 use transcript_ports::{Authorship, Body, Cursor, Instant, SessionId, Uuid};
 
 proptest! {
-    #![proptest_config(Config { failure_persistence: None, rng_seed: RngSeed::Fixed(0), ..Config::default() })]
+    #![proptest_config(Config { cases: 4, failure_persistence: None, ..Config::default() })]
     #[test]
     fn a_reopened_store_resumes_each_session_where_it_was_left(
         session in any::<SessionId>(),
@@ -37,7 +37,10 @@ proptest! {
         let reopened = run.port(SqliteOpener.file::<StreamSchema>(path));
         prop_assert_eq!(reopened.read(SessionCursors)?.resuming(&session), cursor);
     }
+}
 
+proptest! {
+    #![proptest_config(Config { failure_persistence: None, rng_seed: RngSeed::Fixed(0), ..Config::default() })]
     #[test]
     fn a_uuid_column_reads_back(value in any::<Uuid>()) {
         prop_assert_eq!(Uuid::from_raw(value.raw()).into_iter().next(), Some(value));

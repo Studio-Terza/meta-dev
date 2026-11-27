@@ -20,7 +20,7 @@
 
 [{"name": "sh", "arguments": ["-c", "exec sleep 30"]}, 60, "x", 1]
 
-[1, 5]
+[{"secs": 0, "nanos": 50000000}, 5]
 
 [{"name": "sh", "arguments": ["-c", "echo spoken"]}, 60, "x", 20]
 

@@ -258,13 +258,13 @@ fn a_quiet_bell_waits_out_its_pause() -> Result<(), Failed> {
     IgnoredAny::deserialize(&mut rows)?;
     IgnoredAny::deserialize(&mut rows)?;
     IgnoredAny::deserialize(&mut rows)?;
-    let (pause, timeout) = <(Pause, Timeout)>::deserialize(&mut rows)?;
+    let (pause, timeout) = <(Duration, Timeout)>::deserialize(&mut rows)?;
     let deadline = Deadline::after(Wall::from(SystemTime::now()), timeout);
     let quiet = AgentRun::new(Pid::new(std::process::id()), deadline);
     let started = Instant::now();
-    let woke = quiet.bell().waited(Duration::from(pause));
+    let woke = quiet.bell().waited(pause);
     assert_eq!(woke, Woke::Lapsed);
-    assert!(started.elapsed() >= Duration::from(pause));
+    assert!(started.elapsed() >= pause);
     Ok(())
 }
 
