@@ -55,7 +55,7 @@ impl<'run, F: Files, S: Store> Ground<'run, F, S> {
 
     pub fn local(&self) -> Local {
         let text = self.files.read_text(&self.located.kept(Kept::Local)).ignoring(Ignored::Unconfigured);
-        text.and_then(|read| toml::from_str(read.as_ref()).ignoring(Ignored::Unconfigured)).unwrap_or_default()
+        text.map_or_default(|read| Local::written(read.as_ref()))
     }
 
     pub fn transcripts(self) -> Port<'run, ClaudeCodeDir<F>> {

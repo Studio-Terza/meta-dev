@@ -45,6 +45,10 @@ pub struct Unrepositoried;
 pub struct Unrooted;
 
 impl Local {
+    pub fn written(text: &str) -> Local {
+        toml::from_str(text).ignoring(Ignored::Unconfigured).unwrap_or_default()
+    }
+
     pub fn repository(&self) -> Option<&Repository> {
         self.repository.0.as_ref()
     }
