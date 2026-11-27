@@ -617,6 +617,10 @@ fn words_the_cli_does_not_know_are_refused_with_the_usage() -> Result<(), Failed
         &["hook", "stop", "--settings"][..],
         &["ingest", "--wet"][..],
         &["walk"][..],
+        &["walk", "tree.json"][..],
+        &["walk", "tree.json", "sideways"][..],
+        &["verify", "session.jsonl", "pairs.jsonl"][..],
+        &["backtest", "tree.json", "session.jsonl", "pairs.jsonl", "rows.tsv", "tune", "stop", "1", "0", "up"][..],
         &["backtest", "tree.json"][..],
         &["backtest", "tree.json", "session.jsonl", "pairs.jsonl"][..],
         &["backtest", "tree.json", "session.jsonl", "pairs.jsonl", "rows.tsv", "tune", "stop"][..],
@@ -645,7 +649,7 @@ fn a_walk_descends_only_the_chosen_topics_and_prints_the_messages_under_them() -
     let home = Home::new()?;
     let tree = home.planted(TREE)?;
     let replies = Replies::choosing(&[Choice::new(ROOTS, "[1]"), Choice::new(RULINGS, "[1]")]);
-    let said = home.said(&["walk", &tree], QUESTION, &replies);
+    let said = home.said(&["walk", &tree, "levels"], QUESTION, &replies);
     assert_eq!((said.shown.as_str(), said.ended), ("o1\np2\n", Ok(Outcome::Walked)));
     let prompts = replies.prompts();
     assert_eq!(prompts.len(), 2);
@@ -662,7 +666,7 @@ fn a_walk_whose_reply_does_not_parse_descends_every_topic() -> Result<(), Failed
     let home = Home::new()?;
     let tree = home.planted(TREE)?;
     let replies = Replies::choosing(&[Choice::new(ROOTS, "I think topic one")]);
-    let said = home.said(&["walk", &tree], QUESTION, &replies);
+    let said = home.said(&["walk", &tree, "levels"], QUESTION, &replies);
     assert_eq!((said.shown.as_str(), said.ended), ("o1\np2\np3\np4\n", Ok(Outcome::Walked)));
     assert_eq!(replies.prompts().len(), 2);
     Ok(())
@@ -673,7 +677,7 @@ fn a_walk_where_no_topic_bears_prints_nothing() -> Result<(), Failed> {
     let home = Home::new()?;
     let tree = home.planted(TREE)?;
     let replies = Replies::choosing(&[Choice::new(ROOTS, "[]")]);
-    let said = home.said(&["walk", &tree], QUESTION, &replies);
+    let said = home.said(&["walk", &tree, "levels"], QUESTION, &replies);
     assert_eq!((said.shown.as_str(), said.ended), ("", Ok(Outcome::Walked)));
     assert_eq!(replies.prompts().len(), 1);
     Ok(())
@@ -683,7 +687,7 @@ fn a_walk_where_no_topic_bears_prints_nothing() -> Result<(), Failed> {
 fn a_walk_over_a_tree_that_is_not_the_tree_shape_fails() -> Result<(), Failed> {
     let home = Home::new()?;
     let tree = home.planted("{\"roots\": [{\"label\": \"x\"}]}")?;
-    let said = home.said(&["walk", &tree], QUESTION, &Replies::default());
+    let said = home.said(&["walk", &tree, "levels"], QUESTION, &Replies::default());
     assert!(said.ended.is_err_and(|failure| failure.0.contains("cannot read the tree: ")));
     Ok(())
 }
@@ -707,7 +711,11 @@ fn a_backtest_scores_each_logged_stop_against_the_owner_words_it_quoted() -> Res
         Choice::new(QUESTION, "[1]"),
         Choice::new(ASKED_NEXT, "[1, 2]"),
     ]);
-    let said = home.said(&["backtest", &tree, &session, &pairs, &home.rows(), "test", "stop", "1", "0"], "", &replies);
+    let said = home.said(
+        &["backtest", &tree, &session, &pairs, &home.rows(), "test", "stop", "1", "0", "levels"],
+        "",
+        &replies,
+    );
     let rows = [
         "set\tsplit\tindex\tgold\tretrieved\tfound\trecall\tmillis\ttokens\n".to_owned(),
         format!("stop\ttest\t1\t1\t3\t1\t1.000\t{STEP}\t14\n"),
@@ -741,7 +749,11 @@ fn a_backtest_of_one_split_walks_only_its_stops_and_counts_a_missed_quote_agains
     ])?;
     let pairs = home.paired(&[])?;
     let replies = Replies::choosing(&[Choice::new(RULINGS, "[1]"), Choice::new(QUESTION, "[1]")]);
-    let said = home.said(&["backtest", &tree, &session, &pairs, &home.rows(), "tune", "stop", "1", "0"], "", &replies);
+    let said = home.said(
+        &["backtest", &tree, &session, &pairs, &home.rows(), "tune", "stop", "1", "0", "levels"],
+        "",
+        &replies,
+    );
     assert_eq!(replies.prompts().len(), 2);
     assert_eq!(
         said.shown,
@@ -773,8 +785,9 @@ fn a_backtest_of_pairs_walks_every_nth_question_of_its_split_and_drops_answers_o
         serde_json::json!({"at": 3_usize, "question": "Shall I merge it now?", "answer_uuid": "o1"}),
         serde_json::json!({"at": 4_usize, "question": "Is the second part done?", "answer_uuid": "p2"}),
     ])?;
-    let replies = Replies::choosing(&[Choice::new(RULINGS, "[1]"), Choice::new("walk then", "[2]")]);
-    let said = home.said(&["backtest", &tree, &session, &pairs, &home.rows(), "tune", "pair", "2", "1"], "", &replies);
+    let replies = Replies::choosing(&[Choice::new("walk then", "[4]")]);
+    let said =
+        home.said(&["backtest", &tree, &session, &pairs, &home.rows(), "tune", "pair", "2", "1", "flat"], "", &replies);
     assert_eq!(replies.prompts().len(), 1);
     assert_eq!(
         said.shown,
@@ -824,5 +837,49 @@ fn pairs_keeps_only_verbatim_lead_questions_answered_by_a_later_owner_message_in
         prompts.first().is_some_and(|prompt| prompt.contains(&format!("\n[owner o1]\n{OWNER}\n\n[lead]\n{FORCED}\n")))
     );
     assert!(prompts.first().is_some_and(|prompt| !prompt.contains("zz")));
+    Ok(())
+}
+
+#[test]
+fn a_flat_walk_asks_once_over_every_topic_and_prints_the_messages_under_each_chosen_topic() -> Result<(), Failed> {
+    let home = Home::new()?;
+    let tree = home.planted(TREE)?;
+    let replies = Replies::choosing(&[Choice::new("every topic is listed", "[1, 4]")]);
+    let said = home.said(&["walk", &tree, "flat"], QUESTION, &replies);
+    assert_eq!((said.shown.as_str(), said.ended), ("o1\np2\np3\np4\n", Ok(Outcome::Walked)));
+    let prompts = replies.prompts();
+    assert_eq!(prompts.len(), 1);
+    assert!(prompts.first().is_some_and(|prompt| prompt.contains(
+        "\n1. [ideal | meta-dev] Ship the stop hook.\n2. [ruling | meta-dev] Merge only when CI is green.\n\
+         3. [ruling | meta-dev] Never force-push.\n4. [ideal | trips] Walk from Rome to Naples."
+    )));
+    Ok(())
+}
+
+#[test]
+fn verify_keeps_only_the_pairs_whose_answer_the_verifier_confirms() -> Result<(), Failed> {
+    let home = Home::new()?;
+    let session = home.logged(&[
+        Logline::Owner { uuid: "o1", said: OWNER },
+        Logline::Owner { uuid: "p3", said: "No, never force-push." },
+    ])?;
+    let pairs = home.paired(&[
+        serde_json::json!({"at": 0_usize, "question": FORCING, "answer_uuid": "p3"}),
+        serde_json::json!({"at": 1_usize, "question": "Shall I ship the hook today?", "answer_uuid": "o1"}),
+        serde_json::json!({"at": 2_usize, "question": "Where shall we walk?", "answer_uuid": "zz"}),
+    ])?;
+    let verified = home.path().join("verified.jsonl");
+    let replies = Replies::choosing(&[
+        Choice::new("never force-push.\n", "{\"verdict\": \"yes\"}"),
+        Choice::new(OWNER, "{\"verdict\": \"no\"}"),
+    ]);
+    let said = home.said(&["verify", &session, &pairs, &verified.to_string_lossy()], "", &replies);
+    let text = fs::read_to_string(&verified)?;
+    let kept: Vec<Value> = serde_json::Deserializer::from_str(&text).into_iter().collect::<Result<_, _>>()?;
+    assert_eq!(
+        (said.shown.as_str(), said.ended),
+        ("checked\tkept\trejected\tunread\ttokens\n2\t1\t1\t0\t14\n", Ok(Outcome::Verified))
+    );
+    assert_eq!(kept, vec![serde_json::json!({"at": 0_usize, "question": FORCING, "answer_uuid": "p3"})]);
     Ok(())
 }

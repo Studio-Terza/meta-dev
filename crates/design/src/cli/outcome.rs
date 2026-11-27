@@ -9,5 +9,6 @@ pub enum Outcome {
     Trailed,
     Walked,
     Paired,
+    Verified,
     Backtested,
 }

@@ -132,6 +132,10 @@ impl Replied<'_> {
         serde_json::from_str(&self.braced('[', ']')).ignoring(ignored)
     }
 
+    pub fn object<T: DeserializeOwned>(self, ignored: Ignored) -> Option<T> {
+        serde_json::from_str(&self.braced('{', '}')).ignoring(ignored)
+    }
+
     fn braced(self, open: char, close: char) -> String {
         let letters: Vec<char> = self.0.to_string().chars().collect();
         let start = letters.iter().position(|letter| *letter == open).unwrap_or(letters.len());

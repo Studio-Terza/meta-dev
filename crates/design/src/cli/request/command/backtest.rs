@@ -19,7 +19,7 @@ use transcript_ports::{Body, Uuid};
 use super::Ground;
 use super::crew::Crew;
 use super::pairs::Pair;
-use super::walk::{Tree, Walk, Walking};
+use super::walk::{Tree, Variant, Walk, Walking};
 use crate::Outcome;
 use crate::cli::failure::Failure;
 use crate::cli::uttered::Uttered;
@@ -35,6 +35,7 @@ pub struct Backtest {
     set: Set,
     every: usize,
     offset: usize,
+    variant: Variant,
 }
 
 #[derive(strum::Display, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
@@ -108,7 +109,10 @@ impl Backtest {
     const CONCURRENT: usize = 8;
     const HEADER: &'static str = "set\tsplit\tindex\tgold\tretrieved\tfound\trecall\tmillis\ttokens\n";
 
-    pub fn spoken([tree, session, pairs, rows, split, set, every, offset]: [&&str; 8]) -> Result<Backtest, Failure> {
+    pub fn spoken(
+        [tree, session, pairs, rows, split, set, every, offset]: [&&str; 8],
+        variant: &str,
+    ) -> Result<Backtest, Failure> {
         Ok(Backtest {
             tree: PathBuf::from(tree),
             session: PathBuf::from(session),
@@ -118,6 +122,7 @@ impl Backtest {
             set: Set::named(set)?,
             every: every.parse::<usize>().map_err(|_unparsed| Failure::Usage)?,
             offset: offset.parse::<usize>().map_err(|_unparsed| Failure::Usage)?,
+            variant: Variant::named(variant)?,
         })
     }
 
@@ -140,7 +145,7 @@ impl Backtest {
             .filter(|case| case.index.checked_rem(self.every).is_none_or(|left| left == self.offset))
             .collect();
         files.write(&self.rows, Bytes::from(Backtest::HEADER))?;
-        let walking = Walking::new(crew);
+        let walking = Walking::new(crew, self.variant);
         let next = AtomicUsize::new(0);
         let trials = thread::scope(|scope| {
             Trial::joined(

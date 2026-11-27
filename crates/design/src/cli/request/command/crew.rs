@@ -41,7 +41,11 @@ impl<'ports, D: Dispatch, C: Clock> Crew<'ports, D, C> {
     }
 
     pub fn fanned(&self, prompts: &[Prompt], timeout: Timeout) -> Result<Vec<Heard>, Failure> {
-        let job = Job::due_by(Deadline::after(self.clock.now(), timeout), Model::Haiku);
+        self.fanned_to(prompts, timeout, Model::Haiku)
+    }
+
+    pub fn fanned_to(&self, prompts: &[Prompt], timeout: Timeout, model: Model) -> Result<Vec<Heard>, Failure> {
+        let job = Job::due_by(Deadline::after(self.clock.now(), timeout), model);
         let watched = Watch::over(self.dispatch, self.clock).fanned(&job, prompts)?;
         Ok(watched.iter().map(|each| each.visited(Replying)).collect())
     }

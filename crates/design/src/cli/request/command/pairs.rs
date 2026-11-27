@@ -17,8 +17,8 @@ use super::walk::Walk;
 use crate::Outcome;
 use crate::cli::failure::Failure;
 use crate::cli::uttered::Uttered;
-pub use boundary::Pair;
-use boundary::{Excerpt, PairLines, Turn};
+use boundary::{Excerpt, Turn};
+pub use boundary::{Pair, PairLines};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Pairs {

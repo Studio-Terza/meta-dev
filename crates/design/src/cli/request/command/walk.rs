@@ -16,16 +16,18 @@ use crate::Outcome;
 use crate::cli::failure::Failure;
 use crate::cli::uttered::Uttered;
 use boundary::{Choosing, Node};
-pub use boundary::{Retrieved, Tree};
+pub use boundary::{Retrieved, Tree, Variant};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Walk {
     tree: PathBuf,
+    variant: Variant,
 }
 
 #[derive(Debug)]
 pub struct Walking<'ports, D: Dispatch, C: Clock> {
     crew: &'ports Crew<'ports, D, C>,
+    variant: Variant,
 }
 
 #[derive(Debug, Default)]
@@ -40,13 +42,11 @@ struct Level<'tree> {
     walked: Walked<'tree>,
 }
 
-impl From<PathBuf> for Walk {
-    fn from(tree: PathBuf) -> Walk {
-        Walk { tree }
-    }
-}
-
 impl Walk {
+    pub fn spoken(tree: &str, variant: &str) -> Result<Walk, Failure> {
+        Ok(Walk { tree: PathBuf::from(tree), variant: Variant::named(variant)? })
+    }
+
     pub fn answered<F: Files, S: Store, D: Dispatch, C: Clock>(
         &self,
         environment: &impl Environment,
@@ -56,7 +56,7 @@ impl Walk {
         let tree = Walk::planted(ground.files(), &self.tree)?;
         let heard = environment.input().map_err(Failure::Deaf)?;
         let question = Body::try_new(heard.into_inner()).map_err(|_malformed| Failure::Unasked)?;
-        let walked = Walking::new(crew).walked(&tree, &question)?;
+        let walked = Walking::new(crew, self.variant).walked(&tree, &question)?;
         Ok(Uttered::new(Shown::said(walked.retrieved()), Ok(Outcome::Walked)))
     }
 
@@ -68,24 +68,40 @@ impl Walk {
 impl<'ports, D: Dispatch, C: Clock> Walking<'ports, D, C> {
     const TIMEOUT: Timeout = Timeout::new(120);
 
-    pub fn new(crew: &'ports Crew<'ports, D, C>) -> Walking<'ports, D, C> {
-        Walking { crew }
+    pub fn new(crew: &'ports Crew<'ports, D, C>, variant: Variant) -> Walking<'ports, D, C> {
+        Walking { crew, variant }
     }
 
     pub fn walked<'tree>(&self, tree: &'tree Tree, question: &Body) -> Result<Walked<'tree>, Failure> {
-        self.descended(question, Level { frontier: vec![tree.roots()], walked: Walked::default() })
+        match self.variant {
+            Variant::Levels => {
+                self.descended(question, Level { frontier: vec![tree.roots()], walked: Walked::default() })
+            }
+            Variant::Flat => self.picked(question, tree),
+        }
+    }
+
+    fn picked<'tree>(&self, question: &Body, tree: &'tree Tree) -> Result<Walked<'tree>, Failure> {
+        let choosing = Choosing::new(question, tree.nodes(), Variant::Flat);
+        let heard = self.crew.fanned(&[Prompt::from(&choosing)], Self::TIMEOUT)?;
+        let chosen: Vec<&'tree Node> =
+            heard.iter().flat_map(|read| choosing.chosen(read)).flat_map(Node::subtree).collect();
+        Ok(Walked::default().grown(chosen, &heard))
     }
 
     fn descended<'tree>(&self, question: &Body, level: Level<'tree>) -> Result<Walked<'tree>, Failure> {
         let Some(_frontier) = level.frontier.first() else {
             return Ok(level.walked);
         };
-        let choices: Vec<Choosing<'_, 'tree>> =
-            level.frontier.iter().map(|children| Choosing::new(question, children)).collect();
+        let choices: Vec<Choosing<'_, 'tree>> = level
+            .frontier
+            .iter()
+            .map(|children| Choosing::new(question, children.iter().collect(), Variant::Levels))
+            .collect();
         let prompts: Vec<Prompt> = choices.iter().map(Prompt::from).collect();
         let heard = self.crew.fanned(&prompts, Self::TIMEOUT)?;
         let chosen: Vec<&'tree Node> =
-            choices.into_iter().zip(&heard).flat_map(|(choosing, read)| choosing.chosen(read)).collect();
+            choices.iter().zip(&heard).flat_map(|(choosing, read)| choosing.chosen(read)).collect();
         let frontier = chosen.iter().map(|node| node.children()).filter(|children| !children.is_empty());
         let next = Level { frontier: frontier.collect(), walked: level.walked.grown(chosen, &heard) };
         self.descended(question, next)

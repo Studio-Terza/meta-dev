@@ -4,6 +4,7 @@ mod hook;
 mod ingest;
 mod pairs;
 mod stops;
+mod verify;
 mod walk;
 
 use std::path::PathBuf;
@@ -26,6 +27,7 @@ use hook::Hook;
 use ingest::Ingest;
 use pairs::Pairs;
 use stops::Trail;
+use verify::Verify;
 use walk::Walk;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -35,6 +37,7 @@ pub enum Command {
     Hook(Hook),
     Walk(Walk),
     Pairs(Pairs),
+    Verify(Verify),
     Backtest(Backtest),
 }
 
@@ -47,6 +50,7 @@ impl Command {
     const WALK: &'static str = "walk";
     const BACKTEST: &'static str = "backtest";
     const PAIRS: &'static str = "pairs";
+    const VERIFY: &'static str = "verify";
 
     pub fn spoken(words: &[&str]) -> Result<Command, Failure> {
         match words {
@@ -55,10 +59,12 @@ impl Command {
             [Self::STOPS] => Ok(Command::Stops),
             [Self::HOOK, Self::SETTINGS] => Ok(Command::Hook(Hook::Settings)),
             [Self::HOOK, event] => Hook::named(event).map(Command::Hook),
-            [Self::WALK, tree] => Ok(Command::Walk(Walk::from(PathBuf::from(tree)))),
+            [Self::WALK, tree, variant] => Walk::spoken(tree, variant).map(Command::Walk),
             [Self::PAIRS, tree, session, pairs] => Ok(Command::Pairs(Pairs::new([tree, session, pairs]))),
-            [Self::BACKTEST, tree, session, pairs, rows, split, set, every, offset] => {
-                Backtest::spoken([tree, session, pairs, rows, split, set, every, offset]).map(Command::Backtest)
+            [Self::VERIFY, session, pairs, verified] => Ok(Command::Verify(Verify::new([session, pairs, verified]))),
+            [Self::BACKTEST, tree, session, pairs, rows, split, set, every, offset, variant] => {
+                Backtest::spoken([tree, session, pairs, rows, split, set, every, offset], variant)
+                    .map(Command::Backtest)
             }
             _ => Err(Failure::Usage),
         }
@@ -67,7 +73,7 @@ impl Command {
     pub fn opened<O: Opens>(&self, path: PathBuf, opens: &O) -> O::Store {
         match self {
             Command::Ingest(persistence) => persistence.opened(path, opens),
-            Command::Walk(_) | Command::Pairs(_) => Persistence::DryRun.opened(path, opens),
+            Command::Walk(_) | Command::Pairs(_) | Command::Verify(_) => Persistence::DryRun.opened(path, opens),
             Command::Stops | Command::Hook(_) | Command::Backtest(_) => Persistence::File.opened(path, opens),
         }
     }
@@ -89,6 +95,7 @@ impl Command {
             Command::Hook(hook) => hook.answered(environment, ground, crew),
             Command::Walk(walk) => walk.answered(environment, &ground, crew),
             Command::Pairs(pairs) => pairs.answered(&ground, crew),
+            Command::Verify(verify) => verify.answered(&ground, crew),
             Command::Backtest(backtest) => backtest.answered(&ground, crew),
         }
     }
