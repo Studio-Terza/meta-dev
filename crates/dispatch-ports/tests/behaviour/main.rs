@@ -5,8 +5,11 @@ mod ports;
 
 use test_failure::Failed;
 
+use std::fs;
 use std::iter;
 use std::ops::Range;
+use std::path::Path;
+
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
@@ -17,7 +20,7 @@ use proptest::test_runner::{Config, RngSeed};
 
 use dispatch_ports::{
     AgentRun, Bell, ClockFiller, Deadline, Dispatch, DispatchFailure, DispatchFiller, Due, Ended, Errored, Fault,
-    Finished, Job, Model, Output, Pause, Pid, Prompt, Reply, Stall, Stalled, Started, Stderr, Timeout, Tokens, Told,
+    Finished, Job, Model, Output, Pause, Pid, Prompt, Reply, Stall, Stalled, Started, Stderr, Timeout, Told,
     Unreadable, Usage, Wall, Watch, Watched, Woke, clock_ops, dispatch_ops,
 };
 use invariants::{Ignoring, Unpoisoned, invariant, invariants};
@@ -31,68 +34,18 @@ invariants! {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-enum Envelope {
-    Read(Output),
-    Garbled,
-}
-
-impl Envelope {
-    fn read(text: &str) -> Envelope {
-        match Output::read(text, Stderr::Silent) {
-            Output::Unreadable(Unreadable::Json { .. }) => Envelope::Garbled,
-            output @ (Output::Finished(_)
-            | Output::Errored(_)
-            | Output::Unreadable(Unreadable::Unsuccessful { .. })) => Envelope::Read(output),
-        }
-    }
-
-    fn replied(reply: &str, [input, output, written, read]: [u32; 4]) -> Envelope {
-        let usage = Usage::new(Tokens::new(input), Tokens::new(output), Tokens::new(written), Tokens::new(read));
-        Envelope::Read(Output::Finished(Finished::new(Reply::new(reply.to_owned()), usage)))
-    }
-
-    fn errored(told: &str) -> Envelope {
-        Told::try_new(told.to_owned())
-            .ignoring(Ignored::Untold)
-            .map_or(Envelope::Garbled, |inked| Envelope::Read(Output::Errored(Errored::new(inked, Usage::default()))))
-    }
-
-    fn unsuccessful() -> Envelope {
-        Envelope::Read(Output::Unreadable(Unreadable::Unsuccessful { stderr: Stderr::Silent }))
-    }
-}
-
 #[test]
-fn an_agent_result_is_read_as_its_reply_and_usage_or_its_error() {
-    for (text, want) in [
-        (
-            r#"{"type":"result","subtype":"success","is_error":false,"result":"conversational(a.0)","usage":{"input_tokens":4,"output_tokens":9,"cache_creation_input_tokens":2,"cache_read_input_tokens":7,"service_tier":"standard"}}"#,
-            Envelope::replied("conversational(a.0)", [4, 9, 2, 7]),
-        ),
-        (
-            r#"{"subtype":"success","result":"x","usage":{"input_tokens":1,"output_tokens":2}}"#,
-            Envelope::replied("x", [1, 2, 0, 0]),
-        ),
-        (
-            r#"{"type":"result","subtype":"success","is_error":true,"result":"Invalid API key","usage":{"input_tokens":0,"output_tokens":0}}"#,
-            Envelope::errored("Invalid API key"),
-        ),
-        (
-            r#"{"subtype":"error_during_execution","is_error":true,"usage":{"input_tokens":1,"output_tokens":2}}"#,
-            Envelope::unsuccessful(),
-        ),
-        (
-            r#"{"subtype":"error_max_turns","result":"x","usage":{"input_tokens":1,"output_tokens":2}}"#,
-            Envelope::unsuccessful(),
-        ),
-        (r#"{"subtype":"success","usage":{"input_tokens":1,"output_tokens":2}}"#, Envelope::unsuccessful()),
-        (r#"{"subtype":"success","result":"  ","usage":{"input_tokens":1,"output_tokens":2}}"#, Envelope::Garbled),
-        (r#"{"subtype":"success","result":"x"}"#, Envelope::Garbled),
-        ("not json", Envelope::Garbled),
-    ] {
-        assert_eq!(Envelope::read(text), want, "{text}");
-    }
+fn every_agent_result_reads_as_its_golden_reply_usage_or_error() -> Result<(), Failed> {
+    let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/behaviour");
+    let texts: Vec<String> = serde_json::from_str(&fs::read_to_string(directory.join("envelopes.json"))?)?;
+    let read: String = texts
+        .into_iter()
+        .flat_map(|text| [format!("{:?}", Output::read(&text, Stderr::Silent)), "\n".to_owned()])
+        .collect();
+    let golden = directory.join("envelopes.txt");
+    std::env::var_os("RECORD_GOLDENS").map_or(Ok(()), |_| fs::write(&golden, &read))?;
+    assert_eq!(read, fs::read_to_string(golden)?);
+    Ok(())
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -376,9 +329,10 @@ proptest! {
 }
 
 #[test]
-fn a_pause_lasts_its_whole_seconds() {
-    assert_eq!(Duration::from(Pause::new(3)), Duration::from_secs(3));
-    assert_eq!(Duration::from(Pause::new(0)), Duration::ZERO);
+fn pauses_last_whole_seconds_and_moments_count_milliseconds_either_way() {
+    assert_eq!([3, 0].map(|seconds| Duration::from(Pause::new(seconds))), [Duration::from_secs(3), Duration::ZERO]);
+    let [early, late] = [Wall::new(2), Wall::new(5)].map(dispatch_ports::Moment::from);
+    assert_eq!([late.since(early), early.since(late), late.since(late)], [3000, -3000, 0]);
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -411,10 +365,4 @@ fn each_stall_names_its_own_cause() -> Result<(), Failed> {
     let causes: Vec<Cause> = stalls.iter().map(Stall::stalled).collect();
     assert_eq!(causes, [Cause::Errored, Cause::Unreadable, Cause::Overdue, Cause::Unspawned, Cause::Failed]);
     Ok(())
-}
-
-#[test]
-fn a_moment_counts_the_milliseconds_since_an_earlier_one_and_back_to_a_later_one() {
-    let [early, late] = [Wall::new(2), Wall::new(5)].map(dispatch_ports::Moment::from);
-    assert_eq!([late.since(early), early.since(late), late.since(late)], [3000, -3000, 0]);
 }

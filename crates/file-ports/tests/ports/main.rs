@@ -121,26 +121,23 @@ impl Checks {
     }
 }
 
-#[test]
-fn disk_keeps_the_contract() -> Result<(), FileFailure> {
-    let scratch = tempfile::tempdir().map_err(FileFailure::from)?;
-    Checks::on(&Disk, scratch.path())
+impl Checks {
+    fn kept(files: &(impl Files + Sync), root: &Path) -> Result<(), FileFailure> {
+        files.create_directories(&root.join("contract"))?;
+        files.create_directories(&root.join("batch"))?;
+        Checks::on(files, &root.join("contract"))?;
+        Batches::on(files, &root.join("batch"))
+    }
 }
 
 #[test]
-fn fake_keeps_the_contract() -> Result<(), FileFailure> {
-    let memory = Memory::default();
-    memory.create_directories(Path::new("/scratch"))?;
-    Checks::on(&memory, Path::new("/scratch"))
-}
-
-#[test]
-fn cached_keeps_the_contract_over_disk_and_the_fake() -> Result<(), FileFailure> {
-    let scratch = tempfile::tempdir().map_err(FileFailure::from)?;
-    Checks::on(&Cached::new(&Disk), scratch.path())?;
-    let memory = Memory::default();
-    memory.create_directories(Path::new("/scratch"))?;
-    Checks::on(&Cached::new(&memory), Path::new("/scratch"))
+fn disk_the_fake_and_caches_over_both_keep_the_contract_and_answer_batches_path_by_path() -> Result<(), FileFailure> {
+    let [disk, cached] = [(); 2].map(|()| tempfile::tempdir().map_err(FileFailure::from));
+    let [memory, under_cache] = [(); 2].map(|()| Memory::default());
+    Checks::kept(&Disk, disk?.path())?;
+    Checks::kept(&memory, Path::new("/scratch"))?;
+    Checks::kept(&Cached::new(&Disk), cached?.path())?;
+    Checks::kept(&Cached::new(&under_cache), Path::new("/scratch"))
 }
 
 #[test]
@@ -304,48 +301,29 @@ fn disk_stamps_each_file_with_the_time_it_was_written_and_misses_an_absent_one()
     Ok(())
 }
 
-#[test]
-fn disk_and_the_fake_answer_batches_path_by_path() -> Result<(), FileFailure> {
-    let scratch = tempfile::tempdir().map_err(FileFailure::from)?;
-    Batches::on(&Disk, scratch.path())?;
-    let fake = Memory::default();
-    fake.create_directories(Path::new("/batch"))?;
-    Batches::on(&fake, Path::new("/batch"))?;
-    let cached_scratch = tempfile::tempdir().map_err(FileFailure::from)?;
-    Batches::on(&Cached::new(&Disk), cached_scratch.path())?;
-    let cached_fake = Memory::default();
-    cached_fake.create_directories(Path::new("/batch"))?;
-    Batches::on(&Cached::new(&cached_fake), Path::new("/batch"))
-}
-
 struct Tails;
 
 impl Tails {
-    fn of(files: &impl Files, root: &Path, offset: Offset) -> Result<Bytes, FileFailure> {
+    fn of(files: &impl Files, root: &Path, offset: Offset) -> Option<Bytes> {
         let path = root.join("tail.txt");
-        files.write(&path, Bytes::from("0123456789"))?;
-        files.read_from(&path, offset)
+        files
+            .write(&path, Bytes::from("0123456789"))
+            .and_then(|()| files.read_from(&path, offset))
+            .ignoring(Ignored::Failing)
     }
 }
 
 #[test]
-fn read_from_agrees_between_disk_and_memory() -> Result<(), Failed> {
+fn read_from_returns_the_bytes_after_the_offset_alike_on_disk_and_in_memory() -> Result<(), Failed> {
     let scratch = tempfile::tempdir()?;
     let memory = Memory::default();
     memory.create_directories(Path::new("/scratch"))?;
     let offsets = (0..16).map(Offset::try_new).collect::<Result<Vec<Offset>, _>>()?;
-    for at in offsets {
-        let on_disk = Tails::of(&Disk, scratch.path(), at);
-        let in_memory = Tails::of(&memory, Path::new("/scratch"), at);
-        assert_eq!(on_disk.ignoring(Ignored::Failing), in_memory.ignoring(Ignored::Failing), "{at:?}");
-    }
-    Ok(())
-}
-
-#[test]
-fn read_from_returns_the_bytes_after_the_offset() -> Result<(), Failed> {
-    let memory = Memory::default();
-    memory.create_directories(Path::new("/scratch"))?;
-    assert_eq!(Tails::of(&memory, Path::new("/scratch"), Offset::try_new(7)?)?, Bytes::from("789"));
+    let read = |at| [Tails::of(&Disk, scratch.path(), at), Tails::of(&memory, Path::new("/scratch"), at)];
+    let tails: Vec<[Option<Bytes>; 2]> = offsets.into_iter().map(read).collect();
+    let wanted: Vec<[Option<Bytes>; 2]> = (0..16_usize)
+        .map(|at| [(); 2].map(|()| Some(Bytes::from("0123456789".get(at..).unwrap_or_default()))))
+        .collect();
+    assert_eq!(tails, wanted);
     Ok(())
 }

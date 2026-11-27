@@ -23,7 +23,7 @@ out = "::error::lint: above block 0 s, took 0."
 arguments = ["timed", "limits.toml", "lint", "false"]
 files = { "limits.toml" = "[lint]\nwarn = 0.5\nblock = 3.5\n" }
 code = 1
-out = "lint: within warn 0.5 s and block 3.5 s, took 0.0 s\n::error::lint failed: exit status: 1\n"
+out = "::error::lint failed: exit status: 1\nlint: within warn 0.5 s and block 3.5 s, took "
 
 [[case]]
 arguments = ["timed", "limits.toml", "lint", "absent-program"]

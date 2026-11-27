@@ -39,6 +39,12 @@ impl Timed {
         let verdict = limit.judged(spent)?;
         let stage = &self.stage;
         let (warn, block) = (limit.warn(), limit.block());
+        let status = ran.status();
+        let exit = match (status.success(), verdict) {
+            (true, Verdict::Within | Verdict::Warned) => Exit::Passed,
+            (true, Verdict::Blocked) => Exit::Failed,
+            (false, _) => writeln!(out, "::error::{stage} failed: {status}").map(|()| Exit::Failed)?,
+        };
         match verdict {
             Verdict::Within => writeln!(out, "{stage}: within warn {warn} s and block {block} s, took {spent}"),
             Verdict::Warned => {
@@ -46,13 +52,6 @@ impl Timed {
             }
             Verdict::Blocked => writeln!(out, "::error::{stage}: above block {block} s, took {spent}"),
         }?;
-        let status = ran.status();
-        match (status.success(), verdict) {
-            (true, Verdict::Within | Verdict::Warned) => Ok(Exit::Passed),
-            (true, Verdict::Blocked) => Ok(Exit::Failed),
-            (false, _) => {
-                writeln!(out, "::error::{stage} failed: {status}").map(|()| Exit::Failed).map_err(Failure::from)
-            }
-        }
+        Ok(exit)
     }
 }

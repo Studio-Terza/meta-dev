@@ -239,25 +239,16 @@ fn a_failing_migration_leaves_the_store_as_it_was() -> Result<(), Failed> {
 }
 
 #[test]
-fn a_held_file_lock_refuses_every_other_handle_until_it_ends() -> Result<(), Failed> {
+fn a_held_lock_refuses_other_file_handles_until_it_ends_and_a_second_memory_lock_until_dropped() -> Result<(), Failed> {
     let place = Place::new()?;
     let run = Run::root();
-    let (first, second) = (run.port(place.opened()), run.port(place.opened()));
-    let held = first.lock()?;
-    assert!(matches!(second.lock(), Err(Busy::Taken(_))));
+    let (first, second, memory) =
+        (run.port(place.opened()), run.port(place.opened()), run.port(Sqlite::in_memory::<StreamSchema>()));
+    let (held, claimed) = (first.lock()?, memory.lock()?);
+    assert!(matches!((second.lock(), memory.lock()), (Err(Busy::Taken(_)), Err(Busy::Claimed))));
     held.end()?;
-    assert!(second.lock().is_ok());
-    Ok(())
-}
-
-#[test]
-fn a_held_memory_lock_refuses_a_second_lock_until_it_is_dropped() -> Result<(), Busy> {
-    let run = Run::root();
-    let store = run.port(Sqlite::in_memory::<StreamSchema>());
-    let held = store.lock()?;
-    assert!(matches!(store.lock(), Err(Busy::Claimed)));
-    drop(held);
-    assert!(store.lock().is_ok());
+    drop(claimed);
+    assert!(second.lock().is_ok() && memory.lock().is_ok());
     Ok(())
 }
 
