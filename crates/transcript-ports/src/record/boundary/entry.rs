@@ -1,55 +1,106 @@
 mod assistant;
 mod attachment;
 mod classified;
+mod object;
 mod said;
 mod stamp;
 mod user;
 mod voice;
 
-use serde::Deserialize;
+use invariants::Ignoring;
+use serde_json::Value;
 
-use crate::{Line, Unrecognised};
+use crate::{Ignored, Line, Unrecognised};
 use assistant::Assistant;
 use attachment::Attached;
 use classified::Classified;
+use object::Object;
 use stamp::Passing;
 use user::User;
 
-#[derive(Debug, Deserialize)]
-#[serde(tag = "type", rename_all = "kebab-case")]
+#[derive(Debug)]
 pub enum Known {
     User(User),
     Assistant(Assistant),
     Attachment(Attached),
-    AiTitle(Passing),
-    ApiRequest(Passing),
-    ApiRequestBlob(Passing),
-    ApiRequestShape(Passing),
-    ArtifactAutoreactLedger(Passing),
-    ArtifactCommentMonitor(Passing),
-    AtisLatch(Passing),
-    CostState(Passing),
-    FileHistoryDelta(Passing),
-    FileHistorySnapshot(Passing),
-    FrameLink(Passing),
-    LastPrompt(Passing),
-    Launched(Passing),
-    Mode(Passing),
-    PermissionMode(Passing),
-    PrLink(Passing),
-    QueueOperation(Passing),
-    Result(Passing),
-    Started(Passing),
-    Summary(Passing),
-    System(Passing),
-    ToolsUsed(Passing),
+    Passing(Passing),
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
+#[derive(strum::EnumString, Clone, Copy, Debug)]
+#[strum(serialize_all = "kebab-case")]
+enum Tag {
+    User,
+    Assistant,
+    Attachment,
+    AiTitle,
+    ApiRequest,
+    ApiRequestBlob,
+    ApiRequestShape,
+    ArtifactAutoreactLedger,
+    ArtifactCommentMonitor,
+    AtisLatch,
+    CostState,
+    FileHistoryDelta,
+    FileHistorySnapshot,
+    FrameLink,
+    LastPrompt,
+    Launched,
+    Mode,
+    PermissionMode,
+    PrLink,
+    QueueOperation,
+    Result,
+    Started,
+    Summary,
+    System,
+    ToolsUsed,
+}
+
+#[derive(Debug)]
 pub enum Entry {
     Known(Known),
     Unknown(Unrecognised),
+}
+
+impl Known {
+    fn read(entry: Object<'_>) -> Option<Known> {
+        let tag: Tag = entry.tag(Object::TYPE)?.parse().ignoring(Ignored::NotKnown)?;
+        let read = match tag {
+            Tag::User => User::read(entry).map(Known::User),
+            Tag::Assistant => Assistant::read(entry).map(Known::Assistant),
+            Tag::Attachment => Attached::read(entry).map(Known::Attachment),
+            Tag::AiTitle
+            | Tag::ApiRequest
+            | Tag::ApiRequestBlob
+            | Tag::ApiRequestShape
+            | Tag::ArtifactAutoreactLedger
+            | Tag::ArtifactCommentMonitor
+            | Tag::AtisLatch
+            | Tag::CostState
+            | Tag::FileHistoryDelta
+            | Tag::FileHistorySnapshot
+            | Tag::FrameLink
+            | Tag::LastPrompt
+            | Tag::Launched
+            | Tag::Mode
+            | Tag::PermissionMode
+            | Tag::PrLink
+            | Tag::QueueOperation
+            | Tag::Result
+            | Tag::Started
+            | Tag::Summary
+            | Tag::System
+            | Tag::ToolsUsed => entry.whole().map(Known::Passing),
+        };
+        read.ignoring(Ignored::NotKnown)
+    }
+}
+
+impl Entry {
+    pub fn read(value: &Value) -> Result<Entry, serde_json::Error> {
+        let entry = Object::new(value);
+        Known::read(entry).map_or_else(|| entry.whole().map(Entry::Unknown), |known| Ok(Entry::Known(known)))
+    }
 }
 
 impl From<Known> for Option<Line> {
@@ -58,28 +109,7 @@ impl From<Known> for Option<Line> {
             Known::User(user) => user.heard(),
             Known::Assistant(assistant) => assistant.heard(),
             Known::Attachment(attached) => attached.heard(),
-            Known::AiTitle(passing)
-            | Known::ApiRequest(passing)
-            | Known::ApiRequestBlob(passing)
-            | Known::ApiRequestShape(passing)
-            | Known::ArtifactAutoreactLedger(passing)
-            | Known::ArtifactCommentMonitor(passing)
-            | Known::AtisLatch(passing)
-            | Known::CostState(passing)
-            | Known::FileHistoryDelta(passing)
-            | Known::FileHistorySnapshot(passing)
-            | Known::FrameLink(passing)
-            | Known::LastPrompt(passing)
-            | Known::Launched(passing)
-            | Known::Mode(passing)
-            | Known::PermissionMode(passing)
-            | Known::PrLink(passing)
-            | Known::QueueOperation(passing)
-            | Known::Result(passing)
-            | Known::Started(passing)
-            | Known::Summary(passing)
-            | Known::System(passing)
-            | Known::ToolsUsed(passing) => passing.line(),
+            Known::Passing(passing) => passing.line(),
         }
     }
 }

@@ -1,9 +1,11 @@
+use invariants::Ignoring;
 use serde::Deserialize;
 
 use super::classified::Classified;
+use super::object::Object;
 use super::said::{Hears, Said};
 use super::stamp::Stamp;
-use crate::{Authorship, Body, Line, Skipped, Unrecognised};
+use crate::{Authorship, Body, Ignored, Line, Skipped, Unrecognised};
 
 #[derive(Clone, Copy, Debug)]
 struct Failed;
@@ -19,32 +21,36 @@ struct Delivery(Option<Failed>);
 #[serde(from = "String")]
 struct Model(Option<Synthetic>);
 
-#[derive(Debug, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[derive(Debug)]
 enum Written {
     Text { text: Body },
     Thinking,
     ToolUse,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
+#[derive(strum::EnumString, Clone, Copy, Debug)]
+#[strum(serialize_all = "snake_case")]
+enum Tag {
+    Text,
+    Thinking,
+    ToolUse,
+}
+
+#[derive(Debug)]
 enum Block {
     Known(Written),
     Unknown(Unrecognised),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug)]
 struct Message {
     model: Model,
     content: Vec<Block>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug)]
 pub struct Assistant {
-    #[serde(flatten)]
     stamp: Stamp,
-    #[serde(rename = "isApiErrorMessage", default)]
     delivery: Delivery,
     message: Message,
 }
@@ -54,6 +60,46 @@ struct Answer {
     stamp: Stamp,
     delivery: Delivery,
     model: Model,
+}
+
+impl Assistant {
+    const DELIVERY: &'static str = "isApiErrorMessage";
+    const MESSAGE: &'static str = "message";
+
+    pub fn read(entry: Object<'_>) -> Result<Assistant, serde_json::Error> {
+        let delivery = entry.present(Self::DELIVERY).map_or_else(|| Ok(Delivery::default()), Object::whole)?;
+        Ok(Assistant { stamp: entry.whole()?, delivery, message: Message::read(entry.required(Self::MESSAGE)?)? })
+    }
+}
+
+impl Message {
+    const MODEL: &'static str = "model";
+    const CONTENT: &'static str = "content";
+
+    fn read(message: Object<'_>) -> Result<Message, serde_json::Error> {
+        let content: Vec<Block> =
+            message.required(Self::CONTENT)?.each()?.into_iter().map(Block::read).collect::<Result<_, _>>()?;
+        Ok(Message { model: message.field(Self::MODEL)?, content })
+    }
+}
+
+impl Block {
+    fn read(block: Object<'_>) -> Result<Block, serde_json::Error> {
+        Written::read(block).map_or_else(|| block.whole().map(Block::Unknown), |written| Ok(Block::Known(written)))
+    }
+}
+
+impl Written {
+    const TEXT: &'static str = "text";
+
+    fn read(block: Object<'_>) -> Option<Written> {
+        let tag: Tag = block.tag(Object::TYPE)?.parse().ignoring(Ignored::NotKnown)?;
+        match tag {
+            Tag::Text => block.field(Self::TEXT).ignoring(Ignored::NotKnown).map(|text| Written::Text { text }),
+            Tag::Thinking => Some(Written::Thinking),
+            Tag::ToolUse => Some(Written::ToolUse),
+        }
+    }
 }
 
 impl From<bool> for Delivery {

@@ -1,44 +1,84 @@
-use serde::Deserialize;
+use invariants::Ignoring;
 
 use super::classified::Classified;
+use super::object::Object;
 use super::said::Said;
 use super::stamp::Stamp;
 use super::voice::{Listener, Origin};
-use crate::{Body, Line, Unrecognised};
+use crate::{Body, Ignored, Line, Unrecognised};
 
-#[derive(Debug, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[derive(Debug)]
 pub enum Heard {
     Text { text: Body },
     ToolResult,
     Image,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
+#[derive(strum::EnumString, Clone, Copy, Debug)]
+#[strum(serialize_all = "snake_case")]
+enum Tag {
+    Text,
+    ToolResult,
+    Image,
+}
+
+#[derive(Debug)]
 pub enum Block {
     Known(Heard),
     Unknown(Unrecognised),
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
+#[derive(Debug)]
 pub enum Wording {
     Typed(Body),
     Blocks(Vec<Block>),
 }
 
-#[derive(Debug, Deserialize)]
-struct Utterance {
+#[derive(Debug)]
+pub struct User {
+    stamp: Stamp,
+    origin: Option<Origin>,
     content: Wording,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct User {
-    #[serde(flatten)]
-    stamp: Stamp,
-    origin: Option<Origin>,
-    message: Utterance,
+impl User {
+    const ORIGIN: &'static str = "origin";
+    const MESSAGE: &'static str = "message";
+    const CONTENT: &'static str = "content";
+
+    pub fn read(entry: Object<'_>) -> Result<User, serde_json::Error> {
+        let origin = entry.present(Self::ORIGIN).map(Origin::read).transpose()?;
+        let content = Wording::read(entry.required(Self::MESSAGE)?.required(Self::CONTENT)?)?;
+        Ok(User { stamp: entry.whole()?, origin, content })
+    }
+}
+
+impl Wording {
+    pub fn read(content: Object<'_>) -> Result<Wording, serde_json::Error> {
+        content.whole().ignoring(Ignored::NotKnown).map_or_else(
+            || content.each()?.into_iter().map(Block::read).collect::<Result<_, _>>().map(Wording::Blocks),
+            |typed| Ok(Wording::Typed(typed)),
+        )
+    }
+}
+
+impl Block {
+    fn read(block: Object<'_>) -> Result<Block, serde_json::Error> {
+        Heard::read(block).map_or_else(|| block.whole().map(Block::Unknown), |heard| Ok(Block::Known(heard)))
+    }
+}
+
+impl Heard {
+    const TEXT: &'static str = "text";
+
+    fn read(block: Object<'_>) -> Option<Heard> {
+        let tag: Tag = block.tag(Object::TYPE)?.parse().ignoring(Ignored::NotKnown)?;
+        match tag {
+            Tag::Text => block.field(Self::TEXT).ignoring(Ignored::NotKnown).map(|text| Heard::Text { text }),
+            Tag::ToolResult => Some(Heard::ToolResult),
+            Tag::Image => Some(Heard::Image),
+        }
+    }
 }
 
 impl From<Block> for Said {
@@ -62,6 +102,6 @@ impl From<Wording> for Said {
 
 impl Classified for User {
     fn line(self) -> Line {
-        Said::from(self.message.content).heard(Listener::new(self.stamp, self.origin))
+        Said::from(self.content).heard(Listener::new(self.stamp, self.origin))
     }
 }

@@ -1,11 +1,12 @@
-use serde::Deserialize;
+use invariants::Ignoring;
 
+use super::object::Object;
 use super::said::Hears;
 use super::stamp::Stamp;
-use crate::{Authorship, Body, Line, Skipped, Unrecognised};
+use crate::{Authorship, Body, Ignored, Line, Skipped, Unrecognised};
 
-#[derive(Clone, Copy, Debug, Deserialize)]
-#[serde(tag = "kind", rename_all = "kebab-case")]
+#[derive(strum::EnumString, Clone, Copy, Debug)]
+#[strum(serialize_all = "kebab-case")]
 pub enum Source {
     Human,
     TaskNotification,
@@ -15,8 +16,7 @@ pub enum Source {
     AutoContinuation,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
+#[derive(Debug)]
 pub enum Origin {
     Known(Source),
     Unknown(Unrecognised),
@@ -42,6 +42,13 @@ impl Source {
 }
 
 impl Origin {
+    const KIND: &'static str = "kind";
+
+    pub fn read(origin: Object<'_>) -> Result<Origin, serde_json::Error> {
+        let source = origin.tag(Self::KIND).and_then(|kind| kind.parse::<Source>().ignoring(Ignored::NotKnown));
+        source.map_or_else(|| origin.whole().map(Origin::Unknown), |known| Ok(Origin::Known(known)))
+    }
+
     fn spoke(self, stamp: Stamp, text: Body) -> Line {
         match self {
             Origin::Known(source) => source.spoke(stamp, text),

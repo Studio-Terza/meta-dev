@@ -38,6 +38,7 @@ pub use uuid::Uuid;
 invariants::ignored! {
     pub(crate) enum Ignored {
         Unparsed => "a line that does not parse as an entry is kept as an unreadable unrecognised line",
+        NotKnown => "a body whose tag is not a known kind, or that does not read as its kind, is read as unrecognised",
         Oversized => "text pieces whose join passes u32::MAX bytes say nothing",
     }
 }
