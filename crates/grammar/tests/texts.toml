@@ -101,4 +101,10 @@ shell = [
     "mv only",
     "git mv a b",
     "echo '> not a redirect' 'sed -i'",
+    "cd src && echo a > x.rs",
+    "cd /a; cd b; echo a > x",
+    "cd $HOME/repo && echo a > x",
+    "cd - && echo a > x",
+    "cd && echo a > x",
+    "cd ~/r; cd /abs && echo a > x",
 ]

@@ -784,3 +784,25 @@ ran = "mv /tmp/a /home/repo/a"
 
 [[story.step]]
 ran = "git mv /home/repo/a.rs /tmp/a.rs"
+
+[[story]]
+name = "relative shell writes are judged against a cd's target, and refused when that target cannot be worked out"
+repositories = ["/home/repo"]
+
+[[story.step]]
+ran = "cd /home/repo && echo a > src/x.rs"
+
+[[story.step]]
+ran = "cd /home && cd repo; mv a.rs /tmp/a.rs"
+
+[[story.step]]
+ran = "cd /tmp && echo a > out.txt"
+
+[[story.step]]
+ran = "cd $REPO && echo a > out.txt"
+
+[[story.step]]
+ran = "cd - && mv a b"
+
+[[story.step]]
+ran = "cd $REPO && echo a > /tmp/out.txt"

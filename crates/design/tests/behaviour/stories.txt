@@ -1012,3 +1012,21 @@ Ok(Hooked(PreToolUse)) ExitCode(unix_exit_status(0)) ""
 $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"git mv /home/repo/a.rs /tmp/a.rs"},"tool_name":"Bash"}
 Ok(Hooked(PreToolUse)) ExitCode(unix_exit_status(0)) ""
 
+## relative shell writes are judged against a cd's target, and refused when that target cannot be worked out
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cd /home/repo && echo a > src/x.rs"},"tool_name":"Bash"}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: a shell write into /home/repo/src/x.rs, under the repository at /home/repo. Write files there only with the Edit or Write tools."}}
+Ok(Blocked) ExitCode(unix_exit_status(0)) ""
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cd /home && cd repo; mv a.rs /tmp/a.rs"},"tool_name":"Bash"}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `mv` takes /home/repo/a.rs out of the repository at /home/repo, and a move out of a repository is a delete. Use `git mv` to move it within the repository, or `git rm` to delete it."}}
+Ok(Blocked) ExitCode(unix_exit_status(0)) ""
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cd /tmp && echo a > out.txt"},"tool_name":"Bash"}
+Ok(Hooked(PreToolUse)) ExitCode(unix_exit_status(0)) ""
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cd $REPO && echo a > out.txt"},"tool_name":"Bash"}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: a shell write or move onto out.txt after a `cd` whose target cannot be worked out. Use absolute paths, or edit files with the Edit or Write tools."}}
+Ok(Blocked) ExitCode(unix_exit_status(0)) ""
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cd - && mv a b"},"tool_name":"Bash"}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: a shell write or move onto a after a `cd` whose target cannot be worked out. Use absolute paths, or edit files with the Edit or Write tools."}}
+Ok(Blocked) ExitCode(unix_exit_status(0)) ""
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cd $REPO && echo a > /tmp/out.txt"},"tool_name":"Bash"}
+Ok(Hooked(PreToolUse)) ExitCode(unix_exit_status(0)) ""
+

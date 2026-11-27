@@ -3,7 +3,7 @@ use std::path::{Component, Path, PathBuf};
 
 use console_ports::{Heard, Shown};
 use file_ports::{Files, Kind};
-use grammar::{Construct, Edit, Edited, Editor, Flagged, Nested};
+use grammar::{Construct, Directory, Edit, Edited, Editor, Flagged, Nested};
 use newtype::Wrapping;
 use serde::{Deserialize, Serialize};
 use store_ports::Store;
@@ -33,6 +33,7 @@ enum Refusal {
     InPlace { editor: Editor, within: Option<Construct> },
     Wrote { path: PathBuf, repository: PathBuf, within: Option<Construct> },
     Moved { path: PathBuf, repository: PathBuf, within: Option<Construct> },
+    Unresolved { written: String, within: Option<Construct> },
 }
 
 #[derive(Debug)]
@@ -84,24 +85,42 @@ impl<F: Files, S: Store> Judging<'_, '_, F, S> {
 
     fn refusal(&self, edited: &Edited) -> Option<Refusal> {
         let within = edited.construct();
+        let directory = edited.directory();
+        let unresolved = |written: &str| Refusal::Unresolved { written: written.to_owned(), within };
         match edited.edit() {
             Edit::InPlace(editor) => Some(Refusal::InPlace { editor: *editor, within }),
-            Edit::Wrote(written) => {
-                let path = self.resolved(written);
-                self.repository(&path).map(|repository| Refusal::Wrote { path, repository, within })
-            }
+            Edit::Wrote(written) => match self.resolved(written, directory) {
+                Some(path) => self.repository(&path).map(|repository| Refusal::Wrote { path, repository, within }),
+                None => Some(unresolved(written)),
+            },
             Edit::Moved { sources, destination } => {
-                let landing = self.repository(&self.resolved(destination));
-                sources.iter().map(|source| self.resolved(source)).find_map(|path| {
-                    let repository = self.repository(&path).filter(|held| landing.as_ref() != Some(held))?;
-                    Some(Refusal::Moved { path, repository, within })
+                let blind = sources
+                    .iter()
+                    .chain([destination])
+                    .find(|written| self.resolved(written, directory).is_none())
+                    .map(|written| unresolved(written));
+                let landing = self.resolved(destination, directory).and_then(|path| self.repository(&path));
+                blind.or_else(|| {
+                    sources.iter().filter_map(|source| self.resolved(source, directory)).find_map(|path| {
+                        let repository = self.repository(&path).filter(|held| landing.as_ref() != Some(held))?;
+                        Some(Refusal::Moved { path, repository, within })
+                    })
                 })
             }
         }
     }
 
-    fn resolved(&self, written: &str) -> PathBuf {
-        self.cwd.join(written).components().fold(PathBuf::new(), |resolved, component| match component {
+    fn resolved(&self, written: &str, directory: &Directory) -> Option<PathBuf> {
+        let base = match directory {
+            Directory::Started => Some(self.cwd.to_path_buf()),
+            Directory::Changed(steps) => Some(steps.iter().fold(self.cwd.to_path_buf(), |base, step| base.join(step))),
+            Directory::Unknown => Path::new(written).is_absolute().then(PathBuf::new),
+        }?;
+        Some(Self::folded(&base.join(written)))
+    }
+
+    fn folded(path: &Path) -> PathBuf {
+        path.components().fold(PathBuf::new(), |resolved, component| match component {
             Component::ParentDir => resolved.parent().map(Path::to_path_buf).unwrap_or(resolved),
             Component::CurDir => resolved,
             Component::Prefix(_) | Component::RootDir | Component::Normal(_) => resolved.join(component),
@@ -193,6 +212,12 @@ impl fmt::Display for Refusal {
                 Refusal::within(*within),
                 path.display(),
                 repository.display()
+            ),
+            Refusal::Unresolved { written, within } => write!(
+                formatter,
+                "Refused: a shell write or move{} onto {written} after a `cd` whose target cannot be worked out. \
+                 Use absolute paths, or edit files with the Edit or Write tools.",
+                Refusal::within(*within)
             ),
         }
     }

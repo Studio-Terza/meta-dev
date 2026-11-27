@@ -1,6 +1,8 @@
 mod lexeme;
 mod reading;
 
+use std::path::Path;
+
 use reading::Reading;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -41,6 +43,21 @@ pub enum Edit {
 enum Spotted {
     Flagged(Flagged),
     Edit(Edit),
+    Changed(Changed),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Changed {
+    To(String),
+    Unknown,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum Directory {
+    #[default]
+    Started,
+    Changed(Vec<String>),
+    Unknown,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -59,6 +76,7 @@ pub struct Nested {
 pub struct Edited {
     edit: Edit,
     construct: Option<Construct>,
+    directory: Directory,
 }
 
 impl Nested {
@@ -81,7 +99,13 @@ impl Nested {
 impl Edited {
     #[must_use]
     pub fn read(command: &str) -> Vec<Edited> {
-        Reading::occurrences(command).into_iter().filter_map(Occurrence::edited).collect()
+        let walked = Reading::occurrences(command).into_iter().fold(Walk::default(), Walk::stepped);
+        walked.edited
+    }
+
+    #[must_use]
+    pub fn directory(&self) -> &Directory {
+        &self.directory
     }
 
     #[must_use]
@@ -95,18 +119,44 @@ impl Edited {
     }
 }
 
+#[derive(Debug, Default)]
+struct Walk {
+    directory: Directory,
+    edited: Vec<Edited>,
+}
+
+impl Walk {
+    fn stepped(self, occurrence: Occurrence) -> Walk {
+        let construct = occurrence.within.first().copied();
+        match occurrence.spotted {
+            Spotted::Edit(edit) => {
+                let edited = Edited { edit, construct, directory: self.directory.clone() };
+                Walk { edited: self.edited.into_iter().chain([edited]).collect(), ..self }
+            }
+            Spotted::Changed(changed) => Walk { directory: self.directory.changed(changed), ..self },
+            Spotted::Flagged(_) => self,
+        }
+    }
+}
+
+impl Directory {
+    fn changed(self, changed: Changed) -> Directory {
+        match (self, changed) {
+            (_, Changed::To(step)) if Path::new(&step).is_absolute() => Directory::Changed(vec![step]),
+            (Directory::Started, Changed::To(step)) => Directory::Changed(vec![step]),
+            (Directory::Changed(steps), Changed::To(step)) => {
+                Directory::Changed(steps.into_iter().chain([step]).collect())
+            }
+            (Directory::Unknown, Changed::To(_)) | (_, Changed::Unknown) => Directory::Unknown,
+        }
+    }
+}
+
 impl Occurrence {
     fn nested(&self) -> Option<Nested> {
         match self.spotted {
             Spotted::Flagged(flagged) => self.within.first().map(|construct| Nested { flagged, construct: *construct }),
-            Spotted::Edit(_) => None,
-        }
-    }
-
-    fn edited(self) -> Option<Edited> {
-        match self.spotted {
-            Spotted::Edit(edit) => Some(Edited { edit, construct: self.within.first().copied() }),
-            Spotted::Flagged(_) => None,
+            Spotted::Edit(_) | Spotted::Changed(_) => None,
         }
     }
 

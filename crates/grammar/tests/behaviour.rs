@@ -52,7 +52,7 @@ fn every_lexer_reads_its_fixture_texts_as_its_golden_says() -> Result<(), Failed
         .chain(texts.shell.iter().map(|text| {
             let edited: Vec<String> = Edited::read(text)
                 .iter()
-                .map(|edited| format!("{:?} {:?}", edited.edit(), edited.construct()))
+                .map(|edited| format!("{:?} {:?} {:?}", edited.edit(), edited.construct(), edited.directory()))
                 .collect();
             format!(
                 "shell {text:?}: {:?} {edited:?}",

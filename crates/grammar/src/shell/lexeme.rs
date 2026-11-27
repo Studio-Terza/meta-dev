@@ -152,6 +152,9 @@ pub(super) enum Spelling {
     Tee,
     #[regex(r"([^/\x00]*/)*mv", allow_greedy = true)]
     Mv,
+    #[token("cd")]
+    #[token("pushd")]
+    Cd,
 }
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]

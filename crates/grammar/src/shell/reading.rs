@@ -4,7 +4,7 @@ use std::ops::ControlFlow;
 use logos::{Lexer, Logos};
 
 use super::lexeme::{Argued, Lexeme, Line, PerlFlag, Quoted, SedFlag, Spelling, Whole};
-use super::{Construct, Edit, Editor, Flagged, Occurrence, Spotted};
+use super::{Changed, Construct, Edit, Editor, Flagged, Occurrence, Spotted};
 use crate::{Ignoring, Unlexed};
 
 enum Lexing<'text> {
@@ -76,7 +76,11 @@ struct Simple {
     prefixes: Vec<Construct>,
     redirect: Option<Redirect>,
     moved: Option<Vec<String>>,
+    cd: Option<Cding>,
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Cding;
 
 #[derive(Debug, Default)]
 struct Word {
@@ -124,6 +128,7 @@ enum Head {
     Perl,
     Tee,
     Mv,
+    Cd,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -359,31 +364,33 @@ impl State {
     fn flushed(self) -> State {
         let State { top, outer, heredocs, found } = self;
         let Frame { construct, closer, resume, simple } = top;
-        let Simple { word, position, prefixes, redirect, moved } = simple;
+        let Simple { word, position, prefixes, redirect, moved, cd } = simple;
         let state = State {
             top: Frame {
                 construct,
                 closer,
                 resume,
-                simple: Simple { word, position, prefixes, redirect, moved: None },
+                simple: Simple { word, position, prefixes, redirect, moved: None, cd: None },
             },
             outer,
             heredocs,
             found,
         };
         let spoken = moved.as_deref().and_then(<[String]>::split_last);
-        let edit = spoken
-            .filter(|(_destination, sources)| !sources.is_empty())
-            .map(|(destination, sources)| Edit::Moved { sources: sources.to_vec(), destination: destination.clone() });
-        match edit {
-            Some(relocation) => state.spotted(relocation),
-            None => state,
-        }
+        let edit = spoken.filter(|(_destination, sources)| !sources.is_empty()).map(|(destination, sources)| {
+            Spotted::Edit(Edit::Moved { sources: sources.to_vec(), destination: destination.clone() })
+        });
+        let unknown = cd.map(|Cding| Spotted::Changed(Changed::Unknown));
+        edit.into_iter().chain(unknown).fold(state, State::noted)
     }
 
     fn spotted(self, edit: Edit) -> State {
+        self.noted(Spotted::Edit(edit))
+    }
+
+    fn noted(self, spotted: Spotted) -> State {
         let within = self.within();
-        let occurrence = Occurrence { spotted: Spotted::Edit(edit), within };
+        let occurrence = Occurrence { spotted, within };
         State { found: self.found.into_iter().chain(iter::once(occurrence)).collect(), ..self }
     }
 
@@ -403,8 +410,8 @@ impl State {
     fn worded(self) -> State {
         let State { top, outer, heredocs, found } = self;
         let Frame { construct, closer, resume, simple: building } = top;
-        let Simple { word: taken, position, prefixes, redirect, moved } = building;
-        let simple = Simple { word: None, position, prefixes, redirect, moved };
+        let Simple { word: taken, position, prefixes, redirect, moved, cd } = building;
+        let simple = Simple { word: None, position, prefixes, redirect, moved, cd };
         let state = State { top: Frame { construct, closer, resume, simple }, outer, heredocs, found };
         match taken {
             Some(word) => state.word(word),
@@ -429,7 +436,15 @@ impl State {
             Position::Argument(Head::Shell(_)) => Some(self.within()),
             Position::Command
             | Position::Argument(
-                Head::Plain | Head::Xargs(_) | Head::Find | Head::Case | Head::Sed | Head::Perl | Head::Tee | Head::Mv,
+                Head::Plain
+                | Head::Xargs(_)
+                | Head::Find
+                | Head::Case
+                | Head::Sed
+                | Head::Perl
+                | Head::Tee
+                | Head::Mv
+                | Head::Cd,
             )
             | Position::Pattern
             | Position::Named
@@ -495,6 +510,9 @@ impl State {
             (Some(Spelling::Mv), _) => {
                 self.simpled(|simple| Simple { moved: Some(Vec::new()), ..simple }).positioned(argument(Head::Mv))
             }
+            (Some(Spelling::Cd), _) => {
+                self.simpled(|simple| Simple { cd: Some(Cding), ..simple }).positioned(argument(Head::Cd))
+            }
             (
                 Some(
                     Spelling::For
@@ -538,17 +556,32 @@ impl State {
                     ..simple
                 }),
             },
+            Head::Cd => match Whole::read::<PerlFlag>(&word.text) {
+                Some(PerlFlag::InPlace | PerlFlag::Other) => self,
+                None => {
+                    let opaque = word.text.chars().any(|letter| Self::OPAQUE.contains(&letter));
+                    let changed = if opaque { Changed::Unknown } else { Changed::To(word.text.clone()) };
+                    self.simpled(|simple| Simple { cd: None, ..simple })
+                        .noted(Spotted::Changed(changed))
+                        .positioned(Position::Argument(Head::Plain))
+                }
+            },
             Head::Plain | Head::Shell(_) | Head::Xargs(_) | Head::Find | Head::Case => {
                 self.scanned_argument(head, word)
             }
         }
     }
 
+    const OPAQUE: [char; 3] = ['$', '`', '~'];
+
     fn scanned_argument(self, head: Head, word: &Word) -> State {
         let argued = Whole::read::<Argued>(&word.text);
         let shell = |script| Position::Argument(Head::Shell(script));
         match (head, argued) {
-            (Head::Plain | Head::Shell(Script::Given) | Head::Sed | Head::Perl | Head::Tee | Head::Mv, _)
+            (
+                Head::Plain | Head::Shell(Script::Given) | Head::Sed | Head::Perl | Head::Tee | Head::Mv | Head::Cd,
+                _,
+            )
             | (
                 Head::Case,
                 Some(
@@ -686,7 +719,7 @@ impl Frame {
             construct,
             closer,
             resume,
-            simple: Simple { word: None, position, prefixes: Vec::new(), redirect: None, moved: None },
+            simple: Simple { word: None, position, prefixes: Vec::new(), redirect: None, moved: None, cd: None },
         }
     }
 }
@@ -697,7 +730,7 @@ impl Simple {
             Position::Pattern => Position::Pattern,
             Position::Command | Position::Argument(_) | Position::Named | Position::Body => Position::Command,
         };
-        Simple { word: None, position, prefixes: Vec::new(), redirect: None, moved: None }
+        Simple { word: None, position, prefixes: Vec::new(), redirect: None, moved: None, cd: None }
     }
 
     fn redirected(self) -> Simple {
@@ -705,7 +738,7 @@ impl Simple {
     }
 
     fn unprefixed(self) -> Simple {
-        let Simple { word, prefixes, redirect, moved, .. } = self;
+        let Simple { word, prefixes, redirect, moved, cd, .. } = self;
         let kept = prefixes.len().saturating_sub(1);
         Simple {
             word,
@@ -713,6 +746,7 @@ impl Simple {
             prefixes: prefixes.into_iter().take(kept).collect(),
             redirect,
             moved,
+            cd,
         }
     }
 }
