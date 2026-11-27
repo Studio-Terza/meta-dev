@@ -80,7 +80,7 @@ impl<'run> Lints<'run> {
             public_api_tests: lints.graph(),
             emitters: Pausable::admitted(Emitters::default(), lints.entered),
             no_test_only_api: lints.graph(),
-            test_scan: Pausable::admitted(TestScan::default(), Some(())),
+            test_scan: Pausable::admitted(TestScan::within(source.package().test_features()), Some(())),
             primitive_boundary: lints.style(),
             test_shape: lints.style(),
             dead_code: lints.graph(),
@@ -125,7 +125,7 @@ impl<'run> Lints<'run> {
             test_only: Lints::facts(no_test_only_api),
             dead: Lints::facts(dead_code),
         };
-        let budget = Budget::of_file(source, test_scan.woken().unwrap_or_default(), gate);
+        let budget = Budget::of_file(source, &test_scan.woken().unwrap_or_default(), gate);
         Linted { found: found.into_iter().flatten().collect(), facts, budget }
     }
 

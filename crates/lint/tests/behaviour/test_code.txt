@@ -69,4 +69,4 @@ src/lib.rs:77: pub open is named by no other crate; make it private or delete it
 src/lib.rs:82: pub NotHidden is named by no other crate; make it private or delete it
 src/lib.rs:84: pub Targeted is named by no other crate; make it private or delete it
 src/lib.rs:91: pub probe is named by no other crate; make it private or delete it
-test budget: 30 of 111 lines are tests, at most 18% may be; cut test lines or test through fewer, table-driven cases
+test budget: 70 of 111 lines are tests, at most 18% may be; cut test lines or test through fewer, table-driven cases

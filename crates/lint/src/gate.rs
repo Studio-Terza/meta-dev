@@ -20,19 +20,38 @@ impl Gate {
         attributes.iter().map(Gate::of_attribute).find(|gate| *gate == Gate::Skipped).unwrap_or(Gate::Entered)
     }
 
+    pub(crate) fn conditional(attribute: &Attribute, tested: &BTreeSet<Name>) -> Gate {
+        let condition = Some(attribute)
+            .filter(|candidate| candidate.path().is_ident("cfg_attr"))
+            .and_then(|cfg_attr| {
+                cfg_attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated).ignoring(Ignored::Unparsed)
+            })
+            .and_then(|listed| listed.into_iter().next());
+        condition.map_or(Gate::Entered, |first| match &first {
+            Meta::NameValue(named) => Gate::named(named, tested),
+            Meta::Path(_) | Meta::List(_) => Gate::of_condition(&first),
+        })
+    }
+
+    fn named(condition: &MetaNameValue, tested: &BTreeSet<Name>) -> Gate {
+        let feature = Some(condition).filter(|candidate| candidate.path.is_ident("feature"));
+        let named = feature.and_then(|named| match &named.value {
+            Expr::Lit(ExprLit { lit: Lit::Str(spelled), .. }) => {
+                Some(spelled.value()).filter(|name| tested.contains(&Name::spelled(name)))
+            }
+            _ => None,
+        });
+        named.map_or(Gate::Entered, |_| Gate::Skipped)
+    }
+
     pub(crate) fn featured(attributes: &[Attribute], tested: &BTreeSet<Name>) -> Gate {
-        let feature = attributes
+        attributes
             .iter()
             .filter(|attribute| attribute.path().is_ident("cfg"))
             .filter_map(|cfg| cfg.parse_args::<MetaNameValue>().ignoring(Ignored::Unparsed))
-            .filter(|condition| condition.path.is_ident("feature"))
-            .find_map(|condition| match condition.value {
-                Expr::Lit(ExprLit { lit: Lit::Str(named), .. }) => {
-                    Some(named.value()).filter(|name| tested.contains(&Name::spelled(name)))
-                }
-                _ => None,
-            });
-        feature.map_or(Gate::Entered, |_| Gate::Skipped)
+            .map(|condition| Gate::named(&condition, tested))
+            .find(|gate| *gate == Gate::Skipped)
+            .unwrap_or(Gate::Entered)
     }
 
     pub(crate) fn inherent(item: &ItemImpl) -> Gate {

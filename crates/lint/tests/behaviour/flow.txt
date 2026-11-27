@@ -1,4 +1,4 @@
-test budget: 0 of 156 lines are tests, at most 18% may be
+test budget: 22 of 156 lines are tests, at most 18% may be
 free functions are not allowed; make them associated functions or methods:
 src/lib.rs:42: fn inner; make it an associated function or a method
 src/lib.rs:119: fn boxed; make it an associated function or a method

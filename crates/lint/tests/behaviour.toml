@@ -2051,3 +2051,52 @@ pub(crate) struct Order;
 "support/src/sharing.rs" = """
 pub(crate) struct Shared;
 """
+
+[Lint.feature_items]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.feature_items.files]
+"Cargo.toml" = """
+[workspace]
+members = ["app", "support"]
+"""
+"app/Cargo.toml" = """
+[package]
+name = "app"
+
+[dependencies]
+support = { path = "../support" }
+"""
+"app/src/main.rs" = """
+fn main() {}
+"""
+"support/Cargo.toml" = """
+[package]
+name = "support"
+
+[features]
+laws = []
+"""
+"support/src/lib.rs" = """
+#[cfg_attr(feature = "laws", derive(Debug))]
+struct Held {
+    kept: Kept,
+    #[cfg(feature = "laws")]
+    traced: Kept,
+}
+
+struct Kept;
+
+impl Held {
+    #[cfg(feature = "laws")]
+    pub(crate) fn traced(&self) -> &Kept {
+        &self.traced
+    }
+}
+
+#[cfg(feature = "laws")]
+impl Kept {
+    pub(crate) fn law() {}
+}
+"""
