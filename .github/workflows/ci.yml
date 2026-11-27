@@ -36,11 +36,13 @@ jobs:
   test:
     runs-on: ubuntu-latest
     env:
-      RUSTC_WRAPPER: ""
       TIMER: ${{ github.workspace }}/../timer/debug/ci
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/toolchain
+      - uses: mozilla-actions/sccache-action@v0.0.9
+        with:
+          version: v0.19.0
       - uses: rui314/setup-mold@v1
       - name: the timer, built apart from the stage it times
         run: cargo build --locked -q --bin ci --target-dir ../timer
@@ -90,45 +92,32 @@ jobs:
     outputs:
       shards: ${{ steps.plan.outputs.shards }}
     env:
-      GH_TOKEN: ${{ github.token }}
-      RUSTC_WRAPPER: ""
       RUSTFLAGS: ""
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 2
       - uses: ./.github/actions/toolchain
+      - uses: mozilla-actions/sccache-action@v0.0.9
+        with:
+          version: v0.19.0
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-mutants@27.1.0
-      - name: the earlier run's results on this branch
-        run: |
-          mkdir -p "$RUNNER_TEMP/plan" "$RUNNER_TEMP/prior"
-          run=$(gh run list --branch "$GITHUB_HEAD_REF" --workflow ci --event pull_request --status completed --limit 1 --json databaseId --jq '.[].databaseId')
-          test -z "$run" || gh run download "$run" --pattern 'mutants-*' --dir "$RUNNER_TEMP/prior" || true
       - name: plan
         id: plan
         run: |
-          shopt -s nullglob
-          PLAN=$RUNNER_TEMP/plan PRIOR=$RUNNER_TEMP/prior
+          PLAN=$RUNNER_TEMP/plan
+          mkdir -p "$PLAN"
           git diff HEAD^1 HEAD > "$PLAN/changed.diff"
           git diff --numstat --no-renames HEAD^1 HEAD > "$PLAN/changed"
-          git rev-parse HEAD^1 HEAD^2 > "$PLAN/heads"
           cargo mutants --list --json > "$PLAN/workspace.json"
           cargo mutants --list --json --in-diff "$PLAN/changed.diff" > "$PLAN/diff.json"
-          heads="$PRIOR/mutants-plan/heads"
-          earlier=()
-          if test -f "$heads" && { git diff --numstat --no-renames "$(sed -n 1p "$heads")" HEAD^1 && git diff --numstat --no-renames "$(sed -n 2p "$heads")" HEAD^2; } > "$PLAN/numstat"; then
-            earlier=("$PLAN/numstat" "$PRIOR"/*/*.json)
-          fi
-          cargo run --locked -q --bin ci -- mutants-plan "$PLAN/workspace.json" "$PLAN/diff.json" "$PLAN/changed" "$PLAN/reused.json" "$PLAN/caught.txt" "$GITHUB_OUTPUT" "${earlier[@]}"
+          cargo run --locked -q --bin ci -- mutants-plan "$PLAN/workspace.json" "$PLAN/diff.json" "$PLAN/changed" "$PLAN/unselected.txt" "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
           name: mutants-plan
-          path: |
-            ${{ runner.temp }}/plan/heads
-            ${{ runner.temp }}/plan/reused.json
-            ${{ runner.temp }}/plan/caught.txt
+          path: ${{ runner.temp }}/plan/unselected.txt
 
   mutants-shard:
     if: github.event_name == 'pull_request'
@@ -140,11 +129,12 @@ jobs:
       fail-fast: false
       matrix:
         shard: ${{ fromJSON(needs.mutants-plan.outputs.shards) }}
-    env:
-      RUSTC_WRAPPER: ""
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/toolchain
+      - uses: mozilla-actions/sccache-action@v0.0.9
+        with:
+          version: v0.19.0
       - uses: rui314/setup-mold@v1
       - uses: taiki-e/install-action@v2
         with:
@@ -153,11 +143,11 @@ jobs:
         with:
           name: mutants-plan
           path: ${{ runner.temp }}/plan
-      - name: the planned mutants, skipping every one listed in caught.txt
+      - name: every selected mutant, the unselected passed to --iterate as caught
         run: |
           PLAN=$RUNNER_TEMP/plan OUT=$RUNNER_TEMP/out
           mkdir -p "$OUT/mutants.out"
-          cp "$PLAN/caught.txt" "$OUT/mutants.out/caught.txt"
+          cp "$PLAN/unselected.txt" "$OUT/mutants.out/caught.txt"
           cargo mutants --no-shuffle --iterate --output "$OUT" --sharding round-robin --shard "${{ matrix.shard }}/${{ strategy.job-total }}"
       - uses: actions/upload-artifact@v4
         if: success() || failure()

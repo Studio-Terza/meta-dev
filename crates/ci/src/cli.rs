@@ -7,7 +7,7 @@ use invariants::Ignoring;
 
 use crate::failure::Failure;
 use crate::ignored::Ignored;
-use crate::mutants::{Plan, Prior};
+use crate::mutants::Plan;
 use crate::timed::Timed;
 
 #[derive(Debug)]
@@ -37,9 +37,8 @@ impl Cli {
             [name, limits, stage, program, rest @ ..] if name == Cli::TIMED => {
                 Cli::Timed(Timed::new([limits, stage], None, program, rest))
             }
-            [name, workspace, diff, changed, reused, caught, output, prior @ ..] if name == Cli::PLAN => {
-                let given = [workspace, diff, changed, reused, caught, output].map(PathBuf::from);
-                Cli::Plan(Plan::new(given, Prior::given(prior)))
+            [name, workspace, diff, changed, unselected, output] if name == Cli::PLAN => {
+                Cli::Plan(Plan::new([workspace, diff, changed, unselected, output].map(PathBuf::from)))
             }
             _ => Cli::Usage,
         }
