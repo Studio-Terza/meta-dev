@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use proc_macro2::{Delimiter, Ident, Punct, Spacing, TokenStream, TokenTree};
 use syn::visit::{self, Visit};
 use syn::{
-    Attribute, Block, ImplItemFn, ItemConst, ItemEnum, ItemFn, ItemMod, ItemStatic, ItemStruct, ItemTrait, ItemType,
+    Attribute, Block, Expr, ImplItemFn, ItemConst, ItemEnum, ItemFn, ItemMod, ItemStatic, ItemStruct, ItemTrait, ItemType,
     ItemUnion, Lit, Macro, TraitItemFn, TypePath,
 };
 
@@ -86,6 +86,15 @@ impl TestShape {
     fn literal(&mut self, name: &Ident, literal: Option<()>) {
         let found = literal
             .map(|()| Found::spanned(name.span(), format_args!("literal in test {name}"), TestShape::LITERAL_FIX));
+        self.found.extend(found);
+    }
+
+    fn held(&mut self, name: &Ident, value: &Expr) {
+        let mut literals = Literals::default();
+        literals.visit_expr(value);
+        let found = self.tested.and(literals.0).map(|()| {
+            Found::spanned(name.span(), format_args!("literal in test constant {name}"), TestShape::LITERAL_FIX)
+        });
         self.found.extend(found);
     }
 
@@ -239,6 +248,14 @@ impl<'ast> Visit<'ast> for TestShape {
 
     fn visit_item_type(&mut self, item: &'ast ItemType) {
         self.helper(Helper::Type, &item.ident);
+    }
+
+    fn visit_item_const(&mut self, item: &'ast ItemConst) {
+        self.held(&item.ident, &item.expr);
+    }
+
+    fn visit_item_static(&mut self, item: &'ast ItemStatic) {
+        self.held(&item.ident, &item.expr);
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {

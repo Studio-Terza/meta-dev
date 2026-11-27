@@ -35,6 +35,8 @@ tests/.fixtures/primitive_boundary/src/signatures.rs:19: u8 in an associated typ
 tests/.fixtures/primitive_boundary/src/signatures.rs:24: i64 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/primitive_boundary/src/signatures.rs:24: usize in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/primitive_boundary/tests/read.rs:2: str in a field; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests run production code paths: no literals in a test body and no test helpers beyond a test table:
+tests/.fixtures/primitive_boundary/tests/read.rs:4: literal in test constant ROWS; read expected values from a golden file and inputs from a fixture or a proptest strategy
 every pub item is named by another workspace crate:
 tests/.fixtures/primitive_boundary/src/boundary.rs:1: pub Raw is named by no other crate; make it private or delete it
 tests/.fixtures/primitive_boundary/src/boundary.rs:4: pub parsed is named by no other crate; make it private or delete it

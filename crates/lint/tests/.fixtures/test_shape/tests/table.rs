@@ -1,6 +1,8 @@
 use corpus::Shipped;
 
 const GOLDEN: &str = "tests/goldens/table.txt";
+static LIMIT: u8 = 4;
+const DERIVED: &str = GOLDEN;
 
 #[derive(Debug)]
 struct Case {
