@@ -1,0 +1,32 @@
+Violations
+--- out
+--- err
+free functions are not allowed; make them associated functions or methods:
+src/lib.rs:42: fn inner; make it an associated function or a method
+control flow is an expression; every branch yields the value the function returns:
+src/lib.rs:13: mutable local that is only reassigned; a mutable binding is borrowed as &mut or has methods called on it
+src/lib.rs:14: assignment to a local; build the value in one expression or give its type an updater method
+src/lib.rs:16: assignment to a local; build the value in one expression or give its type an updater method
+src/lib.rs:17: mutable local that is only reassigned; a mutable binding is borrowed as &mut or has methods called on it
+src/lib.rs:18: assignment to a local; build the value in one expression or give its type an updater method
+src/lib.rs:19: assignment to a local; build the value in one expression or give its type an updater method
+src/lib.rs:20: mutable local that is only reassigned; a mutable binding is borrowed as &mut or has methods called on it
+src/lib.rs:21: compound assignment to a local; build the value in one expression or give its type an updater method
+src/lib.rs:24: if or match whose value is dropped; let it produce the value the function returns
+src/lib.rs:26: if without else yields nothing; use then_some, filter, or an else branch that produces the value
+src/lib.rs:29: if or match whose value is dropped; let it produce the value the function returns
+src/lib.rs:41: mutable local that is only reassigned; a mutable binding is borrowed as &mut or has methods called on it
+src/lib.rs:46: assignment to a local; build the value in one expression or give its type an updater method
+src/lib.rs:49: for loop; drive the iterator with combinators, const fns excepted
+src/lib.rs:52: for loop; drive the iterator with combinators, const fns excepted
+src/lib.rs:79: loop; drive an iterator with combinators, const fns excepted
+src/lib.rs:97: while loop; drive an iterator with combinators, const fns excepted
+iterators are driven by combinators, not by hand:
+src/lib.rs:49: loop that only accumulates; extend or collect from an iterator instead
+src/lib.rs:59: mutable iterator local; drive it with combinators such as format, collect, or fold
+src/lib.rs:60: mutable iterator local; drive it with combinators such as format, collect, or fold
+tests go through public APIs:
+src/lib.rs:37: test code in src; move it to the package's tests directory and call the public API from there
+src/lib.rs:84: test code in src; move it to the package's tests directory and call the public API from there
+shipped code has no test-only API:
+src/lib.rs:90: visible item gated on test; remove the gate and test through the real public API

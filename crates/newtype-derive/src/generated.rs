@@ -1,10 +1,11 @@
-use syntax::parse::parse_quote;
-use syntax::{Data, DeriveInput, Error, Expr, Fields, Generics, Ident, Punctuated, Token, TokenStream, Variant};
-use syntax::{WherePredicate, format_ident, quote};
+use proc_macro2::TokenStream;
+use quote::{format_ident, quote};
+use syn::punctuated::Punctuated;
+use syn::{Data, DeriveInput, Error, Expr, Fields, Generics, Ident, Token, Variant};
+use syn::{WherePredicate, parse_quote};
 
 use crate::settings::{Checking, Expressed, Settings};
 use crate::wrapped::{Strategy, Wrapped};
-use syntax::Compiled;
 
 pub struct Generated<'input> {
     ident: &'input Ident,
@@ -28,11 +29,13 @@ impl Generated<'_> {
     const EMPTY_ENUM: &str = "an enum with no variants has no values to generate";
 
     pub fn expanded(tokens: TokenStream) -> TokenStream {
-        syntax::parse::parse2(tokens)
-            .and_then(|input: DeriveInput| {
-                Settings::declared(&input.attrs).and_then(|settings| Generator::from(&settings).routed(&input))
-            })
-            .compiled()
+        let expansion = syn::parse2(tokens).and_then(|input: DeriveInput| {
+            Settings::declared(&input.attrs).and_then(|settings| Generator::from(&settings).routed(&input))
+        });
+        match expansion {
+            Ok(expanded) => expanded,
+            Err(error) => error.to_compile_error(),
+        }
     }
 
     fn escaped(&self, generate: &Expr) -> TokenStream {
@@ -46,7 +49,7 @@ impl Generated<'_> {
         self.implemented(drawn.required, &strategy)
     }
 
-    fn enumerated(&self, variants: &Punctuated<Variant, Token![,]>) -> syntax::Result<TokenStream> {
+    fn enumerated(&self, variants: &Punctuated<Variant, Token![,]>) -> syn::Result<TokenStream> {
         let drawn: Vec<(TokenStream, Vec<WherePredicate>)> = variants
             .iter()
             .map(|Variant { ident, fields, .. }| {
@@ -110,7 +113,7 @@ impl<'settings> From<&'settings Settings> for Generator<'settings> {
 }
 
 impl Generator<'_> {
-    fn routed(self, input: &DeriveInput) -> syntax::Result<TokenStream> {
+    fn routed(self, input: &DeriveInput) -> syn::Result<TokenStream> {
         match self {
             Generator::Escaped(generate) => Ok(Generated::from(input).escaped(generate)),
             Generator::Constructed(from, checking) => Generator::constructing(from, checking, input),
@@ -118,14 +121,14 @@ impl Generator<'_> {
         }
     }
 
-    fn constructing(from: &Expr, checking: Checking, input: &DeriveInput) -> syntax::Result<TokenStream> {
+    fn constructing(from: &Expr, checking: Checking, input: &DeriveInput) -> syn::Result<TokenStream> {
         match &input.data {
             Data::Struct(shape) => Ok(Generated::from(input).constructed(from, checking, &shape.fields)),
             Data::Enum(_) | Data::Union(_) => Err(Error::new_spanned(&input.ident, Generated::CONSTRUCTED_ENUM)),
         }
     }
 
-    fn shaping(input: &DeriveInput) -> syntax::Result<TokenStream> {
+    fn shaping(input: &DeriveInput) -> syn::Result<TokenStream> {
         match &input.data {
             Data::Enum(shape) => Generated::from(input).enumerated(&shape.variants),
             Data::Struct(_) | Data::Union(_) => Ok(Wrapped::derived::<Strategy>(input.clone())),

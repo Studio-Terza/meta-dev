@@ -1,9 +1,8 @@
-use syntax::TokenStream;
-use syntax::quote;
-use syntax::{DeriveInput, Generics, Ident};
+use proc_macro2::TokenStream;
+use quote::quote;
+use syn::{DeriveInput, Generics, Ident};
 
 use super::declared::{Constant, Spelling};
-use syntax::Compiled;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Derived {
@@ -36,10 +35,13 @@ impl Derived {
 
 impl Named {
     pub fn expanded(tokens: TokenStream, derived: Derived) -> TokenStream {
-        syntax::parse::parse2::<DeriveInput>(tokens)
+        let expansion = syn::parse2::<DeriveInput>(tokens)
             .map(|DeriveInput { ident, generics, .. }| Named { ident, generics })
-            .map(|named| named.implementing(derived))
-            .compiled()
+            .map(|named| named.implementing(derived));
+        match expansion {
+            Ok(expanded) => expanded,
+            Err(error) => error.to_compile_error(),
+        }
     }
 
     fn implementing(&self, derived: Derived) -> TokenStream {

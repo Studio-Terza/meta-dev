@@ -1,0 +1,5 @@
+Violations
+--- out
+--- err
+a crate exports exactly what another crate uses:
+exporter/src/lib.rs:2: Unused is exported but no other crate names it; export it when a user appears

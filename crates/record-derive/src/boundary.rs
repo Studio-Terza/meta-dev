@@ -1,8 +1,9 @@
 mod reading;
 
-use syntax::TokenStream;
-use syntax::{Data, DataStruct, DeriveInput, Error, Fields, Ident, Type};
-use syntax::{format_ident, quote};
+use proc_macro2::TokenStream;
+use quote::{format_ident, quote};
+use syn::punctuated::Punctuated;
+use syn::{Data, DataStruct, DeriveInput, Error, Fields, Ident, Type};
 
 use reading::Reading;
 
@@ -16,16 +17,16 @@ pub struct Record {
 impl TryFrom<DeriveInput> for Record {
     type Error = Error;
 
-    fn try_from(input: DeriveInput) -> syntax::Result<Record> {
+    fn try_from(input: DeriveInput) -> syn::Result<Record> {
         Some(()).filter(|()| input.generics.params.is_empty()).ok_or_else(|| {
             Error::new_spanned(&input.generics, "a record has no generic parameters; read a concrete line")
         })?;
         let named = Record::named(&input.data)
             .ok_or_else(|| Error::new_spanned(&input.ident, "a record is a struct with named fields"))?;
-        let readings = named.iter().map(Reading::declared).collect::<syntax::Result<Vec<Reading>>>()?;
+        let readings = named.iter().map(Reading::declared).collect::<syn::Result<Vec<Reading>>>()?;
         let declared = input.attrs.iter().find(|attribute| attribute.path().is_ident("record"));
         let source = declared.map_or_else(
-            || Ok(syntax::parse::parse_quote!(::grammar_output::Fields)),
+            || Ok(syn::parse_quote!(::grammar_output::Fields)),
             |attribute| Sourced::try_from(attribute).map(|sourced| sourced.source),
         )?;
         Ok(Record { ident: input.ident, source, readings })
@@ -43,23 +44,23 @@ struct Sourced {
     source: Type,
 }
 
-impl TryFrom<&syntax::Attribute> for Sourced {
+impl TryFrom<&syn::Attribute> for Sourced {
     type Error = Error;
 
-    fn try_from(attribute: &syntax::Attribute) -> syntax::Result<Sourced> {
-        attribute.parse_args_with(|input: syntax::parse::ParseStream| {
+    fn try_from(attribute: &syn::Attribute) -> syn::Result<Sourced> {
+        attribute.parse_args_with(|input: syn::parse::ParseStream| {
             let key: Ident = input.parse()?;
             Some(())
                 .filter(|()| key == "source")
                 .ok_or_else(|| Error::new_spanned(&key, "the only option is source = Type"))?;
-            input.parse::<syntax::Token![=]>()?;
+            input.parse::<syn::Token![=]>()?;
             Ok(Sourced { source: input.parse()? })
         })
     }
 }
 
 impl Record {
-    fn named(data: &Data) -> Option<&syntax::Punctuated<syntax::Field, syntax::Token![,]>> {
+    fn named(data: &Data) -> Option<&Punctuated<syn::Field, syn::Token![,]>> {
         match data {
             Data::Struct(DataStruct { fields: Fields::Named(named), .. }) => Some(&named.named),
             Data::Struct(_) | Data::Enum(_) | Data::Union(_) => None,

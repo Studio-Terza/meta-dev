@@ -1,0 +1,154 @@
+use std::path::Path;
+use std::sync::Arc;
+
+use invariants::Ignoring;
+
+use crate::ignored::Ignored;
+use crate::workspace::{CrateKind, Package};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Place {
+    Shipped,
+    Tests,
+    Elsewhere,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Rooted {
+    CrateRoot,
+    Module,
+}
+
+#[derive(Debug)]
+struct Location {
+    kind: CrateKind,
+    module: Vec<String>,
+    rooted: Rooted,
+}
+
+#[derive(Debug)]
+pub(crate) struct Source {
+    real: Arc<Path>,
+    shown: Arc<Path>,
+    text: String,
+    package: Arc<Package>,
+    location: Location,
+}
+
+impl Location {
+    const SOURCE: &'static str = "src";
+    const BUILD: &'static str = "build.rs";
+    const LIBRARY: &'static str = "lib.rs";
+    const MAIN: &'static str = "main.rs";
+    const BINARIES: &'static str = "bin";
+    const MODULE: &'static str = "mod";
+    const EXTENSION: &'static str = "rs";
+    const TARGETS: [(&'static str, CrateKind); 3] =
+        [("tests", CrateKind::Tests), ("examples", CrateKind::Examples), ("benches", CrateKind::Benches)];
+
+    fn of(package: &Package, real: &Path, fallback: CrateKind) -> Location {
+        let inside = real.strip_prefix(package.directory()).ignoring(Ignored::Outside).unwrap_or(real);
+        let parts: Vec<String> =
+            inside.components().map(|component| component.as_os_str().to_string_lossy().into_owned()).collect();
+        let target = parts.first().and_then(|first| Location::TARGETS.iter().find(|(name, _)| first == name));
+        match (parts.as_slice(), target) {
+            ([source, rest @ ..], _) if source == Location::SOURCE => Location::in_source(rest),
+            ([build], _) if build == Location::BUILD => {
+                Location { kind: CrateKind::Build, module: Vec::new(), rooted: Rooted::CrateRoot }
+            }
+            ([_, _, rest @ ..], Some((_, kind))) => {
+                Location { kind: *kind, module: Location::modules(rest), rooted: Rooted::Module }
+            }
+            (_, Some((_, kind))) => Location { kind: *kind, module: Vec::new(), rooted: Rooted::CrateRoot },
+            _ => Location { kind: fallback, module: Vec::new(), rooted: Rooted::Module },
+        }
+    }
+
+    fn in_source(rest: &[String]) -> Location {
+        let binary = |module| Location { kind: CrateKind::Binary, module, rooted: Rooted::CrateRoot };
+        match rest {
+            [library] if library == Location::LIBRARY => {
+                Location { kind: CrateKind::Library, module: Vec::new(), rooted: Rooted::CrateRoot }
+            }
+            [main] if main == Location::MAIN => binary(Vec::new()),
+            [listed, _] if listed == Location::BINARIES => binary(Location::modules(rest)),
+            [listed, _, main] if listed == Location::BINARIES && main == Location::MAIN => {
+                binary(Location::modules(rest))
+            }
+            _ => Location { kind: CrateKind::Library, module: Location::modules(rest), rooted: Rooted::Module },
+        }
+    }
+
+    fn modules(parts: &[String]) -> Vec<String> {
+        let named = parts.iter().map(|part| {
+            let path = Path::new(part);
+            let source = path.extension().filter(|extension| *extension == Location::EXTENSION);
+            source
+                .and_then(|_| path.file_stem())
+                .map_or_else(|| part.clone(), |stem| stem.to_string_lossy().into_owned())
+        });
+        named.filter(|name| name != Location::MODULE).collect()
+    }
+}
+
+impl Source {
+    const PORTS: &'static str = "ports";
+
+    pub(crate) fn new(
+        package: Arc<Package>,
+        real: Arc<Path>,
+        shown: Arc<Path>,
+        fallback: CrateKind,
+        text: String,
+    ) -> Source {
+        let location = Location::of(&package, &real, fallback);
+        Source { real, shown, text, package, location }
+    }
+
+    pub(crate) fn real(&self) -> &Path {
+        &self.real
+    }
+
+    pub(crate) fn shown(&self) -> &Arc<Path> {
+        &self.shown
+    }
+
+    pub(crate) fn text(&self) -> &str {
+        &self.text
+    }
+
+    pub(crate) fn package(&self) -> &Arc<Package> {
+        &self.package
+    }
+
+    pub(crate) fn place(&self) -> Place {
+        match self.location.kind {
+            CrateKind::Library | CrateKind::Binary | CrateKind::Build => Place::Shipped,
+            CrateKind::Tests => Place::Tests,
+            CrateKind::Examples | CrateKind::Benches => Place::Elsewhere,
+        }
+    }
+
+    pub(crate) fn library_root(&self) -> Option<()> {
+        (self.location.kind == CrateKind::Library && self.location.rooted == Rooted::CrateRoot).then_some(())
+    }
+
+    pub(crate) fn own_crate(&self) -> Option<String> {
+        let binary = self.location.kind == CrateKind::Binary && self.location.rooted == Rooted::CrateRoot;
+        (self.place() == Place::Shipped && !binary).then(|| self.package.crate_name())
+    }
+
+    pub(crate) fn ported(&self) -> Option<()> {
+        let last_word = self
+            .package
+            .name()
+            .chars()
+            .rev()
+            .skip_while(|letter| !letter.is_alphanumeric())
+            .take_while(|letter| letter.is_alphanumeric())
+            .flat_map(char::to_lowercase);
+        let named = self.place() == Place::Shipped && last_word.eq(Source::PORTS.chars().rev());
+        let module = self.location.module.iter().any(|segment| segment == Source::PORTS);
+        (named || module).then_some(())
+    }
+}

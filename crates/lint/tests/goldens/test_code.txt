@@ -1,0 +1,38 @@
+Violations
+--- out
+--- err
+free functions are not allowed; make them associated functions or methods:
+src/lib.rs:41: fn gated_free; make it an associated function or a method
+src/lib.rs:44: fn inside; make it an associated function or a method
+src/lib.rs:48: fn emitted; make it an associated function or a method
+src/lib.rs:57: fn probe; make it an associated function or a method
+tests/reach.rs:12: fn listed; make it an associated function or a method
+control flow is an expression; every branch yields the value the function returns:
+src/lib.rs:58: assignment to a local; build the value in one expression or give its type an updater method
+src/lib.rs:58: assignment to a local; build the value in one expression or give its type an updater method
+tests go through public APIs:
+src/lib.rs:7: test code in src; move it to the package's tests directory and call the public API from there
+src/lib.rs:16: test code in src; move it to the package's tests directory and call the public API from there
+src/lib.rs:20: test code in src; move it to the package's tests directory and call the public API from there
+src/lib.rs:27: test code in src; move it to the package's tests directory and call the public API from there
+src/lib.rs:32: test code in src; move it to the package's tests directory and call the public API from there
+src/lib.rs:36: test code in src; move it to the package's tests directory and call the public API from there
+src/lib.rs:41: test code in src; move it to the package's tests directory and call the public API from there
+src/lib.rs:43: test code in src; move it to the package's tests directory and call the public API from there
+tests/reach.rs:3: test file includes a module from src with #[path]; call the public API instead
+tests/reach.rs:8: test file includes a module from src with #[path]; call the public API instead
+shipped code has no test-only API:
+Cargo.toml:5: test feature testing; remove the feature and test through the API every build has
+Cargo.toml:6: test feature mocks_extra; remove the feature and test through the API every build has
+src/lib.rs:10: visible item gated on test; remove the gate and test through the real public API
+src/lib.rs:12: #[doc(hidden)] on a visible item; document it as real API, or make it private
+src/lib.rs:21: visible item gated on test; remove the gate and test through the real public API
+src/lib.rs:23: #[doc(hidden)] on a visible item; document it as real API, or make it private
+src/lib.rs:27: visible item gated on test; remove the gate and test through the real public API
+src/lib.rs:43: visible item gated on test; remove the gate and test through the real public API
+src/lib.rs:52: test feature mock; remove the feature and test through the API every build has
+src/lib.rs:53: test feature testing; remove the feature and test through the API every build has
+src/lib.rs:58: test feature test-utils; remove the feature and test through the API every build has
+tests/helpers/common.rs:1: test feature mock; remove the feature and test through the API every build has
+a function returning bool forgets what it found and makes the caller branch on a flag:
+src/lib.rs:57: fn probe -> bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty

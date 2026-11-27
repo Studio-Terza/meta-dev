@@ -1,0 +1,2 @@
+[workspace]
+members = ["provider", "consumer", "globbed", "unused"]

@@ -12,7 +12,9 @@ doctest = false
 [dependencies]
 grammar-ident = { path = "../grammar-ident" }
 strum.workspace = true
-syntax = { path = "../syntax" }
+proc-macro2.workspace = true
+quote.workspace = true
+syn.workspace = true
 
 [lints]
 workspace = true

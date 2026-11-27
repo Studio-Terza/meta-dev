@@ -1,13 +1,13 @@
-use syntax::parse::{Parse, ParseStream};
-use syntax::{Expr, Token};
+use syn::parse::{Parse, ParseStream};
+use syn::{Expr, Token};
 
 use super::Checking;
 
 mod keyword {
-    syntax::custom_keyword!(checked);
-    syntax::custom_keyword!(strategy);
-    syntax::custom_keyword!(from);
-    syntax::custom_keyword!(generate);
+    syn::custom_keyword!(checked);
+    syn::custom_keyword!(strategy);
+    syn::custom_keyword!(from);
+    syn::custom_keyword!(generate);
 }
 
 pub enum Setting {
@@ -39,7 +39,7 @@ impl Setting {
 }
 
 impl Parse for Setting {
-    fn parse(input: ParseStream<'_>) -> syntax::Result<Setting> {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Setting> {
         let look = input.lookahead1();
         let key = [
             (look.peek(keyword::checked), Key::Checked),
@@ -61,7 +61,7 @@ enum Key {
 }
 
 impl Key {
-    fn parsed(self, input: ParseStream<'_>) -> syntax::Result<Setting> {
+    fn parsed(self, input: ParseStream<'_>) -> syn::Result<Setting> {
         match self {
             Key::Checked => input.parse::<keyword::checked>().map(|_| Setting::Checked),
             Key::Expressed(expressed) => expressed
@@ -74,7 +74,7 @@ impl Key {
 }
 
 impl Expressed {
-    fn keyword(self, input: ParseStream<'_>) -> syntax::Result<()> {
+    fn keyword(self, input: ParseStream<'_>) -> syn::Result<()> {
         match self {
             Expressed::Strategy => input.parse::<keyword::strategy>().map(|_| ()),
             Expressed::From => input.parse::<keyword::from>().map(|_| ()),

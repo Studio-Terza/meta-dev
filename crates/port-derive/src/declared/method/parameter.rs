@@ -1,6 +1,6 @@
-use syntax::TokenStream;
-use syntax::{Ident, Type};
-use syntax::{ToTokens, quote};
+use proc_macro2::TokenStream;
+use quote::{ToTokens, quote};
+use syn::{Ident, Type};
 
 pub struct Parameter {
     name: Ident,

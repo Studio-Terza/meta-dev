@@ -2,9 +2,9 @@ mod parameter;
 mod per_type;
 mod returned;
 
-use syntax::TokenStream;
-use syntax::quote;
-use syntax::{FnArg, Generics, Ident, ReturnType, TraitItemFn, Type};
+use proc_macro2::TokenStream;
+use quote::quote;
+use syn::{FnArg, Generics, Ident, ReturnType, TraitItemFn, Type};
 
 use super::boundary::Spelling;
 use super::names::OpsName;

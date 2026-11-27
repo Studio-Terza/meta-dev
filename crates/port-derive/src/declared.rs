@@ -6,11 +6,10 @@ mod method;
 mod names;
 mod ops;
 
-use syntax::TokenStream;
-use syntax::parse::Nothing;
-use syntax::parse::parse_quote;
-use syntax::quote;
-use syntax::{ItemTrait, Token, TraitItem, TraitItemFn, TypeParamBound, Visibility};
+use proc_macro2::TokenStream;
+use quote::quote;
+use syn::parse::Nothing;
+use syn::{ItemTrait, Token, TraitItem, TraitItemFn, TypeParamBound, Visibility, parse_quote};
 
 pub use boundary::{Constant, Spelling};
 
@@ -20,7 +19,6 @@ use filler::Filler;
 use method::Method;
 use names::{CallerName, FillerName, OpsName};
 use ops::Ops;
-use syntax::Compiled;
 
 pub trait Rendered {
     fn rendered(declared: &Declared) -> TokenStream;
@@ -50,11 +48,14 @@ impl AsRef<[Method]> for Declared {
 
 impl Declared {
     pub fn expanded(attributes: TokenStream, item: TokenStream) -> TokenStream {
-        syntax::parse::parse2::<Nothing>(attributes)
-            .and_then(|Nothing| syntax::parse::parse2::<ItemTrait>(item))
+        let expansion = syn::parse2::<Nothing>(attributes)
+            .and_then(|Nothing| syn::parse2::<ItemTrait>(item))
             .map(Declared::parsed)
-            .map(|declared| Self::expansion(&declared))
-            .compiled()
+            .map(|declared| Self::expansion(&declared));
+        match expansion {
+            Ok(expanded) => expanded,
+            Err(error) => error.to_compile_error(),
+        }
     }
 
     pub fn expansion(&self) -> TokenStream {

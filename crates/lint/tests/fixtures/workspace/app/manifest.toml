@@ -1,0 +1,10 @@
+[package]
+name = "app"
+
+[features]
+mock-data = []
+fast = []
+
+[[bin]]
+name = "tool"
+path = "tools/run.rs"
