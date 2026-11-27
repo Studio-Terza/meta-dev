@@ -1,13 +1,15 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
+mod detail;
 mod prose;
 mod queue;
 mod report;
 mod unlexed;
 
+pub use detail::{Cited, Heading};
 pub use invariants::Ignoring;
 pub use logos;
 pub use prose::Prose;
 pub use queue::Queue;
-pub use report::{AgentReport, Ended, JobLink};
+pub use report::{AgentReport, BranchName, Ended, JobLink, Target};
 pub use unlexed::Unlexed;

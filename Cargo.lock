@@ -153,6 +153,7 @@ dependencies = [
  "grammar",
  "grammar-lines",
  "grammar-slug",
+ "grammar-spec-line",
  "hex",
  "invariants",
  "newtype",

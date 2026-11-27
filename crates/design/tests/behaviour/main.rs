@@ -6,7 +6,7 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::time::{Duration, SystemTime};
 use test_failure::Failed;
 
@@ -20,6 +20,7 @@ use dispatch_ports::{
 use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Offset, Size, Stamps, Text};
 use grammar_slug::Letters;
 use invariants::Unpoisoned;
+use newtype::Wrapping;
 use port_core::Pass;
 use serde_json::Value;
 use sqlite_ports::SqliteOpener;
@@ -46,27 +47,52 @@ const OTHER: &str = "fedcba9876543210fedcba9876543210fedcba98";
 const HEAD: &str = "pr view 12 --json headRefOid";
 const WATCH: &str = "pr checks 12 --watch --fail-fast";
 const CHECKS: &str = "pr checks 12 --json name,bucket,link";
+const LISTED: &str = "pr checks 12 --json name,state";
 const LOG: &str = "run view --job 456 --log-failed";
-const UNTYPED: &str = "End your turn with exactly one line and nothing else: DONE #<pr> <full sha> once the pull \
-                       request's head is that commit, or BLOCKED #<pr> <full sha> when you cannot go on.";
+const UNTYPED: &str = "End your turn with exactly one line and nothing else: DONE <branch> <full sha> once that \
+                       commit is the pushed head of a branch with no pull request yet, DONE #<pr> <full sha> once the \
+                       pull request's head is that commit, or BLOCKED #<pr> <full sha> when you cannot go on.";
+const BRANCH: &str = "design/open-pr";
+const REMOTE: &str = "api graphql -F owner={owner} -F name={repo} -f ref=refs/heads/design/open-pr -f \
+                      query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(\
+                      qualifiedName:$ref){target{oid}}}}";
+const FIRST: &str = "log --reverse --format=%(trailers:key=Spec,valueonly,separator=%x2c) \
+                     origin/main..0123456789abcdef0123456789abcdef01234567";
+const CREATE: &str = "pr create --head design/open-pr --base main --title D2 Typed agent outcomes --body spec: \
+                      tools-retirement#D2\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)";
+const SPEC: &str = "# Tools retirement\n\nD1 Dropped until missed (D2 later): waits.\n\nD2 Typed agent outcomes (owner \
+                    de7a042f): the hook refuses (with D3) other endings.\nD20 Later work (owner 1).\n";
+const VIEW: &str = "pr view design/open-pr --json number";
 
 #[derive(Debug)]
 struct Stepping {
     now: SystemTime,
     moments: AtomicI64,
+    slept: AtomicU64,
+}
+
+impl Stepping {
+    fn at(now: SystemTime) -> Stepping {
+        Stepping { now, moments: AtomicI64::default(), slept: AtomicU64::default() }
+    }
+
+    fn wall(&self) -> Wall {
+        Wall::from(self.now + Duration::from_secs(self.slept.load(Ordering::Relaxed)))
+    }
 }
 
 impl ClockFiller for Stepping {
     fn now(&self, _pass: Pass<'_, clock_ops::Now>) -> Wall {
-        Wall::from(self.now)
+        self.wall()
     }
 
     fn moment(&self, _pass: Pass<'_, clock_ops::Moment>) -> Moment {
         Moment::new(self.moments.fetch_add(STEP, Ordering::Relaxed))
     }
 
-    fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, _pause: Pause, _bell: &Bell) -> Wall {
-        Wall::from(SystemTime::now())
+    fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause, _bell: &Bell) -> Wall {
+        self.slept.fetch_add(u64::from(pause.into_inner()), Ordering::Relaxed);
+        self.wall()
     }
 }
 
@@ -134,13 +160,13 @@ impl DispatchFiller for Agent<'_> {
 
 #[derive(Debug, Default)]
 struct GitHub {
-    answers: BTreeMap<String, Ran>,
+    answers: BTreeMap<String, Vec<Ran>>,
     asked: Mutex<Vec<Asked>>,
 }
 
 #[derive(Clone, Debug)]
 struct Answer {
-    asked: &'static str,
+    asked: String,
     ran: Ran,
 }
 
@@ -151,14 +177,21 @@ struct Asked {
 }
 
 impl Answer {
-    fn new(asked: &'static str, ran: Ran) -> Answer {
-        Answer { asked, ran }
+    fn new(asked: &str, ran: Ran) -> Answer {
+        Answer { asked: format!("gh {asked}"), ran }
+    }
+
+    fn git(asked: &str, ran: Ran) -> Answer {
+        Answer { asked: format!("git {asked}"), ran }
     }
 }
 
 impl GitHub {
     fn answering(given: &[Answer]) -> GitHub {
-        let answers = given.iter().map(|answer| (format!("gh {}", answer.asked), answer.ran.clone())).collect();
+        let answers = given.iter().fold(BTreeMap::<String, Vec<Ran>>::new(), |mut answers, answer| {
+            answers.entry(answer.asked.clone()).or_default().push(answer.ran.clone());
+            answers
+        });
         GitHub { answers, asked: Mutex::default() }
     }
 
@@ -181,8 +214,12 @@ impl ShellFiller for Gh<'_> {
         let spoken =
             [call.program().to_owned()].into_iter().chain(call.arguments().iter().cloned()).collect::<Vec<_>>();
         let asked = Asked { spoken: spoken.join(" "), deadline: call.deadline() };
-        let answer = self.github.answers.get(&asked.spoken).cloned().ok_or(DispatchFailure::Unjoined);
-        self.github.asked.lock().unpoisoned().push(asked);
+        let mut log = self.github.asked.lock().unpoisoned();
+        let earlier = log.iter().filter(|before| before.spoken == asked.spoken).count();
+        let answers = self.github.answers.get(&asked.spoken);
+        let answer =
+            answers.and_then(|rans| rans.get(earlier).or(rans.last())).cloned().ok_or(DispatchFailure::Unjoined);
+        log.push(asked);
         answer
     }
 }
@@ -344,7 +381,7 @@ impl Home {
         .hearing(Heard::new(input.to_owned()));
         let words = ["--workspace", "work"].iter().chain(arguments).map(OsString::from);
         let files = Rerooted { temporary: self.path().join("tmp") };
-        let clock = Stepping { now: self.at, moments: AtomicI64::default() };
+        let clock = Stepping::at(self.at);
         let agents = Agents::new(|_kept: PathBuf| Agent { replies }, clock, Gh { github });
         let uttered = Cli::new(&environment, files, SqliteOpener, agents).rooted(words);
         let shown = AsRef::<Shown>::as_ref(&uttered).to_string();
@@ -380,6 +417,13 @@ impl Home {
         let folder = self.path().join("studio-meta-dev/transcripts");
         fs::create_dir_all(&folder)?;
         fs::write(folder.join("queue.md"), text)?;
+        Ok(())
+    }
+
+    fn specified(&self, text: &str) -> Result<(), Failed> {
+        let folder = self.path().join("studio-meta-dev/transcripts/specs");
+        fs::create_dir_all(&folder)?;
+        fs::write(folder.join("tools-retirement.md"), text)?;
         Ok(())
     }
 
@@ -465,6 +509,16 @@ impl GitHub {
         Answer::new(WATCH, Ran::Succeeded(Printed::default()))
     }
 
+    fn listed(names: &[&str]) -> Answer {
+        let listed: Vec<Value> =
+            names.iter().map(|name| serde_json::json!({"name": name, "state": "IN_PROGRESS"})).collect();
+        Answer::new(LISTED, Ran::Failed(Printed::new(Value::from(listed).to_string())))
+    }
+
+    fn unlisted() -> Answer {
+        Answer::new(LISTED, Ran::Failed(Printed::default()))
+    }
+
     fn checks(buckets: &[[&str; 3]]) -> Answer {
         let listed: Vec<Value> = buckets
             .iter()
@@ -476,6 +530,7 @@ impl GitHub {
     fn red() -> GitHub {
         GitHub::answering(&[
             GitHub::head(SHA),
+            GitHub::listed(&["test"]),
             Answer::new(WATCH, Ran::Failed(Printed::default())),
             GitHub::checks(&[
                 ["test", "fail", "https://github.com/o/r/actions/runs/9/job/456"],
@@ -494,12 +549,35 @@ impl GitHub {
     fn green() -> GitHub {
         GitHub::answering(&[
             GitHub::head(SHA),
+            GitHub::listed(&["test"]),
             GitHub::watched(),
             GitHub::checks(&[
                 ["test", "pass", "https://github.com/o/r/actions/runs/9/job/456"],
                 ["mutants", "skipping", "https://github.com/o/r/actions/runs/9/job/459"],
             ]),
         ])
+    }
+}
+
+impl GitHub {
+    fn remote(held: &str) -> Answer {
+        let found = format!("{{\"data\":{{\"repository\":{{\"ref\":{held}}}}}}}");
+        Answer::new(REMOTE, Ran::Succeeded(Printed::new(found)))
+    }
+
+    fn pushed(sha: &str) -> Answer {
+        GitHub::remote(&format!("{{\"target\":{{\"oid\":\"{sha}\"}}}}"))
+    }
+
+    fn first(trailer: &str) -> Answer {
+        let log = format!("{trailer}\nother#D9\n");
+        Answer::git(FIRST, Ran::Succeeded(Printed::new(log)))
+    }
+
+    fn opening(after: &[Answer]) -> GitHub {
+        let created = Answer::new(CREATE, Ran::Succeeded(Printed::new("https://github.com/o/r/pull/12\n".to_owned())));
+        let before = [GitHub::pushed(SHA), GitHub::first("tools-retirement#D2"), created];
+        GitHub::answering(&before.into_iter().chain(after.iter().cloned()).collect::<Vec<_>>())
     }
 }
 
@@ -522,6 +600,9 @@ fn an_untyped_ending_is_sent_back_once_with_the_two_lines_and_then_escalated() -
         format!("DONE 12 {SHA}"),
         "DONE #12 0123456".to_owned(),
         format!("DONE #12 {SHA}0"),
+        format!("DONE main {SHA}"),
+        format!("DONE Design/open-pr {SHA}"),
+        format!("DONE {BRANCH}/ {SHA}"),
         String::new(),
     ];
     for said in &untyped {
@@ -559,8 +640,8 @@ fn a_done_on_green_checks_waits_on_ci_for_up_to_twenty_minutes_and_lets_the_agen
     let said = home.finished("\nDONE #12 0123456789ABCDEF0123456789ABCDEF01234567\n", false, &github);
     let wall = Wall::from(home.at);
     assert_eq!((said.shown.as_str(), said.ended), ("", Ok(Outcome::Hooked(HookEvent::SubagentStop))));
-    assert_eq!(github.asked(), [HEAD, WATCH, CHECKS].map(|asked| format!("gh {asked}")));
-    assert_eq!(github.deadlines(), [60, 1200, 60].map(|seconds| Deadline::after(wall, Timeout::new(seconds))));
+    assert_eq!(github.asked(), [HEAD, LISTED, WATCH, CHECKS].map(|asked| format!("gh {asked}")));
+    assert_eq!(github.deadlines(), [60, 60, 1200, 60].map(|seconds| Deadline::after(wall, Timeout::new(seconds))));
     Ok(())
 }
 
@@ -571,7 +652,7 @@ fn a_done_on_red_checks_is_sent_back_with_each_failed_jobs_log_tail() -> Result<
     assert_eq!(said.ended, Ok(Outcome::Blocked));
     assert_eq!(said.reason()?, Some(Home::golden("subagent-failing.txt")?));
     assert_eq!(
-        github.asked().get(3..).map(<[String]>::to_vec),
+        github.asked().get(4..).map(<[String]>::to_vec),
         Some(vec![format!("gh {LOG}"), "gh run view --job 458 --log-failed".to_owned()])
     );
     Ok(())
@@ -599,7 +680,9 @@ fn a_blocked_agent_and_every_unread_step_are_escalated_to_the_queue_and_the_agen
     home.queued("")?;
     let blocked = format!("BLOCKED #12 {SHA}");
     let done = format!("DONE #12 {SHA}");
-    let watching = |checks: Answer| GitHub::answering(&[GitHub::head(SHA), GitHub::watched(), checks]);
+    let listed = GitHub::listed(&["test"]);
+    let watching =
+        |checks: Answer| GitHub::answering(&[GitHub::head(SHA), GitHub::listed(&["test"]), GitHub::watched(), checks]);
     let cases = [
         (&blocked, GitHub::default()),
         (&done, GitHub::default()),
@@ -608,9 +691,9 @@ fn a_blocked_agent_and_every_unread_step_are_escalated_to_the_queue_and_the_agen
             GitHub::answering(&[Answer::new(HEAD, Ran::Failed(Printed::new(format!("{{\"headRefOid\":\"{SHA}\"}}"))))]),
         ),
         (&done, GitHub::answering(&[Answer::new(HEAD, Ran::Succeeded(Printed::new("{}".to_owned())))])),
-        (&done, GitHub::answering(&[GitHub::head(SHA)])),
-        (&done, GitHub::answering(&[GitHub::head(SHA), Answer::new(WATCH, Ran::Overdue)])),
-        (&done, GitHub::answering(&[GitHub::head(SHA), GitHub::watched()])),
+        (&done, GitHub::answering(&[GitHub::head(SHA), listed.clone()])),
+        (&done, GitHub::answering(&[GitHub::head(SHA), listed.clone(), Answer::new(WATCH, Ran::Overdue)])),
+        (&done, GitHub::answering(&[GitHub::head(SHA), listed, GitHub::watched()])),
         (&done, watching(Answer::new(CHECKS, Ran::Overdue))),
         (&done, watching(GitHub::checks(&[]))),
         (&done, watching(Answer::new(CHECKS, Ran::Succeeded(Printed::new("[{".to_owned()))))),
@@ -622,6 +705,129 @@ fn a_blocked_agent_and_every_unread_step_are_escalated_to_the_queue_and_the_agen
         assert_eq!((escalated.shown.as_str(), escalated.ended), ("", Ok(Outcome::Escalated)), "{said} {github:?}");
     }
     assert_eq!(home.queue()?, Home::golden("escalated-queue.md")?);
+    Ok(())
+}
+
+impl GitHub {
+    fn timeline(&self, at: SystemTime) -> String {
+        let start = Wall::from(at).into_inner();
+        let log = self.asked.lock().unpoisoned();
+        let lines: Vec<String> = log
+            .iter()
+            .map(|asked| format!("+{} {}\n", asked.deadline.into_inner().into_inner() - start, asked.spoken))
+            .collect();
+        lines.concat()
+    }
+}
+
+#[test]
+fn a_done_before_any_check_is_listed_polls_until_checks_appear_then_waits_for_green() -> Result<(), Failed> {
+    let home = Home::new()?;
+    let green = GitHub::checks(&[["test", "pass", ""], ["lint", "pass", ""]]);
+    let github = GitHub::answering(&[
+        GitHub::head(SHA),
+        GitHub::unlisted(),
+        GitHub::listed(&[]),
+        GitHub::listed(&["test", "lint"]),
+        GitHub::watched(),
+        green,
+    ]);
+    let said = home.finished(&format!("DONE #12 {SHA}"), false, &github);
+    assert_eq!((said.shown.as_str(), said.ended), ("", Ok(Outcome::Hooked(HookEvent::SubagentStop))));
+    assert_eq!(github.timeline(home.at), Home::golden("checks-appear.txt")?);
+    Ok(())
+}
+
+#[test]
+fn a_done_whose_checks_never_appear_is_escalated_after_five_minutes_of_polling() -> Result<(), Failed> {
+    let home = Home::new()?;
+    home.queued("")?;
+    let github = GitHub::answering(&[GitHub::head(SHA), GitHub::unlisted()]);
+    let said = home.finished(&format!("DONE #12 {SHA}"), false, &github);
+    assert_eq!((said.shown.as_str(), said.ended), ("", Ok(Outcome::Escalated)));
+    assert_eq!(github.timeline(home.at), Home::golden("no-checks.txt")?);
+    assert_eq!(home.queue()?, Home::golden("escalated-no-checks-queue.md")?);
+    Ok(())
+}
+
+#[test]
+fn a_done_on_a_pushed_branch_opens_its_pull_request_from_the_first_commit_and_waits_on_ci() -> Result<(), Failed> {
+    let viewed = Answer::new(VIEW, Ran::Succeeded(Printed::new("{\"number\":12}".to_owned())));
+    let green = GitHub::checks(&[["test", "pass", "https://github.com/o/r/actions/runs/9/job/456"]]);
+    let github = GitHub::opening(&[viewed, GitHub::head(SHA), GitHub::listed(&["test"]), GitHub::watched(), green]);
+    let home = Home::new()?;
+    home.specified(SPEC)?;
+    let said = home.finished(&format!("DONE {BRANCH} {SHA}"), false, &github);
+    assert_eq!((said.shown.as_str(), said.ended), ("", Ok(Outcome::Hooked(HookEvent::SubagentStop))));
+    let asked = [format!("gh {REMOTE}"), format!("git {FIRST}"), format!("gh {CREATE}"), format!("gh {VIEW}")];
+    let checked = [HEAD, LISTED, WATCH, CHECKS].map(|step| format!("gh {step}"));
+    assert_eq!(github.asked(), [&asked[..], &checked[..]].concat());
+    Ok(())
+}
+
+#[test]
+fn a_done_on_a_branch_whose_remote_head_differs_is_sent_back_to_push() -> Result<(), Failed> {
+    let home = Home::new()?;
+    let push = format!(" Push the commit, then end with DONE {BRANCH} <full sha of the pushed head>.");
+    let cases = [
+        (GitHub::pushed(OTHER), format!("Branch {BRANCH} has remote head {OTHER}, not {SHA}.{push}")),
+        (GitHub::remote("null"), format!("Branch {BRANCH} is not on the remote.{push}")),
+    ];
+    for (remote, reason) in cases {
+        let github = GitHub::answering(&[remote]);
+        let said = home.finished(&format!("DONE {BRANCH} {SHA}"), true, &github);
+        assert_eq!((said.reason()?, said.ended), (Some(reason), Ok(Outcome::Blocked)));
+        assert_eq!(github.asked(), [format!("gh {REMOTE}")]);
+    }
+    Ok(())
+}
+
+#[test]
+fn a_branch_that_cannot_be_read_or_opened_is_escalated_on_the_branch() -> Result<(), Failed> {
+    let home = Home::new()?;
+    home.queued("")?;
+    home.specified(SPEC)?;
+    let unviewed = Answer::new(VIEW, Ran::Succeeded(Printed::new("{}".to_owned())));
+    let cases = [
+        (format!("BLOCKED {BRANCH} {SHA}"), GitHub::default()),
+        (format!("DONE {BRANCH} {SHA}"), GitHub::default()),
+        (format!("DONE {BRANCH} {SHA}"), GitHub::answering(&[GitHub::remote("{}")])),
+        (format!("DONE {BRANCH} {SHA}"), GitHub::answering(&[GitHub::pushed(SHA)])),
+        (
+            format!("DONE {BRANCH} {SHA}"),
+            GitHub::answering(&[GitHub::pushed(SHA), Answer::git(FIRST, Ran::Succeeded(Printed::default()))]),
+        ),
+        (format!("DONE {BRANCH} {SHA}"), GitHub::answering(&[GitHub::pushed(SHA), GitHub::first("")])),
+        (
+            format!("DONE {BRANCH} {SHA}"),
+            GitHub::answering(&[GitHub::pushed(SHA), GitHub::first("tools-retirement#D2")]),
+        ),
+        (format!("DONE {BRANCH} {SHA}"), GitHub::opening(&[])),
+        (format!("DONE {BRANCH} {SHA}"), GitHub::opening(&[unviewed])),
+    ];
+    for (said, github) in &cases {
+        let escalated = home.finished(said, false, github);
+        assert_eq!((escalated.shown.as_str(), escalated.ended), ("", Ok(Outcome::Escalated)), "{said} {github:?}");
+    }
+    assert_eq!(home.queue()?, Home::golden("escalated-branch-queue.md")?);
+    Ok(())
+}
+
+#[test]
+fn a_branch_whose_spec_detail_has_no_heading_is_escalated_and_never_opened() -> Result<(), Failed> {
+    let home = Home::new()?;
+    home.queued("")?;
+    let done = format!("DONE {BRANCH} {SHA}");
+    let cited = |trailer: &str| GitHub::answering(&[GitHub::pushed(SHA), GitHub::first(trailer)]);
+    let unspecified = home.finished(&done, false, &cited("tools-retirement#D2"));
+    home.specified("D1 Dropped (D2 later).\nD20 Later work (owner 1).\nD2\n D2 Indented (owner 2).\n")?;
+    let cases = [cited("tools-retirement#D2"), cited("tools-retirement#D2, other#D3"), cited("owner 3c84f560")];
+    let escalated = cases.iter().map(|github| home.finished(&done, false, github)).collect::<Vec<_>>();
+    let first = [unspecified];
+    let ended = first.iter().chain(&escalated).map(|said| (said.shown.as_str(), said.ended == Ok(Outcome::Escalated)));
+    assert_eq!(ended.collect::<Vec<_>>(), [("", true); 4]);
+    assert!(cases.iter().all(|github| github.asked().len() == 2));
+    assert_eq!(home.queue()?, Home::golden("escalated-detail-queue.md")?);
     Ok(())
 }
 
