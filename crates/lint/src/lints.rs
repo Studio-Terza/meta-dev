@@ -14,15 +14,13 @@ mod vec_out_params;
 
 use std::sync::Arc;
 
-use syn::visit::Visit;
-
 use crate::budget::{Budget, TestScan};
 use crate::finding::Finding;
 use crate::gate::Gate;
 use crate::graph::Graph;
 use crate::source::Source;
 use crate::style::Style;
-use crate::walk::{Pausable, Walker};
+use crate::walk::{Lineup, Pausable, Walker};
 use crate::workspace::Package;
 pub(crate) use bool_methods::BoolMethods;
 pub(crate) use expression_flow::ExpressionFlow;
@@ -61,7 +59,7 @@ pub(crate) struct Lints<'run> {
 impl<'run> Lints<'run> {
     pub(crate) fn linted(source: &'run Source, file: &syn::File, gate: Gate) -> Linted {
         let lints = Lints { source, entered: gate.entered() };
-        let mut walker = Walker {
+        let lineup = Lineup {
             no_free_fns: lints.style(),
             vec_out_params: lints.style(),
             named_lifetimes: lints.style(),
@@ -77,8 +75,7 @@ impl<'run> Lints<'run> {
             no_test_only_api: lints.graph(),
             test_scan: Pausable::admitted(TestScan::default(), Some(())),
         };
-        walker.visit_file(file);
-        let Walker {
+        let Lineup {
             no_free_fns,
             vec_out_params,
             named_lifetimes,
@@ -93,7 +90,7 @@ impl<'run> Lints<'run> {
             emitters,
             no_test_only_api,
             test_scan,
-        } = walker;
+        } = Walker::walked(lineup, file);
         let found = [
             lints.found(lints.style::<NoComments>()),
             lints.found(no_free_fns),

@@ -35,25 +35,22 @@ enum Phase {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Step {
-    Entered,
-    Skipped,
-    Asleep,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Hold {
-    Paused,
-    Kept,
+enum State {
+    Awake,
+    PausedAt(usize),
+    Off,
 }
 
 #[derive(Debug)]
 pub(crate) struct Pausable<Lint> {
     lint: Lint,
-    paused: usize,
-    steps: Vec<Step>,
-    chosen: Vec<Option<Expanded>>,
-    held: Vec<Hold>,
+    state: State,
+}
+
+#[derive(Debug)]
+pub(crate) struct Walker<'file> {
+    lineup: Lineup<'file>,
+    depth: usize,
 }
 
 impl From<Option<()>> for Descent {
@@ -75,8 +72,7 @@ impl Expanded {
 
 impl<Lint> Pausable<Lint> {
     pub(crate) fn admitted(lint: Lint, admitted: Option<()>) -> Pausable<Lint> {
-        let paused = admitted.map_or(1, |()| 0);
-        Pausable { lint, paused, steps: Vec::new(), chosen: Vec::new(), held: Vec::new() }
+        Pausable { lint, state: admitted.map_or(State::Off, |()| State::Awake) }
     }
 
     pub(crate) fn woken(self) -> Option<Lint> {
@@ -84,70 +80,91 @@ impl<Lint> Pausable<Lint> {
     }
 
     fn active(&self) -> Option<()> {
-        (self.paused == 0).then_some(())
+        (self.state == State::Awake).then_some(())
     }
 
-    fn entered(&mut self, hook: impl FnOnce(&mut Lint) -> Descent) {
-        let step = self.active().map_or(Step::Asleep, |()| match hook(&mut self.lint) {
-            Descent::Into => Step::Entered,
-            Descent::Over => Step::Skipped,
-        });
-        self.paused += usize::from(step == Step::Skipped);
-        self.steps.push(step);
+    fn entered(&mut self, depth: usize, hook: impl FnOnce(&mut Lint) -> Descent) {
+        let over = self.active().map(|()| hook(&mut self.lint)).filter(|descent| *descent == Descent::Over);
+        self.state = over.map_or(self.state, |_| State::PausedAt(depth));
     }
 
-    fn left(&mut self, hook: impl FnOnce(&mut Lint)) {
-        match self.steps.pop() {
-            Some(Step::Entered) => hook(&mut self.lint),
-            Some(Step::Skipped) => self.paused -= 1,
-            Some(Step::Asleep) | None => {}
+    fn left(&mut self, depth: usize, hook: impl FnOnce(&mut Lint)) {
+        match self.state {
+            State::Awake => hook(&mut self.lint),
+            State::PausedAt(at) => self.state = if at == depth { State::Awake } else { self.state },
+            State::Off => {}
         }
     }
 
-    fn chose(&mut self, hook: impl FnOnce(&mut Lint) -> Expanded) {
-        let chosen = self.active().map(|()| hook(&mut self.lint));
-        self.chosen.push(chosen);
+    fn chose(&mut self, hook: impl FnOnce(&mut Lint) -> Expanded) -> Option<Expanded> {
+        self.active().map(|()| hook(&mut self.lint))
     }
 
-    fn wants(&self, phase: Phase) -> Option<()> {
-        self.chosen.last().copied().flatten().and_then(|chosen| chosen.admits(phase))
+    fn held(&mut self, depth: usize, wanted: Option<()>) {
+        let unwanted = self.active().and(wanted.xor(Some(())));
+        self.state = unwanted.map_or(self.state, |()| State::PausedAt(depth));
+    }
+}
+
+impl Walker<'_> {
+    pub(crate) fn walked<'file>(lineup: Lineup<'file>, file: &syn::File) -> Lineup<'file> {
+        let mut walker = Walker { lineup, depth: 0 };
+        walker.visit_file(file);
+        walker.lineup
     }
 
-    fn hold(&mut self, phase: Phase) {
-        let unwanted = self.active().and(self.wants(phase).xor(Some(())));
-        let held = unwanted.map_or(Hold::Kept, |()| Hold::Paused);
-        self.paused += usize::from(held == Hold::Paused);
-        self.held.push(held);
-    }
-
-    fn release(&mut self) {
-        self.paused -= usize::from(self.held.pop() == Some(Hold::Paused));
-    }
-
-    fn unchose(&mut self) {
-        self.chosen.pop();
+    fn deeper(&mut self, walk: impl FnOnce(&mut Self, usize)) {
+        self.depth += 1;
+        walk(self, self.depth);
+        self.depth -= 1;
     }
 }
 
 macro_rules! each {
-    ($walker:expr, [$($lint:ident: $kind:ty),* $(,)?], $method:ident $arguments:tt) => {
-        $( $walker.$lint.$method $arguments; )*
+    ($lineup:expr, [$($lint:ident: $kind:ty),* $(,)?], $method:ident $arguments:tt) => {
+        $( $lineup.$lint.$method $arguments; )*
     };
 }
 
-macro_rules! any {
-    ($walker:expr, [$($lint:ident: $kind:ty),* $(,)?], $method:ident $arguments:tt) => {
-        [$( $walker.$lint.$method $arguments ),*].into_iter().flatten().next()
+macro_rules! lineup {
+    ($life:lifetime [$($lint:ident: $kind:ty),* $(,)?]) => {
+        #[derive(Debug)]
+        pub(crate) struct Lineup<$life> {
+            $(pub $lint: Pausable<$kind>,)*
+        }
+
+        #[derive(Clone, Copy, Debug)]
+        struct Chosen {
+            $($lint: Option<Expanded>,)*
+        }
+
+        impl Lineup<'_> {
+            fn awake(&self) -> Option<()> {
+                [$(self.$lint.active()),*].into_iter().flatten().next()
+            }
+
+            fn chose(&mut self, invocation: &Macro) -> Chosen {
+                Chosen { $($lint: self.$lint.chose(|lint| Hooks::macro_called(lint, invocation)),)* }
+            }
+
+            fn held(&mut self, depth: usize, chosen: Chosen, phase: Phase) {
+                $(self.$lint.held(depth, chosen.$lint.and_then(|choice| choice.admits(phase)));)*
+            }
+
+            fn released(&mut self, depth: usize) {
+                $(self.$lint.left(depth, |_| {});)*
+            }
+        }
+
+        impl Chosen {
+            fn wanting(self, phase: Phase) -> Option<()> {
+                [$(self.$lint.and_then(|choice| choice.admits(phase))),*].into_iter().flatten().next()
+            }
+        }
     };
 }
 
 macro_rules! walker {
-    (@walker $life:lifetime [$($lint:ident: $kind:ty),* $(,)?]) => {
-        #[derive(Debug)]
-        pub(crate) struct Walker<$life> {
-            $(pub $lint: Pausable<$kind>,)*
-        }
-    };
     (
         $life:lifetime;
         lints $lints:tt
@@ -167,49 +184,44 @@ macro_rules! walker {
             }
         }
 
-        walker!(@walker $life $lints);
+        lineup!($life $lints);
 
         impl Walker<'_> {
-            fn awake(&self) -> Option<()> {
-                any!(self, $lints, active())
-            }
-
-            fn wanting(&self, phase: Phase) -> Option<()> {
-                any!(self, $lints, wants(phase))
-            }
-
-            fn phased(&mut self, phase: Phase, walk: impl FnOnce(&mut Self)) {
-                each!(self, $lints, hold(phase));
-                walk(self);
-                each!(self, $lints, release());
+            fn phased(&mut self, chosen: Chosen, phase: Phase, walk: impl FnOnce(&mut Self)) {
+                self.deeper(|walker, depth| {
+                    walker.lineup.held(depth, chosen, phase);
+                    walk(walker);
+                    walker.lineup.released(depth);
+                });
             }
         }
 
         impl<'ast> Visit<'ast> for Walker<'_> {
             $(
                 fn $visit(&mut self, node: &'ast $node) {
-                    each!(self, $lints, entered(|lint| Hooks::$hook(lint, node)));
-                    self.awake().map_or_default(|()| visit::$visit(self, node));
-                    each!(self, $lints, left(|lint| Hooks::$left(lint, node)));
+                    self.deeper(|walker, depth| {
+                        each!(walker.lineup, $lints, entered(depth, |lint| Hooks::$hook(lint, node)));
+                        walker.lineup.awake().map_or_default(|()| visit::$visit(walker, node));
+                        each!(walker.lineup, $lints, left(depth, |lint| Hooks::$left(lint, node)));
+                    });
                 }
             )*
 
             fn visit_macro(&mut self, node: &'ast Macro) {
-                each!(self, $lints, chose(|lint| Hooks::macro_called(lint, node)));
+                let chosen = self.lineup.chose(node);
                 let defining = Expansion::defining(node);
                 let statements = Phase::Statements(defining);
-                self.wanting(statements).map_or_default(|()| {
+                chosen.wanting(statements).map_or_default(|()| {
                     let expansion = Expansion::of(node);
-                    self.phased(statements, |walker| expansion.walk(walker));
+                    self.phased(chosen, statements, |walker| expansion.walk(walker));
                 });
-                self.wanting(Phase::Substituted).and(defining).map_or_default(|()| {
+                chosen.wanting(Phase::Substituted).and(defining).map_or_default(|()| {
                     let expansion = Expansion::substituted(node);
-                    self.phased(Phase::Substituted, |walker| expansion.walk(walker));
+                    self.phased(chosen, Phase::Substituted, |walker| expansion.walk(walker));
                 });
-                self.wanting(Phase::Path).map_or_default(|()| {
-                    self.phased(Phase::Path, |walker| visit::visit_macro(walker, node));
+                chosen.wanting(Phase::Path).map_or_default(|()| {
+                    self.phased(chosen, Phase::Path, |walker| visit::visit_macro(walker, node));
                 });
-                each!(self, $lints, unchose());
             }
         }
     };
