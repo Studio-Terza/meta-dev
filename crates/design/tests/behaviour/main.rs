@@ -47,8 +47,17 @@ const HEAD: &str = "pr view 12 --json headRefOid";
 const WATCH: &str = "pr checks 12 --watch --fail-fast";
 const CHECKS: &str = "pr checks 12 --json name,bucket,link";
 const LOG: &str = "run view --job 456 --log-failed";
-const UNTYPED: &str = "End your turn with exactly one line and nothing else: DONE #<pr> <full sha> once the pull \
-                       request's head is that commit, or BLOCKED #<pr> <full sha> when you cannot go on.";
+const UNTYPED: &str = "End your turn with exactly one line and nothing else: DONE <branch> <full sha> once that \
+                       commit is the pushed head of a branch with no pull request yet, DONE #<pr> <full sha> once the \
+                       pull request's head is that commit, or BLOCKED #<pr> <full sha> when you cannot go on.";
+const BRANCH: &str = "design/open-pr";
+const REMOTE: &str = "api graphql -F owner={owner} -F name={repo} -f ref=refs/heads/design/open-pr -f \
+                      query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(\
+                      qualifiedName:$ref){target{oid}}}}";
+const FIRST: &str = "log --reverse --format=%s%n%(trailers:key=Spec,valueonly,separator=%x2c) origin/main..0123456789abcdef0123456789abcdef01234567";
+const CREATE: &str = "pr create --head design/open-pr --base main --title Open the pull request in code --body spec: \
+                      tools-retirement#D2\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)";
+const VIEW: &str = "pr view design/open-pr --json number";
 
 #[derive(Debug)]
 struct Stepping {
@@ -140,7 +149,7 @@ struct GitHub {
 
 #[derive(Clone, Debug)]
 struct Answer {
-    asked: &'static str,
+    asked: String,
     ran: Ran,
 }
 
@@ -151,14 +160,18 @@ struct Asked {
 }
 
 impl Answer {
-    fn new(asked: &'static str, ran: Ran) -> Answer {
-        Answer { asked, ran }
+    fn new(asked: &str, ran: Ran) -> Answer {
+        Answer { asked: format!("gh {asked}"), ran }
+    }
+
+    fn git(asked: &str, ran: Ran) -> Answer {
+        Answer { asked: format!("git {asked}"), ran }
     }
 }
 
 impl GitHub {
     fn answering(given: &[Answer]) -> GitHub {
-        let answers = given.iter().map(|answer| (format!("gh {}", answer.asked), answer.ran.clone())).collect();
+        let answers = given.iter().map(|answer| (answer.asked.clone(), answer.ran.clone())).collect();
         GitHub { answers, asked: Mutex::default() }
     }
 
@@ -503,6 +516,28 @@ impl GitHub {
     }
 }
 
+impl GitHub {
+    fn remote(held: &str) -> Answer {
+        let found = format!("{{\"data\":{{\"repository\":{{\"ref\":{held}}}}}}}");
+        Answer::new(REMOTE, Ran::Succeeded(Printed::new(found)))
+    }
+
+    fn pushed(sha: &str) -> Answer {
+        GitHub::remote(&format!("{{\"target\":{{\"oid\":\"{sha}\"}}}}"))
+    }
+
+    fn first(trailer: &str) -> Answer {
+        let log = format!("Open the pull request in code\n{trailer}\nLater work\nspec: other#D9\n");
+        Answer::git(FIRST, Ran::Succeeded(Printed::new(log)))
+    }
+
+    fn opening(after: &[Answer]) -> GitHub {
+        let created = Answer::new(CREATE, Ran::Succeeded(Printed::new("https://github.com/o/r/pull/12\n".to_owned())));
+        let before = [GitHub::pushed(SHA), GitHub::first("tools-retirement#D2"), created];
+        GitHub::answering(&before.into_iter().chain(after.iter().cloned()).collect::<Vec<_>>())
+    }
+}
+
 impl Home {
     fn queue(&self) -> Result<String, Failed> {
         Ok(fs::read_to_string(self.path().join("studio-meta-dev/transcripts/queue.md"))?)
@@ -522,6 +557,9 @@ fn an_untyped_ending_is_sent_back_once_with_the_two_lines_and_then_escalated() -
         format!("DONE 12 {SHA}"),
         "DONE #12 0123456".to_owned(),
         format!("DONE #12 {SHA}0"),
+        format!("DONE main {SHA}"),
+        format!("DONE Design/open-pr {SHA}"),
+        format!("DONE {BRANCH}/ {SHA}"),
         String::new(),
     ];
     for said in &untyped {
@@ -622,6 +660,66 @@ fn a_blocked_agent_and_every_unread_step_are_escalated_to_the_queue_and_the_agen
         assert_eq!((escalated.shown.as_str(), escalated.ended), ("", Ok(Outcome::Escalated)), "{said} {github:?}");
     }
     assert_eq!(home.queue()?, Home::golden("escalated-queue.md")?);
+    Ok(())
+}
+
+#[test]
+fn a_done_on_a_pushed_branch_opens_its_pull_request_from_the_first_commit_and_waits_on_ci() -> Result<(), Failed> {
+    let viewed = Answer::new(VIEW, Ran::Succeeded(Printed::new("{\"number\":12}".to_owned())));
+    let green = GitHub::checks(&[["test", "pass", "https://github.com/o/r/actions/runs/9/job/456"]]);
+    let github = GitHub::opening(&[viewed, GitHub::head(SHA), GitHub::watched(), green]);
+    let said = Home::new()?.finished(&format!("DONE {BRANCH} {SHA}"), false, &github);
+    assert_eq!((said.shown.as_str(), said.ended), ("", Ok(Outcome::Hooked(HookEvent::SubagentStop))));
+    let asked = [format!("gh {REMOTE}"), format!("git {FIRST}"), format!("gh {CREATE}"), format!("gh {VIEW}")];
+    let checked = [HEAD, WATCH, CHECKS].map(|step| format!("gh {step}"));
+    assert_eq!(github.asked(), [&asked[..], &checked[..]].concat());
+    Ok(())
+}
+
+#[test]
+fn a_done_on_a_branch_whose_remote_head_differs_is_sent_back_to_push() -> Result<(), Failed> {
+    let home = Home::new()?;
+    let push = format!(" Push the commit, then end with DONE {BRANCH} <full sha of the pushed head>.");
+    let cases = [
+        (GitHub::pushed(OTHER), format!("Branch {BRANCH} has remote head {OTHER}, not {SHA}.{push}")),
+        (GitHub::remote("null"), format!("Branch {BRANCH} is not on the remote.{push}")),
+    ];
+    for (remote, reason) in cases {
+        let github = GitHub::answering(&[remote]);
+        let said = home.finished(&format!("DONE {BRANCH} {SHA}"), true, &github);
+        assert_eq!((said.reason()?, said.ended), (Some(reason), Ok(Outcome::Blocked)));
+        assert_eq!(github.asked(), [format!("gh {REMOTE}")]);
+    }
+    Ok(())
+}
+
+#[test]
+fn a_branch_that_cannot_be_read_or_opened_is_escalated_on_the_branch() -> Result<(), Failed> {
+    let home = Home::new()?;
+    home.queued("")?;
+    let unviewed = Answer::new(VIEW, Ran::Succeeded(Printed::new("{}".to_owned())));
+    let cases = [
+        (format!("BLOCKED {BRANCH} {SHA}"), GitHub::default()),
+        (format!("DONE {BRANCH} {SHA}"), GitHub::default()),
+        (format!("DONE {BRANCH} {SHA}"), GitHub::answering(&[GitHub::remote("{}")])),
+        (format!("DONE {BRANCH} {SHA}"), GitHub::answering(&[GitHub::pushed(SHA)])),
+        (
+            format!("DONE {BRANCH} {SHA}"),
+            GitHub::answering(&[GitHub::pushed(SHA), Answer::git(FIRST, Ran::Succeeded(Printed::default()))]),
+        ),
+        (format!("DONE {BRANCH} {SHA}"), GitHub::answering(&[GitHub::pushed(SHA), GitHub::first("")])),
+        (
+            format!("DONE {BRANCH} {SHA}"),
+            GitHub::answering(&[GitHub::pushed(SHA), GitHub::first("tools-retirement#D2")]),
+        ),
+        (format!("DONE {BRANCH} {SHA}"), GitHub::opening(&[])),
+        (format!("DONE {BRANCH} {SHA}"), GitHub::opening(&[unviewed])),
+    ];
+    for (said, github) in &cases {
+        let escalated = home.finished(said, false, github);
+        assert_eq!((escalated.shown.as_str(), escalated.ended), ("", Ok(Outcome::Escalated)), "{said} {github:?}");
+    }
+    assert_eq!(home.queue()?, Home::golden("escalated-branch-queue.md")?);
     Ok(())
 }
 

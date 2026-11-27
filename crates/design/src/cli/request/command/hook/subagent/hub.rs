@@ -1,13 +1,15 @@
+use std::fmt;
 use std::ops::Not;
 use std::path::Path;
 
 use design_messages::{CheckName, PullNumber};
 use dispatch_ports::{Call, Clock, Deadline, Dispatch, Ran, Shell, Timeout};
+use grammar_spec_line::Attachment;
 use invariants::Ignoring;
 use serde::Deserialize;
 
 use super::super::super::crew::Crew;
-use super::boundary::{CommitSha, JobId};
+use super::boundary::{Branch, Branched, CommitSha, First, JobId, Opened, Pushed};
 use super::{FailedJob, UnreadStep};
 use crate::cli::request::ignored::Ignored;
 
@@ -57,21 +59,100 @@ enum State {
 #[serde(from = "String")]
 struct Link(Option<JobId>);
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Unopened {
+    Unpushed(Option<CommitSha>),
+    Unread(UnreadStep),
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Body<'spec>(&'spec Attachment);
+
+#[derive(Debug, Deserialize)]
+struct Found {
+    data: Data,
+}
+
+#[derive(Debug, Deserialize)]
+struct Data {
+    repository: Repository,
+}
+
+#[derive(Debug, Deserialize)]
+struct Repository {
+    #[serde(rename = "ref")]
+    reference: Option<Targeted>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Targeted {
+    target: Oid,
+}
+
+#[derive(Debug, Deserialize)]
+struct Oid {
+    oid: CommitSha,
+}
+
 impl<'crew, D: Dispatch, C: Clock, G: Shell> Hub<'crew, D, C, G> {
     const PROGRAM: &'static str = "gh";
     const QUICK: Timeout = Timeout::new(60);
     const WATCH: Timeout = Timeout::new(20 * 60);
     const UNLOGGED: &'static str = "(the log could not be read)";
+    const GIT: &'static str = "git";
+    const BASE: &'static str = "main";
+    const MAIN: &'static str = "origin/main";
+    const FIRST: &'static str = "--format=%s%n%(trailers:key=Spec,valueonly,separator=%x2c)";
+    const REMOTE: &'static str = "query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name)\
+                                  {ref(qualifiedName:$ref){target{oid}}}}";
 
     pub fn new(crew: &'crew Crew<'crew, D, C, G>, directory: &'crew Path) -> Hub<'crew, D, C, G> {
         Hub { crew, directory }
     }
 
     fn ran(&self, arguments: &[&str], timeout: Timeout) -> Option<Ran> {
+        self.spoke(Hub::<D, C, G>::PROGRAM, arguments, timeout)
+    }
+
+    fn spoke(&self, program: &'static str, arguments: &[&str], timeout: Timeout) -> Option<Ran> {
         let spoken = arguments.iter().map(|word| (*word).to_owned()).collect();
         let deadline = Deadline::after(self.crew.now(), timeout);
-        let call = Call::new(Hub::<D, C, G>::PROGRAM, spoken, self.directory.to_path_buf(), deadline);
+        let call = Call::new(program, spoken, self.directory.to_path_buf(), deadline);
         self.crew.ran(&call).ignoring(Ignored::Unrun)
+    }
+
+    pub fn opened(&self, branched: &Branched) -> Result<Pushed, Unopened> {
+        let held = self.remote(branched.branch())?;
+        (held == Some(branched.head())).then_some(()).ok_or(Unopened::Unpushed(held))?;
+        let first = self.first(branched.head())?;
+        let spec = first.spec().ok_or(Unopened::Unread(UnreadStep::Spec))?;
+        let branch = branched.branch().to_string();
+        let body = Body(spec).to_string();
+        let title = first.subject().to_string();
+        let asked =
+            ["pr", "create", "--head", &branch, "--base", Hub::<D, C, G>::BASE, "--title", &title, "--body", &body];
+        self.ran(&asked, Self::QUICK).as_ref().and_then(Ran::succeeded).ok_or(UnreadStep::Open)?;
+        let viewed = self.ran(&["pr", "view", &branch, "--json", "number"], Self::QUICK);
+        let printed = viewed.as_ref().and_then(Ran::succeeded).ok_or(UnreadStep::Open)?;
+        let opened = serde_json::from_str::<Opened>(printed.as_ref()).map_err(|_unread| UnreadStep::Open)?;
+        Ok(Pushed::new(opened.pull(), branched.head()))
+    }
+
+    fn remote(&self, branch: &Branch) -> Result<Option<CommitSha>, UnreadStep> {
+        let reference = format!("ref=refs/heads/{branch}");
+        let query = format!("query={}", Hub::<D, C, G>::REMOTE);
+        let asked = ["api", "graphql", "-F", "owner={owner}", "-F", "name={repo}", "-f", &reference, "-f", &query];
+        let ran = self.ran(&asked, Self::QUICK);
+        let printed = ran.as_ref().and_then(Ran::succeeded).ok_or(UnreadStep::Remote)?;
+        let found: Found = serde_json::from_str(printed.as_ref()).map_err(|_unread| UnreadStep::Remote)?;
+        Ok(found.data.repository.reference.map(|targeted| targeted.target.oid))
+    }
+
+    fn first(&self, head: CommitSha) -> Result<First, UnreadStep> {
+        let range = format!("{}..{head}", Hub::<D, C, G>::MAIN);
+        let ran = self.spoke(Hub::<D, C, G>::GIT, &["log", "--reverse", Hub::<D, C, G>::FIRST, &range], Self::QUICK);
+        let printed = ran.as_ref().and_then(Ran::succeeded).ok_or(UnreadStep::Commits)?;
+        First::read(printed.as_ref()).ok_or(UnreadStep::Commits)
     }
 
     pub fn head(&self, pull: PullNumber) -> Result<CommitSha, UnreadStep> {
@@ -142,5 +223,17 @@ impl Bucket {
 impl From<String> for Link {
     fn from(link: String) -> Link {
         Link(JobId::linked(&link))
+    }
+}
+
+impl From<UnreadStep> for Unopened {
+    fn from(step: UnreadStep) -> Unopened {
+        Unopened::Unread(step)
+    }
+}
+
+impl fmt::Display for Body<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "spec: {}\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)", self.0)
     }
 }

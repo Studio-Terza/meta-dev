@@ -21,8 +21,8 @@ use crate::cli::request::ignored::Ignored;
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
 pub use boundary::Finishing;
-use boundary::{CommitSha, JobId, Pushed, Reminder, Report, Said};
-use hub::{Hub, Verdict};
+use boundary::{At, Branched, CommitSha, JobId, Pushed, Reminder, Report, Said};
+use hub::{Hub, Unopened, Verdict};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ending {
@@ -53,6 +53,10 @@ pub enum UnreadStep {
     Watch,
     Overdue,
     Checks,
+    Remote,
+    Commits,
+    Spec,
+    Open,
 }
 
 #[derive(Debug)]
@@ -62,6 +66,12 @@ struct Untyped;
 struct Unpushed {
     pushed: Pushed,
     held: CommitSha,
+}
+
+#[derive(Debug)]
+struct Stale<'report> {
+    branched: &'report Branched,
+    held: Option<CommitSha>,
 }
 
 #[derive(Debug)]
@@ -79,7 +89,7 @@ struct Excerpt {
 #[derive(Debug)]
 struct Escalated<'finishing> {
     escalation: Escalation,
-    pushed: Option<Pushed>,
+    at: Option<At>,
     directory: &'finishing Path,
 }
 
@@ -95,48 +105,54 @@ impl Finishing {
     ) -> Result<Uttered, Failure> {
         let hub = Hub::new(crew, self.directory());
         match (self.said(), self.reminder()) {
-            (Said::Typed(report), _reminder) => self.ended(*report, &report.ending(&hub, ground.store()), ground, &hub),
+            (Said::Typed(report), _reminder) => self.reported(report, ground, &hub),
             (Said::Untyped, Reminder::First) => Decision::blocked(Untyped.to_string()),
             (Said::Untyped, Reminder::Repeated) => self.escalated(ground, None, Escalation::Unread(UnreadStep::Ending)),
         }
     }
 
-    fn ended<F: Files, S: Store, D: Dispatch, C: Clock, G: Shell>(
+    fn reported<F: Files, S: Store, D: Dispatch, C: Clock, G: Shell>(
         &self,
-        report: Report,
-        ending: &Ending,
+        report: &Report,
         ground: &Ground<'_, F, S>,
         hub: &Hub<'_, D, C, G>,
     ) -> Result<Uttered, Failure> {
-        let pushed = report.pushed();
-        match ending {
-            Ending::Stop => Ok(Uttered::silent(Ok(Outcome::Hooked(HookEvent::SubagentStop)))),
-            Ending::Unpushed { held } => Decision::blocked(Unpushed { pushed, held: *held }.to_string()),
-            Ending::Failing(jobs) => Decision::blocked(Logged::fetched(pushed, jobs, hub).to_string()),
-            Ending::Escalate(escalation) => self.escalated(ground, Some(pushed), escalation.clone()),
+        match report {
+            Report::Blocked(at) => self.escalated(ground, Some(at.clone()), Escalation::Blocked),
+            Report::Done(At::Pull(pushed)) => self.done(*pushed, ground, hub),
+            Report::Done(At::Branch(branched)) => match hub.opened(branched) {
+                Ok(pushed) => self.done(pushed, ground, hub),
+                Err(Unopened::Unpushed(held)) => Decision::blocked(Stale { branched, held }.to_string()),
+                Err(Unopened::Unread(step)) => {
+                    self.escalated(ground, Some(At::Branch(branched.clone())), Escalation::Unread(step))
+                }
+            },
+        }
+    }
+
+    fn done<F: Files, S: Store, D: Dispatch, C: Clock, G: Shell>(
+        &self,
+        pushed: Pushed,
+        ground: &Ground<'_, F, S>,
+        hub: &Hub<'_, D, C, G>,
+    ) -> Result<Uttered, Failure> {
+        match pushed.checked(hub, ground.store()) {
+            Ok(Ending::Stop) => Ok(Uttered::silent(Ok(Outcome::Hooked(HookEvent::SubagentStop)))),
+            Ok(Ending::Unpushed { held }) => Decision::blocked(Unpushed { pushed, held }.to_string()),
+            Ok(Ending::Failing(jobs)) => Decision::blocked(Logged::fetched(pushed, &jobs, hub).to_string()),
+            Ok(Ending::Escalate(escalation)) => self.escalated(ground, Some(At::Pull(pushed)), escalation),
+            Err(step) => self.escalated(ground, Some(At::Pull(pushed)), Escalation::Unread(step)),
         }
     }
 
     fn escalated<F: Files, S: Store>(
         &self,
         ground: &Ground<'_, F, S>,
-        pushed: Option<Pushed>,
+        at: Option<At>,
         escalation: Escalation,
     ) -> Result<Uttered, Failure> {
-        ground.queued(Escalated { escalation, pushed, directory: self.directory() }).map_err(Failure::Unqueued)?;
+        ground.queued(Escalated { escalation, at, directory: self.directory() }).map_err(Failure::Unqueued)?;
         Ok(Uttered::silent(Ok(Outcome::Escalated)))
-    }
-}
-
-impl Report {
-    fn ending<D: Dispatch, C: Clock, G: Shell>(self, hub: &Hub<'_, D, C, G>, store: &impl Store) -> Ending {
-        match self {
-            Report::Blocked(_pushed) => Ending::Escalate(Escalation::Blocked),
-            Report::Done(pushed) => match pushed.checked(hub, store) {
-                Ok(ending) => ending,
-                Err(step) => Ending::Escalate(Escalation::Unread(step)),
-            },
-        }
     }
 }
 
@@ -203,9 +219,31 @@ impl Excerpt {
 impl fmt::Display for Untyped {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(
-            "End your turn with exactly one line and nothing else: DONE #<pr> <full sha> once the pull request's head \
-             is that commit, or BLOCKED #<pr> <full sha> when you cannot go on.",
+            "End your turn with exactly one line and nothing else: DONE <branch> <full sha> once that commit is the \
+             pushed head of a branch with no pull request yet, DONE #<pr> <full sha> once the pull request's head is \
+             that commit, or BLOCKED #<pr> <full sha> when you cannot go on.",
         )
+    }
+}
+
+impl fmt::Display for Stale<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Stale { branched, held } = self;
+        let branch = branched.branch();
+        match held {
+            Some(remote) => write!(formatter, "Branch {branch} has remote head {remote}, not {}.", branched.head()),
+            None => write!(formatter, "Branch {branch} is not on the remote."),
+        }?;
+        write!(formatter, " Push the commit, then end with DONE {branch} <full sha of the pushed head>.")
+    }
+}
+
+impl fmt::Display for At {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            At::Pull(pushed) => write!(formatter, "#{} {}", pushed.pull(), pushed.head()),
+            At::Branch(branched) => write!(formatter, "{} {}", branched.branch(), branched.head()),
+        }
     }
 }
 
@@ -250,7 +288,7 @@ impl fmt::Display for Escalation {
 impl fmt::Display for Escalated<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "- [agent outcome] {}", self.escalation)?;
-        self.pushed.iter().try_for_each(|pushed| write!(formatter, " on #{} {}", pushed.pull(), pushed.head()))?;
+        self.at.iter().try_for_each(|at| write!(formatter, " on {at}"))?;
         write!(formatter, ", from {}", self.directory.display())
     }
 }

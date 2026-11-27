@@ -13,6 +13,8 @@ enum Piece<'text> {
     Ended(Ended),
     #[regex("#[0-9]+", |lexer| lexer.slice().get(1..).and_then(Piece::numbered))]
     Pull(NonZeroU32),
+    #[regex("[a-z0-9][a-z0-9-]*(/[a-z0-9][a-z0-9-]*)+", |lexer| lexer.slice())]
+    Branch(&'text str),
     #[regex("[0-9a-fA-F]{40}", |lexer| lexer.slice())]
     Head(&'text str),
 }
@@ -35,18 +37,41 @@ pub enum Ended {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Target<'text> {
+    Pull(NonZeroU32),
+    Branch(&'text str),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AgentReport<'text> {
     ended: Ended,
-    pull: NonZeroU32,
+    target: Target<'text>,
     head: &'text str,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct JobLink(NonZeroU64);
 
-impl Piece<'_> {
+impl<'text> Piece<'text> {
     fn numbered(digits: &str) -> Option<NonZeroU32> {
         digits.parse::<NonZeroU32>().ignoring(Unlexed::OutOfRange)
+    }
+
+    fn target(self) -> Option<Target<'text>> {
+        match self {
+            Piece::Pull(pull) => Some(Target::Pull(pull)),
+            Piece::Branch(branch) => Some(Target::Branch(branch)),
+            Piece::Ended(_) | Piece::Head(_) => None,
+        }
+    }
+}
+
+impl<'text> Target<'text> {
+    #[must_use]
+    pub fn read(text: &'text str) -> Option<Target<'text>> {
+        let pieces = Piece::lexer(text).collect::<Result<Vec<Piece<'text>>, ()>>().ignoring(Unlexed::NotThisGrammar)?;
+        let [only] = <[Piece<'text>; 1]>::try_from(pieces).ignoring(Unlexed::OtherShape)?;
+        only.target()
     }
 }
 
@@ -61,8 +86,10 @@ impl<'text> AgentReport<'text> {
     pub fn read(text: &'text str) -> Option<AgentReport<'text>> {
         let pieces = Piece::lexer(text).collect::<Result<Vec<Piece<'text>>, ()>>().ignoring(Unlexed::NotThisGrammar)?;
         match <[Piece<'text>; 3]>::try_from(pieces).ignoring(Unlexed::OtherShape)? {
-            [Piece::Ended(ended), Piece::Pull(pull), Piece::Head(head)] => Some(AgentReport { ended, pull, head }),
-            [Piece::Ended(_) | Piece::Pull(_) | Piece::Head(_), _, _] => None,
+            [Piece::Ended(ended), aimed, Piece::Head(head)] => {
+                aimed.target().map(|target| AgentReport { ended, target, head })
+            }
+            [Piece::Ended(_) | Piece::Pull(_) | Piece::Branch(_) | Piece::Head(_), _, _] => None,
         }
     }
 
@@ -72,8 +99,8 @@ impl<'text> AgentReport<'text> {
     }
 
     #[must_use]
-    pub fn pull(&self) -> NonZeroU32 {
-        self.pull
+    pub fn target(&self) -> Target<'text> {
+        self.target
     }
 
     #[must_use]
