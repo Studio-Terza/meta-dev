@@ -20,7 +20,7 @@ use super::persistence::Persistence;
 use crate::cli::failure::Failure;
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
-use backtest::{Backtest, Split};
+use backtest::Backtest;
 pub use crew::Crew;
 use hook::Hook;
 use ingest::Ingest;
@@ -57,11 +57,9 @@ impl Command {
             [Self::HOOK, event] => Hook::named(event).map(Command::Hook),
             [Self::WALK, tree] => Ok(Command::Walk(Walk::from(PathBuf::from(tree)))),
             [Self::PAIRS, tree, session, pairs] => Ok(Command::Pairs(Pairs::new([tree, session, pairs]))),
-            [Self::BACKTEST, tree, session, pairs, rows] => {
-                Ok(Command::Backtest(Backtest::new([tree, session, pairs, rows], Split::VARIANTS)))
+            [Self::BACKTEST, tree, session, pairs, rows, split, set, every] => {
+                Backtest::spoken([tree, session, pairs, rows, split, set, every]).map(Command::Backtest)
             }
-            [Self::BACKTEST, tree, session, pairs, rows, split] => Split::named(split)
-                .map(|named| Command::Backtest(Backtest::new([tree, session, pairs, rows], &[named]))),
             _ => Err(Failure::Usage),
         }
     }
@@ -74,7 +72,7 @@ impl Command {
         }
     }
 
-    pub fn written<F: Files, S: Store, D: Dispatch + Sync, C: Clock + Sync>(
+    pub fn written<F: Files + Sync, S: Store, D: Dispatch + Sync, C: Clock + Sync>(
         self,
         environment: &impl Environment,
         ground: Ground<'_, F, S>,

@@ -1,8 +1,10 @@
 mod boundary;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
+use std::iter;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread::{self, ScopedJoinHandle};
 
 use console_ports::Shown;
@@ -29,12 +31,14 @@ pub struct Backtest {
     session: PathBuf,
     pairs: PathBuf,
     rows: PathBuf,
-    splits: Vec<Split>,
+    split: Split,
+    set: Set,
+    every: usize,
 }
 
 #[derive(strum::Display, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
 #[strum(serialize_all = "lowercase")]
-pub enum Split {
+enum Split {
     Tune,
     Test,
 }
@@ -88,7 +92,7 @@ struct Extra<'run> {
 #[derive(Debug)]
 struct Report<'run, 'tree> {
     trials: &'run [Trial<'run, 'tree>],
-    summaries: Vec<Summary<'run, 'tree>>,
+    summaries: [Summary<'run, 'tree>; 1],
     brute: Brute,
     extras: Vec<Extra<'run>>,
 }
@@ -103,17 +107,19 @@ impl Backtest {
     const CONCURRENT: usize = 8;
     const HEADER: &'static str = "set\tsplit\tindex\tgold\tretrieved\tfound\trecall\tmillis\ttokens\n";
 
-    pub fn new([tree, session, pairs, rows]: [&&str; 4], splits: &[Split]) -> Backtest {
-        Backtest {
+    pub fn spoken([tree, session, pairs, rows, split, set, every]: [&&str; 7]) -> Result<Backtest, Failure> {
+        Ok(Backtest {
             tree: PathBuf::from(tree),
             session: PathBuf::from(session),
             pairs: PathBuf::from(pairs),
             rows: PathBuf::from(rows),
-            splits: splits.to_vec(),
-        }
+            split: Split::named(split)?,
+            set: Set::named(set)?,
+            every: every.parse::<usize>().map_err(|_unparsed| Failure::Usage)?,
+        })
     }
 
-    pub fn answered<F: Files, S: Store, D: Dispatch + Sync, C: Clock + Sync>(
+    pub fn answered<F: Files + Sync, S: Store, D: Dispatch + Sync, C: Clock + Sync>(
         &self,
         ground: &Ground<'_, F, S>,
         crew: &Crew<'_, D, C>,
@@ -126,37 +132,43 @@ impl Backtest {
         let brute = Brute(ground.store().read(StopTrail)?);
         let cases: Vec<Case<'_>> =
             Backtest::stops(&tree, &log).into_iter().chain(Backtest::paired(&tree, &pairs)).collect();
-        let chosen: Vec<&Case<'_>> = cases.iter().filter(|case| self.splits.contains(&case.split)).collect();
+        let chosen: Vec<&Case<'_>> = cases
+            .iter()
+            .filter(|case| case.set == self.set && case.split == self.split)
+            .filter(|case| case.index.checked_rem(self.every).is_none_or(|left| left == 0))
+            .collect();
         files.write(&self.rows, Bytes::from(Backtest::HEADER))?;
         let walking = Walking::new(crew);
-        let batches = chosen
-            .chunks(Backtest::CONCURRENT)
-            .map(|batch| self.batch(files, &walking, crew, &tree, batch))
-            .collect::<Result<Vec<Vec<Trial<'_, '_>>>, Failure>>()?;
-        let trials: Vec<Trial<'_, '_>> = batches.into_iter().flatten().collect();
-        let summaries = Set::VARIANTS
-            .iter()
-            .flat_map(|set| self.splits.iter().map(|split| Summary::of(*set, *split, &trials)))
-            .filter(|summary| !summary.trials.is_empty())
-            .collect();
+        let next = AtomicUsize::new(0);
+        let trials = thread::scope(|scope| {
+            Trial::joined(
+                iter::repeat_with(|| scope.spawn(|| self.worked(files, &walking, crew, &tree, &chosen, &next)))
+                    .take(Backtest::CONCURRENT)
+                    .collect(),
+            )
+        })?;
+        let summaries = [Summary { set: self.set, split: self.split, trials: trials.iter().collect() }];
         let extras = Extra::sampled(&trials, &history);
         let report = Report { trials: &trials, summaries, brute, extras };
         Ok(Uttered::new(Shown::said(report), Ok(Outcome::Backtested)))
     }
 
-    fn batch<'run, 'tree, D: Dispatch + Sync, C: Clock + Sync>(
+    fn worked<'run, 'tree, D: Dispatch + Sync, C: Clock + Sync>(
         &self,
         files: &impl Files,
         walking: &Walking<'_, D, C>,
         crew: &Crew<'_, D, C>,
         tree: &'tree Tree,
-        batch: &[&'run Case<'tree>],
+        chosen: &[&'run Case<'tree>],
+        next: &AtomicUsize,
     ) -> Result<Vec<Trial<'run, 'tree>>, Failure> {
-        let trials = thread::scope(|scope| {
-            Trial::joined(batch.iter().map(|case| scope.spawn(|| Trial::run(walking, crew, tree, case))).collect())
-        })?;
-        files.append(&self.rows, &Bytes::from(&Rows(&trials)))?;
-        Ok(trials)
+        iter::from_fn(|| chosen.get(next.fetch_add(1, Ordering::Relaxed)))
+            .map(|case| {
+                let trial = Trial::run(walking, crew, tree, case)?;
+                files.append(&self.rows, &Bytes::from(&format_args!("{trial}\n")))?;
+                Ok(trial)
+            })
+            .collect()
     }
 
     fn stops<'tree>(tree: &'tree Tree, log: &Log) -> Vec<Case<'tree>> {
@@ -192,8 +204,14 @@ impl Backtest {
     }
 }
 
+impl Set {
+    fn named(word: &str) -> Result<Set, Failure> {
+        Set::VARIANTS.iter().find(|set| set.to_string() == word).copied().ok_or(Failure::Usage)
+    }
+}
+
 impl Split {
-    pub fn named(word: &str) -> Result<Split, Failure> {
+    fn named(word: &str) -> Result<Split, Failure> {
         Split::VARIANTS.iter().find(|split| split.to_string() == word).copied().ok_or(Failure::Usage)
     }
 
@@ -216,9 +234,15 @@ impl<'run, 'tree> Trial<'run, 'tree> {
     }
 
     fn joined(
-        running: Vec<ScopedJoinHandle<'_, Result<Trial<'run, 'tree>, Failure>>>,
+        running: Vec<ScopedJoinHandle<'_, Result<Vec<Trial<'run, 'tree>>, Failure>>>,
     ) -> Result<Vec<Trial<'run, 'tree>>, Failure> {
-        running.into_iter().map(|handle| handle.join().map_err(|_panicked| Failure::Panicked)?).collect()
+        let worked = running
+            .into_iter()
+            .map(|handle| handle.join().map_err(|_panicked| Failure::Panicked)?)
+            .collect::<Result<Vec<Vec<Trial<'run, 'tree>>>, Failure>>()?;
+        let ordered: BTreeMap<usize, Trial<'run, 'tree>> =
+            worked.into_iter().flatten().map(|trial| (trial.case.index, trial)).collect();
+        Ok(ordered.into_values().collect())
     }
 
     fn found(&self) -> usize {
@@ -234,14 +258,9 @@ impl<'run, 'tree> Trial<'run, 'tree> {
     }
 }
 
-impl<'run, 'tree> Summary<'run, 'tree> {
+impl Summary<'_, '_> {
     const PERCENTILE: usize = 90;
     const WHOLE: usize = 100;
-
-    fn of(set: Set, split: Split, trials: &'run [Trial<'run, 'tree>]) -> Summary<'run, 'tree> {
-        let kept = trials.iter().filter(|trial| trial.case.set == set && trial.case.split == split).collect();
-        Summary { set, split, trials: kept }
-    }
 
     fn median<T: Ord + Copy + Default>(values: Vec<T>) -> T {
         Summary::ranked(values, 1, 2)

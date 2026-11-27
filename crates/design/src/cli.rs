@@ -38,7 +38,7 @@ impl<H, C: ClockFiller> Agents<H, C> {
     }
 }
 
-impl<'environment, E: Environment, F: Files, O, H, C: ClockFiller + Sync> Cli<'environment, E, F, O, H, C> {
+impl<'environment, E: Environment, F: Files + Sync, O, H, C: ClockFiller + Sync> Cli<'environment, E, F, O, H, C> {
     pub fn new(
         environment: &'environment E,
         files: F,
