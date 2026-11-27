@@ -177,10 +177,9 @@ dependencies = [
  "design",
  "dispatch-ports",
  "file-ports",
- "grammar-slug",
+ "serde",
  "serde_json",
  "sqlite-ports",
- "tempfile",
  "test-failure",
 ]
 

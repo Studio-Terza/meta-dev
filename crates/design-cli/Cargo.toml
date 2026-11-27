@@ -17,10 +17,9 @@ file-ports = { path = "../file-ports" }
 sqlite-ports = { path = "../sqlite-ports" }
 
 [dev-dependencies]
-grammar-slug = { path = "../grammar-slug" }
+serde.workspace = true
 serde_json.workspace = true
 test-failure = { path = "../test-failure" }
-tempfile.workspace = true
 
 [lints]
 workspace = true

@@ -1,13 +1,14 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
 mod ports {
-    use std::ffi::OsString;
+    use std::fs;
     use std::io::{self, Write};
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
     use std::process::{Command, Stdio};
 
-    use grammar_slug::Letters;
-    use tempfile::TempDir;
+    use console_ports::Variables;
+    use design::Arguments;
+    use serde::Deserialize;
     use test_failure::Failed;
 
     #[test]
@@ -19,57 +20,39 @@ mod ports {
             .map(|directory| directory.join(&table))
             .find(|candidate| candidate.is_file())
             .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-        let sections: Vec<Vec<Vec<String>>> = serde_json::from_slice(&std::fs::read(found)?)?;
-        let [header, cases, ..] = sections.as_slice() else {
-            return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-        };
-        let Some([binary, home_variable, workspace_flag, projects, work, golden, exit, out, err]) =
-            header.first().map(Vec::as_slice)
-        else {
-            return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-        };
+        let bytes = fs::read(found)?;
+        let mut rows = serde_json::Deserializer::from_slice(&bytes);
+        let binary = PathBuf::deserialize(&mut rows)?;
+        let environment = Variables::deserialize(&mut rows)?;
+        let home = PathBuf::deserialize(&mut rows)?;
+        let projects = PathBuf::deserialize(&mut rows)?;
+        let golden = PathBuf::deserialize(&mut rows)?;
+        let cases = Vec::<(PathBuf, Arguments)>::deserialize(&mut rows)?;
         let design = std::env::current_exe()?
             .ancestors()
-            .map(|directory| directory.join(binary))
+            .map(|directory| directory.join(&binary))
             .find(|candidate| candidate.is_file())
             .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-        let home = TempDir::new()?;
-        let workspace = home.path().join(work);
-        let slug = Letters::slugged(&workspace.to_string_lossy());
-        std::fs::create_dir_all(home.path().join(projects).join(slug))?;
+        fs::create_dir_all(&projects)?;
         let shown = cases
-            .iter()
-            .map(|case| {
-                let [input, words @ ..] = case.as_slice() else {
-                    return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-                };
-                let arguments = [OsString::from(workspace_flag), workspace.clone().into_os_string()]
-                    .into_iter()
-                    .chain(words.iter().map(OsString::from));
+            .into_iter()
+            .map(|(input, arguments)| {
                 let mut child = Command::new(&design)
-                    .env(home_variable, home.path())
-                    .current_dir(home.path())
+                    .envs(environment.iter())
+                    .current_dir(&home)
                     .args(arguments)
                     .stdin(Stdio::piped())
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped())
                     .spawn()?;
-                let fed = std::fs::read(Path::new(input))?;
+                let fed = fs::read(input)?;
                 child.stdin.take().into_iter().try_for_each(|mut stdin| stdin.write_all(&fed))?;
                 let output = child.wait_with_output()?;
-                let code = output.status.code().map_or_default(|code| code.to_string());
-                Ok([
-                    exit.clone(),
-                    code,
-                    out.clone(),
-                    String::from_utf8(output.stdout)?,
-                    err.clone(),
-                    String::from_utf8(output.stderr)?,
-                ]
-                .concat())
+                Ok((output.status.code(), String::from_utf8(output.stdout)?, String::from_utf8(output.stderr)?))
             })
-            .collect::<Result<String, Failed>>()?;
-        assert_eq!(shown, std::fs::read_to_string(golden)?);
+            .collect::<Result<Vec<_>, Failed>>()?;
+        fs::remove_dir_all(&home)?;
+        assert_eq!(shown, serde_json::from_slice::<Vec<_>>(&fs::read(golden)?)?);
         Ok(())
     }
 }

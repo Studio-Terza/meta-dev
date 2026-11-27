@@ -1,8 +1,15 @@
+"design"
+
+{"HOME": "/private/tmp/design-cli-scenarios", "PWD": "/private/tmp/design-cli-scenarios"}
+
+"/private/tmp/design-cli-scenarios"
+
+"/private/tmp/design-cli-scenarios/.claude/projects/-private-tmp-design-cli-scenarios-work"
+
+"tests/goldens/scenarios.json"
+
 [
-  [["design", "HOME", "--workspace", ".claude/projects", "work", "tests/goldens/scenarios.txt", "--- exit ", "\n--- out\n", "--- err\n"]],
-  [
-    ["tests/fixtures/empty.txt", "frobnicate"],
-    ["tests/fixtures/stop-active.json", "hook", "stop"],
-    ["tests/fixtures/not-json.txt", "hook", "stop"]
-  ]
+  ["tests/fixtures/empty.txt", ["--workspace", "work", "frobnicate"]],
+  ["tests/fixtures/stop-active.json", ["--workspace", "work", "hook", "stop"]],
+  ["tests/fixtures/not-json.txt", ["--workspace", "work", "hook", "stop"]]
 ]

@@ -1,0 +1,5 @@
+[
+  [1, "", "usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | subagent-stop | --settings))\n"],
+  [0, "", ""],
+  [1, "", "cannot read the hook input: expected ident at line 1 column 2\n"]
+]
