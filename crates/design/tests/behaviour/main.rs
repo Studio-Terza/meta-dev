@@ -501,13 +501,23 @@ impl Step {
     }
 }
 
+type Told = Result<String, Untold>;
+
+#[derive(Debug, thiserror::Error)]
+enum Untold {
+    #[error("story {story:?} failed: {failed}")]
+    Failed { story: String, failed: String },
+    #[error("a story's thread panicked")]
+    Panicked,
+}
+
 impl Story {
-    fn joined(running: Vec<thread::ScopedJoinHandle<'_, Result<String, String>>>) -> Vec<Result<String, String>> {
+    fn joined(running: Vec<thread::ScopedJoinHandle<'_, Told>>) -> Vec<Told> {
         running
             .into_iter()
             .map(|handle| match handle.join() {
                 Ok(told) => told,
-                Err(_panicked) => Err("a story panicked".to_owned()),
+                Err(_panicked) => Err(Untold::Panicked),
             })
             .collect()
     }
@@ -547,16 +557,20 @@ impl Story {
 #[test]
 fn every_story_says_what_its_golden_says() -> Result<(), Failed> {
     let stories = Story::all()?;
-    let told: Vec<Result<String, String>> = thread::scope(|scope| {
-        let running: Vec<thread::ScopedJoinHandle<'_, Result<String, String>>> = stories
+    let told: Vec<Told> = thread::scope(|scope| {
+        let running: Vec<thread::ScopedJoinHandle<'_, Told>> = stories
             .iter()
             .map(|story| {
-                scope.spawn(move || story.shown().map_err(|failed| format!("{} failed: {failed:?}", story.name)))
+                scope.spawn(move || {
+                    story
+                        .shown()
+                        .map_err(|failed| Untold::Failed { story: story.name.clone(), failed: format!("{failed:?}") })
+                })
             })
             .collect();
         Story::joined(running)
     });
-    let shown: String = told.into_iter().collect::<Result<_, String>>()?;
+    let shown: String = told.into_iter().collect::<Result<_, Untold>>()?;
     let golden = Path::new(env!("CARGO_MANIFEST_DIR")).join(GOLDEN);
     std::env::var_os("RECORD_GOLDENS").map_or(Ok(()), |_| fs::write(&golden, &shown))?;
     assert_eq!(shown, fs::read_to_string(golden)?);
