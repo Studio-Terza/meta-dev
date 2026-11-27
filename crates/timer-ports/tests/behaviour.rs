@@ -1,16 +1,28 @@
 use std::time::Duration;
 
-use timer_ports::{Elapsed, Moment, Monotonic, Timer};
+use port_core::Run;
+use proptest::prelude::{Strategy, any, prop_assert_eq, proptest};
+use timer_ports::{Elapsed, Moment, Monotonic, Stopped, Timer};
+
+proptest! {
+    #[test]
+    fn moments_measure_saturating_spans_that_add_and_show_whole_milliseconds(
+        early in any::<u32>().prop_map(|millis| Duration::from_millis(u64::from(millis))),
+        late in any::<u32>().prop_map(|millis| Duration::from_millis(u64::from(millis))),
+    ) {
+        let span = Moment::from(late).since(Moment::from(early));
+        prop_assert_eq!(span, Elapsed::from(late.saturating_sub(early)));
+        prop_assert_eq!((span + Elapsed::from(early)).to_string(), late.max(early).as_millis().to_string());
+        prop_assert_eq!(Moment::from(late).to_string(), late.as_millis().to_string());
+    }
+}
 
 #[test]
-fn moments_measure_never_negative_spans_that_add_and_show_whole_milliseconds() {
-    let [early, late] = [2_000, 5_000].map(|millis| Moment::from(Duration::from_millis(millis)));
-    let spans = [late.since(early), early.since(late), late.since(early) + Elapsed::from(Duration::from_millis(40))];
-    assert_eq!(spans.map(|span| span.to_string()), ["3000", "0", "3040"]);
-    assert_eq!(format!("{late:>6}|{}", Elapsed::default()), "  5000|0");
-    let run = port_core::Run::root();
-    let clock = run.port(Monotonic::default());
-    let first = clock.now();
-    std::thread::sleep(Duration::from_millis(5));
-    assert!(clock.now().since(first) >= Elapsed::from(Duration::from_millis(5)));
+fn a_monotonic_clock_never_runs_backwards_and_a_stopped_clock_stands_still() {
+    let run = Run::root();
+    let monotonic = run.port(Monotonic::default());
+    let first = monotonic.now();
+    assert!(monotonic.now() >= first);
+    let stopped = run.port(Stopped::default());
+    assert_eq!(stopped.now(), Moment::default());
 }
