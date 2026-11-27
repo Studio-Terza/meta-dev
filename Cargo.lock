@@ -664,7 +664,6 @@ dependencies = [
  "invariants",
  "newtype",
  "port-derive",
- "strum",
  "thiserror",
 ]
 
@@ -935,6 +934,7 @@ dependencies = [
  "newtype",
  "port-core",
  "proptest",
+ "serde_json",
  "sqlite-ports",
  "store-ports-macros",
  "tempfile",

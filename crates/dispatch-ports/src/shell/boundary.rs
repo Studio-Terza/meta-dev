@@ -1,11 +1,23 @@
 use std::path::{Path, PathBuf};
 
 use newtype::{Display, Newtype};
+use serde::Deserialize;
 
 use crate::Deadline;
 
-#[derive(Newtype, Display, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Newtype, Display, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
+#[serde(transparent)]
 pub struct Printed(String);
+
+#[derive(Newtype, Display, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(transparent)]
+pub struct Spoken(String);
+
+impl From<&Call> for Spoken {
+    fn from(call: &Call) -> Spoken {
+        Spoken([call.program].into_iter().chain(call.arguments.iter().map(String::as_str)).collect::<Vec<&str>>().join(" "))
+    }
+}
 
 impl AsRef<str> for Printed {
     fn as_ref(&self) -> &str {

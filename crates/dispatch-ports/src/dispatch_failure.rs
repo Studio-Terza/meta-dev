@@ -22,4 +22,6 @@ pub enum DispatchFailure {
     Lookup(#[source] io::Error),
     #[error("cannot kill a process group: {0}")]
     Kill(#[source] io::Error),
+    #[error("the shell holds no answer to the call")]
+    Unanswered,
 }

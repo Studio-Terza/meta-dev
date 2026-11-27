@@ -1,17 +1,21 @@
+use std::io;
+use std::iter;
 use std::num::NonZeroU32;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use design_messages::{CheckName, Fate, Halt, PullNumber, SessionCursors, SessionRecords, StreamSchema};
 use dispatch_ports::{Pid, Tokens, Wall};
 use file_ports::Offset;
 use newtype::{Counter, Enumerated};
-use port_core::Run;
+use port_core::{Released, Run};
+use proptest::collection::vec;
 use proptest::option;
 use proptest::prelude::{any, prop_assert, prop_assert_eq, proptest};
 use proptest::test_runner::{Config, RngSeed};
 use sqlite_ports::SqliteOpener;
-use store_ports::{Busy, Column, ColumnFailure, Counted, Opens, Store, Written};
+use store_ports::{Busy, Column, ColumnFailure, Counted, Opens, Store, StoreLock, Written, store_ops};
 use tempfile::TempDir;
+use test_failure::Failed;
 use transcript_ports::{Authorship, Body, Cursor, Instant, SessionId, Uuid};
 
 proptest! {
@@ -139,6 +143,83 @@ proptest! {
         held.end()?;
         prop_assert!(second.lock().is_ok());
     }
+}
+
+proptest! {
+    #[test]
+    fn each_read_is_counted_once_and_nothing_else_is(reads in 0..16_usize) {
+        let run = Run::root();
+        let store = run.port(SqliteOpener.in_memory::<StreamSchema>());
+        iter::repeat_n(SessionCursors, reads).try_for_each(|query| store.read(query).map(drop))?;
+        drop(store);
+        let measured = run.finish();
+        prop_assert_eq!(measured.snapshot().calls::<SessionCursors>().count(), reads);
+        prop_assert_eq!(measured.snapshot().iter().map(|counted| counted.calls().count()).sum::<usize>(), reads);
+    }
+
+    #[test]
+    fn reads_on_scoped_threads_are_all_counted(threads in 1..6_usize) {
+        let run = Run::root();
+        let store = run.port(SqliteOpener.in_memory::<StreamSchema>());
+        std::thread::scope(|scope| {
+            let reading = &store;
+            iter::repeat_n(SessionCursors, threads).for_each(|query| {
+                scope.spawn(move || reading.read(query).map(drop));
+            });
+        });
+        drop(store);
+        prop_assert_eq!(run.finish().snapshot().calls::<SessionCursors>().count(), threads);
+    }
+
+    #[test]
+    fn runs_never_share_their_counts(left in 0..8_usize, right in 0..8_usize) {
+        let (first, second) = (Run::root(), Run::root());
+        let (one, other) =
+            (first.port(SqliteOpener.in_memory::<StreamSchema>()), second.port(SqliteOpener.in_memory::<StreamSchema>()));
+        iter::repeat_n(SessionCursors, left).try_for_each(|query| one.read(query).map(drop))?;
+        iter::repeat_n(SessionCursors, right).try_for_each(|query| other.read(query).map(drop))?;
+        drop((one, other));
+        prop_assert_eq!(first.finish().snapshot().calls::<SessionCursors>().count(), left);
+        prop_assert_eq!(second.finish().snapshot().calls::<SessionCursors>().count(), right);
+    }
+
+    #[test]
+    fn each_lock_is_counted_and_released_once_whether_ended_or_dropped(endings in vec(any::<bool>(), 0..8)) {
+        let run = Run::root();
+        let store = run.port(SqliteOpener.in_memory::<StreamSchema>());
+        for ended in &endings {
+            let held = store.lock()?;
+            if *ended { held.end()? } else { drop(held) }
+        }
+        drop(store);
+        let settled = run.finish().settled()?;
+        prop_assert_eq!(settled.calls::<store_ops::Lock>().count(), endings.len());
+        prop_assert_eq!(settled.calls::<Released<StoreLock>>().count(), endings.len());
+    }
+}
+
+#[test]
+fn op_names_are_the_module_path_then_the_trait_and_method() -> Result<(), Failed> {
+    let source = Path::new(file!());
+    let table = source.with_file_name(source.file_stem().unwrap_or_default());
+    let found = std::env::current_dir()?
+        .ancestors()
+        .map(|directory| directory.join(&table))
+        .find(|candidate| candidate.is_file())
+        .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
+    let rows: Vec<Vec<String>> = serde_json::from_slice(&std::fs::read(found)?)?;
+    let Some([golden, newline]) = rows.first().map(Vec::as_slice) else {
+        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
+    };
+    let run = Run::root();
+    let store = run.port(SqliteOpener.in_memory::<StreamSchema>());
+    store.read(SessionCursors)?;
+    store.lock()?.end()?;
+    drop(store);
+    let named: Vec<String> =
+        run.finish().settled()?.iter().map(|counted| [counted.name().to_string(), newline.clone()].concat()).collect();
+    assert_eq!(named.concat(), std::fs::read_to_string(golden)?);
+    Ok(())
 }
 
 #[test]
