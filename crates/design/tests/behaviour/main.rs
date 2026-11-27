@@ -17,7 +17,7 @@ use dispatch_ports::{
 };
 use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Offset, Size, Stamps, Text};
 use grammar::Letters;
-use invariants::Unpoisoned;
+use invariants::{Unpoisoned, invariant, invariants};
 use port_core::Pass;
 use serde_json::Value;
 use sqlite_ports::SqliteOpener;
@@ -33,15 +33,24 @@ const TEMPORARY: &str = "/private/tmp";
 const TRIMMING: u32 = 1;
 const READING: u32 = 2;
 const STEP: i64 = 5;
+const READS: i64 = 10_000;
 
 #[derive(Debug)]
 struct Stepping {
     now: SystemTime,
     moments: AtomicI64,
+    reads: AtomicI64,
+}
+
+invariants! {
+    enum Invariant {
+        Endless => "a stop reads the fixed test clock fewer than ten thousand times",
+    }
 }
 
 impl ClockFiller for Stepping {
     fn now(&self, _pass: Pass<'_, clock_ops::Now>) -> Wall {
+        invariant!(self.reads.fetch_add(1, Ordering::Relaxed) < READS, Invariant::Endless);
         Wall::from(self.now)
     }
 
@@ -251,7 +260,7 @@ impl Home {
         .hearing(Heard::new(input.to_owned()));
         let words = ["--workspace", "work"].iter().chain(arguments).map(OsString::from);
         let files = Rerooted { temporary: self.path().join("tmp") };
-        let clock = Stepping { now: self.at, moments: AtomicI64::default() };
+        let clock = Stepping { now: self.at, moments: AtomicI64::default(), reads: AtomicI64::default() };
         let uttered =
             Cli::new(&environment, files, SqliteOpener, Agents::new(|_kept: PathBuf| Agent { replies }, clock))
                 .rooted(words);
