@@ -29,7 +29,7 @@ impl Budget {
 
     pub(crate) fn of_file(source: &Source, scan: TestScan, gate: Gate) -> Budget {
         let lines = source.text().lines();
-        let shipped = gate.entered().filter(|()| source.place() == Place::Shipped);
+        let shipped = gate.entered().filter(|()| source.place() == Place::Shipped).and(source.package().shipped());
         Budget { lines, test_lines: shipped.map_or(lines, |()| scan.test_lines) }
     }
 

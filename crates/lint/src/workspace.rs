@@ -1,6 +1,7 @@
 mod boundary;
 mod manifest;
 
+use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::iter;
 use std::path::{Path, PathBuf};
@@ -77,9 +78,18 @@ pub(crate) struct Package {
     name: Name,
     manifest: Arc<Path>,
     features: Vec<Feature>,
+    testing: Option<()>,
 }
 
 impl Package {
+    fn placed(self, testing: &BTreeSet<PathBuf>) -> Package {
+        Package { testing: testing.contains(&self.directory).then_some(()), ..self }
+    }
+
+    pub(crate) fn shipped(&self) -> Option<()> {
+        self.testing.xor(Some(()))
+    }
+
     pub(crate) fn directory(&self) -> &Path {
         &self.directory
     }
@@ -175,9 +185,14 @@ impl Workspace {
         });
         let (found, listed): (Vec<Option<Package>>, Vec<Manifest>) =
             read.into_iter().map(|entry| (entry.package, entry.manifest)).unzip();
+        let testing = Manifest::testing(&listed);
         let admitted = Manifest::admitted(&listed.into_iter().chain(above).collect::<Vec<Manifest>>());
-        let packages: Vec<Arc<Package>> =
-            found.into_iter().flatten().filter(|package| admitted.contains(&package.directory)).map(Arc::new).collect();
+        let packages: Vec<Arc<Package>> = found
+            .into_iter()
+            .flatten()
+            .filter(|package| admitted.contains(&package.directory))
+            .map(|package| Arc::new(package.placed(&testing)))
+            .collect();
         let roots: Vec<CrateRoot> = packages.iter().flat_map(|package| Workspace::roots(files, package)).collect();
         match roots.first() {
             Some(_) => Ok(Workspace { packages, roots }),
@@ -222,6 +237,7 @@ impl Workspace {
             name: named,
             manifest: tree.shown(manifest),
             features: Workspace::features(text.as_ref(), &table),
+            testing: None,
         });
         Ok(Listed { package, manifest: Manifest::new(directory, &table) })
     }

@@ -4,7 +4,7 @@ use proc_macro2::{Delimiter, Ident, Punct, Spacing, TokenStream, TokenTree};
 use syn::visit::{self, Visit};
 use syn::{
     Attribute, ImplItemFn, ItemConst, ItemEnum, ItemFn, ItemMod, ItemStatic, ItemStruct, ItemTrait, ItemType,
-    ItemUnion, Lit, Macro, TraitItemFn, TypePath,
+    ItemUnion, Lit, Macro, Meta, TraitItemFn, TypePath,
 };
 
 use crate::finding::{Found, Rule};
@@ -65,6 +65,8 @@ impl TestShape {
         Fix("read expected values from a golden file and inputs from a fixture or a proptest strategy");
     const HELPER_FIX: Fix = Fix("test through the production code path; a test file holds tests and their table");
     const DECLARING: &'static str = "fn";
+    const DERIVE: &'static str = "derive";
+    const FIXTURE: &'static str = "Fixture";
     const MARK: char = '#';
     const TRUTHS: [&'static str; 2] = ["true", "false"];
 
@@ -178,9 +180,22 @@ impl TestShape {
         }
     }
 
-    fn shaped(&mut self, name: &Ident, named: Named) -> Descent {
+    fn shaped(&mut self, attributes: &[Attribute], name: &Ident, named: Named) -> Descent {
+        let fixture = attributes.iter().find(|attribute| TestShape::derives_fixture(attribute).is_some());
+        self.tables.0.extend(fixture.map(|_| name.clone()));
         self.testing().map_or_default(|()| self.shapes.push(Shape { name: name.clone(), named }));
         Descent::Over
+    }
+
+    fn derives_fixture(attribute: &Attribute) -> Option<()> {
+        let derived = match &attribute.meta {
+            Meta::List(list) if list.path.is_ident(TestShape::DERIVE) => Some(list.tokens.clone()),
+            Meta::List(_) | Meta::Path(_) | Meta::NameValue(_) => None,
+        }?;
+        derived
+            .into_iter()
+            .find(|tree| matches!(tree, TokenTree::Ident(ident) if ident == TestShape::FIXTURE))
+            .map(|_| ())
     }
 }
 
@@ -250,13 +265,13 @@ impl Hooks for TestShape {
     fn item_struct(&mut self, item: &ItemStruct) -> Descent {
         let mut named = Named::default();
         named.visit_fields(&item.fields);
-        self.shaped(&item.ident, named)
+        self.shaped(&item.attrs, &item.ident, named)
     }
 
     fn item_enum(&mut self, item: &ItemEnum) -> Descent {
         let mut named = Named::default();
         item.variants.iter().for_each(|variant| named.visit_fields(&variant.fields));
-        self.shaped(&item.ident, named)
+        self.shaped(&item.attrs, &item.ident, named)
     }
 
     fn item_union(&mut self, item: &ItemUnion) -> Descent {

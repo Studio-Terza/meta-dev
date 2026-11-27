@@ -18,6 +18,7 @@ pub(crate) struct Manifest {
     packaged: Option<()>,
     members: Option<Members>,
     depends: Vec<PathBuf>,
+    shipping: Vec<PathBuf>,
 }
 
 impl Members {
@@ -49,19 +50,61 @@ impl Members {
 
 impl Manifest {
     const DEPENDENCIES: [&'static str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
+    const SHIPPING: [&'static str; 2] = ["dependencies", "build-dependencies"];
 
     pub(crate) fn new(directory: PathBuf, table: &DeTable<'_>) -> Manifest {
         let workspace = table.get("workspace").map(toml::Spanned::get_ref);
         let shared = workspace.and_then(|value| value.as_table()).and_then(|inner| inner.get("dependencies"));
         let sections = Manifest::DEPENDENCIES.iter().filter_map(|name| table.get(*name)).chain(shared);
-        let depends = sections
+        let depends = Manifest::pathed(&directory, sections);
+        let shipping = Manifest::pathed(&directory, Manifest::SHIPPING.iter().filter_map(|name| table.get(*name)));
+        Manifest {
+            packaged: table.get("package").map(|_| ()),
+            members: workspace.map(Members::of),
+            depends,
+            shipping,
+            directory,
+        }
+    }
+
+    fn pathed<'table>(
+        directory: &Path,
+        sections: impl Iterator<Item = &'table toml::Spanned<DeValue<'table>>>,
+    ) -> Vec<PathBuf> {
+        sections
             .filter_map(|section| section.get_ref().as_table())
             .flat_map(|dependencies| dependencies.iter().map(|(_, dependency)| dependency.get_ref()))
             .filter_map(|dependency| dependency.as_table().and_then(|inner| inner.get("path")))
             .filter_map(|path| path.get_ref().as_str())
             .map(|path| Manifest::lexical(&directory.join(path)))
+            .collect()
+    }
+
+    pub(crate) fn testing(manifests: &[Manifest]) -> BTreeSet<PathBuf> {
+        let packaged: Vec<&Manifest> = manifests.iter().filter(|manifest| manifest.packaged.is_some()).collect();
+        let depended: BTreeSet<&PathBuf> = packaged.iter().flat_map(|manifest| &manifest.depends).collect();
+        let roots: BTreeSet<PathBuf> = packaged
+            .iter()
+            .filter(|manifest| !depended.contains(&manifest.directory))
+            .map(|manifest| manifest.directory.clone())
             .collect();
-        Manifest { packaged: table.get("package").map(|_| ()), members: workspace.map(Members::of), depends, directory }
+        let shipped = iter::successors(Some(roots), |known| {
+            let reached: BTreeSet<PathBuf> = packaged
+                .iter()
+                .filter(|manifest| known.contains(&manifest.directory))
+                .flat_map(|manifest| manifest.shipping.iter())
+                .filter(|path| !known.contains(*path))
+                .cloned()
+                .collect();
+            reached.first().map(|_| known.union(&reached).cloned().collect())
+        })
+        .last()
+        .unwrap_or_default();
+        packaged
+            .iter()
+            .map(|manifest| manifest.directory.clone())
+            .filter(|directory| !shipped.contains(directory))
+            .collect()
     }
 
     pub(crate) fn admitted(manifests: &[Manifest]) -> BTreeSet<PathBuf> {
