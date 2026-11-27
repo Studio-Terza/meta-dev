@@ -11,5 +11,5 @@ pub use invariants::Ignoring;
 pub use logos;
 pub use prose::Prose;
 pub use queue::Queue;
-pub use report::{AgentReport, Ended, JobLink, Target};
+pub use report::{AgentReport, BranchName, Ended, JobLink, Target};
 pub use unlexed::Unlexed;

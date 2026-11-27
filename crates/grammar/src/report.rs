@@ -1,3 +1,4 @@
+use std::fmt;
 use std::num::{NonZeroU32, NonZeroU64};
 
 use logos::Logos;
@@ -39,8 +40,11 @@ pub enum Ended {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Target<'text> {
     Pull(NonZeroU32),
-    Branch(&'text str),
+    Branch(BranchName<'text>),
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BranchName<'text>(&'text str);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AgentReport<'text> {
@@ -60,18 +64,15 @@ impl<'text> Piece<'text> {
     fn target(self) -> Option<Target<'text>> {
         match self {
             Piece::Pull(pull) => Some(Target::Pull(pull)),
-            Piece::Branch(branch) => Some(Target::Branch(branch)),
+            Piece::Branch(branch) => Some(Target::Branch(BranchName(branch))),
             Piece::Ended(_) | Piece::Head(_) => None,
         }
     }
 }
 
-impl<'text> Target<'text> {
-    #[must_use]
-    pub fn read(text: &'text str) -> Option<Target<'text>> {
-        let pieces = Piece::lexer(text).collect::<Result<Vec<Piece<'text>>, ()>>().ignoring(Unlexed::NotThisGrammar)?;
-        let [only] = <[Piece<'text>; 1]>::try_from(pieces).ignoring(Unlexed::OtherShape)?;
-        only.target()
+impl fmt::Display for BranchName<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.0)
     }
 }
 

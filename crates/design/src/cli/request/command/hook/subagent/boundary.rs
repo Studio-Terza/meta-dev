@@ -4,12 +4,12 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use design_messages::PullNumber;
-use grammar::{AgentReport, Ended, JobLink, Target};
+use grammar::{AgentReport, BranchName, Ended, JobLink, Target};
 use grammar_lines::Lines;
 use grammar_spec_line::Attachment;
 use hex::FromHex;
 use invariants::Ignoring;
-use newtype::{Checked, Display, Newtype};
+use newtype::{Display, Newtype};
 use serde::Deserialize;
 
 use crate::cli::request::ignored::Ignored;
@@ -63,8 +63,7 @@ pub struct Branched {
     head: CommitSha,
 }
 
-#[derive(Newtype, Display, Clone, Debug, PartialEq, Eq)]
-#[newtype(checked)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Branch(String);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -87,10 +86,6 @@ pub struct JobId(NonZeroU64);
 #[derive(Debug, thiserror::Error)]
 #[error("not a full commit sha of forty hexadecimal digits")]
 pub struct Unhexed;
-
-#[derive(Debug, thiserror::Error)]
-#[error("not a branch name of lowercase words joined by hyphens and slashes")]
-pub struct Unbranched;
 
 impl Finishing {
     pub fn said(&self) -> &Said {
@@ -123,9 +118,7 @@ impl Report {
         let head = read.head().parse::<CommitSha>().ignoring(Ignored::Untyped)?;
         let at = match read.target() {
             Target::Pull(pull) => At::Pull(Pushed::new(PullNumber::new(pull), head)),
-            Target::Branch(branch) => {
-                At::Branch(Branched { branch: Branch::try_new(branch.to_owned()).ignoring(Ignored::Untyped)?, head })
-            }
+            Target::Branch(branch) => At::Branch(Branched { branch: Branch::from(branch), head }),
         };
         match read.ended() {
             Ended::Done => Some(Report::Done(at)),
@@ -178,14 +171,15 @@ impl Opened {
     }
 }
 
-impl Checked for Branch {
-    type Error = Unbranched;
+impl From<BranchName<'_>> for Branch {
+    fn from(lexed: BranchName<'_>) -> Branch {
+        Branch(lexed.to_string())
+    }
+}
 
-    fn checked(text: &String) -> Result<&String, Unbranched> {
-        match Target::read(text) {
-            Some(Target::Branch(_branch)) => Ok(text),
-            Some(Target::Pull(_)) | None => Err(Unbranched),
-        }
+impl fmt::Display for Branch {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
     }
 }
 
