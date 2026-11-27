@@ -36,7 +36,7 @@ toml.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 
 [dev-dependencies]
-doubles = { path = "../doubles" }
+console-doubles = { path = "../console-doubles" }
 test-failure = { path = "../test-failure" }
 tempfile.workspace = true
 

@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use doubles::Memory;
+use file_doubles::Memory;
 use file_ports::{Bytes, Disk, Files};
 use fixture::{Cases, Debugged, Failed, Fixture, Properties, Spelled};
 use invariants::{Ignoring, ignored};

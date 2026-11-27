@@ -30,7 +30,7 @@ timer-ports = { path = "../timer-ports" }
 toml.workspace = true
 
 [dev-dependencies]
-doubles = { path = "../doubles" }
+file-doubles = { path = "../file-doubles" }
 fixture = { path = "../fixture" }
 
 [lints]

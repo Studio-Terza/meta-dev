@@ -10,7 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
-doubles = { path = "../doubles" }
+file-doubles = { path = "../file-doubles" }
 file-ports = { path = "../file-ports" }
 newtype = { path = "../newtype" }
 proptest.workspace = true

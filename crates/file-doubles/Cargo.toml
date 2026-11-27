@@ -1,5 +1,5 @@
 [package]
-name = "doubles"
+name = "file-doubles"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -10,13 +10,10 @@ test = false
 doctest = false
 
 [dependencies]
-console-ports = { path = "../console-ports" }
-dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports", features = ["laws"] }
 invariants = { path = "../invariants" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
-serde.workspace = true
 
 [lints]
 workspace = true

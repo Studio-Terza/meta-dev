@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use doubles::Memory;
+use file_doubles::Memory;
 use fixture::{Cases, Failed, Fixture};
 use lint::{Cli, Verdict};
 use serde::Deserialize;

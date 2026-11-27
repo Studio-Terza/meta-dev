@@ -19,7 +19,7 @@ laws = ["port-derive/laws"]
 
 [dev-dependencies]
 design-messages = { path = "../design-messages" }
-doubles = { path = "../doubles" }
+dispatch-doubles = { path = "../dispatch-doubles" }
 dispatch-ports = { path = "../dispatch-ports" }
 fixture = { path = "../fixture" }
 serde.workspace = true

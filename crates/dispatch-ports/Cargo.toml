@@ -20,7 +20,7 @@ serde_json.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-doubles = { path = "../doubles" }
+dispatch-doubles = { path = "../dispatch-doubles" }
 fixture = { path = "../fixture" }
 proptest.workspace = true
 

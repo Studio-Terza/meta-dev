@@ -1,10 +1,10 @@
 use std::{iter, thread};
 
 use design_messages::{SessionCursors, StreamSchema};
+use dispatch_doubles::{Count, Scripted, Stepped};
 use dispatch_ports::{
     AgentRun, Bell, Clock, Deadline, Dispatch, Job, Model, Pause, Pid, Prompt, Reply, Timeout, Wall, dispatch_ops,
 };
-use doubles::{Count, Scripted, Stepped};
 use fixture::{Cases, Debugged, Failed, Fixture};
 use newtype::Wrapping;
 use port_core::{Counted, Op, Released, Resource, Run};
