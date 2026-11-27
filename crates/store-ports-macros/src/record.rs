@@ -8,7 +8,7 @@ use crate::expanded::Expanding;
 use query_cache::Origin;
 
 #[derive(Debug)]
-pub struct Record {
+pub(crate) struct Record {
     visibility: Visibility,
     row: Ident,
     table: LitStr,
@@ -60,10 +60,14 @@ impl Expanding for Record {
         let keyed = key.bound();
         let query = quote!(::store_ports::query!);
         let prepared = quote!(::store_ports::Prepared);
+        let reachable = match &visibility {
+            Visibility::Inherited => TokenStream::new(),
+            Visibility::Public(_) | Visibility::Restricted(_) => quote!(pub),
+        };
         Ok(quote! {
             #[derive(Clone, Debug, PartialEq, Eq)]
             #visibility struct #fresh {
-                #(#visibility #given_names: #given_types,)*
+                #(#reachable #given_names: #given_types,)*
             }
 
             impl ::core::convert::From<&#row> for #fresh {

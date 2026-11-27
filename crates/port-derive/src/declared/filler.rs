@@ -5,7 +5,7 @@ use super::method::Method;
 use super::names::OpsName;
 use super::{Declared, Rendered};
 
-pub struct Filler;
+pub(crate) struct Filler;
 
 impl Rendered for Filler {
     fn rendered(declared: &Declared) -> TokenStream {

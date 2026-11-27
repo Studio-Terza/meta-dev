@@ -3,21 +3,21 @@ use quote::{ToTokens, format_ident};
 use syn::LitStr;
 
 #[derive(Clone, Copy, Debug)]
-pub enum Derivation {
+pub(crate) enum Derivation {
     Filler,
     OpsModule,
 }
 
 #[derive(strum::VariantArray, Clone, Copy, Debug)]
-pub enum Constant {
+pub(crate) enum Constant {
     Name,
     Release,
 }
 
-pub struct Spelling;
+pub(crate) struct Spelling;
 
 impl Spelling {
-    pub fn derived(caller: &Ident, derivation: Derivation) -> Ident {
+    pub(crate) fn derived(caller: &Ident, derivation: Derivation) -> Ident {
         match derivation {
             Derivation::Filler => Ident::new(&format!("{caller}Filler"), caller.span()),
             Derivation::OpsModule => Ident::new(&Self::ops_module_text(caller), caller.span()),
@@ -33,7 +33,7 @@ impl Spelling {
         format!("{snake}_ops")
     }
 
-    pub fn camel(method: &Ident) -> Ident {
+    pub(crate) fn camel(method: &Ident) -> Ident {
         let text = method.to_string();
         let raised = std::iter::once('_').chain(text.chars()).map(|before| before == '_');
         let camel: String = text
@@ -45,22 +45,22 @@ impl Spelling {
         Ident::new(&camel, method.span())
     }
 
-    pub fn input(position: usize) -> Ident {
+    pub(crate) fn input(position: usize) -> Ident {
         format_ident!("input{position}")
     }
 
-    pub fn method_path(caller: &impl ToTokens, method: &Ident) -> LitStr {
+    pub(crate) fn method_path(caller: &impl ToTokens, method: &Ident) -> LitStr {
         LitStr::new(&format!("::{}::{method}", caller.to_token_stream()), method.span())
     }
 
-    pub fn constant(constant: Constant) -> Ident {
+    pub(crate) fn constant(constant: Constant) -> Ident {
         match constant {
             Constant::Name => Ident::new("NAME", Span::call_site()),
             Constant::Release => Ident::new("RELEASE", Span::call_site()),
         }
     }
 
-    pub fn type_path(ident: &Ident, constant: Constant) -> LitStr {
+    pub(crate) fn type_path(ident: &Ident, constant: Constant) -> LitStr {
         match constant {
             Constant::Name => LitStr::new(&format!("::{ident}"), ident.span()),
             Constant::Release => LitStr::new(&format!("::{ident}::release"), ident.span()),

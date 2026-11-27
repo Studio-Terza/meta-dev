@@ -121,7 +121,7 @@ impl Place {
     }
 
     fn applied(&self) -> Result<BTreeSet<Version>, StoreFailure> {
-        Ok(Run::root().port(self.opened_as::<Untouched>()).read(Applied)?.into_iter().collect())
+        Ok(Run::root().port(self.opened()).read(Applied)?.into_iter().collect())
     }
 
     fn cursor(store: &impl Store) -> Result<Cursor, Failed> {
@@ -148,16 +148,6 @@ impl Older {
 impl Schema for Older {
     fn migrator() -> &'static Migrator {
         &OLDER
-    }
-}
-
-struct Untouched;
-
-static UNTOUCHED: LazyLock<Migrator> = LazyLock::new(|| Migrator::from(Vec::new()).ignoring_missing());
-
-impl Schema for Untouched {
-    fn migrator() -> &'static Migrator {
-        &UNTOUCHED
     }
 }
 

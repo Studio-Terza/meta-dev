@@ -34,12 +34,6 @@ proptest! {
     }
 
     #[test]
-    fn a_spec_line_of_one_attachment_carries_that_attachment(attachment in any::<Attachment>()) {
-        let line = Spec::read(&format!("spec: {attachment}"));
-        prop_assert_eq!(line.as_ref().and_then(Line::spec).and_then(|spec| spec.attachment()), Some(&attachment));
-    }
-
-    #[test]
     fn any_text_the_spec_line_lexer_accepts_reads_back_from_its_rendering(
         text in prop_oneof![
             any::<String>(),

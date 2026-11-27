@@ -4,7 +4,7 @@ mod connected;
 use std::path::Path;
 
 use rusqlite::Connection;
-use store_ports::{Batch, Created, Provenance, Query, Record, StoreFailure};
+use store_ports::{Batch, Created, Query, Record, StoreFailure};
 
 use super::failed::{Unexecuted, Unopened};
 use super::migrations::Migrations;
@@ -14,7 +14,6 @@ pub(super) use connected::Connected;
 #[derive(Debug)]
 pub(super) struct Opened {
     connection: Connection,
-    provenance: Provenance,
 }
 
 impl Opened {
@@ -24,22 +23,18 @@ impl Opened {
 
     pub(super) fn filed(path: &Path, migrations: Migrations) -> Result<Opened, StoreFailure> {
         let connection = Connection::open(path).map_err(Unopened::from)?;
-        Opened::configured(connection, Provenance::Fresh)?.migrated(migrations)
+        Opened::configured(connection)?.migrated(migrations)
     }
 
     pub(super) fn fresh(migrations: Migrations) -> Result<Opened, StoreFailure> {
         let connection = Connection::open_in_memory().map_err(Unopened::from)?;
-        Opened::configured(connection, Provenance::Fresh)?.migrated(migrations)
+        Opened::configured(connection)?.migrated(migrations)
     }
 
     pub(super) fn copied(image: &Snapshot) -> Result<Opened, StoreFailure> {
         let mut connection = Connection::open_in_memory().map_err(Unopened::from)?;
         image.restored(&mut connection).map_err(Unopened::from)?;
-        Opened::configured(connection, Provenance::Copied)
-    }
-
-    pub(super) fn provenance(&self) -> Provenance {
-        self.provenance
+        Opened::configured(connection)
     }
 
     pub(super) fn image(&self) -> Result<Snapshot, StoreFailure> {
@@ -58,11 +53,11 @@ impl Opened {
         self.settled(|connected| created.stored(connected))
     }
 
-    fn configured(connection: Connection, provenance: Provenance) -> Result<Opened, StoreFailure> {
+    fn configured(connection: Connection) -> Result<Opened, StoreFailure> {
         connection.execute_batch(Self::SETTINGS).map_err(Unopened::from)?;
         connection.busy_timeout(Self::BUSY).map_err(Unopened::from)?;
         connection.set_prepared_statement_cache_capacity(Self::STATEMENTS);
-        Ok(Opened { connection, provenance })
+        Ok(Opened { connection })
     }
 
     fn migrated(self, migrations: Migrations) -> Result<Opened, StoreFailure> {

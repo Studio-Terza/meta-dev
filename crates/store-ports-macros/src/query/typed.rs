@@ -9,7 +9,7 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 #[serde(try_from = "String")]
-pub struct ColumnName {
+pub(crate) struct ColumnName {
     ident: Ident,
     nullability: Nullability,
     overridden: Option<Type>,
@@ -29,7 +29,7 @@ enum Presence {
 }
 
 #[derive(Debug)]
-pub struct Typed {
+pub(crate) struct Typed {
     ident: Ident,
     column: Type,
 }
@@ -39,7 +39,7 @@ pub struct Typed {
 struct Unmapped(Ident);
 
 impl Typed {
-    pub fn described(described: &Described<ColumnName>, span: Span) -> syn::Result<Typed> {
+    pub(crate) fn described(described: &Described<ColumnName>, span: Span) -> syn::Result<Typed> {
         let ColumnName { ident, nullability, overridden } = described.as_ref();
         let spelled = described.storage().spelled().map(syn::parse_str::<Type>).transpose()?;
         let base = overridden.clone().or(spelled).ok_or_else(|| syn::Error::new(span, Unmapped(ident.clone())))?;

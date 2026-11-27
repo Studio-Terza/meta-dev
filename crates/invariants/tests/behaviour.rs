@@ -1,7 +1,7 @@
 use std::panic;
 use std::sync::Mutex;
 
-use invariants::{Ignoring, Rejoined, Unpoisoned, ignored, invariant, invariants};
+use invariants::{Ignoring, Unpoisoned, ignored, invariant, invariants};
 
 invariants! {
     enum Invariant {
@@ -70,18 +70,12 @@ fn invariants_hold_quietly_and_break_loudly_with_their_text_and_detail() {
         invariant!(broken Invariant::Positive)
     }));
     let poisoned = Caught::said(panic::catch_unwind(|| *lock.lock().unpoisoned()));
-    let joined = Caught::said(panic::catch_unwind(|| std::thread::spawn(|| 5_u8).join().rejoined()));
-    let carried = Caught::said(panic::catch_unwind(|| {
-        std::thread::spawn(|| invariant!(broken Invariant::Narrow)).join().rejoined()
-    }));
     assert_eq!(
-        [held, poisoning, poisoned, joined, carried],
+        [held, poisoning, poisoned],
         [
             "gave 30".to_owned(),
             "broken invariant: the count is positive".to_owned(),
-            format!("broken invariant: {POISONED}"),
-            "gave 5".to_owned(),
-            "broken invariant: the count fits a byte".to_owned()
+            format!("broken invariant: {POISONED}")
         ]
     );
     assert_eq!(

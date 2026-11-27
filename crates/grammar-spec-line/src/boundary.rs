@@ -23,7 +23,6 @@ pub enum Line {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Spec {
     value: String,
-    attachment: Option<Attachment>,
 }
 
 #[derive(Newtype, Arbitrary, Clone, Debug, PartialEq, Eq)]
@@ -71,24 +70,11 @@ impl Head {
 
 impl Spec {
     fn after(rest: &[Lexed]) -> Option<Spec> {
-        let only = <&[Lexed; 1]>::try_from(rest).ignoring(Unlexed::OtherShape);
-        rest.first().map(|_said| Spec {
-            value: rest.iter().map(|piece| piece.text.as_str()).collect(),
-            attachment: only.and_then(|[sole]| sole.attachment()),
-        })
-    }
-
-    #[must_use]
-    pub fn attachment(&self) -> Option<&Attachment> {
-        self.attachment.as_ref()
+        rest.first().map(|_said| Spec { value: rest.iter().map(|piece| piece.text.as_str()).collect() })
     }
 }
 
 impl Lexed {
-    fn attachment(&self) -> Option<Attachment> {
-        Attachment::try_new(self.text.clone()).ignoring(Unlexed::NotThisGrammar)
-    }
-
     fn spoken(lexed: &[Lexed]) -> &[Lexed] {
         let last = lexed.iter().rposition(|said| said.piece.spoken().is_some());
         lexed.get(..last.map_or(0, |at| at + 1)).unwrap_or_default()

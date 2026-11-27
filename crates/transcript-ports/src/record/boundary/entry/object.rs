@@ -7,26 +7,26 @@ use serde_json::Value;
 pub struct Object<'value>(&'value Value);
 
 impl<'value> Object<'value> {
-    pub const TYPE: &'static str = "type";
+    pub(crate) const TYPE: &'static str = "type";
     const ABSENT: Value = Value::Null;
 
     pub fn new(value: &'value Value) -> Object<'value> {
         Object(value)
     }
 
-    pub fn tag(self, key: &str) -> Option<&'value str> {
+    pub(crate) fn tag(self, key: &str) -> Option<&'value str> {
         self.0.get(key).and_then(Value::as_str)
     }
 
-    pub fn present(self, name: &str) -> Option<Object<'value>> {
+    pub(crate) fn present(self, name: &str) -> Option<Object<'value>> {
         self.0.get(name).filter(|value| value.is_null().not()).map(Object)
     }
 
-    pub fn required(self, name: &'static str) -> Result<Object<'value>, serde_json::Error> {
+    pub(crate) fn required(self, name: &'static str) -> Result<Object<'value>, serde_json::Error> {
         self.0.get(name).map(Object).ok_or_else(|| serde_json::Error::missing_field(name))
     }
 
-    pub fn field<T: DeserializeOwned>(self, name: &str) -> Result<T, serde_json::Error> {
+    pub(crate) fn field<T: DeserializeOwned>(self, name: &str) -> Result<T, serde_json::Error> {
         T::deserialize(self.0.get(name).unwrap_or(&Self::ABSENT))
     }
 

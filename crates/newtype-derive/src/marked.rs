@@ -3,22 +3,22 @@ use quote::{format_ident, quote};
 use syn::{DeriveInput, Generics, Ident, Visibility};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Mark {
+pub(crate) enum Mark {
     Spelled,
     Listed,
 }
 
-pub struct Marked<'item> {
+pub(crate) struct Marked<'item> {
     ident: &'item Ident,
     generics: &'item Generics,
 }
 
 impl<'item> Marked<'item> {
-    pub fn new(ident: &'item Ident, generics: &'item Generics) -> Marked<'item> {
+    pub(crate) fn new(ident: &'item Ident, generics: &'item Generics) -> Marked<'item> {
         Marked { ident, generics }
     }
 
-    pub fn expanded(tokens: TokenStream, mark: Mark) -> TokenStream {
+    pub(crate) fn expanded(tokens: TokenStream, mark: Mark) -> TokenStream {
         let expansion = syn::parse2::<DeriveInput>(tokens)
             .map(|input| Marked::new(&input.ident, &input.generics).marked(mark, &input.vis));
         match expansion {
@@ -66,7 +66,7 @@ impl<'item> Marked<'item> {
         }
     }
 
-    pub fn stored(&self, kind: &TokenStream) -> TokenStream {
+    pub(crate) fn stored(&self, kind: &TokenStream) -> TokenStream {
         let name = self.ident;
         let (implemented, arguments, bounds) = self.generics.split_for_impl();
         quote! {

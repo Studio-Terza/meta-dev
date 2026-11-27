@@ -10,16 +10,16 @@ use syn::LitStr;
 use query_cache::Disk;
 
 #[derive(Debug)]
-pub struct Directory(PathBuf);
+pub(crate) struct Directory(PathBuf);
 
 #[derive(Debug)]
-pub struct Found {
+pub(crate) struct Found {
     file: MigrationFile,
     path: PathBuf,
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum Unmigrated {
+pub(crate) enum Unmigrated {
     #[error("cannot list the migrations in {}: {source}", path.display())]
     Unlisted { path: PathBuf, source: io::Error },
     #[error("{} is not named <version>_<description>.sql", path.display())]
@@ -31,11 +31,11 @@ pub enum Unmigrated {
 impl Directory {
     const DEFAULT: &'static str = "migrations";
 
-    pub fn named(relative: Option<&LitStr>) -> Directory {
+    pub(crate) fn named(relative: Option<&LitStr>) -> Directory {
         Directory(Disk::manifest().join(relative.map_or_else(|| Self::DEFAULT.to_owned(), LitStr::value)))
     }
 
-    pub fn migrations(&self) -> Result<Vec<Found>, Unmigrated> {
+    pub(crate) fn migrations(&self) -> Result<Vec<Found>, Unmigrated> {
         let paths = Disk::listed(&self.0).map_err(|source| Unmigrated::Unlisted { path: self.0.clone(), source })?;
         let listed = paths.into_iter().map(Found::read).try_fold(
             BTreeMap::new(),

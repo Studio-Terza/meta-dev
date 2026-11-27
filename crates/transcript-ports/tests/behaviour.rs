@@ -12,7 +12,6 @@ use proptest::test_runner::{Config, RngSeed};
 use transcript_ports::transcripts_ops::{ReadFrom, Sessions};
 use transcript_ports::{
     Authorship, Body, ClaudeCodeDir, Cursor, Instant, Kind, Line, Read, Record, SessionId, Skipped, Transcripts,
-    Unrecognised,
 };
 
 ignored! {
@@ -59,11 +58,7 @@ impl Transcript {
         match line {
             Line::Said(record) => vec![Transcript::said(&record)],
             Line::Skipped(skipped) => edge(&skipped).into_iter().collect(),
-            Line::Unrecognised(unrecognised) => {
-                let unknown: &Unrecognised = &unrecognised;
-                let passing = unknown.passing().as_ref().and_then(edge);
-                [format!("unrecognised {}", unknown.kind())].into_iter().chain(passing).collect()
-            }
+            Line::Unrecognised(unrecognised) => vec![format!("unrecognised {}", unrecognised.kind())],
         }
     }
 

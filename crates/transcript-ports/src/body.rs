@@ -22,7 +22,7 @@ impl Checked for Body {
 }
 
 impl Body {
-    pub fn joined(&self, after: &Body) -> Result<Body, Malformed> {
+    pub(crate) fn joined(&self, after: &Body) -> Result<Body, Malformed> {
         Body::try_new(format!("{self} {after}"))
     }
 }

@@ -6,7 +6,7 @@ pub enum Model {
 
 impl Model {
     #[must_use]
-    pub fn spelled(self) -> [&'static str; 2] {
+    pub(crate) fn spelled(self) -> [&'static str; 2] {
         match self {
             Model::Haiku => ["--model", "haiku"],
             Model::Sonnet => ["--model", "sonnet"],

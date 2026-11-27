@@ -15,8 +15,7 @@ use migrations::Migrations;
 use opened::Opened;
 use place::Place;
 use store_ports::{
-    Batch, Busy, Claim, Created, Opens, Provenance, Query, Record, Schema, StoreFailure, StoreFiller, StoreLock,
-    store_ops,
+    Batch, Busy, Claim, Created, Opens, Query, Record, Schema, StoreFailure, StoreFiller, StoreLock, store_ops,
 };
 
 #[derive(Clone, Debug)]
@@ -45,11 +44,6 @@ impl Sqlite {
     #[must_use]
     pub fn in_memory<S: Schema>() -> Sqlite {
         Sqlite::placed(Place::Memory, Migrations::declared::<S>())
-    }
-
-    #[must_use]
-    pub fn provenance(&self) -> Option<Provenance> {
-        self.shared.opened.lock().unpoisoned().as_ref().map(Opened::provenance)
     }
 
     fn placed(place: Place, migrations: Migrations) -> Sqlite {

@@ -3,7 +3,7 @@ use quote::quote;
 
 use super::{Declared, Rendered};
 
-pub struct Caller;
+pub(crate) struct Caller;
 
 impl Rendered for Caller {
     fn rendered(declared: &Declared) -> TokenStream {

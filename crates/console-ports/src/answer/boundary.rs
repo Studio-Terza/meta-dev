@@ -39,7 +39,7 @@ impl Answer {
     }
 
     #[must_use]
-    pub fn complained(code: ExitCode, complaint: impl Display) -> Answer {
+    fn complained(code: ExitCode, complaint: impl Display) -> Answer {
         Answer { shown: Shown::default(), complaint: Complaint(complaint.to_string()), code }
     }
 

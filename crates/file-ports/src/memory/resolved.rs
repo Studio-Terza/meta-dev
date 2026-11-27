@@ -1,7 +1,7 @@
 use std::path::{Component, Path, PathBuf};
 
 #[derive(Debug)]
-pub struct Resolved(PathBuf);
+pub(crate) struct Resolved(PathBuf);
 
 impl Resolved {
     pub fn into_inner(self) -> PathBuf {

@@ -14,9 +14,9 @@ fn the_process_answers_with_its_arguments_and_the_answer_s_code() {
 
 #[test]
 fn an_answer_gathers_what_it_shows_and_keeps_its_complaint() {
-    let answer = Answer::complained(ExitCode::FAILURE, "c").showing("a").showing("b");
+    let answer = Answer::answered(Err::<Answer, &str>("c")).showing("a").showing("b");
     assert_eq!(AsRef::<str>::as_ref(AsRef::<Shown>::as_ref(&answer)), "ab");
-    assert_eq!(AsRef::<str>::as_ref(AsRef::<Complaint>::as_ref(&answer)), "c");
+    assert_eq!(AsRef::<str>::as_ref(AsRef::<Complaint>::as_ref(&answer)), "c\n");
     assert_eq!(answer.code(), ExitCode::FAILURE);
 }
 

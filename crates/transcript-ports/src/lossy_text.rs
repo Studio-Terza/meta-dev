@@ -1,5 +1,5 @@
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct LossyText(String);
+pub(crate) struct LossyText(String);
 
 impl LossyText {
     const REPLACEMENT: &'static str = "\u{FFFD}";
