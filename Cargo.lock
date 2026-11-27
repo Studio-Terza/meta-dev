@@ -841,6 +841,7 @@ dependencies = [
  "design-messages",
  "dispatch-ports",
  "file-ports",
+ "fixture",
  "invariants",
  "newtype",
  "port-core",
@@ -848,7 +849,6 @@ dependencies = [
  "sqlite-ports",
  "store-ports-macros",
  "tempfile",
- "test-failure",
  "thiserror",
  "transcript-ports",
 ]

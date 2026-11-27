@@ -21,7 +21,7 @@ store-ports-macros = { path = "../store-ports-macros" }
 thiserror.workspace = true
 
 [dev-dependencies]
-test-failure = { path = "../test-failure" }
+fixture = { path = "../fixture" }
 sqlite-ports = { path = "../sqlite-ports" }
 design-messages = { path = "../design-messages" }
 dispatch-ports = { path = "../dispatch-ports" }
