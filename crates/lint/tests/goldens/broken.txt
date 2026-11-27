@@ -1,5 +1,6 @@
 Refused
 --- out
+test budget: 0 of 3 lines are tests, at most 18% may be
 --- err
 cannot parse src/bad.rs:1: cannot parse string into token stream
 cannot read src/missing.rs: entity not found

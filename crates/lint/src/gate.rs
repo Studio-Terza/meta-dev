@@ -91,10 +91,6 @@ impl TestMark {
         here.chain(nested.flatten()).collect()
     }
 
-    pub(crate) fn counted(tokens: TokenStream) -> usize {
-        TestMark::written(tokens).iter().filter_map(TestMark::on).count()
-    }
-
     fn attribute(mark: &TokenTree, body: &TokenTree) -> Option<Attribute> {
         let written = TokenStream::from_iter([mark.clone(), body.clone()]);
         Attribute::parse_outer.parse2(written).ignoring(Ignored::Unparsed).and_then(|parsed| parsed.into_iter().next())

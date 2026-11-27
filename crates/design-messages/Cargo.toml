@@ -27,6 +27,3 @@ console-ports = { path = "../console-ports" }
 
 [lints]
 workspace = true
-
-[dev-dependencies]
-sqlite-ports = { path = "../sqlite-ports" }

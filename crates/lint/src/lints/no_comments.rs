@@ -1,6 +1,5 @@
 use invariants::Ignoring;
 use rustc_lexer::{FrontmatterAllowed, TokenKind, strip_shebang, tokenize};
-use syn::visit::Visit;
 
 use crate::finding::{Found, Rule};
 use crate::ignored::Ignored;
@@ -21,8 +20,6 @@ struct Lexed {
 impl NoComments<'_> {
     const FIX: &'static str = "delete it and say the same in the names of the code";
 }
-
-impl Visit<'_> for NoComments<'_> {}
 
 impl<'file> Style<'file> for NoComments<'file> {
     const RULE: Rule = Rule::NoComments;

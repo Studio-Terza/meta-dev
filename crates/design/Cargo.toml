@@ -9,22 +9,26 @@ publish.workspace = true
 test = false
 doctest = false
 
+[[bin]]
+name = "design"
+path = "src/main.rs"
+test = false
+
 [dependencies]
 invariants = { path = "../invariants" }
 console-ports = { path = "../console-ports" }
 design-messages = { path = "../design-messages" }
 dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports" }
-grammar-lines = { path = "../grammar-lines" }
 grammar = { path = "../grammar" }
 grammar-git = { path = "../grammar-git" }
-grammar-slug = { path = "../grammar-slug" }
 grammar-spec-line = { path = "../grammar-spec-line" }
 hex.workspace = true
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 serde.workspace = true
 serde_json.workspace = true
+sqlite-ports = { path = "../sqlite-ports" }
 store-ports = { path = "../store-ports" }
 strum.workspace = true
 thiserror.workspace = true
@@ -33,7 +37,6 @@ transcript-ports = { path = "../transcript-ports" }
 
 [dev-dependencies]
 test-failure = { path = "../test-failure" }
-sqlite-ports = { path = "../sqlite-ports" }
 tempfile.workspace = true
 
 [lints]

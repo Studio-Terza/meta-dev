@@ -1,5 +1,6 @@
 Violations
 --- out
+test budget: 5 of 32 lines are tests, at most 18% may be
 --- err
 free functions are not allowed; make them associated functions or methods:
 src/free.rs:1: fn helper; make it an associated function or a method

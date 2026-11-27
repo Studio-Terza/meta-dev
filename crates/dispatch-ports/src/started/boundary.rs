@@ -1,7 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-use grammar_lstart::Stamp;
+use grammar::Stamp;
 use invariants::Ignoring;
 use newtype::{Listed, Spelled};
 use strum::{Display, IntoStaticStr, VariantArray};

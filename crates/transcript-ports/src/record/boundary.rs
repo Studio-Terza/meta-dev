@@ -1,8 +1,8 @@
 mod entry;
 
-use grammar_lines::Lines;
+use crate::lossy_text::LossyText;
+use grammar::Lines;
 use invariants::Ignoring;
-use text_lines::LossyText;
 
 use crate::{Ignored, Line, Unrecognised};
 use entry::Entry;
@@ -20,7 +20,8 @@ impl Line {
     }
 
     fn read(line: &str) -> Option<Line> {
-        serde_json::from_str::<Entry>(line)
+        serde_json::from_str::<serde_json::Value>(line)
+            .and_then(|value| Entry::read(&value))
             .ignoring(Ignored::Unparsed)
             .map_or_else(|| Some(Line::Unrecognised(Unrecognised::unreadable())), Option::<Line>::from)
     }

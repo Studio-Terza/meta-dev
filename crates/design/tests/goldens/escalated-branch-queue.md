@@ -1,9 +1,0 @@
-- [agent outcome] blocked on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent
-- [agent outcome] unread remote on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent
-- [agent outcome] unread remote on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent
-- [agent outcome] unread commits on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent
-- [agent outcome] unread commits on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent
-- [agent outcome] unread spec on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent
-- [agent outcome] unread open on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent
-- [agent outcome] unread open on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent
-- [agent outcome] unread open on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent

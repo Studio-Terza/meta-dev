@@ -1,44 +1,16 @@
 use std::time::Duration;
 
-use timer_ports::{Elapsed, Moment};
-
-struct Millis;
-
-impl Millis {
-    fn moment(millis: u64) -> Moment {
-        Moment::from(Duration::from_millis(millis))
-    }
-
-    fn elapsed(millis: u64) -> Elapsed {
-        Elapsed::from(Duration::from_millis(millis))
-    }
-}
+use timer_ports::{Elapsed, Moment, Monotonic, Timer};
 
 #[test]
-fn a_moment_since_an_earlier_one_is_the_time_between_them_and_never_negative() {
-    assert_eq!(Millis::moment(5_000).since(Millis::moment(2_000)), Millis::elapsed(3_000));
-    assert_eq!(Millis::moment(2_000).since(Millis::moment(5_000)), Elapsed::from(Duration::ZERO));
-    assert_eq!(Millis::moment(7).since(Millis::moment(7)), Elapsed::from(Duration::ZERO));
-}
-
-#[test]
-fn an_elapsed_time_shows_its_whole_milliseconds() {
-    assert_eq!(Millis::elapsed(1_500).to_string(), "1500");
-    assert_eq!(Millis::elapsed(0).to_string(), "0");
-}
-
-#[test]
-fn two_elapsed_times_add_up_to_their_sum() {
-    assert_eq!(Millis::elapsed(1_200) + Millis::elapsed(300), Millis::elapsed(1_500));
-    assert_eq!(Millis::elapsed(0) + Millis::elapsed(40), Millis::elapsed(40));
-}
-
-#[test]
-fn the_monotonic_clock_moves_forward_with_time() {
+fn moments_measure_never_negative_spans_that_add_and_show_whole_milliseconds() {
+    let [early, late] = [2_000, 5_000].map(|millis| Moment::from(Duration::from_millis(millis)));
+    let spans = [late.since(early), early.since(late), late.since(early) + Elapsed::from(Duration::from_millis(40))];
+    assert_eq!(spans.map(|span| span.to_string()), ["3000", "0", "3040"]);
+    assert_eq!(format!("{late:>6}|{}", Elapsed::default()), "  5000|0");
     let run = port_core::Run::root();
-    let clock = run.port(timer_ports::Monotonic::default());
-    let first = timer_ports::Timer::now(&clock);
+    let clock = run.port(Monotonic::default());
+    let first = clock.now();
     std::thread::sleep(Duration::from_millis(5));
-    let later = timer_ports::Timer::now(&clock);
-    assert!(later.since(first) >= Elapsed::from(Duration::from_millis(5)));
+    assert!(clock.now().since(first) >= Elapsed::from(Duration::from_millis(5)));
 }

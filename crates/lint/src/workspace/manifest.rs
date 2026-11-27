@@ -113,11 +113,12 @@ impl Manifest {
         let packaged = |path: &PathBuf| by_directory.get(path.as_path()).and_then(|manifest| manifest.packaged);
         let widened = iter::successors(Some(listed), |known| {
             let users = known.iter().filter_map(|path| by_directory.get(path.as_path())).chain([&self]);
-            let reached: BTreeSet<PathBuf> = users
+            let depended: BTreeSet<PathBuf> = users
                 .flat_map(|manifest| manifest.depends.iter())
-                .filter(|path| packaged(path).is_some() && !known.contains(*path))
+                .filter(|path| packaged(path).is_some())
                 .cloned()
                 .collect();
+            let reached: BTreeSet<PathBuf> = depended.difference(known).cloned().collect();
             reached.first().map(|_| known.union(&reached).cloned().collect())
         });
         widened.last().unwrap_or_default()

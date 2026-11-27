@@ -12,7 +12,7 @@ use newtype::{Arbitrary, Checked, Newtype};
 use head::Head;
 use piece::Piece;
 
-use grammar_unspelled::Unspelled;
+use grammar::Unspelled;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Line {

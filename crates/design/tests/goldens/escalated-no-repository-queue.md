@@ -1,6 +1,0 @@
-- [agent outcome] unread no-repository on #12 0123456789abcdef0123456789abcdef01234567, from /work/agent
-- [agent outcome] unread no-repository on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent
-- [agent outcome] unread no-repository on #12 0123456789abcdef0123456789abcdef01234567, from /work/agent
-- [agent outcome] unread no-repository on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent
-- [agent outcome] unread no-repository on #12 0123456789abcdef0123456789abcdef01234567, from /work/agent
-- [agent outcome] unread no-repository on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent

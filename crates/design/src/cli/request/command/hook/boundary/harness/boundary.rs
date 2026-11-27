@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use design_messages::{Halt, Tally};
 use file_ports::{Bytes, Epoch, Offset, Size, Stamp, Stamps, Tail};
-use grammar_lines::Lines;
+use grammar::Lines;
 use invariants::Ignoring;
 use newtype::Wrapping;
 use serde::Deserialize;

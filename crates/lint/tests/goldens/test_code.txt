@@ -48,3 +48,4 @@ src/lib.rs:92: test feature test-utils; remove the feature and test through the 
 tests/helpers/common.rs:1: test feature mock; remove the feature and test through the API every build has
 a function returning bool forgets what it found and makes the caller branch on a flag:
 src/lib.rs:91: fn probe -> bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
+test budget: 30 of 111 lines are tests, at most 18% may be; cut test lines or test through fewer, table-driven cases

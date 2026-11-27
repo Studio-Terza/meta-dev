@@ -1,5 +1,6 @@
 Refused
 --- out
+test budget: 0 of 0 lines are tests, at most 18% may be
 --- err
 cannot parse Cargo.toml: TOML parse error at line 1, column 5
   |

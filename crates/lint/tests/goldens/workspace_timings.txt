@@ -4,20 +4,7 @@ lint timings in milliseconds, each stage summed over files and threads:
 run: wall time of the whole run
 find: list the packages and their crate roots
 parse: read and parse each file once
-visit: NoComments
-visit: NoFreeFns
-visit: VecOutParams
-visit: NamedLifetimes
-visit: TypeShape
-visit: ExpressionFlow
-visit: ManualIteration
-visit: ProcessStarters
-visit: PublicSurface
-visit: PublicApiTests
-visit: NoTestOnlyApi
-visit: BoolMethods
-visit: NoDyn
-visit: test budget
+visit: walk each file's tree once through every lint and the test budget
 reduce: join the graph lints' facts
 --- err
 free functions are not allowed; make them associated functions or methods:
@@ -49,3 +36,4 @@ app/src/lib.rs:11: test code in src; move it to the package's tests directory an
 app/src/lib.rs:14: test code in src; move it to the package's tests directory and call the public API from there
 shipped code has no test-only API:
 app/Cargo.toml:5: test feature mock-data; remove the feature and test through the API every build has
+test budget: 36 of 80 lines are tests, at most 18% may be; cut test lines or test through fewer, table-driven cases

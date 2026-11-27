@@ -1,4 +1,4 @@
-use grammar_reply::Inked;
+use grammar::Inked;
 use newtype::Checked;
 use serde::Deserialize;
 

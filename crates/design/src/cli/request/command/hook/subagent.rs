@@ -8,7 +8,7 @@ use console_ports::Heard;
 use design_messages::{CheckName, FailedBefore, Failing};
 use dispatch_ports::{Clock, Dispatch, Shell};
 use file_ports::Files;
-use grammar_lines::Lines;
+use grammar::Lines;
 use invariants::Ignoring;
 use newtype::Wrapping;
 use store_ports::Store;

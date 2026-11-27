@@ -11,8 +11,7 @@ doctest = false
 
 [dependencies]
 invariants = { path = "../invariants" }
-grammar-lstart = { path = "../grammar-lstart" }
-grammar-reply = { path = "../grammar-reply" }
+grammar = { path = "../grammar" }
 newtype = { path = "../newtype" }
 strum.workspace = true
 port-core = { path = "../port-core" }

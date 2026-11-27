@@ -1,5 +1,3 @@
-use syn::visit::Visit;
-
 use crate::finding::{Found, Rule};
 use crate::source::{Place, Source};
 
@@ -18,7 +16,7 @@ impl Reads {
     }
 }
 
-pub(crate) trait Style<'file>: Sized + for<'ast> Visit<'ast> {
+pub(crate) trait Style<'file>: Sized {
     const RULE: Rule;
     const READS: Reads;
 

@@ -1,3 +1,3 @@
 mod boundary;
 
-pub use boundary::{Answer, Complaint, Shown, Tale, Teller};
+pub use boundary::{Answer, Complaint, Shown};

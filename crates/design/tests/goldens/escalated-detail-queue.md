@@ -1,4 +1,0 @@
-- [agent outcome] unread detail on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent
-- [agent outcome] unread detail on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent
-- [agent outcome] unread detail on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent
-- [agent outcome] unread detail on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent

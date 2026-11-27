@@ -1,18 +1,19 @@
+use std::path::Path;
 use std::sync::Mutex;
 
 use invariants::{Ignoring, Unpoisoned, ignored};
 use newtype::Counter;
 use port_core::{
-    Calls, Counted, Held, Measured, Metered, Op, Pass, Port, Release, ReleaseReceipt, Released, Resource, Run,
-    Snapshot, port,
+    Calls, Counted, Held, Measured, Metered, Op, Pass, Port, Release, ReleaseReceipt, Released, Resource, Run, port,
 };
-use strum::VariantArray;
 
 ignored! {
     enum Ignored {
         Unlocked => "a fallible lock that fails holds nothing, as an optional lock that finds none",
     }
 }
+
+const GOLDEN: &str = "tests/laws.txt";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Session(String);
@@ -21,7 +22,7 @@ struct Session(String);
 #[error("the session lock was already gone")]
 struct Gone;
 
-#[derive(VariantArray, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Lockable {
     Intact,
     Broken,
@@ -58,28 +59,58 @@ trait SessionCache {
     fn clear(&self);
 }
 
-impl SessionCacheFiller for Memory {
-    fn clear(&self, _pass: Pass<'_, session_cache_ops::Clear>) {}
+#[port]
+trait Queries {
+    #[op(Q)]
+    fn ask<Q: Query>(&self, query: &Q) -> Q::Answer;
 }
+
+trait Query: Op {
+    type Answer;
+
+    fn answered(&self, rows: &[Session]) -> Self::Answer;
+}
+
+#[derive(Op)]
+struct Count;
+
+#[derive(Op)]
+struct Names;
 
 #[derive(Debug, Default)]
 struct Memory {
     sessions: Mutex<Vec<Session>>,
 }
 
-impl Memory {
-    fn holding(names: &[&str]) -> Memory {
-        Memory { sessions: Mutex::new(names.iter().map(|name| Session((*name).to_owned())).collect()) }
-    }
+impl Query for Count {
+    type Answer = usize;
 
-    fn listed(&self) -> Vec<Session> {
-        self.sessions.lock().unpoisoned().clone()
+    fn answered(&self, rows: &[Session]) -> usize {
+        rows.len()
+    }
+}
+
+impl Query for Names {
+    type Answer = Vec<String>;
+
+    fn answered(&self, rows: &[Session]) -> Vec<String> {
+        rows.iter().map(|session| session.0.clone()).collect()
+    }
+}
+
+impl SessionCacheFiller for Memory {
+    fn clear(&self, _pass: Pass<'_, session_cache_ops::Clear>) {}
+}
+
+impl QueriesFiller for Memory {
+    fn ask<Q: Query>(&self, _pass: Pass<'_, Q>, query: &Q) -> Q::Answer {
+        query.answered(&self.sessions.lock().unpoisoned())
     }
 }
 
 impl TranscriptsFiller for Memory {
     fn sessions(&self, _pass: Pass<'_, transcripts_ops::Sessions>) -> Vec<Session> {
-        self.listed()
+        self.sessions.lock().unpoisoned().clone()
     }
 
     fn read_from(&self, _pass: Pass<'_, transcripts_ops::ReadFrom>, session: &Session, at: usize) -> Vec<String> {
@@ -101,324 +132,96 @@ impl TranscriptsFiller for Memory {
 
 impl SessionLock {
     fn of(session: &Session) -> SessionLock {
-        let lockable = Lockable::VARIANTS.iter().copied().find(|lockable| lockable.session() == *session);
-        SessionLock { lockable: lockable.unwrap_or(Lockable::Intact) }
+        SessionLock { lockable: if session.0 == "broken" { Lockable::Broken } else { Lockable::Intact } }
     }
 }
 
-impl Lockable {
-    fn session(self) -> Session {
-        match self {
-            Lockable::Intact => Session("a".to_owned()),
-            Lockable::Broken => Session("broken".to_owned()),
-        }
-    }
+struct Scenario(&'static str, &'static [&'static str], for<'run, 'port> fn(&'port Port<'run, Memory>) -> String);
 
-    fn ended(self) -> Result<(), Gone> {
-        match self {
-            Lockable::Intact => Ok(()),
-            Lockable::Broken => Err(Gone),
-        }
-    }
+impl Scenario {
+    const ALL: [Scenario; 15] = [
+        Scenario("no calls", &[], |_| String::new()),
+        Scenario("each call counts once", &["a"], |port| format!("{:?}", [(); 3].map(|()| port.sessions().len()))),
+        Scenario("a provided method counts its calls", &["a", "b"], |port| {
+            format!("{:?}", Scenario::metered(port).read_all())
+        }),
+        Scenario("scoped threads", &["a"], |port| {
+            format!("{:?}", std::thread::scope(|scope| [(); 4].map(|()| scope.spawn(|| port.sessions())).len()))
+        }),
+        Scenario("runs keep their own counts", &["a"], |port| {
+            format!("{} {:?}", port.sessions().len(), Scenario::ALL.get(1).map(Scenario::shown))
+        }),
+        Scenario("ops list in name order", &["a"], |port| {
+            format!(
+                "{:?} {:?} {:?}",
+                port.read_from(&Session::a(), 1),
+                port.sessions().len(),
+                port.lock(&Session::a()).map(Held::end)
+            )
+        }),
+        Scenario("per-type ops", &["a", "b"], |port| {
+            format!("{} {} {:?}", port.ask(&Count), port.ask(&Count), port.ask(&Names))
+        }),
+        Scenario("a fallible lock dropped", &[], |port| {
+            format!("{:?}", port.lock(&Session::a()).ignoring(Ignored::Unlocked).map(|held| held.lockable))
+        }),
+        Scenario("an optional lock dropped", &[], |port| {
+            format!("{:?}", port.try_lock(&Session::a()).map(|held| held.lockable))
+        }),
+        Scenario("a bare lock dropped", &[], |port| format!("{:?}", port.lock_bare(&Session::a()).lockable)),
+        Scenario("a broken lock ended", &[], |port| {
+            format!("{:?}", port.lock(&Session("broken".to_owned())).map(Held::end))
+        }),
+        Scenario("a broken lock dropped", &[], |port| {
+            format!("{:?}", port.lock(&Session("broken".to_owned())).map(|held| held.lockable))
+        }),
+        Scenario("a lock changed through its hold", &[], |port| Scenario::changed(port.lock_bare(&Session::a()))),
+        Scenario("a two-word trait", &[], |port| format!("{:?}", SessionCache::clear(port))),
+        Scenario("names", &[], |_| format!("{} {} {}", SessionLock::NAME, Released::<SessionLock>::NAME, Count::NAME)),
+    ];
 
-    fn failure(self) -> Option<String> {
-        match self {
-            Lockable::Intact => None,
-            Lockable::Broken => {
-                Some(format!("releasing {} failed: {Gone} (0 further release failures)", SessionLock::NAME))
-            }
-        }
-    }
-}
-
-trait Query: Op {
-    type Answer;
-
-    fn answered(&self, rows: &[Session]) -> Self::Answer;
-}
-
-#[derive(Op)]
-struct Count;
-
-#[derive(Op)]
-struct Names;
-
-impl Query for Count {
-    type Answer = usize;
-
-    fn answered(&self, rows: &[Session]) -> usize {
-        rows.len()
-    }
-}
-
-impl Query for Names {
-    type Answer = Vec<String>;
-
-    fn answered(&self, rows: &[Session]) -> Vec<String> {
-        rows.iter().map(|session| session.0.clone()).collect()
-    }
-}
-
-#[port]
-trait Queries {
-    #[op(Q)]
-    fn ask<Q: Query>(&self, query: &Q) -> Q::Answer;
-}
-
-impl QueriesFiller for Memory {
-    fn ask<Q: Query>(&self, _pass: Pass<'_, Q>, query: &Q) -> Q::Answer {
-        query.answered(&self.listed())
-    }
-}
-
-struct Tally;
-
-impl Tally {
-    fn names(snapshot: &Snapshot) -> Vec<String> {
-        snapshot.iter().map(|counted| counted.name().to_string()).collect()
-    }
-
-    fn named<O: Op>() -> String {
-        O::NAME.to_string()
-    }
-
-    fn over<F>(run: &Run, filler: F) -> Port<'_, F> {
-        run.port(filler)
-    }
-
-    fn metered<P: Metered>(port: &P) -> &P {
+    fn metered<Ported: Metered>(port: &Ported) -> &Ported {
         port
     }
 
-    fn counts(counted: Counted) -> usize {
-        counted.calls().count()
+    fn changed(mut held: Held<'_, SessionLock>) -> String {
+        let reached = held.lockable;
+        held.lockable = Lockable::Broken;
+        format!("{reached:?} {:?}", held.end())
     }
 
-    fn finished(run: Run) -> Measured {
-        run.finish()
-    }
-}
-
-#[test]
-fn an_op_is_counted_once_per_call_of_its_own() {
-    (0usize..24).for_each(|calls| {
+    fn shown(&self) -> String {
         let run = Run::root();
-        let port = run.port(Memory::holding(&["a"]));
-        (0..calls).for_each(|_| {
-            let _ = Transcripts::sessions(&port);
-        });
+        let port =
+            run.port(Memory { sessions: Mutex::new(self.1.iter().map(|name| Session((*name).to_owned())).collect()) });
+        let said = (self.2)(&port);
         drop(port);
-        let measured = run.finish();
-        assert_eq!(measured.snapshot().calls::<transcripts_ops::Sessions>(), Calls::new(calls));
-        assert_eq!(measured.snapshot().calls::<transcripts_ops::ReadFrom>(), Calls::zero());
-        assert_eq!(measured.snapshot().iter().map(Tally::counts).sum::<usize>(), calls);
-    });
-}
-
-#[test]
-fn a_provided_method_counts_the_required_calls_it_makes() {
-    (0usize..8).for_each(|sessions| {
-        let names: Vec<String> = (0..sessions).map(|number| number.to_string()).collect();
-        let run = Run::root();
-        let port = run.port(Memory::holding(&names.iter().map(String::as_str).collect::<Vec<_>>()));
-        assert_eq!(Transcripts::read_all(Tally::metered(&port)).len(), sessions);
-        drop(port);
-        let measured = run.finish();
-        assert_eq!(measured.snapshot().calls::<transcripts_ops::Sessions>(), Calls::new(1));
-        assert_eq!(measured.snapshot().calls::<transcripts_ops::ReadFrom>(), Calls::new(sessions));
-    });
-}
-
-#[test]
-fn calls_on_scoped_threads_are_all_counted() {
-    (1usize..6).for_each(|threads| {
-        let run = Run::root();
-        let port = run.port(Memory::holding(&["a"]));
-        std::thread::scope(|scope| {
-            (0..threads).for_each(|_| {
-                scope.spawn(|| Transcripts::sessions(&port));
-            });
-        });
-        drop(port);
-        let measured = Tally::finished(run);
-        assert_eq!(measured.snapshot().calls::<transcripts_ops::Sessions>(), Calls::new(threads));
-    });
-}
-
-#[test]
-fn runs_never_share_their_counts() {
-    (0usize..8).flat_map(|left| (0usize..8).map(move |right| (left, right))).for_each(|pair| {
-        let (first, second) = (Run::root(), Run::root());
-        let (left, right) = (first.port(Memory::default()), second.port(Memory::default()));
-        (0..pair.0).for_each(|_| {
-            let _ = Transcripts::sessions(&left);
-        });
-        (0..pair.1).for_each(|_| {
-            let _ = Transcripts::sessions(&right);
-        });
-        drop((left, right));
-        let (counted, other) = (first.finish(), second.finish());
-        assert_eq!(counted.snapshot().calls::<transcripts_ops::Sessions>(), Calls::new(pair.0));
-        assert_eq!(other.snapshot().calls::<transcripts_ops::Sessions>(), Calls::new(pair.1));
-    });
-}
-
-#[test]
-fn a_snapshot_lists_ops_in_name_order() {
-    (0_u8..8).map(|bits| (bits & 1 == 1, bits & 2 == 2, bits & 4 == 4)).for_each(|which| {
-        let run = Run::root();
-        let port = Tally::over(&run, Memory::holding(&["a"]));
-        let session = Session("a".to_owned());
-        let _ = which.0.then(|| Transcripts::read_from(&port, &session, 0));
-        let _ = which.1.then(|| Transcripts::sessions(&port));
-        let _ = which.2.then(|| Transcripts::lock(&port, &session));
-        drop(port);
-        let names = Tally::names(run.finish().snapshot());
-        let mut sorted = names.clone();
-        sorted.sort();
-        assert_eq!(names, sorted);
-    });
-}
-
-#[test]
-fn op_names_are_the_module_path_then_the_trait_and_method() {
-    assert_eq!(Tally::named::<transcripts_ops::Sessions>(), "laws::transcripts_ops::Transcripts::sessions");
-    assert_eq!(Tally::named::<transcripts_ops::ReadFrom>(), "laws::transcripts_ops::Transcripts::read_from");
-    assert_eq!(Tally::named::<transcripts_ops::Lock>(), "laws::transcripts_ops::Transcripts::lock");
-}
-
-#[test]
-fn a_resource_and_a_derived_op_are_named_by_module_path() {
-    assert_eq!(SessionLock::NAME.to_string(), "laws::SessionLock");
-    assert_eq!(SessionLock::RELEASE.to_string(), "laws::SessionLock::release");
-    assert_eq!(Tally::named::<Released<SessionLock>>(), "laws::SessionLock::release");
-    assert_eq!(Tally::named::<Count>(), "laws::Count");
-}
-
-#[test]
-fn per_type_ops_count_each_query_type_apart() {
-    (0usize..6).flat_map(|first| (0usize..6).map(move |second| (first, second))).for_each(|asked| {
-        let run = Run::root();
-        let port = run.port(Memory::holding(&["a", "b"]));
-        (0..asked.0).for_each(|_| {
-            let _ = Queries::ask(&port, &Count);
-        });
-        (0..asked.1).for_each(|_| {
-            let _ = Queries::ask(&port, &Names);
-        });
-        assert_eq!(Queries::ask(&port, &Names), ["a", "b"]);
-        drop(port);
-        let measured = run.finish();
-        assert_eq!(measured.snapshot().calls::<Count>(), Calls::new(asked.0));
-        assert_eq!(measured.snapshot().calls::<Names>(), Calls::new(asked.1.saturating_add(1)));
-    });
-}
-
-#[derive(VariantArray, Clone, Copy, Debug)]
-enum Acquisition {
-    Fallible,
-    Optional,
-    Bare,
-}
-
-impl Acquisition {
-    fn held<'port>(self, port: &'port Port<'_, Memory>, session: &Session) -> Option<Held<'port, SessionLock>> {
-        match self {
-            Acquisition::Fallible => Transcripts::lock(port, session).ignoring(Ignored::Unlocked),
-            Acquisition::Optional => Transcripts::try_lock(port, session),
-            Acquisition::Bare => Some(Transcripts::lock_bare(port, session)),
-        }
-    }
-}
-
-#[test]
-fn acquiring_counts_the_op_and_dropping_counts_one_release() {
-    Acquisition::VARIANTS.iter().copied().for_each(|acquisition| {
-        let run = Run::root();
-        let port = run.port(Memory::holding(&["a"]));
-        let held = acquisition.held(&port, &Session("a".to_owned()));
-        assert!(held.is_some());
-        drop(held);
-        drop(port);
-        let measured = run.finish();
-        let acquired: usize = [
-            measured.snapshot().calls::<transcripts_ops::Lock>(),
-            measured.snapshot().calls::<transcripts_ops::TryLock>(),
-            measured.snapshot().calls::<transcripts_ops::LockBare>(),
-        ]
-        .into_iter()
-        .map(Calls::count)
-        .sum();
-        assert_eq!(acquired, 1);
-        assert_eq!(measured.snapshot().calls::<Released<SessionLock>>(), Calls::new(1));
-        assert!(measured.settled().is_ok());
-    });
-}
-
-#[test]
-fn ending_a_held_resource_releases_once_and_returns_its_failure() {
-    Lockable::VARIANTS.iter().copied().for_each(|lockable| {
-        let run = Run::root();
-        let port = run.port(Memory::default());
-        let ended = Transcripts::lock(&port, &lockable.session()).map(Held::end);
-        drop(port);
-        let measured = run.finish();
-        assert_eq!(ended, Ok(lockable.ended()));
-        assert_eq!(measured.snapshot().calls::<Released<SessionLock>>(), Calls::new(1));
-        assert!(measured.settled().is_ok());
-    });
-}
-
-#[test]
-fn a_failed_release_on_drop_shows_in_the_measured_failures() {
-    Lockable::VARIANTS.iter().copied().for_each(|lockable| {
-        let run = Run::root();
-        let port = run.port(Memory::default());
-        drop(Transcripts::lock(&port, &lockable.session()));
-        drop(port);
-        let measured = run.finish();
-        assert_eq!(measured.snapshot().calls::<Released<SessionLock>>(), Calls::new(1));
-        let said = match measured.settled() {
-            Ok(_snapshot) => None,
-            Err(failures) => Some(failures.to_string()),
+        let measured: Measured = run.finish();
+        let counted: Vec<String> = measured
+            .snapshot()
+            .iter()
+            .map(|counted: Counted| format!("{} {}", counted.name(), counted.calls().count()))
+            .collect();
+        let sessions: Calls = measured.snapshot().calls::<transcripts_ops::Sessions>();
+        let settled = match measured.settled() {
+            Ok(_snapshot) => "settled".to_owned(),
+            Err(failures) => failures.to_string(),
         };
-        assert_eq!(said, lockable.failure());
-    });
+        format!("{}: {said}; {} sessions in [{}]; {settled}\n", self.0, sessions.count(), counted.join(", "))
+    }
 }
 
-#[test]
-fn a_resource_is_released_exactly_once_whether_ended_or_dropped() {
-    for ending in [false, true] {
-        let run = Run::root();
-        let port = run.port(Memory::holding(&["a"]));
-        let held = Transcripts::lock(&port, &Session("a".to_owned()));
-        let ended = ending.then_some(held).map(|lock| lock.map(Held::end));
-        assert!(ended.iter().all(|result| matches!(result, Ok(Ok(())))));
-        drop(port);
-        let measured = run.finish();
-        assert_eq!(measured.snapshot().calls::<Released<SessionLock>>(), Calls::new(1));
-        assert!(measured.settled().is_ok());
+impl Session {
+    fn a() -> Session {
+        Session("a".to_owned())
     }
 }
 
 #[test]
-fn a_two_word_trait_names_its_ops_module_in_snake_case() {
-    let run = Run::root();
-    let port = Tally::over(&run, Memory::default());
-    SessionCache::clear(Tally::metered(&port));
-    drop(port);
-    assert_eq!(Tally::names(run.finish().snapshot()), ["laws::session_cache_ops::SessionCache::clear"]);
-}
-
-#[test]
-fn a_held_resource_is_reached_and_changed_through_its_hold_and_released_once() {
-    let run = Run::root();
-    let port = run.port(Memory::default());
-    let mut held = port.lock_bare(&Session("a".to_owned()));
-    let reached = held.lockable;
-    held.lockable = Lockable::Broken;
-    assert_eq!((reached, held.end()), (Lockable::Intact, Err(Gone)));
-    let measured = run.finish();
-    assert_eq!(measured.snapshot().calls::<Released<SessionLock>>(), Calls::new(1));
-    assert!(measured.settled().is_ok());
+fn every_scenario_counts_and_releases_as_its_golden_says() -> Result<(), std::io::Error> {
+    let shown: String = Scenario::ALL.iter().map(Scenario::shown).collect();
+    let golden = Path::new(env!("CARGO_MANIFEST_DIR")).join(GOLDEN);
+    std::env::var_os("RECORD_GOLDENS").map_or(Ok(()), |_| std::fs::write(&golden, &shown))?;
+    assert_eq!(shown, std::fs::read_to_string(golden)?);
+    Ok(())
 }
