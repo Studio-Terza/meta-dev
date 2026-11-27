@@ -68,6 +68,9 @@ shell "bash <<A\nrm x": Some((Rm, Heredoc))
 shell "cat <<A\nrm x\nA\nrm y": None
 shell "cat <<-A\n\trm x\n\tA\nrm y": None
 shell "cat <<A\n\tA\nrm y\nA": None
+shell "bash <<A\n\tA\nrm y\nA": Some((Rm, Heredoc))
+shell "bash <<A\necho a\nrm x\nA\necho done": Some((Rm, Heredoc))
+shell ">log bash -c 'rm x'": Some((Rm, ShellScript))
 shell "cd /w && for f in *.tmp; do /bin/rm \"$f\"; done": Some((Rm, Loop))
 shell "bash -c 'for f in a; do rm $f; done'": Some((Rm, ShellScript))
 shell "for f in a; do bash -c \"rm $f\"; done": Some((Rm, Loop))
