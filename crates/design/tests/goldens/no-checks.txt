@@ -1,31 +1,31 @@
-+60 gh pr view 12 --json headRefOid
-+60 gh pr checks 12 --json name,state
-+70 gh pr checks 12 --json name,state
-+80 gh pr checks 12 --json name,state
-+90 gh pr checks 12 --json name,state
-+100 gh pr checks 12 --json name,state
-+110 gh pr checks 12 --json name,state
-+120 gh pr checks 12 --json name,state
-+130 gh pr checks 12 --json name,state
-+140 gh pr checks 12 --json name,state
-+150 gh pr checks 12 --json name,state
-+160 gh pr checks 12 --json name,state
-+170 gh pr checks 12 --json name,state
-+180 gh pr checks 12 --json name,state
-+190 gh pr checks 12 --json name,state
-+200 gh pr checks 12 --json name,state
-+210 gh pr checks 12 --json name,state
-+220 gh pr checks 12 --json name,state
-+230 gh pr checks 12 --json name,state
-+240 gh pr checks 12 --json name,state
-+250 gh pr checks 12 --json name,state
-+260 gh pr checks 12 --json name,state
-+270 gh pr checks 12 --json name,state
-+280 gh pr checks 12 --json name,state
-+290 gh pr checks 12 --json name,state
-+300 gh pr checks 12 --json name,state
-+310 gh pr checks 12 --json name,state
-+320 gh pr checks 12 --json name,state
-+330 gh pr checks 12 --json name,state
-+340 gh pr checks 12 --json name,state
-+350 gh pr checks 12 --json name,state
++60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr checks 12 --json name,state -R o/r
++70 gh pr checks 12 --json name,state -R o/r
++80 gh pr checks 12 --json name,state -R o/r
++90 gh pr checks 12 --json name,state -R o/r
++100 gh pr checks 12 --json name,state -R o/r
++110 gh pr checks 12 --json name,state -R o/r
++120 gh pr checks 12 --json name,state -R o/r
++130 gh pr checks 12 --json name,state -R o/r
++140 gh pr checks 12 --json name,state -R o/r
++150 gh pr checks 12 --json name,state -R o/r
++160 gh pr checks 12 --json name,state -R o/r
++170 gh pr checks 12 --json name,state -R o/r
++180 gh pr checks 12 --json name,state -R o/r
++190 gh pr checks 12 --json name,state -R o/r
++200 gh pr checks 12 --json name,state -R o/r
++210 gh pr checks 12 --json name,state -R o/r
++220 gh pr checks 12 --json name,state -R o/r
++230 gh pr checks 12 --json name,state -R o/r
++240 gh pr checks 12 --json name,state -R o/r
++250 gh pr checks 12 --json name,state -R o/r
++260 gh pr checks 12 --json name,state -R o/r
++270 gh pr checks 12 --json name,state -R o/r
++280 gh pr checks 12 --json name,state -R o/r
++290 gh pr checks 12 --json name,state -R o/r
++300 gh pr checks 12 --json name,state -R o/r
++310 gh pr checks 12 --json name,state -R o/r
++320 gh pr checks 12 --json name,state -R o/r
++330 gh pr checks 12 --json name,state -R o/r
++340 gh pr checks 12 --json name,state -R o/r
++350 gh pr checks 12 --json name,state -R o/r

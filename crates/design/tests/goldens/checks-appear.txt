@@ -1,6 +1,6 @@
-+60 gh pr view 12 --json headRefOid
-+60 gh pr checks 12 --json name,state
-+70 gh pr checks 12 --json name,state
-+80 gh pr checks 12 --json name,state
-+1220 gh pr checks 12 --watch --fail-fast
-+80 gh pr checks 12 --json name,bucket,link
++60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr checks 12 --json name,state -R o/r
++70 gh pr checks 12 --json name,state -R o/r
++80 gh pr checks 12 --json name,state -R o/r
++1220 gh pr checks 12 --watch --fail-fast -R o/r
++80 gh pr checks 12 --json name,bucket,link -R o/r
