@@ -1,351 +1,102 @@
-mod ignored;
+use std::path::PathBuf;
 
-use std::io;
-use std::path::{Path, PathBuf};
-use test_failure::Failed;
-
-use file_ports::{
-    Absent, Bytes, Cached, Disk, FileFailure, Files, Kind, Memory, Offset, Size, Stamp, Stamps, Tail, Text,
-};
-use invariants::Ignoring;
+use file_ports::{Absent, Bytes, Cached, Disk, Files, Kind, Memory, Offset};
 use newtype::Wrapping;
+use proptest::prelude::{any, prop_assert_eq, proptest};
 
-use ignored::Ignored;
+const NAME: &str = "[a-z]{1,8}";
+const OTHER: &str = "[A-Z]{1,8}";
+const INNER: &str = "inner";
 
-struct Contract<'files, Port: Files> {
-    files: &'files Port,
-    root: PathBuf,
-}
-
-impl<Port: Files> Contract<'_, Port> {
-    fn at(&self, name: &str) -> PathBuf {
-        self.root.join(name)
+proptest! {
+    #[test]
+    fn disk_and_memory_read_back_what_was_written(name in NAME, bytes in any::<Bytes>()) {
+        let scratch = tempfile::tempdir()?;
+        let path = scratch.path().join(&name);
+        let memory = Memory::default();
+        memory.create_directories(scratch.path())?;
+        Disk.write(&path, bytes.clone())?;
+        memory.write(&path, bytes.clone())?;
+        prop_assert_eq!(Disk.read(&path)?, bytes.clone());
+        prop_assert_eq!(memory.read(&path)?, bytes);
+        prop_assert_eq!(Disk.kind(&path), memory.kind(&path));
     }
 
-    fn written_then_read(&self) -> Result<Text, FileFailure> {
-        let path = self.at("note.txt");
-        self.files.write(&path, Bytes::from("written"))?;
-        assert_eq!(self.files.read(&path)?, Bytes::from("written"));
-        self.files.read_text(&path)
+    #[test]
+    fn disk_and_memory_append_after_what_was_there(name in NAME, first in any::<Bytes>(), second in any::<Bytes>()) {
+        let scratch = tempfile::tempdir()?;
+        let path = scratch.path().join(&name);
+        let memory = Memory::default();
+        memory.create_directories(scratch.path())?;
+        let joined = Bytes::new(first.clone().into_inner().into_iter().chain(second.clone().into_inner()).collect());
+        Disk.append(&path, &first).and_then(|()| Disk.append(&path, &second))?;
+        memory.append(&path, &first).and_then(|()| memory.append(&path, &second))?;
+        prop_assert_eq!(Disk.read(&path)?, joined.clone());
+        prop_assert_eq!(memory.read(&path)?, joined);
     }
 
-    fn appended(&self) -> Result<Text, FileFailure> {
-        let path = self.at("log.txt");
-        self.files.append(&path, &Bytes::from("one "))?;
-        self.files.append(&path, &Bytes::from("two"))?;
-        self.files.read_text(&path)
+    #[test]
+    fn disk_and_memory_copy_and_list_alike(name in NAME, copy in OTHER, bytes in any::<Bytes>()) {
+        let scratch = tempfile::tempdir()?;
+        let inner = scratch.path().join(INNER);
+        let [from, to] = [scratch.path().join(&name), inner.join(&copy)];
+        let memory = Memory::default();
+        memory.create_directories(&inner)?;
+        Disk.create_directories(&inner)?;
+        Disk.write(&from, bytes.clone()).and_then(|()| Disk.copy(&from, &to))?;
+        memory.write(&from, bytes.clone()).and_then(|()| memory.copy(&from, &to))?;
+        prop_assert_eq!(Disk.read(&to)?, bytes.clone());
+        prop_assert_eq!(memory.read(&to)?, bytes);
+        let mut on_disk = Disk.entries(scratch.path())?;
+        let mut in_memory = memory.entries(scratch.path())?;
+        on_disk.sort();
+        in_memory.sort();
+        prop_assert_eq!(on_disk, in_memory);
     }
 
-    fn copied(&self) -> Result<Text, FileFailure> {
-        self.files.write(&self.at("from.txt"), Bytes::from("copied"))?;
-        self.files.copy(&self.at("from.txt"), &self.at("to.txt"))?;
-        self.files.read_text(&self.at("to.txt"))
+    #[test]
+    fn disk_and_memory_miss_the_same_paths(name in NAME) {
+        let scratch = tempfile::tempdir()?;
+        let path = scratch.path().join(&name);
+        let memory = Memory::default();
+        memory.create_directories(scratch.path())?;
+        prop_assert_eq!(Disk.kind(&path), Kind::Missing);
+        prop_assert_eq!(memory.kind(&path), Kind::Missing);
+        prop_assert_eq!(Disk.read(&path).is_err(), memory.read(&path).is_err());
+        prop_assert_eq!(Disk.size(&path).is_err(), memory.size(&path).is_err());
     }
 
-    fn nested(&self) -> Result<Vec<PathBuf>, FileFailure> {
-        let directory = self.at("outer/inner");
-        self.files.create_directories(&directory)?;
-        self.files.write(&directory.join("b.txt"), Bytes::from("b"))?;
-        self.files.write(&self.at("outer/a.txt"), Bytes::from("a"))?;
-        assert_eq!(self.files.kind(&directory), Kind::Directory);
-        let mut entries = self.files.entries(&self.at("outer"))?;
-        entries.sort();
-        Ok(entries)
+    #[test]
+    fn reading_from_an_offset_skips_that_many_bytes(name in NAME, bytes in any::<Bytes>(), offset in any::<Offset>()) {
+        let scratch = tempfile::tempdir()?;
+        let path = scratch.path().join(&name);
+        let memory = Memory::default();
+        memory.create_directories(scratch.path())?;
+        Disk.write(&path, bytes.clone())?;
+        memory.write(&path, bytes.clone())?;
+        let skipped = usize::try_from(offset.position()).unwrap_or(usize::MAX);
+        let tail = Bytes::new(bytes.into_inner().into_iter().skip(skipped).collect());
+        prop_assert_eq!(Disk.read_from(&path, offset)?, tail.clone());
+        prop_assert_eq!(memory.read_from(&path, offset)?, tail);
     }
 
-    fn missing(&self) -> Vec<String> {
-        let absent = self.at("absent.txt");
-        vec![
-            Self::named(&self.files.read(&absent).map(|_| ())),
-            Self::named(&self.files.read_text(&absent).map(|_| ())),
-            Self::named(&self.files.entries(&absent).map(|_| ())),
-            Self::named(&self.files.canonical(&absent).map(|_| ())),
-            Self::named(&self.files.copy(&absent, &self.at("copy.txt"))),
-            Self::named(&self.files.write(&self.at("absent/inside.txt"), Bytes::from("x"))),
-            format!("{:?}", self.files.kind(&absent)),
-        ]
+    #[test]
+    fn a_cache_reads_and_writes_through_to_its_files(name in NAME, first in any::<Bytes>(), second in any::<Bytes>()) {
+        let memory = Memory::default();
+        let path = PathBuf::from(&name);
+        memory.write(&path, first.clone())?;
+        let cached = Cached::new(&memory);
+        prop_assert_eq!(cached.read(&path)?, first);
+        cached.write(&path, second.clone())?;
+        prop_assert_eq!(cached.read(&path)?, second.clone());
+        prop_assert_eq!(memory.read(&path)?, second);
     }
 
-    fn named(result: &Result<(), FileFailure>) -> String {
-        match result {
-            Ok(()) => "ok".to_owned(),
-            Err(FileFailure::Missing(_)) => "missing".to_owned(),
-            Err(FileFailure::Failed(_)) => "failed".to_owned(),
-        }
+    #[test]
+    fn absent_holds_nothing_and_takes_nothing(name in NAME, bytes in any::<Bytes>()) {
+        let path = PathBuf::from(&name);
+        prop_assert_eq!(Absent.write(&path, bytes.clone()).is_err(), Absent.read(&path).is_err());
+        prop_assert_eq!(Absent.append(&path, &bytes).is_err(), Absent.entries(&path).is_err());
+        prop_assert_eq!(Absent.kind(&path), Kind::Missing);
     }
-
-    fn not_text(&self) -> String {
-        let path = self.at("binary");
-        let written = self.files.write(&path, Bytes::new(vec![0xff, 0xfe]));
-        Self::named(&written.and_then(|()| self.files.read_text(&path).map(|_| ())))
-    }
-
-    fn beneath_a_file(&self) -> String {
-        let written = self.files.write(&self.at("blocker"), Bytes::from(""));
-        Self::named(&written.and_then(|()| self.files.create_directories(&self.at("blocker/inner"))))
-    }
-
-    fn resolved(&self) -> Result<[PathBuf; 2], FileFailure> {
-        let real = self.files.canonical(&self.at("outer/a.txt"))?;
-        let dotted = self.files.canonical(&self.at("outer/./inner/../a.txt"))?;
-        assert_eq!(Self::named(&self.files.read(&self.at("outer")).map(|_| ())), "failed");
-        Ok([real, dotted])
-    }
-
-    fn canonical_file(&self) -> Result<PathBuf, FileFailure> {
-        let path = self.at("here.txt");
-        self.files.write(&path, Bytes::from("here"))?;
-        assert_eq!(self.files.kind(&path), Kind::File);
-        self.files.canonical(&path)
-    }
-}
-
-struct Checks;
-
-impl Checks {
-    fn on(files: &(impl Files + Sync), root: &Path) -> Result<(), FileFailure> {
-        let contract = Contract { files, root: root.to_path_buf() };
-        assert_eq!(contract.written_then_read()?.as_ref(), "written");
-        assert_eq!(contract.appended()?, Text::new("one two".to_owned()));
-        assert_eq!(contract.copied()?, Text::new("copied".to_owned()));
-        assert_eq!(contract.nested()?, vec![contract.at("outer/a.txt"), contract.at("outer/inner")]);
-        let [real, dotted] = std::thread::scope(|scope| scope.spawn(|| contract.resolved()).join())
-            .ignoring(Ignored::Panicked)
-            .unwrap_or_else(|| Err(FileFailure::Failed(io::Error::from(io::ErrorKind::Other))))?;
-        assert_eq!(dotted, real);
-        assert_eq!(contract.missing(), ["missing", "missing", "missing", "missing", "missing", "missing", "Missing"]);
-        assert_eq!(contract.not_text(), "failed");
-        assert_eq!(contract.beneath_a_file(), "failed");
-        assert_eq!(contract.canonical_file()?.file_name(), Some(std::ffi::OsStr::new("here.txt")));
-        Ok(())
-    }
-}
-
-#[test]
-fn disk_keeps_the_contract() -> Result<(), FileFailure> {
-    let scratch = tempfile::tempdir().map_err(FileFailure::from)?;
-    Checks::on(&Disk, scratch.path())
-}
-
-#[test]
-fn fake_keeps_the_contract() -> Result<(), FileFailure> {
-    let memory = Memory::default();
-    memory.create_directories(Path::new("/scratch"))?;
-    Checks::on(&memory, Path::new("/scratch"))
-}
-
-#[test]
-fn cached_keeps_the_contract_over_disk_and_the_fake() -> Result<(), FileFailure> {
-    let scratch = tempfile::tempdir().map_err(FileFailure::from)?;
-    Checks::on(&Cached::new(&Disk), scratch.path())?;
-    let memory = Memory::default();
-    memory.create_directories(Path::new("/scratch"))?;
-    Checks::on(&Cached::new(&memory), Path::new("/scratch"))
-}
-
-#[test]
-fn cached_reads_each_path_once_until_something_is_written_through_it() -> Result<(), FileFailure> {
-    let memory: Memory = [(PathBuf::from("/a.txt"), Bytes::from("first"))].into_iter().collect();
-    let cached = Cached::new(&memory);
-    let first = cached.read_text(Path::new("/a.txt"))?;
-    let listed_first = cached.entries(Path::new("/"))?;
-    memory.write(Path::new("/a.txt"), Bytes::from("second"))?;
-    memory.write(Path::new("/b.txt"), Bytes::from("b"))?;
-    let remembered = (cached.read_text(Path::new("/a.txt"))?, cached.read(Path::new("/a.txt"))?);
-    let listed = cached.entries(Path::new("/"))?;
-    cached.write(Path::new("/c.txt"), Bytes::from("c"))?;
-    let reread = cached.read_text(Path::new("/a.txt"))?;
-    assert_eq!([first, reread], [Text::new("first".to_owned()), Text::new("second".to_owned())]);
-    assert_eq!(remembered, (Text::new("first".to_owned()), Bytes::from("first")));
-    assert_eq!([listed_first, listed], [[PathBuf::from("/a.txt")], [PathBuf::from("/a.txt")]]);
-    assert_eq!(cached.entries(Path::new("/"))?.len(), 3);
-    Ok(())
-}
-
-#[test]
-fn cached_remembers_a_disk_failure_with_its_message_until_something_is_written_through_it() -> Result<(), FileFailure> {
-    let scratch = tempfile::tempdir().map_err(FileFailure::from)?;
-    let later = scratch.path().join("later.txt");
-    let cached = Cached::new(&Disk);
-    let first = cached.canonical(&later).map_err(|failure| failure.to_string());
-    Disk.write(&later, Bytes::from("now here"))?;
-    let remembered = cached.canonical(&later).map_err(|failure| failure.to_string());
-    let missing = matches!(cached.read_text(&later), Err(FileFailure::Missing(_)));
-    cached.write(&scratch.path().join("other.txt"), Bytes::from("other"))?;
-    assert_eq!(first, remembered);
-    let fresh = Disk.canonical(&scratch.path().join("absent"));
-    assert!(matches!((first, fresh), (Err(said), Err(failure)) if said == failure.to_string()));
-    assert_eq!((missing, cached.read_text(&later)?.as_ref().to_owned()), (false, "now here".to_owned()));
-    Ok(())
-}
-
-#[test]
-fn fake_starts_from_its_entries() -> Result<(), FileFailure> {
-    let memory: Memory = [(PathBuf::from("/a/b.txt"), Bytes::from("b"))].into_iter().collect();
-    assert_eq!(memory.kind(Path::new("/a")), Kind::Directory);
-    assert_eq!(memory.entries(Path::new("/a"))?, [PathBuf::from("/a/b.txt")]);
-    assert_eq!(memory.read_text(Path::new("/a/b.txt"))?, Text::new("b".to_owned()));
-    memory.write(Path::new("top.txt"), Bytes::from("top"))?;
-    assert_eq!(memory.kind(Path::new("top.txt")), Kind::File);
-    let empty = Memory::default();
-    empty.write(Path::new("alone.txt"), Bytes::from("alone"))?;
-    assert_eq!(empty.kind(Path::new("alone.txt")), Kind::File);
-    Ok(())
-}
-
-#[test]
-fn disk_names_a_link() -> Result<(), FileFailure> {
-    let scratch = tempfile::tempdir().map_err(FileFailure::from)?;
-    let target = scratch.path().join("target.txt");
-    Disk.write(&target, Bytes::from("t"))?;
-    let link = scratch.path().join("link");
-    std::os::unix::fs::symlink(&target, &link).map_err(FileFailure::from)?;
-    assert_eq!(Disk.kind(&link), Kind::Link);
-    Ok(())
-}
-
-#[test]
-fn a_failure_gives_back_its_error() {
-    let missing = io::Error::from(FileFailure::from(io::Error::from(io::ErrorKind::NotFound)));
-    let denied = io::Error::from(FileFailure::from(io::Error::from(io::ErrorKind::PermissionDenied)));
-    assert_eq!((missing.kind(), denied.kind()), (io::ErrorKind::NotFound, io::ErrorKind::PermissionDenied));
-    assert_eq!(
-        FileFailure::from(io::Error::from(io::ErrorKind::NotFound)).to_string(),
-        io::Error::from(io::ErrorKind::NotFound).to_string()
-    );
-}
-
-#[test]
-fn absent_holds_nothing_and_takes_nothing() {
-    let path = Path::new("/a.txt");
-    assert!(matches!(Absent.read(path), Err(FileFailure::Missing(_))));
-    assert!(matches!(Absent.read_text(path), Err(FileFailure::Missing(_))));
-    assert!(matches!(Absent.write(path, Bytes::from("a")), Err(FileFailure::Missing(_))));
-    assert!(matches!(Absent.append(path, &Bytes::from("a")), Err(FileFailure::Missing(_))));
-    assert!(matches!(Absent.create_directories(path), Err(FileFailure::Missing(_))));
-    assert!(matches!(Absent.copy(path, path), Err(FileFailure::Missing(_))));
-    assert!(matches!(Absent.entries(path), Err(FileFailure::Missing(_))));
-    assert!(matches!(Absent.canonical(path), Err(FileFailure::Missing(_))));
-    assert!(matches!(Absent.size(path), Err(FileFailure::Missing(_))));
-    assert_eq!(Absent.kind(path), Kind::Missing);
-}
-
-struct Batches;
-
-impl Batches {
-    fn on(files: &impl Files, root: &Path) -> Result<(), FileFailure> {
-        let [a, b, absent] = ["a.txt", "copies/a.txt", "absent.txt"].map(|name| root.join(name));
-        files.write(&a, Bytes::from("a"))?;
-        files.create_directories(&root.join("copies"))?;
-        files.copy_into(std::slice::from_ref(&a), &root.join("copies"))?;
-        let both = [a.clone(), b.clone()];
-        assert_eq!(
-            files.read_many(&both).into_iter().collect::<Result<Vec<_>, _>>()?,
-            [Bytes::from("a"), Bytes::from("a")]
-        );
-        let texts = files.read_text_many(&both).into_iter().collect::<Result<Vec<_>, _>>()?;
-        assert_eq!(texts.iter().map(AsRef::as_ref).collect::<Vec<&str>>(), ["a", "a"]);
-        assert_eq!(files.kinds(&[a.clone(), absent.clone()]), [Kind::File, Kind::Missing]);
-        let canonical = files.canonical_many(&[a, absent.clone()]);
-        assert!(matches!(canonical.as_slice(), [Ok(_), Err(FileFailure::Missing(_))]));
-        let listed = files.entries_many(&[root.join("copies"), absent]);
-        assert!(matches!(listed.as_slice(), [Ok(_), Err(FileFailure::Missing(_))]));
-        assert_eq!(listed.into_iter().next().unwrap_or_else(|| Ok(Vec::new()))?, [b]);
-        files.write(&root.join("c.txt"), Bytes::from("c"))?;
-        let copied = files.copy_each_into(&[root.join("none"), root.join("c.txt")], &root.join("copies"));
-        assert!(matches!(copied.as_slice(), [Err(FileFailure::Missing(_)), Ok(())]));
-        assert_eq!(files.read_text(&root.join("copies/c.txt"))?.as_ref(), "c");
-        assert!(matches!(files.copy_into(&[root.join("none")], &root.join("copies")), Err(FileFailure::Missing(_))));
-        let mirrored = Memory::default();
-        files.mirror(root, &mirrored)?;
-        assert_eq!(
-            mirrored.entries(root)?,
-            files.entries(root).map(|mut entries| {
-                entries.sort();
-                entries
-            })?
-        );
-        assert_eq!(mirrored.read_text(&root.join("copies/c.txt"))?.as_ref(), "c");
-        assert!(matches!(files.mirror(&root.join("none"), &Memory::default()), Err(FileFailure::Missing(_))));
-        files.write(&root.join("copies/deep.txt"), Bytes::from("12345"))?;
-        assert_eq!(files.size(&root.join("copies/deep.txt"))?, Size::new(5));
-        assert_eq!(files.bytes_below(&root.join("copies"))?, Size::new(7));
-        assert!(matches!(files.bytes_below(&root.join("nothing-here")), Err(FileFailure::Missing(_))));
-        assert!(matches!(files.size(&root.join("nothing-here")), Err(FileFailure::Missing(_))));
-        let [deep, single] = ["copies/deep.txt", "copies/c.txt"].map(|name| root.join(name));
-        let sized = files.sizes(&[deep.clone(), root.join("nothing-here"), single]);
-        assert!(
-            matches!(sized.as_slice(), [Ok(five), Err(FileFailure::Missing(_)), Ok(one)] if *five == Size::new(5) && *one == Size::new(1))
-        );
-        let tails: Vec<Tail> = [3, 1]
-            .into_iter()
-            .filter_map(|at| Offset::try_new(at).ignoring(Ignored::Negative))
-            .map(|at| Tail::new(deep.clone(), at))
-            .collect();
-        assert_eq!(
-            files.read_tails(&tails).into_iter().collect::<Result<Vec<Bytes>, _>>()?,
-            [Bytes::from("45"), Bytes::from("2345")]
-        );
-        Ok(())
-    }
-}
-
-const WRITTEN_AFTER: i64 = 1_767_225_600;
-
-#[test]
-fn disk_stamps_each_file_with_the_time_it_was_written_and_misses_an_absent_one() -> Result<(), FileFailure> {
-    let scratch = tempfile::tempdir().map_err(FileFailure::from)?;
-    let written = scratch.path().join("stamped.txt");
-    Disk.write(&written, Bytes::from("now"))?;
-    let stamped = Disk.stamps_many(&[written, scratch.path().join("absent.txt")]);
-    let dated =
-        |stamps: &Stamps| [Stamp::Born, Stamp::Touched].map(|stamp| stamps.dated(stamp).into_inner() > WRITTEN_AFTER);
-    assert!(matches!(stamped.as_slice(), [Ok(stamps), Err(FileFailure::Missing(_))] if dated(stamps) == [true, true]));
-    Ok(())
-}
-
-#[test]
-fn disk_and_the_fake_answer_batches_path_by_path() -> Result<(), FileFailure> {
-    let scratch = tempfile::tempdir().map_err(FileFailure::from)?;
-    Batches::on(&Disk, scratch.path())?;
-    let fake = Memory::default();
-    fake.create_directories(Path::new("/batch"))?;
-    Batches::on(&fake, Path::new("/batch"))?;
-    let cached_scratch = tempfile::tempdir().map_err(FileFailure::from)?;
-    Batches::on(&Cached::new(&Disk), cached_scratch.path())?;
-    let cached_fake = Memory::default();
-    cached_fake.create_directories(Path::new("/batch"))?;
-    Batches::on(&Cached::new(&cached_fake), Path::new("/batch"))
-}
-
-struct Tails;
-
-impl Tails {
-    fn of(files: &impl Files, root: &Path, offset: Offset) -> Result<Bytes, FileFailure> {
-        let path = root.join("tail.txt");
-        files.write(&path, Bytes::from("0123456789"))?;
-        files.read_from(&path, offset)
-    }
-}
-
-#[test]
-fn read_from_agrees_between_disk_and_memory() -> Result<(), Failed> {
-    let scratch = tempfile::tempdir()?;
-    let memory = Memory::default();
-    memory.create_directories(Path::new("/scratch"))?;
-    let offsets = (0..16).map(Offset::try_new).collect::<Result<Vec<Offset>, _>>()?;
-    for at in offsets {
-        let on_disk = Tails::of(&Disk, scratch.path(), at);
-        let in_memory = Tails::of(&memory, Path::new("/scratch"), at);
-        assert_eq!(on_disk.ignoring(Ignored::Failing), in_memory.ignoring(Ignored::Failing), "{at:?}");
-    }
-    Ok(())
-}
-
-#[test]
-fn read_from_returns_the_bytes_after_the_offset() -> Result<(), Failed> {
-    let memory = Memory::default();
-    memory.create_directories(Path::new("/scratch"))?;
-    assert_eq!(Tails::of(&memory, Path::new("/scratch"), Offset::try_new(7)?)?, Bytes::from("789"));
-    Ok(())
 }

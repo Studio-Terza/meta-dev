@@ -274,8 +274,8 @@ version = "0.1.0"
 dependencies = [
  "invariants",
  "newtype",
+ "proptest",
  "tempfile",
- "test-failure",
  "thiserror",
 ]
 
