@@ -320,7 +320,7 @@ Reply with JSON only, no prose and no code fence: a list of passage numbers, suc
 
 ## a stalled stop drains the queue in code and shows only what stays open
 $ hook stop < {"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}
-{"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\nOpen items in the queue:\n- process-rebuild D3: the queue drains itself (closes on the merge of process-rebuild#D3's pull request)\n- the lint additions (closes on #43 merging or closing)\n- an old pull request the listing no longer reaches (closes on #99 merging or closing)\n- agent outcome: blocked on design/queue (closes on a passing DONE on design/queue)\n- worktree kept: unpushed after merging #41 (closes on /home/placed being removed)\n- altitude classification of owner messages (closes on an owner ruling's message id recorded as ruling.message)\n"}
+{"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\nOpen items in the queue:\n- tools-retirement#D3 D3 Hook rules only when missed (closes when its pull request merges)\n- #43 Lint additions (closes when it merges or closes)\n- #99 (closes when it merges or closes)\n- agent outcome: blocked on design/queue, from /home/agent (closes when a DONE on design/queue passes, or it merges or closes)\n- worktree /home/placed kept (unpushed) after #41 D3 The queue drains itself merged (closes when it is removed)\n- owner ruling asked in 4c371128: \"what clears the queue?\" (closes when ruling.ruled names the answer)\n"}
 Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 +120 claude -p --output-format json --setting-sources user --strict-mcp-config --tools  --model haiku in /home/work/.meta/agents fed:
 An AI agent just ended its turn with this message to its owner:
@@ -330,11 +330,14 @@ Below are earlier messages from the owner, each headed by [uuid timestamp].
 List every passage that bears on the message: an earlier answer to anything it asks, a decision, rule, preference or instruction it should follow, or the next step the owner set. A missed passage costs far more than an extra one, so when unsure, include it.
 Reply with JSON only, no prose and no code fence: a list of {"uuid": the full uuid from the header, "quote": an excerpt of that message copied exactly, character for character, one or two sentences}. Reply [] if none bear on it.
 
-[o1 2026-01-01T00:00:00Z] Merge only when CI is green.
+[4c371128-0000-4000-8000-000000000000 2026-01-01T00:00:00Z] what clears the queue?
+Some things need a ruling.
 
-+60 gh pr list --state all --limit 100 --json number,state,headRefName,body -R o/r in /home/work/.meta/agents
+[f6484f7e-0000-4000-8000-000000000000 2026-01-01T00:00:00Z] Defer the merge queue.
+
++60 gh pr list --state all --limit 100 --json number,state,title,headRefName,body -R o/r in /home/work/.meta/agents
 $ hook stop < {"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}
-{"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\nOpen items in the queue:\n- process-rebuild D3: the queue drains itself (closes on the merge of process-rebuild#D3's pull request)\n- the lint additions (closes on #43 merging or closing)\n- an old pull request the listing no longer reaches (closes on #99 merging or closing)\n- agent outcome: blocked on design/queue (closes on a passing DONE on design/queue)\n- worktree kept: unpushed after merging #41 (closes on /home/placed being removed)\n- altitude classification of owner messages (closes on an owner ruling's message id recorded as ruling.message)\n"}
+{"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\nOpen items in the queue:\n- tools-retirement#D3 D3 Hook rules only when missed (closes when its pull request merges)\n- #43 Lint additions (closes when it merges or closes)\n- #99 (closes when it merges or closes)\n- agent outcome: blocked on design/queue, from /home/agent (closes when a DONE on design/queue passes, or it merges or closes)\n- worktree /home/placed kept (unpushed) after #41 D3 The queue drains itself merged (closes when it is removed)\n- owner ruling asked in 4c371128: \"what clears the queue?\" (closes when ruling.ruled names the answer)\n"}
 Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 +120 claude -p --output-format json --setting-sources user --strict-mcp-config --tools  --model haiku in /home/work/.meta/agents fed:
 An AI agent just ended its turn with this message to its owner:
@@ -344,40 +347,46 @@ Below are earlier messages from the owner, each headed by [uuid timestamp].
 List every passage that bears on the message: an earlier answer to anything it asks, a decision, rule, preference or instruction it should follow, or the next step the owner set. A missed passage costs far more than an extra one, so when unsure, include it.
 Reply with JSON only, no prose and no code fence: a list of {"uuid": the full uuid from the header, "quote": an excerpt of that message copied exactly, character for character, one or two sentences}. Reply [] if none bear on it.
 
-[o1 2026-01-01T00:00:00Z] Merge only when CI is green.
+[4c371128-0000-4000-8000-000000000000 2026-01-01T00:00:00Z] what clears the queue?
+Some things need a ruling.
 
-+60 gh pr list --state all --limit 100 --json number,state,headRefName,body -R o/r in /home/work/.meta/agents
+[f6484f7e-0000-4000-8000-000000000000 2026-01-01T00:00:00Z] Defer the merge queue.
+
++60 gh pr list --state all --limit 100 --json number,state,title,headRefName,body -R o/r in /home/work/.meta/agents
 queue:
 [[item]]
-said = "process-rebuild D3: the queue drains itself"
-spec = "process-rebuild#D3"
+spec = "tools-retirement#D3"
 
 [[item]]
-said = "the lint additions"
 pull = 43
 
 [[item]]
-said = "an old pull request the listing no longer reaches"
 pull = 99
 
 [[item]]
-said = "agent outcome: blocked on design/queue"
 
 [item.escalation]
+cause = "blocked"
+from = "/home/agent"
+
+[item.escalation.at]
 branch = "design/queue"
 
 [[item]]
-said = "worktree kept: unpushed after merging #41"
-worktree = "/home/placed"
+
+[item.worktree]
+path = "/home/placed"
+held = "unpushed"
+merged = 41
 
 [[item]]
-said = "altitude classification of owner messages"
 
 [item.ruling]
+asked = "4c371128"
 
-## a queue that does not parse is named in the stall and left as it is
+## a queue that does not parse, or holds free text, is named in the stall and left as it is
 $ hook stop < {"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}
-{"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\nthe queue does not read as its typed TOML, so it is left as it is: TOML parse error at line 1, column 8\n  |\n1 | [[item]\n  |        ^\nunclosed array table, expected `]`\n"}
+{"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\nthe queue does not read as its typed TOML, so it is left as it is: TOML parse error at line 1, column 1\n  |\n1 | [[item]]\n  | ^^^^^^^^\nwanted exactly 1 element, more than 1 element\n"}
 Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 +120 claude -p --output-format json --setting-sources user --strict-mcp-config --tools  --model haiku in /home/work/.meta/agents fed:
 An AI agent just ended its turn with this message to its owner:
@@ -390,12 +399,13 @@ Reply with JSON only, no prose and no code fence: a list of {"uuid": the full uu
 [o1 2026-01-01T00:00:00Z] Merge only when CI is green.
 
 queue:
-[[item]
-said = 1
+[[item]]
+said = "free text is not an item"
+pull = 44
 
 ## pull requests that cannot be listed still let worktrees and rulings close
 $ hook stop < {"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}
-{"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\nOpen items in the queue:\n- the lint additions (closes on #43 merging or closing)\n"}
+{"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\nOpen items in the queue:\n- #43 (closes when it merges or closes)\n"}
 Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 +120 claude -p --output-format json --setting-sources user --strict-mcp-config --tools  --model haiku in /home/work/.meta/agents fed:
 An AI agent just ended its turn with this message to its owner:
@@ -407,10 +417,9 @@ Reply with JSON only, no prose and no code fence: a list of {"uuid": the full uu
 
 [o1 2026-01-01T00:00:00Z] Merge only when CI is green.
 
-+60 gh pr list --state all --limit 100 --json number,state,headRefName,body -R o/r in /home/work/.meta/agents
++60 gh pr list --state all --limit 100 --json number,state,title,headRefName,body -R o/r in /home/work/.meta/agents
 queue:
 [[item]]
-said = "the lint additions"
 pull = 43
 
 ## a flagged command hidden in a script is refused and told to unroll; a plain one passes to the harness
@@ -485,8 +494,12 @@ $ hook subagent-stop < {"cwd":"/work/agent","hook_event_name":"SubagentStop","la
 Ok(Escalated) ExitCode(unix_exit_status(0)) ""
 queue:
 [[item]]
-said = "agent outcome: unread ending, from /work/agent"
-worktree = "/work/agent"
+
+[item.escalation]
+from = "/work/agent"
+
+[item.escalation.cause]
+unread = "ending"
 
 ## a done on a sha the pull request does not hold, or on a conflicting one, is sent back without waiting on ci
 $ hook subagent-stop < {"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":true}
@@ -512,10 +525,16 @@ Ok(Hooked(SubagentStop)) ExitCode(unix_exit_status(0)) ""
 +90 gh pr checks 12 --json name,bucket,link -R o/r
 queue:
 [[item]]
-said = "agent outcome: blocked on #13"
 
 [item.escalation]
+cause = "blocked"
+from = "/work/agent"
+
+[item.escalation.at]
 pull = 13
+
+[[item]]
+pull = 12
 
 ## a red done is sent back with each failed job's log tail, a repeat failure is escalated, and a green between them clears the repeat
 $ hook subagent-stop < {"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}
@@ -546,10 +565,15 @@ Ok(Escalated) ExitCode(unix_exit_status(0)) ""
 +60 gh pr checks 12 --json name,bucket,link -R o/r
 queue:
 [[item]]
-said = "agent outcome: repeat failure of test on #12 0123456789abcdef0123456789abcdef01234567, from /work/agent"
 
 [item.escalation]
+from = "/work/agent"
+
+[item.escalation.at]
 pull = 12
+
+[item.escalation.cause]
+repeat-failure = "test"
 
 ## a blocked agent and every unread step are queued on the pull request
 $ hook subagent-stop < {"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"BLOCKED #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}
@@ -584,46 +608,79 @@ Ok(Escalated) ExitCode(unix_exit_status(0)) ""
 +2390 gh pr checks 12 --watch --fail-fast -R o/r
 queue:
 [[item]]
-said = "agent outcome: blocked on #12 0123456789abcdef0123456789abcdef01234567, from /work/agent"
 
 [item.escalation]
+cause = "blocked"
+from = "/work/agent"
+
+[item.escalation.at]
 pull = 12
 
 [[item]]
-said = "agent outcome: unread head on #12 0123456789abcdef0123456789abcdef01234567, from /work/agent"
 
 [item.escalation]
+from = "/work/agent"
+
+[item.escalation.at]
 pull = 12
+
+[item.escalation.cause]
+unread = "head"
 
 [[item]]
-said = "agent outcome: unread head on #12 0123456789abcdef0123456789abcdef01234567, from /work/agent"
 
 [item.escalation]
+from = "/work/agent"
+
+[item.escalation.at]
 pull = 12
+
+[item.escalation.cause]
+unread = "head"
 
 [[item]]
-said = "agent outcome: unread head on #12 0123456789abcdef0123456789abcdef01234567, from /work/agent"
 
 [item.escalation]
+from = "/work/agent"
+
+[item.escalation.at]
 pull = 12
+
+[item.escalation.cause]
+unread = "head"
 
 [[item]]
-said = "agent outcome: unread mergeable on #12 0123456789abcdef0123456789abcdef01234567, from /work/agent"
 
 [item.escalation]
+from = "/work/agent"
+
+[item.escalation.at]
 pull = 12
+
+[item.escalation.cause]
+unread = "mergeable"
 
 [[item]]
-said = "agent outcome: unread checks on #12 0123456789abcdef0123456789abcdef01234567, from /work/agent"
 
 [item.escalation]
+from = "/work/agent"
+
+[item.escalation.at]
 pull = 12
+
+[item.escalation.cause]
+unread = "checks"
 
 [[item]]
-said = "agent outcome: unread overdue on #12 0123456789abcdef0123456789abcdef01234567, from /work/agent"
 
 [item.escalation]
+from = "/work/agent"
+
+[item.escalation.at]
 pull = 12
+
+[item.escalation.cause]
+unread = "overdue"
 
 ## a done on a pushed branch opens its pull request, waits on ci, and clears the branch's escalation
 $ hook subagent-stop < {"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}
@@ -696,64 +753,112 @@ Ok(Escalated) ExitCode(unix_exit_status(0)) ""
 +60 gh pr view design/open-pr --json number -R o/r
 queue:
 [[item]]
-said = "agent outcome: blocked on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent"
 
 [item.escalation]
+cause = "blocked"
+from = "/work/agent"
+
+[item.escalation.at]
 branch = "design/open-pr"
 
 [[item]]
-said = "agent outcome: unread remote on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent"
 
 [item.escalation]
+from = "/work/agent"
+
+[item.escalation.at]
 branch = "design/open-pr"
+
+[item.escalation.cause]
+unread = "remote"
 
 [[item]]
-said = "agent outcome: unread commits on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent"
 
 [item.escalation]
+from = "/work/agent"
+
+[item.escalation.at]
 branch = "design/open-pr"
+
+[item.escalation.cause]
+unread = "commits"
 
 [[item]]
-said = "agent outcome: unread commits on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent"
 
 [item.escalation]
+from = "/work/agent"
+
+[item.escalation.at]
 branch = "design/open-pr"
+
+[item.escalation.cause]
+unread = "commits"
 
 [[item]]
-said = "agent outcome: unread spec on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent"
 
 [item.escalation]
+from = "/work/agent"
+
+[item.escalation.at]
 branch = "design/open-pr"
+
+[item.escalation.cause]
+unread = "spec"
 
 [[item]]
-said = "agent outcome: unread detail on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent"
 
 [item.escalation]
+from = "/work/agent"
+
+[item.escalation.at]
 branch = "design/open-pr"
+
+[item.escalation.cause]
+unread = "detail"
 
 [[item]]
-said = "agent outcome: unread detail on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent"
 
 [item.escalation]
+from = "/work/agent"
+
+[item.escalation.at]
 branch = "design/open-pr"
+
+[item.escalation.cause]
+unread = "detail"
 
 [[item]]
-said = "agent outcome: unread detail on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent"
 
 [item.escalation]
+from = "/work/agent"
+
+[item.escalation.at]
 branch = "design/open-pr"
+
+[item.escalation.cause]
+unread = "detail"
 
 [[item]]
-said = "agent outcome: unread open on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent"
 
 [item.escalation]
+from = "/work/agent"
+
+[item.escalation.at]
 branch = "design/open-pr"
+
+[item.escalation.cause]
+unread = "open"
 
 [[item]]
-said = "agent outcome: unread open on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent"
 
 [item.escalation]
+from = "/work/agent"
+
+[item.escalation.at]
 branch = "design/open-pr"
+
+[item.escalation.cause]
+unread = "open"
 
 ## a workspace whose local settings name no specs, a relative path, or no repository escalates without guessing
 $ hook subagent-stop < {"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}
@@ -762,10 +867,15 @@ Ok(Escalated) ExitCode(unix_exit_status(0)) ""
 +60 gh api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567
 queue:
 [[item]]
-said = "agent outcome: unread no-specs on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent"
 
 [item.escalation]
+from = "/work/agent"
+
+[item.escalation.at]
 branch = "design/open-pr"
+
+[item.escalation.cause]
+unread = "no-specs"
 
 ## local settings naming the queue at a relative path, or no queue, refuse to escalate
 $ hook subagent-stop < {"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"BLOCKED #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}
@@ -779,16 +889,26 @@ $ hook subagent-stop < {"cwd":"/work/agent","hook_event_name":"SubagentStop","la
 Ok(Escalated) ExitCode(unix_exit_status(0)) ""
 queue:
 [[item]]
-said = "agent outcome: unread no-repository on #12 0123456789abcdef0123456789abcdef01234567, from /work/agent"
 
 [item.escalation]
+from = "/work/agent"
+
+[item.escalation.at]
 pull = 12
 
+[item.escalation.cause]
+unread = "no-repository"
+
 [[item]]
-said = "agent outcome: unread no-repository on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent"
 
 [item.escalation]
+from = "/work/agent"
+
+[item.escalation.at]
 branch = "design/open-pr"
+
+[item.escalation.cause]
+unread = "no-repository"
 
 ## a merged pull request's clean pushed worktree is removed, and any other is kept and queued until it is gone
 $ hook post-tool-use < {"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"cd /work && gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}
@@ -831,22 +951,37 @@ Ok(Escalated) ExitCode(unix_exit_status(0)) ""
 +60 git worktree remove /work/wt-open-pr
 queue:
 [[item]]
-said = "worktree kept: unviewed after merging #12, from /work/agent"
-worktree = "/work/agent"
+
+[item.worktree]
+path = "/work/agent"
+held = "unviewed"
+merged = 12
 
 [[item]]
-said = "worktree kept: unlisted after merging #12, from /work/agent"
-worktree = "/work/agent"
+
+[item.worktree]
+path = "/work/agent"
+held = "unlisted"
+merged = 12
 
 [[item]]
-said = "worktree kept: dirty after merging #12 at /work/wt-open-pr, from /work/agent"
-worktree = "/work/wt-open-pr"
+
+[item.worktree]
+path = "/work/wt-open-pr"
+held = "dirty"
+merged = 12
 
 [[item]]
-said = "worktree kept: unpushed after merging #12 at /work/wt-open-pr, from /work/agent"
-worktree = "/work/wt-open-pr"
+
+[item.worktree]
+path = "/work/wt-open-pr"
+held = "unpushed"
+merged = 12
 
 [[item]]
-said = "worktree kept: unremoved after merging #12 at /work/wt-open-pr, from /work/agent"
-worktree = "/work/wt-open-pr"
+
+[item.worktree]
+path = "/work/wt-open-pr"
+held = "unremoved"
+merged = 12
 

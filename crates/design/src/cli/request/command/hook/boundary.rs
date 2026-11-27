@@ -6,13 +6,15 @@ use std::ops::Not;
 use std::path::PathBuf;
 
 use console_ports::{Heard, Shown};
-use design_messages::{LastSaid, Overran, Overruns};
+use design_messages::{LastSaid, Overran, Overruns, OwnerHistory, Said};
 use dispatch_ports::{Clock, Shell, Wall};
 use file_ports::{Epoch, Files};
+use grammar::Lines;
+use grammar_spec_line::Attachment;
 use newtype::Wrapping;
 use serde::{Deserialize, Serialize};
 use store_ports::Store;
-use transcript_ports::{Body, SessionId};
+use transcript_ports::{Body, SessionId, Uuid};
 
 use super::super::Ground;
 use super::super::crew::Crew;
@@ -20,7 +22,7 @@ use super::answers::{Answering, Answers};
 use super::subagent::Hub;
 use crate::cli::failure::Failure;
 use crate::cli::request::ignored::Ignored;
-use crate::cli::request::{Local, Queue};
+use crate::cli::request::{Landed, Local, Named, Queue, Rooted};
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
 pub use harness::Stopped;
@@ -70,8 +72,19 @@ pub struct Observed<'ground, 'run, F: Files, S: Store> {
     tasks: Option<Tasks>,
 }
 
-#[derive(Clone, Copy, Debug)]
-struct Queued<'queue>(&'queue Queue);
+#[derive(Debug)]
+struct Queued<'shown, 'ground, 'run, F: Files, S: Store> {
+    queue: &'shown Queue,
+    landed: &'shown [Landed],
+    naming: &'shown Naming<'ground, 'run, F, S>,
+}
+
+#[derive(Debug)]
+struct Naming<'ground, 'run, F: Files, S: Store> {
+    ground: &'ground Ground<'run, F, S>,
+    specs: Option<&'ground Rooted>,
+    owners: Vec<Said>,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Continuing;
@@ -213,22 +226,46 @@ impl<'ground, 'run, F: Files, S: Store> Observed<'ground, 'run, F, S> {
 
     fn drained<C: Clock, G: Shell>(&self, crew: &Crew<'_, C, G>, local: &Local, queue: &Queue) -> Option<String> {
         queue.items().first()?;
-        let landed = local.repository().and_then(|repository| Hub::new(crew, crew.scratch(), repository).landed());
-        let drained = queue.clone().drained(&landed.unwrap_or_default(), |path| self.ground.kind(path));
+        let landed = local
+            .repository()
+            .and_then(|repository| Hub::new(crew, crew.scratch(), repository).landed())
+            .unwrap_or_default();
+        let drained = queue.clone().drained(&landed, |path| self.ground.kind(path));
         let file = local.queue().filter(|_file| drained != *queue);
         file.map(|rewritten| self.ground.queued(rewritten, &drained).ignoring(Ignored::Unrewritten));
-        drained.items().first().map(|_open| Queued(&drained).to_string())
+        let owners = self.ground.store().read(OwnerHistory).ignoring(Ignored::Unanswered).unwrap_or_default();
+        let naming = Naming { ground: self.ground, specs: local.specs(), owners };
+        drained.items().first().map(|_open| Queued { queue: &drained, landed: &landed, naming: &naming }.to_string())
     }
 }
 
-impl Queued<'_> {
+impl<F: Files, S: Store> Named for Naming<'_, '_, F, S> {
+    fn spec(&self, cited: &Attachment) -> Option<String> {
+        self.specs.and_then(|specs| self.ground.titled(specs, cited)).map(|heading| heading.to_string())
+    }
+
+    fn owner(&self, message: &str) -> Option<String> {
+        let said = self.owners.iter().find(|said| {
+            let uuid = AsRef::<Uuid>::as_ref(*said).to_string();
+            uuid.get(..message.len()) == Some(message)
+        })?;
+        let body: &Body = said.as_ref();
+        let lines = match body.as_ref().parse::<Lines>() {
+            Ok(lines) => lines,
+            Err(unsplit) => match unsplit {},
+        };
+        lines.into_iter().next()
+    }
+}
+
+impl<F: Files, S: Store> Queued<'_, '_, '_, F, S> {
     const HEADER: &'static str = "Open items in the queue:";
 }
 
-impl fmt::Display for Queued<'_> {
+impl<F: Files, S: Store> fmt::Display for Queued<'_, '_, '_, F, S> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(formatter, "{}", Queued::HEADER)?;
-        self.0.items().iter().try_for_each(|item| writeln!(formatter, "{item}"))
+        writeln!(formatter, "{}", Self::HEADER)?;
+        self.queue.items().iter().try_for_each(|item| writeln!(formatter, "{}", item.shown(self.landed, self.naming)))
     }
 }
 

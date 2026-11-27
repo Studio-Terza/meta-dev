@@ -17,8 +17,9 @@ use super::super::Ground;
 use super::super::crew::Crew;
 use super::boundary::Decision;
 use crate::cli::failure::Failure;
+pub use crate::cli::request::UnreadStep;
 use crate::cli::request::ignored::Ignored;
-use crate::cli::request::{Item, Local, Target, Waits};
+use crate::cli::request::{Cause as Escalation, Item, Local, Target};
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
 use boundary::{At, Branched, JobId, Pushed, Reminder, Report, Said};
@@ -39,30 +40,6 @@ pub enum Ending {
 pub struct FailedJob {
     check: CheckName,
     job: JobId,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Escalation {
-    Blocked,
-    RepeatFailure(CheckName),
-    Unread(UnreadStep),
-}
-
-#[derive(strum::Display, Clone, Copy, Debug, PartialEq, Eq)]
-#[strum(serialize_all = "kebab-case")]
-pub enum UnreadStep {
-    Ending,
-    Head,
-    Mergeable,
-    Overdue,
-    Checks,
-    NoRepository,
-    NoSpecs,
-    Remote,
-    Commits,
-    Spec,
-    Detail,
-    Open,
 }
 
 #[derive(Debug)]
@@ -102,13 +79,6 @@ struct Logged {
 struct Excerpt {
     failed: FailedJob,
     lines: Vec<String>,
-}
-
-#[derive(Debug)]
-struct Escalated<'finishing> {
-    escalation: Escalation,
-    at: Option<&'finishing At>,
-    directory: &'finishing Path,
 }
 
 impl Finishing {
@@ -177,11 +147,7 @@ impl<F: Files, S: Store> Desk<'_, '_, F, S> {
 
     fn escalated(&self, at: Option<&At>, escalation: Escalation) -> Result<Uttered, Failure> {
         let file = self.local.queue().ok_or(Failure::Unplaced)?;
-        let waits = at.map_or_else(
-            || Waits::Worktree(self.directory.to_path_buf()),
-            |aimed| Waits::Escalation(Target::from(aimed)),
-        );
-        let item = Item::new(Escalated { escalation, at, directory: self.directory }, waits);
+        let item = Item::escalated(at.map(Target::from), escalation, self.directory);
         let queue = self.ground.queue(file)?.with(item);
         self.ground.queued(file, &queue)?;
         Ok(Uttered::silent(Ok(Outcome::Escalated)))
@@ -331,23 +297,5 @@ impl fmt::Display for Logged {
             write!(formatter, "\n{check} (job {job}):\n")?;
             lines.iter().try_for_each(|line| writeln!(formatter, "{line}"))
         })
-    }
-}
-
-impl fmt::Display for Escalation {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Escalation::Blocked => formatter.write_str("blocked"),
-            Escalation::RepeatFailure(check) => write!(formatter, "repeat failure of {check}"),
-            Escalation::Unread(step) => write!(formatter, "unread {step}"),
-        }
-    }
-}
-
-impl fmt::Display for Escalated<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "agent outcome: {}", self.escalation)?;
-        self.at.iter().try_for_each(|at| write!(formatter, " on {at}"))?;
-        write!(formatter, ", from {}", self.directory.display())
     }
 }

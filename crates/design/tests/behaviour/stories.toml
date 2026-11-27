@@ -179,58 +179,59 @@ stop = { said = "Shall I port the hook?" }
 
 [[story]]
 name = "a stalled stop drains the queue in code and shows only what stays open"
-transcript = [["user", "o1", "Merge only when CI is green."], ["assistant", "p1", "Understood."]]
+transcript = [
+  ["user", "4c371128-0000-4000-8000-000000000000", "what clears the queue?\nSome things need a ruling."],
+  ["user", "f6484f7e-0000-4000-8000-000000000000", "Defer the merge queue."],
+  ["assistant", "p1", "Understood."],
+]
+spec = """
+# Tools retirement
+
+D1 Dropped until missed (D2 later): waits.
+D3 Hook rules only when missed (owner 2026-11-26): landing is deleted.
+"""
 queue = '''
 [[item]]
-said = "process-rebuild D1: keep only what works"
-spec = "process-rebuild#D1"
+spec = "tools-retirement#D1"
 
 [[item]]
-said = "process-rebuild D3: the queue drains itself"
-spec = "process-rebuild#D3"
+spec = "tools-retirement#D3"
 
 [[item]]
-said = "re-land the target cache fallback"
 pull = 42
 
 [[item]]
-said = "the lint additions"
 pull = 43
 
 [[item]]
-said = "an old pull request the listing no longer reaches"
 pull = 99
 
 [[item]]
-said = "agent outcome: repeat failure of test on #42"
-escalation = { pull = 42 }
+escalation = { at = { pull = 42 }, cause = { repeat-failure = "test" }, from = "/home/agent" }
 
 [[item]]
-said = "agent outcome: unread open on design/x"
-escalation = { branch = "design/x" }
+escalation = { at = { branch = "design/x" }, cause = { unread = "open" }, from = "/home/agent" }
 
 [[item]]
-said = "agent outcome: blocked on design/queue"
-escalation = { branch = "design/queue" }
+escalation = { at = { branch = "design/queue" }, cause = "blocked", from = "/home/agent" }
 
 [[item]]
-said = "worktree kept: dirty after merging #40"
-worktree = "/home/placed/gone"
+escalation = { cause = { unread = "ending" }, from = "/home/placed/gone" }
 
 [[item]]
-said = "worktree kept: unpushed after merging #41"
-worktree = "/home/placed"
+worktree = { path = "/home/placed/gone", held = "dirty", merged = 40 }
 
 [[item]]
-said = "altitude classification of owner messages"
-ruling = {}
+worktree = { path = "/home/placed", held = "unpushed", merged = 41 }
 
 [[item]]
-said = "the deferred merge queue"
-ruling = { message = "f6484f7e" }
+ruling = { asked = "4c371128" }
+
+[[item]]
+ruling = { asked = "4c371128", ruled = "f6484f7e" }
 '''
 answers = [
-  { asked = "pr list --state all --limit 100 --json number,state,headRefName,body -R o/r", ran = "Succeeded", printed = '[{"number":40,"state":"MERGED","headRefName":"design/process-rebuild","body":"spec: process-rebuild#D1, process-rebuild#D2\n\nGenerated"},{"number":41,"state":"OPEN","headRefName":"design/queue","body":"spec: process-rebuild#D3"},{"number":42,"state":"CLOSED","headRefName":"ci/fallback","body":"no spec line"},{"number":43,"state":"OPEN","headRefName":"lint/additions","body":""},{"number":44,"state":"MERGED","headRefName":"design/x","body":"spec: none"}]' },
+  { asked = "pr list --state all --limit 100 --json number,state,title,headRefName,body -R o/r", ran = "Succeeded", printed = '[{"number":40,"state":"MERGED","title":"D1 Keep only what works","headRefName":"design/process-rebuild","body":"spec: tools-retirement#D1, tools-retirement#D2\n\nGenerated"},{"number":41,"state":"OPEN","title":"D3 The queue drains itself","headRefName":"design/queue","body":"spec: tools-retirement#D3"},{"number":42,"state":"CLOSED","title":"Target cache fallback","headRefName":"ci/fallback","body":"no spec line"},{"number":43,"state":"OPEN","title":"Lint additions","headRefName":"lint/additions","body":""},{"number":44,"state":"MERGED","title":"Elsewhere","headRefName":"design/x","body":"spec: none"}]' },
 ]
 
 [[story.step]]
@@ -240,9 +241,9 @@ stop = {}
 stop = {}
 
 [[story]]
-name = "a queue that does not parse is named in the stall and left as it is"
+name = "a queue that does not parse, or holds free text, is named in the stall and left as it is"
 transcript = [["user", "o1", "Merge only when CI is green."], ["assistant", "p1", "Understood."]]
-queue = "[[item]\nsaid = 1\n"
+queue = "[[item]]\nsaid = \"free text is not an item\"\npull = 44\n"
 
 [[story.step]]
 stop = {}
@@ -252,19 +253,16 @@ name = "pull requests that cannot be listed still let worktrees and rulings clos
 transcript = [["user", "o1", "Merge only when CI is green."], ["assistant", "p1", "Understood."]]
 queue = '''
 [[item]]
-said = "the lint additions"
 pull = 43
 
 [[item]]
-said = "worktree kept: dirty after merging #40"
-worktree = "/home/placed/gone"
+worktree = { path = "/home/placed/gone", held = "dirty", merged = 40 }
 
 [[item]]
-said = "the deferred merge queue"
-ruling = { message = "f6484f7e" }
+ruling = { asked = "4c371128", ruled = "f6484f7e" }
 '''
 answers = [
-  { asked = "pr list --state all --limit 100 --json number,state,headRefName,body -R o/r", ran = "Failed", printed = "" },
+  { asked = "pr list --state all --limit 100 --json number,state,title,headRefName,body -R o/r", ran = "Failed", printed = "" },
 ]
 
 [[story.step]]
@@ -372,12 +370,13 @@ answers = [
 name = "a done right after opening waits for checks to appear, watches them, and stops on green clearing its escalations"
 queue = '''
 [[item]]
-said = "agent outcome: unread checks on #12"
-escalation = { pull = 12 }
+escalation = { at = { pull = 12 }, cause = { unread = "checks" }, from = "/work/agent" }
 
 [[item]]
-said = "agent outcome: blocked on #13"
-escalation = { pull = 13 }
+escalation = { at = { pull = 13 }, cause = "blocked", from = "/work/agent" }
+
+[[item]]
+pull = 12
 '''
 answers = [
   { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
@@ -515,8 +514,7 @@ answers = [
 name = "a done on a pushed branch opens its pull request, waits on ci, and clears the branch's escalation"
 queue = '''
 [[item]]
-said = "agent outcome: unread open on design/open-pr"
-escalation = { branch = "design/open-pr" }
+escalation = { at = { branch = "design/open-pr" }, cause = { unread = "open" }, from = "/work/agent" }
 '''
 spec = """
 # Tools retirement

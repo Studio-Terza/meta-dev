@@ -1,6 +1,6 @@
 use std::num::NonZeroU32;
 
-use newtype::{Checked, CheckedDeserialize, Display, Newtype};
+use newtype::{Checked, CheckedDeserialize, Display, Newtype, Serialize};
 use store_ports::{Batch, Columns, Execute, Prepared, Query, StoreFailure};
 
 use super::{FailedBefore, Failing};
@@ -8,7 +8,7 @@ use super::{FailedBefore, Failing};
 #[derive(Newtype, Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PullNumber(NonZeroU32);
 
-#[derive(Newtype, Display, CheckedDeserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Newtype, Display, CheckedDeserialize, Serialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[newtype(checked)]
 pub struct CheckName(String);
 

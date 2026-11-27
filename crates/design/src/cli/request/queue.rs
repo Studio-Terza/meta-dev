@@ -4,6 +4,7 @@ use std::ops::Not;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+use design_messages::CheckName;
 use file_ports::Kind;
 use grammar::{Cited as Detail, Lines};
 use grammar_spec_line::{Attachment, Line};
@@ -19,20 +20,21 @@ pub struct Queue {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-pub struct Item {
-    said: String,
-    #[serde(flatten)]
-    waits: Waits,
+#[serde(rename_all = "kebab-case")]
+pub enum Item {
+    Spec(Cited),
+    Pull(NonZeroU32),
+    Escalation(Escalated),
+    Worktree(Kept),
+    Ruling(Ruling),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case")]
-pub enum Waits {
-    Spec(Cited),
-    Pull(NonZeroU32),
-    Escalation(Target),
-    Worktree(PathBuf),
-    Ruling(Ruling),
+pub struct Escalated {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    at: Option<Target>,
+    cause: Cause,
+    from: PathBuf,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -42,11 +44,62 @@ pub enum Target {
     Branch(String),
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
-pub struct Ruling {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    message: Option<String>,
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum Cause {
+    Blocked,
+    RepeatFailure(CheckName),
+    Unread(UnreadStep),
 }
+
+#[derive(strum::Display, Deserialize, Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "kebab-case")]
+#[serde(rename_all = "kebab-case")]
+pub enum UnreadStep {
+    Ending,
+    Head,
+    Mergeable,
+    Overdue,
+    Checks,
+    NoRepository,
+    NoSpecs,
+    Remote,
+    Commits,
+    Spec,
+    Detail,
+    Open,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub struct Kept {
+    path: PathBuf,
+    held: Held,
+    merged: NonZeroU32,
+}
+
+#[derive(strum::Display, Deserialize, Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "kebab-case")]
+#[serde(rename_all = "kebab-case")]
+pub enum Held {
+    NoRepository,
+    Unviewed,
+    Unlisted,
+    Unstatused,
+    Dirty,
+    Unpushed,
+    Unremoved,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub struct Ruling {
+    asked: MessageRef,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    ruled: Option<MessageRef>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(try_from = "String", into = "String")]
+pub struct MessageRef(String);
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(try_from = "String", into = "String")]
@@ -56,6 +109,7 @@ pub struct Cited(Attachment);
 pub struct Landed {
     number: NonZeroU32,
     state: Settled,
+    title: String,
     #[serde(rename = "headRefName")]
     branch: String,
     body: String,
@@ -69,6 +123,23 @@ enum Settled {
     Closed,
     #[serde(rename = "OPEN")]
     Open,
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("a message id is eight or more hexadecimal digits")]
+pub struct Unreferenced;
+
+pub trait Named {
+    fn spec(&self, cited: &Attachment) -> Option<String>;
+
+    fn owner(&self, message: &str) -> Option<String>;
+}
+
+#[derive(Debug)]
+pub struct Shown<'shown, N: Named> {
+    item: &'shown Item,
+    landed: &'shown [Landed],
+    named: &'shown N,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -91,30 +162,44 @@ impl Queue {
 
     #[must_use]
     pub fn cleared(self, passed: &[Target]) -> Queue {
-        let open = |item: &Item| match &item.waits {
-            Waits::Escalation(target) => passed.contains(target).not(),
-            Waits::Spec(_) | Waits::Pull(_) | Waits::Worktree(_) | Waits::Ruling(_) => true,
+        let open = |item: &Item| match item {
+            Item::Escalation(Escalated { at: Some(target), .. }) => passed.contains(target).not(),
+            Item::Escalation(Escalated { at: None, .. })
+            | Item::Spec(_)
+            | Item::Pull(_)
+            | Item::Worktree(_)
+            | Item::Ruling(_) => true,
         };
         Queue { items: self.items.into_iter().filter(open).collect() }
     }
 }
 
 impl Item {
-    pub fn new(said: impl fmt::Display, waits: Waits) -> Item {
-        Item { said: said.to_string(), waits }
+    pub fn escalated(at: Option<Target>, cause: Cause, from: &Path) -> Item {
+        Item::Escalation(Escalated { at, cause, from: from.to_path_buf() })
+    }
+
+    pub fn kept(path: PathBuf, held: Held, merged: NonZeroU32) -> Item {
+        Item::Worktree(Kept { path, held, merged })
+    }
+
+    pub fn shown<'shown, N: Named>(&'shown self, landed: &'shown [Landed], named: &'shown N) -> Shown<'shown, N> {
+        Shown { item: self, landed, named }
     }
 
     fn closed(&self, landed: &[Landed], kind: impl Fn(&Path) -> Kind) -> Option<Closed> {
-        match &self.waits {
-            Waits::Spec(cited) => landed.iter().find(|pull| pull.merged(cited).is_some()).map(|_merged| Closed),
-            Waits::Pull(pull) | Waits::Escalation(Target::Pull(pull)) => {
+        match self {
+            Item::Spec(cited) => landed.iter().find(|pull| pull.merged(cited).is_some()).map(|_merged| Closed),
+            Item::Pull(pull) | Item::Escalation(Escalated { at: Some(Target::Pull(pull)), .. }) => {
                 landed.iter().find(|listed| listed.number == *pull).and_then(Landed::settled)
             }
-            Waits::Escalation(Target::Branch(branch)) => {
+            Item::Escalation(Escalated { at: Some(Target::Branch(branch)), .. }) => {
                 landed.iter().find(|listed| listed.branch == *branch).and_then(Landed::settled)
             }
-            Waits::Worktree(path) => (kind(path) == Kind::Missing).then_some(Closed),
-            Waits::Ruling(Ruling { message }) => message.as_ref().map(|_ruled| Closed),
+            Item::Escalation(Escalated { at: None, from: path, .. }) | Item::Worktree(Kept { path, .. }) => {
+                (kind(path) == Kind::Missing).then_some(Closed)
+            }
+            Item::Ruling(Ruling { ruled, .. }) => ruled.as_ref().map(|_ruled| Closed),
         }
     }
 }
@@ -140,6 +225,11 @@ impl Landed {
         let found = Detail::each(&attached).into_iter().find(|landed| asked.contains(landed));
         found.and((self.state == Settled::Merged).then_some(Closed))
     }
+
+    fn titled(landed: &[Landed], pull: NonZeroU32) -> String {
+        let title = landed.iter().find(|listed| listed.number == pull).map(|listed| format!(" {}", listed.title));
+        format!("#{pull}{}", title.unwrap_or_default())
+    }
 }
 
 impl TryFrom<String> for Cited {
@@ -156,17 +246,82 @@ impl From<Cited> for String {
     }
 }
 
-impl fmt::Display for Item {
+impl MessageRef {
+    const SHORTEST: usize = 8;
+}
+
+impl TryFrom<String> for MessageRef {
+    type Error = Unreferenced;
+
+    fn try_from(text: String) -> Result<MessageRef, Unreferenced> {
+        let hexadecimal = text.chars().all(|letter| letter.is_ascii_hexdigit());
+        (hexadecimal && text.len() >= MessageRef::SHORTEST).then_some(MessageRef(text)).ok_or(Unreferenced)
+    }
+}
+
+impl From<MessageRef> for String {
+    fn from(message: MessageRef) -> String {
+        message.0
+    }
+}
+
+impl fmt::Display for Cause {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "- {} (closes on ", self.said)?;
-        match &self.waits {
-            Waits::Spec(cited) => write!(formatter, "the merge of {}'s pull request", cited.0),
-            Waits::Pull(pull) => write!(formatter, "#{pull} merging or closing"),
-            Waits::Escalation(Target::Pull(pull)) => write!(formatter, "a passing DONE on #{pull}, or it merging"),
-            Waits::Escalation(Target::Branch(branch)) => write!(formatter, "a passing DONE on {branch}"),
-            Waits::Worktree(path) => write!(formatter, "{} being removed", path.display()),
-            Waits::Ruling(_) => formatter.write_str("an owner ruling's message id recorded as ruling.message"),
-        }?;
-        formatter.write_str(")")
+        match self {
+            Cause::Blocked => formatter.write_str("blocked"),
+            Cause::RepeatFailure(check) => write!(formatter, "repeat failure of {check}"),
+            Cause::Unread(step) => write!(formatter, "unread {step}"),
+        }
+    }
+}
+
+impl fmt::Display for Target {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Target::Pull(pull) => write!(formatter, "#{pull}"),
+            Target::Branch(branch) => formatter.write_str(branch),
+        }
+    }
+}
+
+impl<N: Named> fmt::Display for Shown<'_, N> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Shown { item, landed, named } = self;
+        match item {
+            Item::Spec(cited) => {
+                let line = named.spec(&cited.0).unwrap_or_else(|| cited.0.to_string());
+                write!(formatter, "- {} {line} (closes when its pull request merges)", cited.0)
+            }
+            Item::Pull(pull) => {
+                write!(formatter, "- {} (closes when it merges or closes)", Landed::titled(landed, *pull))
+            }
+            Item::Escalation(Escalated { at, cause, from }) => {
+                write!(formatter, "- agent outcome: {cause}")?;
+                match at {
+                    Some(Target::Pull(pull)) => write!(formatter, " on {}", Landed::titled(landed, *pull)),
+                    Some(Target::Branch(branch)) => write!(formatter, " on {branch}"),
+                    None => Ok(()),
+                }?;
+                let closes = at.as_ref().map_or_else(
+                    || format!("{} is removed", from.display()),
+                    |target| format!("a DONE on {target} passes, or it merges or closes"),
+                );
+                write!(formatter, ", from {} (closes when {closes})", from.display())
+            }
+            Item::Worktree(Kept { path, held, merged }) => write!(
+                formatter,
+                "- worktree {} kept ({held}) after {} merged (closes when it is removed)",
+                path.display(),
+                Landed::titled(landed, *merged)
+            ),
+            Item::Ruling(Ruling { asked, .. }) => {
+                let said = named.owner(&asked.0).map_or_else(String::new, |text| format!(": \"{text}\""));
+                write!(
+                    formatter,
+                    "- owner ruling asked in {}{said} (closes when ruling.ruled names the answer)",
+                    asked.0
+                )
+            }
+        }
     }
 }

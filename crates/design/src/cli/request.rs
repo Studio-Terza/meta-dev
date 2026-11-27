@@ -16,10 +16,10 @@ use super::failure::Failure;
 use command::Command;
 pub use command::Crew;
 pub use ground::Ground;
-pub use local::{Local, Repository};
+pub use local::{Local, Repository, Rooted};
 use projects::Projects;
 pub use projects::{Kept, Located};
-pub use queue::{Item, Landed, Queue, Target, Waits};
+pub use queue::{Cause, Held, Item, Landed, Named, Queue, Target, UnreadStep};
 
 #[derive(Debug)]
 pub struct Request {

@@ -152,7 +152,7 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
 
     pub fn landed(&self) -> Option<Vec<Landed>> {
         let asked =
-            ["pr", "list", "--state", "all", "--limit", Self::LANDED, "--json", "number,state,headRefName,body"];
+            ["pr", "list", "--state", "all", "--limit", Self::LANDED, "--json", "number,state,title,headRefName,body"];
         let ran = self.ran(&asked, Self::QUICK);
         let printed = ran.as_ref().and_then(Ran::succeeded)?;
         serde_json::from_str(printed.as_ref()).ignoring(Ignored::Undrained)

@@ -1,6 +1,5 @@
 mod boundary;
 
-use std::fmt;
 use std::path::{Path, PathBuf};
 
 use console_ports::Heard;
@@ -15,7 +14,7 @@ use super::super::Ground;
 use super::super::crew::Crew;
 use super::subagent::Hub;
 use crate::cli::failure::Failure;
-use crate::cli::request::{Item, Local, Waits};
+use crate::cli::request::{Held, Item, Local};
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
 pub use boundary::Used;
@@ -34,29 +33,10 @@ enum Released {
     Untouched,
 }
 
-#[derive(strum::Display, Clone, Copy, Debug, PartialEq, Eq)]
-#[strum(serialize_all = "kebab-case")]
-enum Held {
-    NoRepository,
-    Unviewed,
-    Unlisted,
-    Unstatused,
-    Dirty,
-    Unpushed,
-    Unremoved,
-}
-
 #[derive(Debug)]
 struct Holding {
     held: Held,
     worktree: Option<PathBuf>,
-}
-
-#[derive(Debug)]
-struct Kept<'used> {
-    holding: &'used Holding,
-    pull: PullNumber,
-    directory: &'used Path,
 }
 
 impl Used {
@@ -85,9 +65,8 @@ impl Used {
             Ok(Released::Untouched) => Ok(Uttered::silent(Ok(Outcome::Hooked(HookEvent::PostToolUse)))),
             Err(holding) => {
                 let file = local.queue().ok_or(Failure::Unplaced)?;
-                let worktree = holding.worktree.clone().unwrap_or_else(|| self.directory().to_path_buf());
-                let item =
-                    Item::new(Kept { holding: &holding, pull, directory: self.directory() }, Waits::Worktree(worktree));
+                let worktree = holding.worktree.unwrap_or_else(|| self.directory().to_path_buf());
+                let item = Item::kept(worktree, holding.held, pull.into_inner());
                 ground.queued(file, &ground.queue(file)?.with(item))?;
                 Ok(Uttered::silent(Ok(Outcome::Escalated)))
             }
@@ -137,13 +116,5 @@ impl<C: Clock, G: Shell> Releasing<'_, '_, C, G> {
 impl From<Held> for Holding {
     fn from(held: Held) -> Holding {
         Holding { held, worktree: None }
-    }
-}
-
-impl fmt::Display for Kept<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "worktree kept: {} after merging #{}", self.holding.held, self.pull)?;
-        self.holding.worktree.iter().try_for_each(|path| write!(formatter, " at {}", path.display()))?;
-        write!(formatter, ", from {}", self.directory.display())
     }
 }
