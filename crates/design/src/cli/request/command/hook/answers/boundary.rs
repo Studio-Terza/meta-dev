@@ -12,18 +12,18 @@ use crate::cli::request::ignored::Ignored;
 use invariants::Ignoring;
 
 #[derive(Debug)]
-pub struct Asked {
+pub(crate) struct Asked {
     question: Body,
 }
 
 #[derive(Debug)]
-pub struct Reading<'history> {
+pub(crate) struct Reading<'history> {
     chunks: Vec<&'history [Said]>,
     prompts: Vec<Prompt>,
 }
 
 #[derive(Debug)]
-pub struct Trimming<'asked> {
+pub(crate) struct Trimming<'asked> {
     question: &'asked Body,
     quotes: Vec<String>,
 }
@@ -35,16 +35,16 @@ struct Picked {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Answers(Vec<Quote>);
+pub(crate) struct Answers(Vec<Quote>);
 
 #[derive(Debug)]
-pub struct Selecting<'asked> {
+pub(crate) struct Selecting<'asked> {
     question: &'asked Body,
     shown: Vec<String>,
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct Replied<'reply>(&'reply Reply);
+pub(crate) struct Replied<'reply>(&'reply Reply);
 
 impl From<&Body> for Asked {
     fn from(said: &Body) -> Asked {
@@ -57,7 +57,7 @@ impl Asked {
         Selecting { question: &self.question, shown: shown.iter().map(ToString::to_string).collect() }
     }
 
-    pub fn reading<'history>(&self, history: &'history [Said]) -> Reading<'history> {
+    pub(crate) fn reading<'history>(&self, history: &'history [Said]) -> Reading<'history> {
         let chunks: Vec<&[Said]> = history.chunks(Reading::CHUNK).collect();
         let prompts = chunks
             .iter()
@@ -69,7 +69,7 @@ impl Asked {
         Reading { chunks, prompts }
     }
 
-    pub fn trimming(&self, quotes: &[Quote]) -> Trimming<'_> {
+    pub(crate) fn trimming(&self, quotes: &[Quote]) -> Trimming<'_> {
         Trimming {
             question: &self.question,
             quotes: quotes.iter().zip(1..).map(|(quote, number)| format!("{number}. {quote}")).collect(),
@@ -80,11 +80,11 @@ impl Asked {
 impl Reading<'_> {
     const CHUNK: usize = 300;
 
-    pub fn prompts(&self) -> &[Prompt] {
+    pub(crate) fn prompts(&self) -> &[Prompt] {
         &self.prompts
     }
 
-    pub fn quoted(&self, heard: &[Option<Reply>]) -> Vec<Vec<Quote>> {
+    pub(crate) fn quoted(&self, heard: &[Option<Reply>]) -> Vec<Vec<Quote>> {
         self.chunks
             .iter()
             .zip(heard)
@@ -94,7 +94,7 @@ impl Reading<'_> {
 }
 
 impl Replied<'_> {
-    pub fn listed<T: DeserializeOwned>(self) -> Vec<T> {
+    pub(crate) fn listed<T: DeserializeOwned>(self) -> Vec<T> {
         serde_json::from_str(&self.braced('[', ']')).ignoring(Ignored::Unpicked).unwrap_or_default()
     }
 
@@ -109,7 +109,7 @@ impl Replied<'_> {
 impl Answers {
     const KEPT: usize = 8;
 
-    pub fn kept(reply: &Reply, quotes: &[Quote]) -> Option<Answers> {
+    pub(crate) fn kept(reply: &Reply, quotes: &[Quote]) -> Option<Answers> {
         let named: BTreeSet<usize> = Replied(reply).listed::<usize>().into_iter().collect();
         let kept: Vec<Quote> = quotes
             .iter()
@@ -121,7 +121,7 @@ impl Answers {
         kept.is_empty().not().then_some(Answers(kept))
     }
 
-    pub fn quoted(reply: &Reply, candidates: &[Said]) -> Vec<Quote> {
+    pub(crate) fn quoted(reply: &Reply, candidates: &[Said]) -> Vec<Quote> {
         let picked: Vec<Picked> = Replied(reply).listed();
         picked
             .iter()

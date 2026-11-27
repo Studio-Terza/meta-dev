@@ -14,7 +14,7 @@ use serde::Deserialize;
 use crate::cli::request::ignored::Ignored;
 
 #[derive(Debug, Deserialize)]
-pub struct Finishing {
+pub(crate) struct Finishing {
     #[serde(rename = "stop_hook_active", default)]
     reminder: Reminder,
     #[serde(rename = "last_assistant_message", default)]
@@ -24,7 +24,7 @@ pub struct Finishing {
 
 #[derive(Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(from = "bool")]
-pub enum Reminder {
+pub(crate) enum Reminder {
     #[default]
     First,
     Repeated,
@@ -32,52 +32,52 @@ pub enum Reminder {
 
 #[derive(Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 #[serde(from = "Option<String>")]
-pub enum Said {
+pub(crate) enum Said {
     Typed(Report),
     #[default]
     Untyped,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Report {
+pub(crate) enum Report {
     Done(At),
     Blocked(At),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum At {
+pub(crate) enum At {
     Pull(Pushed),
     Branch(Branched),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Pushed {
+pub(crate) struct Pushed {
     pull: PullNumber,
     head: CommitSha,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Branched {
+pub(crate) struct Branched {
     branch: Branch,
     head: CommitSha,
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(try_from = "String")]
-pub struct Branch(String);
+pub(crate) struct Branch(String);
 
 #[derive(Debug, thiserror::Error)]
 #[error("not a branch name of the form area/topic")]
-pub struct Unbranched;
+pub(crate) struct Unbranched;
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(from = "String")]
-pub struct First {
+pub(crate) struct First {
     spec: Option<Attachment>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Compared {
+pub(crate) struct Compared {
     commits: Vec<Committed>,
 }
 
@@ -92,31 +92,31 @@ struct Message {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Opened {
+pub(crate) struct Opened {
     number: NonZeroU32,
 }
 
 #[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(try_from = "String")]
-pub struct CommitSha([u8; 20]);
+pub(crate) struct CommitSha([u8; 20]);
 
 #[derive(Newtype, Display, Clone, Copy, Debug, PartialEq, Eq)]
-pub struct JobId(NonZeroU64);
+pub(crate) struct JobId(NonZeroU64);
 
 #[derive(Debug, thiserror::Error)]
 #[error("not a full commit sha of forty hexadecimal digits")]
-pub struct Unhexed;
+pub(crate) struct Unhexed;
 
 impl Finishing {
-    pub fn said(&self) -> &Said {
+    pub(crate) fn said(&self) -> &Said {
         &self.said
     }
 
-    pub fn reminder(&self) -> Reminder {
+    pub(crate) fn reminder(&self) -> Reminder {
         self.reminder
     }
 
-    pub fn directory(&self) -> &Path {
+    pub(crate) fn directory(&self) -> &Path {
         &self.cwd
     }
 }
@@ -148,31 +148,31 @@ impl Report {
 }
 
 impl Pushed {
-    pub fn new(pull: PullNumber, head: CommitSha) -> Pushed {
+    pub(crate) fn new(pull: PullNumber, head: CommitSha) -> Pushed {
         Pushed { pull, head }
     }
 
-    pub fn pull(self) -> PullNumber {
+    pub(crate) fn pull(self) -> PullNumber {
         self.pull
     }
 
-    pub fn head(self) -> CommitSha {
+    pub(crate) fn head(self) -> CommitSha {
         self.head
     }
 }
 
 impl Branched {
-    pub fn branch(&self) -> &Branch {
+    pub(crate) fn branch(&self) -> &Branch {
         &self.branch
     }
 
-    pub fn head(&self) -> CommitSha {
+    pub(crate) fn head(&self) -> CommitSha {
         self.head
     }
 }
 
 impl First {
-    pub fn spec(&self) -> Option<&Attachment> {
+    pub(crate) fn spec(&self) -> Option<&Attachment> {
         self.spec.as_ref()
     }
 }
@@ -185,13 +185,13 @@ impl From<String> for First {
 }
 
 impl Compared {
-    pub fn first(self) -> Option<First> {
+    pub(crate) fn first(self) -> Option<First> {
         self.commits.into_iter().next().map(|committed| committed.commit.message)
     }
 }
 
 impl Opened {
-    pub fn pull(&self) -> PullNumber {
+    pub(crate) fn pull(&self) -> PullNumber {
         PullNumber::new(self.number)
     }
 }
@@ -239,7 +239,7 @@ impl fmt::Display for CommitSha {
 }
 
 impl JobId {
-    pub fn linked(link: &str) -> Option<JobId> {
+    pub(crate) fn linked(link: &str) -> Option<JobId> {
         JobLink::read(link).map(|linked| JobId::new(linked.job()))
     }
 }

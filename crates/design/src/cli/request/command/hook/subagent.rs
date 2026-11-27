@@ -17,18 +17,18 @@ use super::super::Ground;
 use super::super::crew::Crew;
 use super::boundary::Decision;
 use crate::cli::failure::Failure;
-pub use crate::cli::request::UnreadStep;
+pub(crate) use crate::cli::request::UnreadStep;
 use crate::cli::request::ignored::Ignored;
 use crate::cli::request::{Cause as Escalation, Item, Local, Target};
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
 use boundary::{At, Branched, JobId, Pushed, Reminder, Report, Said};
-pub use boundary::{Branch, CommitSha, Finishing};
-pub use hub::Hub;
+pub(crate) use boundary::{Branch, CommitSha, Finishing};
+pub(crate) use hub::Hub;
 use hub::{Mergeability, Unopened, Verdict};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Ending {
+pub(crate) enum Ending {
     Stop,
     Unpushed { held: CommitSha },
     Conflicting,
@@ -37,7 +37,7 @@ pub enum Ending {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FailedJob {
+pub(crate) struct FailedJob {
     check: CheckName,
     job: JobId,
 }
@@ -82,11 +82,11 @@ struct Excerpt {
 }
 
 impl Finishing {
-    pub fn heard(heard: Heard) -> Result<Finishing, Failure> {
+    pub(crate) fn heard(heard: Heard) -> Result<Finishing, Failure> {
         serde_json::from_str(&heard.into_inner()).map_err(Failure::Unheard)
     }
 
-    pub fn answered<F: Files, S: Store, C: Clock, G: Shell>(
+    pub(crate) fn answered<F: Files, S: Store, C: Clock, G: Shell>(
         &self,
         ground: &Ground<'_, F, S>,
         crew: &Crew<'_, C, G>,
@@ -183,7 +183,7 @@ impl Pushed {
 }
 
 impl FailedJob {
-    pub fn new(check: CheckName, job: JobId) -> FailedJob {
+    pub(crate) fn new(check: CheckName, job: JobId) -> FailedJob {
         FailedJob { check, job }
     }
 }

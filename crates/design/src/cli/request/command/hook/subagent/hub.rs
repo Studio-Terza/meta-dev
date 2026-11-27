@@ -20,14 +20,14 @@ use crate::cli::request::ignored::Ignored;
 use crate::cli::request::{Landed, Local, Repository};
 
 #[derive(Debug)]
-pub struct Hub<'crew, C: Clock, G: Shell> {
+pub(crate) struct Hub<'crew, C: Clock, G: Shell> {
     crew: &'crew Crew<'crew, C, G>,
     directory: &'crew Path,
     repository: &'crew Repository,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Verdict {
+pub(crate) enum Verdict {
     Green,
     Red(Vec<FailedJob>),
 }
@@ -44,7 +44,7 @@ struct Merging {
 }
 
 #[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Mergeability {
+pub(crate) enum Mergeability {
     #[serde(rename = "MERGEABLE")]
     Clean,
     #[serde(rename = "CONFLICTING")]
@@ -82,7 +82,7 @@ enum State {
 struct Link(Option<JobId>);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Unopened {
+pub(crate) enum Unopened {
     Unpushed(Option<CommitSha>),
     Unread(UnreadStep),
 }
@@ -127,7 +127,7 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
     const REMOTE: &'static str = "query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name)\
                                   {ref(qualifiedName:$ref){target{oid}}}}";
 
-    pub fn new(
+    pub(crate) fn new(
         crew: &'crew Crew<'crew, C, G>,
         directory: &'crew Path,
         repository: &'crew Repository,
@@ -144,13 +144,13 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
         self.crew.spoke(Hub::<C, G>::PROGRAM, arguments, self.directory, timeout)
     }
 
-    pub fn viewed<T: DeserializeOwned>(&self, pull: PullNumber, fields: &str) -> Option<T> {
+    pub(crate) fn viewed<T: DeserializeOwned>(&self, pull: PullNumber, fields: &str) -> Option<T> {
         let ran = self.ran(&["pr", "view", &pull.to_string(), "--json", fields], Self::QUICK);
         let printed = ran.as_ref().and_then(Ran::succeeded)?;
         serde_json::from_str(printed.as_ref()).ignoring(Ignored::Unviewed)
     }
 
-    pub fn landed(&self) -> Option<Vec<Landed>> {
+    pub(crate) fn landed(&self) -> Option<Vec<Landed>> {
         let asked =
             ["pr", "list", "--state", "all", "--limit", Self::LANDED, "--json", "number,state,title,headRefName,body"];
         let ran = self.ran(&asked, Self::QUICK);
@@ -158,7 +158,7 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
         serde_json::from_str(printed.as_ref()).ignoring(Ignored::Undrained)
     }
 
-    pub fn opened<F: Files, S: Store>(
+    pub(crate) fn opened<F: Files, S: Store>(
         &self,
         branched: &Branched,
         ground: &Ground<'_, F, S>,
@@ -201,15 +201,15 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
         compared.first().ok_or(UnreadStep::Commits)
     }
 
-    pub fn head(&self, pull: PullNumber) -> Result<CommitSha, UnreadStep> {
+    pub(crate) fn head(&self, pull: PullNumber) -> Result<CommitSha, UnreadStep> {
         self.viewed::<Head>(pull, "headRefOid").map(|read| read.head).ok_or(UnreadStep::Head)
     }
 
-    pub fn mergeable(&self, pull: PullNumber) -> Result<Mergeability, UnreadStep> {
+    pub(crate) fn mergeable(&self, pull: PullNumber) -> Result<Mergeability, UnreadStep> {
         self.viewed::<Merging>(pull, "mergeable").map(|read| read.mergeable).ok_or(UnreadStep::Mergeable)
     }
 
-    pub fn settled(&self, pull: PullNumber) -> Result<Verdict, UnreadStep> {
+    pub(crate) fn settled(&self, pull: PullNumber) -> Result<Verdict, UnreadStep> {
         let deadline = Deadline::after(self.crew.now(), Self::WATCH);
         iter::repeat_with(|| self.crew.now())
             .take_while(|now| deadline.due(*now) == Due::Pending)
@@ -231,7 +231,7 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
         listed.map_or(Ok(None), |checks| Verdict::read(&checks))
     }
 
-    pub fn log(&self, job: JobId) -> String {
+    pub(crate) fn log(&self, job: JobId) -> String {
         let ran = self.ran(&["run", "view", "--job", &job.to_string(), "--log-failed"], Self::QUICK);
         ran.as_ref().and_then(Ran::succeeded).map_or_else(|| Hub::<C, G>::UNLOGGED.to_owned(), ToString::to_string)
     }
@@ -252,7 +252,7 @@ impl Verdict {
         })
     }
 
-    pub fn failed(self) -> Vec<FailedJob> {
+    pub(crate) fn failed(self) -> Vec<FailedJob> {
         match self {
             Verdict::Green => Vec::new(),
             Verdict::Red(jobs) => jobs,

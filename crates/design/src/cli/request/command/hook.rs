@@ -23,13 +23,13 @@ use subagent::Finishing;
 use unroll::Running;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Hook {
+pub(crate) enum Hook {
     Settings,
     On(HookEvent),
 }
 
 impl Hook {
-    pub fn answered<F: Files + Clone, S: Store, C: Clock, G: Shell>(
+    pub(crate) fn answered<F: Files + Clone, S: Store, C: Clock, G: Shell>(
         self,
         environment: &impl Environment,
         ground: &Ground<'_, F, S>,

@@ -13,7 +13,7 @@ use transcript_ports::{Body, TaskId};
 use crate::cli::request::ignored::Ignored;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Halt {
+pub(crate) enum Halt {
     Live,
     Stalled,
     Overrun,
@@ -37,24 +37,24 @@ enum Status {
 struct Ended;
 
 #[derive(Debug)]
-pub struct Output {
+pub(crate) struct Output {
     runner: Runner,
     path: PathBuf,
     name: Body,
 }
 
 #[derive(Debug)]
-pub struct Task {
+pub(crate) struct Task {
     runner: Runner,
     status: Status,
     name: Body,
 }
 
 #[derive(Debug, Default)]
-pub struct Stopped(BTreeSet<TaskId>);
+pub(crate) struct Stopped(BTreeSet<TaskId>);
 
 #[derive(Debug, Default)]
-pub struct Tasks {
+pub(crate) struct Tasks {
     shells: usize,
     agents: usize,
     hung: Vec<Body>,
@@ -155,7 +155,7 @@ impl Runner {
 }
 
 impl Output {
-    pub fn listed(path: &Path) -> Option<Output> {
+    pub(crate) fn listed(path: &Path) -> Option<Output> {
         let runner = Runner::spawned(path)?;
         let name = path
             .file_stem()
@@ -164,7 +164,7 @@ impl Output {
         Some(Output { runner, path: path.to_path_buf(), name })
     }
 
-    pub fn tailed(&self, size: Size) -> Option<Tail> {
+    pub(crate) fn tailed(&self, size: Size) -> Option<Tail> {
         let from = i64::try_from(size.into_inner().saturating_sub(self.runner.tail())).ignoring(Ignored::Untasked)?;
         Some(Tail::new(self.path.clone(), Offset::try_new(from).ignoring(Ignored::Untasked)?))
     }
@@ -214,7 +214,7 @@ impl Task {
     const CONTINUATION: u8 = 0b1100_0000;
     const FOLLOWER: u8 = 0b1000_0000;
 
-    pub fn new(Output { runner, name, .. }: Output, tail: &Bytes, stamps: Stamps, now: Epoch) -> Option<Task> {
+    pub(crate) fn new(Output { runner, name, .. }: Output, tail: &Bytes, stamps: Stamps, now: Epoch) -> Option<Task> {
         let whole: Vec<u8> =
             tail.as_ref().iter().copied().skip_while(|byte| byte & Self::CONTINUATION == Self::FOLLOWER).collect();
         let text = String::from_utf8(whole).ignoring(Ignored::Untasked)?;
@@ -272,17 +272,17 @@ impl Tasks {
     }
 
     #[must_use]
-    pub fn unstopped(self, stopped: &Stopped) -> Tasks {
+    pub(crate) fn unstopped(self, stopped: &Stopped) -> Tasks {
         Tasks { hung: self.hung.into_iter().filter(|name| stopped.holding(name).is_none()).collect(), ..self }
     }
 
     #[must_use]
-    pub fn running(&self) -> usize {
+    pub(crate) fn running(&self) -> usize {
         self.shells + self.agents
     }
 
     #[must_use]
-    pub fn hung(&self) -> &[Body] {
+    pub(crate) fn hung(&self) -> &[Body] {
         &self.hung
     }
 }

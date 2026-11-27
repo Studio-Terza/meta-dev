@@ -25,12 +25,12 @@ use crate::cli::request::ignored::Ignored;
 use crate::cli::request::{Landed, Local, Named, Queue, Rooted};
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
-pub use harness::Stopped;
+pub(crate) use harness::Stopped;
 use harness::{Halt, Harness, Tasks};
 use invariants::Ignoring;
 
 #[derive(Debug, Serialize)]
-pub struct Settings {
+pub(crate) struct Settings {
     hooks: BTreeMap<HookEvent, [Matcher; 1]>,
 }
 
@@ -55,7 +55,7 @@ struct Handler {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Stopping {
+pub(crate) struct Stopping {
     #[serde(rename = "stop_hook_active")]
     continuation: Continuation,
     #[serde(rename = "last_assistant_message", default)]
@@ -67,7 +67,7 @@ pub struct Stopping {
 }
 
 #[derive(Debug)]
-pub struct Observed<'ground, 'run, F: Files, S: Store> {
+pub(crate) struct Observed<'ground, 'run, F: Files, S: Store> {
     ground: &'ground Ground<'run, F, S>,
     tasks: Option<Tasks>,
 }
@@ -94,13 +94,13 @@ struct Continuing;
 struct Continuation(Option<Continuing>);
 
 #[derive(Debug, Serialize)]
-pub struct Decision {
+pub(crate) struct Decision {
     decision: Verdict,
     reason: String,
 }
 
 #[derive(Debug, Serialize)]
-pub enum Verdict {
+pub(crate) enum Verdict {
     #[serde(rename = "block")]
     Block,
 }
@@ -108,7 +108,7 @@ pub enum Verdict {
 impl Settings {
     const KIND: &'static str = "command";
 
-    pub fn listed(events: &[HookEvent]) -> Settings {
+    pub(crate) fn listed(events: &[HookEvent]) -> Settings {
         Settings {
             hooks: events
                 .iter()
@@ -143,14 +143,14 @@ impl Settings {
         }
     }
 
-    pub fn written(&self) -> Result<Uttered, Failure> {
+    pub(crate) fn written(&self) -> Result<Uttered, Failure> {
         let json = serde_json::to_string_pretty(self).map_err(Failure::Render)?;
         Ok(Uttered::new(Shown::said(format_args!("{json}\n")), Ok(Outcome::Settings)))
     }
 }
 
 impl Stopping {
-    pub fn heard(heard: Heard) -> Result<Stopping, Failure> {
+    pub(crate) fn heard(heard: Heard) -> Result<Stopping, Failure> {
         serde_json::from_str(&heard.into_inner()).map_err(Failure::Unheard)
     }
 
@@ -159,12 +159,12 @@ impl Stopping {
     const OVERRUN: &'static str =
         "OVERRUN: these background tasks ran 20 minutes without finishing or writing output; check and stop them:";
 
-    pub fn tasks<F: Files, S: Store>(&self, ground: &Ground<'_, F, S>, now: Wall) -> Option<Tasks> {
+    pub(crate) fn tasks<F: Files, S: Store>(&self, ground: &Ground<'_, F, S>, now: Wall) -> Option<Tasks> {
         let harness = Harness::new(ground.files(), Epoch::new(now.into_inner()));
         self.transcript.as_deref().map(|transcript| harness.tasks(transcript))
     }
 
-    pub fn decided<F: Files, S: Store, C: Clock, G: Shell>(
+    pub(crate) fn decided<F: Files, S: Store, C: Clock, G: Shell>(
         &self,
         crew: &Crew<'_, C, G>,
         observed: &Observed<'_, '_, F, S>,
@@ -194,7 +194,7 @@ impl Stopping {
 }
 
 impl<'ground, 'run, F: Files, S: Store> Observed<'ground, 'run, F, S> {
-    pub fn new(ground: &'ground Ground<'run, F, S>, tasks: Option<Tasks>) -> Observed<'ground, 'run, F, S> {
+    pub(crate) fn new(ground: &'ground Ground<'run, F, S>, tasks: Option<Tasks>) -> Observed<'ground, 'run, F, S> {
         Observed { ground, tasks }
     }
 
@@ -282,7 +282,7 @@ impl Decision {
         })
     }
 
-    pub fn blocked(reason: String) -> Result<Uttered, Failure> {
+    pub(crate) fn blocked(reason: String) -> Result<Uttered, Failure> {
         let json = serde_json::to_string(&Decision { decision: Verdict::Block, reason }).map_err(Failure::Render)?;
         Ok(Uttered::new(Shown::said(format_args!("{json}\n")), Ok(Outcome::Blocked)))
     }

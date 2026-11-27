@@ -14,7 +14,7 @@ use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
 
 #[derive(Debug, Deserialize)]
-pub struct Running {
+pub(crate) struct Running {
     #[serde(default)]
     cwd: PathBuf,
     #[serde(default)]
@@ -65,11 +65,11 @@ enum Permission {
 }
 
 impl Running {
-    pub fn heard(heard: Heard) -> Result<Running, Failure> {
+    pub(crate) fn heard(heard: Heard) -> Result<Running, Failure> {
         serde_json::from_str(&heard.into_inner()).map_err(Failure::Unheard)
     }
 
-    pub fn answered<F: Files, S: Store>(&self, ground: &Ground<'_, F, S>) -> Result<Uttered, Failure> {
+    pub(crate) fn answered<F: Files, S: Store>(&self, ground: &Ground<'_, F, S>) -> Result<Uttered, Failure> {
         let command = self.tool_input.command.as_deref().unwrap_or_default();
         let judging = Judging { ground, cwd: &self.cwd };
         let refused = Nested::read(command)

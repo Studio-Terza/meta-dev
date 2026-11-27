@@ -1,4 +1,4 @@
-mod count;
+mod boundary;
 
 use std::fmt;
 
@@ -9,7 +9,7 @@ use transcript_ports::{Authorship, Cursor, Kind, Line, Session, SessionId, Trans
 
 use crate::cli::Count;
 use crate::cli::failure::Failure;
-use count::Counts;
+use boundary::Counts;
 
 #[derive(Debug)]
 struct ReadTo {
@@ -26,7 +26,7 @@ struct Ingested {
 }
 
 #[derive(Debug)]
-pub struct Tally {
+pub(crate) struct Tally {
     ends: Vec<ReadTo>,
     authorship: Counts<Authorship>,
     unrecognised: Counts<Kind>,
@@ -34,14 +34,14 @@ pub struct Tally {
 }
 
 #[derive(Debug)]
-pub struct Ingest<'ports, T: Transcripts, S: Store> {
+pub(crate) struct Ingest<'ports, T: Transcripts, S: Store> {
     transcripts: &'ports T,
     store: &'ports S,
     cursors: Cursors,
 }
 
 impl<'ports, T: Transcripts, S: Store> Ingest<'ports, T, S> {
-    pub fn read(store: &'ports S, transcripts: &'ports T) -> Result<Tally, Failure> {
+    pub(crate) fn read(store: &'ports S, transcripts: &'ports T) -> Result<Tally, Failure> {
         let lock = store.lock()?;
         let ingest = Ingest { transcripts, store, cursors: store.read(SessionCursors)? };
         let sessions = transcripts.sessions()?;

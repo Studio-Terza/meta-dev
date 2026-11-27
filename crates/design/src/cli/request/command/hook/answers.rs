@@ -7,11 +7,11 @@ use transcript_ports::Body;
 
 use super::super::crew::{Crew, Prompt};
 use crate::cli::failure::Failure;
-pub use boundary::Answers;
+pub(crate) use boundary::Answers;
 use boundary::Asked;
 
 #[derive(Debug)]
-pub struct Answering<'ports, S: Store, C: Clock, G: Shell> {
+pub(crate) struct Answering<'ports, S: Store, C: Clock, G: Shell> {
     store: &'ports S,
     crew: &'ports Crew<'ports, C, G>,
 }
@@ -19,11 +19,11 @@ pub struct Answering<'ports, S: Store, C: Clock, G: Shell> {
 impl<'ports, S: Store, C: Clock, G: Shell> Answering<'ports, S, C, G> {
     const TIMEOUT: Timeout = Timeout::new(120);
 
-    pub fn new(store: &'ports S, crew: &'ports Crew<'ports, C, G>) -> Answering<'ports, S, C, G> {
+    pub(crate) fn new(store: &'ports S, crew: &'ports Crew<'ports, C, G>) -> Answering<'ports, S, C, G> {
         Answering { store, crew }
     }
 
-    pub fn searched(&self, said: &Body) -> Result<Option<Answers>, Failure> {
+    pub(crate) fn searched(&self, said: &Body) -> Result<Option<Answers>, Failure> {
         let asked = Asked::from(said);
         let history: Vec<Said> = self.store.read(OwnerHistory)?;
         let reading = asked.reading(&history);

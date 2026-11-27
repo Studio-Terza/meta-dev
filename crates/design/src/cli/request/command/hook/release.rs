@@ -17,7 +17,7 @@ use crate::cli::failure::Failure;
 use crate::cli::request::{Held, Item, Local};
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
-pub use boundary::Used;
+pub(crate) use boundary::Used;
 use boundary::{Checkout, Landed, State};
 
 #[derive(Debug)]
@@ -40,11 +40,11 @@ struct Holding {
 }
 
 impl Used {
-    pub fn heard(heard: Heard) -> Result<Used, Failure> {
+    pub(crate) fn heard(heard: Heard) -> Result<Used, Failure> {
         serde_json::from_str(&heard.into_inner()).map_err(Failure::Unheard)
     }
 
-    pub fn answered<F: Files, S: Store, C: Clock, G: Shell>(
+    pub(crate) fn answered<F: Files, S: Store, C: Clock, G: Shell>(
         &self,
         ground: &Ground<'_, F, S>,
         crew: &Crew<'_, C, G>,

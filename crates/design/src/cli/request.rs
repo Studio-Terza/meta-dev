@@ -14,15 +14,15 @@ use store_ports::Opens;
 
 use super::failure::Failure;
 use command::Command;
-pub use command::Crew;
-pub use ground::Ground;
-pub use local::{Local, Repository, Rooted};
+pub(crate) use command::Crew;
+pub(crate) use ground::Ground;
+pub(crate) use local::{Local, Repository, Rooted};
 use projects::Projects;
-pub use projects::{Kept, Located};
-pub use queue::{Cause, Held, Item, Landed, Named, Queue, Target, UnreadStep};
+pub(crate) use projects::{Kept, Located};
+pub(crate) use queue::{Cause, Held, Item, Landed, Named, Queue, Target, UnreadStep};
 
 #[derive(Debug)]
-pub struct Request {
+pub(crate) struct Request {
     command: Command,
     workspace: Option<PathBuf>,
 }
@@ -34,22 +34,22 @@ struct Words {
 }
 
 impl Request {
-    pub fn parsed(arguments: impl Iterator<Item = OsString>) -> Result<Request, Failure> {
+    pub(crate) fn parsed(arguments: impl Iterator<Item = OsString>) -> Result<Request, Failure> {
         let words = Words::heard(&arguments.collect::<Vec<OsString>>())?;
         let spoken = words.spoken.iter().map(|word| word.to_str()).collect::<Option<Vec<&str>>>();
         let command = spoken.ok_or(Failure::Usage).and_then(|said| Command::spoken(&said))?;
         Ok(Request { command, workspace: words.workspace })
     }
 
-    pub fn located(&self, environment: &impl Environment) -> Result<Located, Failure> {
+    pub(crate) fn located(&self, environment: &impl Environment) -> Result<Located, Failure> {
         Projects::located(environment, self.workspace.as_deref().map(Path::new))
     }
 
-    pub fn opened<O: Opens>(&self, located: &Located, opens: &O) -> O::Store {
+    pub(crate) fn opened<O: Opens>(&self, located: &Located, opens: &O) -> O::Store {
         self.command.opened(located.kept(Kept::Store), opens)
     }
 
-    pub fn command(self) -> Command {
+    pub(crate) fn command(self) -> Command {
         self.command
     }
 }

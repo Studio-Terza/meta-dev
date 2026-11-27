@@ -9,17 +9,17 @@ use serde::Deserialize;
 use crate::cli::request::ignored::Ignored;
 
 #[derive(Debug)]
-pub struct Crew<'ports, C: Clock, G: Shell> {
+pub(crate) struct Crew<'ports, C: Clock, G: Shell> {
     clock: &'ports C,
     shell: &'ports G,
     scratch: PathBuf,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Prompt(String);
+pub(crate) struct Prompt(String);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Reply(String);
+pub(crate) struct Reply(String);
 
 #[derive(Debug, Deserialize)]
 struct Envelope {
@@ -50,33 +50,39 @@ impl<'ports, C: Clock, G: Shell> Crew<'ports, C, G> {
         "haiku",
     ];
 
-    pub fn new(clock: &'ports C, shell: &'ports G, scratch: PathBuf) -> Crew<'ports, C, G> {
+    pub(crate) fn new(clock: &'ports C, shell: &'ports G, scratch: PathBuf) -> Crew<'ports, C, G> {
         Crew { clock, shell, scratch }
     }
 
-    pub fn now(&self) -> Wall {
+    pub(crate) fn now(&self) -> Wall {
         self.clock.now()
     }
 
-    pub fn scratch(&self) -> &Path {
+    pub(crate) fn scratch(&self) -> &Path {
         &self.scratch
     }
 
-    pub fn spoke(&self, program: &'static str, arguments: &[&str], directory: &Path, timeout: Timeout) -> Option<Ran> {
+    pub(crate) fn spoke(
+        &self,
+        program: &'static str,
+        arguments: &[&str],
+        directory: &Path,
+        timeout: Timeout,
+    ) -> Option<Ran> {
         let spoken = arguments.iter().map(|word| (*word).to_owned()).collect();
         let call = Call::new(program, spoken, directory.to_path_buf(), Deadline::after(self.clock.now(), timeout));
         self.shell.ran(&call).ignoring(Ignored::Unrun)
     }
 
-    pub fn paused(&self, pause: Pause) {
+    pub(crate) fn paused(&self, pause: Pause) {
         self.clock.paused(pause);
     }
 
-    pub fn replied(&self, prompt: &Prompt, timeout: Timeout) -> Option<Reply> {
+    pub(crate) fn replied(&self, prompt: &Prompt, timeout: Timeout) -> Option<Reply> {
         self.fanned(slice::from_ref(prompt), timeout).into_iter().next().flatten()
     }
 
-    pub fn fanned(&self, prompts: &[Prompt], timeout: Timeout) -> Vec<Option<Reply>> {
+    pub(crate) fn fanned(&self, prompts: &[Prompt], timeout: Timeout) -> Vec<Option<Reply>> {
         let deadline = Deadline::after(self.clock.now(), timeout);
         let asked: Vec<String> = Self::ASKED.map(str::to_owned).to_vec();
         let calls: Vec<Call> = prompts

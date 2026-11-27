@@ -1,4 +1,4 @@
-mod count;
+mod boundary;
 mod failure;
 pub(crate) mod outcome;
 mod request;
@@ -12,7 +12,7 @@ use file_ports::FilesFiller;
 use port_core::Run;
 use store_ports::Opens;
 
-pub use count::Count;
+pub(crate) use boundary::Count;
 pub use failure::Failure;
 use request::{Crew, Ground, Kept, Request};
 use uttered::{Settled, Uttered};
@@ -55,7 +55,7 @@ impl<'environment, E: Environment, F: FilesFiller + Clone, O: Opens, C: ClockFil
         uttered.settled(run.finish())
     }
 
-    pub fn report(self, run: &Run, arguments: impl Iterator<Item = OsString>) -> Uttered {
+    pub(crate) fn report(self, run: &Run, arguments: impl Iterator<Item = OsString>) -> Uttered {
         match self.answered(run, arguments) {
             Ok(uttered) => uttered,
             Err(failure) => Uttered::silent(Err(failure)),

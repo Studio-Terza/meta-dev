@@ -6,11 +6,11 @@ use file_ports::{Batched, Epoch, Files, Kind, Tail};
 use invariants::Ignoring;
 
 use crate::cli::request::ignored::Ignored;
-pub use boundary::{Halt, Stopped, Tasks};
+pub(crate) use boundary::{Halt, Stopped, Tasks};
 use boundary::{Output, Task};
 
 #[derive(Debug)]
-pub struct Harness<'files, F: Files> {
+pub(crate) struct Harness<'files, F: Files> {
     files: &'files F,
     now: Epoch,
 }
@@ -20,11 +20,11 @@ impl<'files, F: Files> Harness<'files, F> {
     const TASKS: &'static str = "tasks";
     const SUBAGENTS: &'static str = "subagents";
 
-    pub fn new(files: &'files F, now: Epoch) -> Harness<'files, F> {
+    pub(crate) fn new(files: &'files F, now: Epoch) -> Harness<'files, F> {
         Harness { files, now }
     }
 
-    pub fn tasks(&self, transcript: &Path) -> Tasks {
+    pub(crate) fn tasks(&self, transcript: &Path) -> Tasks {
         let listed: Vec<PathBuf> = self
             .files
             .entries_many(&self.folders(transcript))

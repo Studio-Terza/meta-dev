@@ -15,12 +15,12 @@ use super::persistence::Persistence;
 use crate::cli::failure::Failure;
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
-pub use crew::Crew;
+pub(crate) use crew::Crew;
 use hook::Hook;
 use ingest::Ingest;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Command {
+pub(crate) enum Command {
     Ingest(Persistence),
     Hook(Hook),
 }
@@ -31,7 +31,7 @@ impl Command {
     const HOOK: &'static str = "hook";
     const SETTINGS: &'static str = "--settings";
 
-    pub fn spoken(words: &[&str]) -> Result<Command, Failure> {
+    pub(crate) fn spoken(words: &[&str]) -> Result<Command, Failure> {
         match words {
             [Self::INGEST] => Ok(Command::Ingest(Persistence::File)),
             [Self::INGEST, Self::DRY_RUN] => Ok(Command::Ingest(Persistence::DryRun)),
@@ -41,14 +41,14 @@ impl Command {
         }
     }
 
-    pub fn opened<O: Opens>(self, path: PathBuf, opens: &O) -> O::Store {
+    pub(crate) fn opened<O: Opens>(self, path: PathBuf, opens: &O) -> O::Store {
         match self {
             Command::Ingest(persistence) => persistence.opened(path, opens),
             Command::Hook(_) => Persistence::File.opened(path, opens),
         }
     }
 
-    pub fn written<F: Files + Clone, S: Store, C: Clock, G: Shell>(
+    pub(crate) fn written<F: Files + Clone, S: Store, C: Clock, G: Shell>(
         self,
         environment: &impl Environment,
         ground: &Ground<'_, F, S>,

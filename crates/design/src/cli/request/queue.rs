@@ -14,14 +14,14 @@ use serde::{Deserialize, Serialize};
 use super::ignored::Ignored;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
-pub struct Queue {
+pub(crate) struct Queue {
     #[serde(default, rename = "item", skip_serializing_if = "Vec::is_empty")]
     items: Vec<Item>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
-pub enum Item {
+pub(crate) enum Item {
     Spec(Cited),
     Pull(NonZeroU32),
     Escalation(Escalated),
@@ -30,7 +30,7 @@ pub enum Item {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-pub struct Escalated {
+pub(crate) struct Escalated {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     at: Option<Target>,
     cause: Cause,
@@ -39,14 +39,14 @@ pub struct Escalated {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
-pub enum Target {
+pub(crate) enum Target {
     Pull(NonZeroU32),
     Branch(String),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
-pub enum Cause {
+pub(crate) enum Cause {
     Blocked,
     RepeatFailure(CheckName),
     Unread(UnreadStep),
@@ -55,7 +55,7 @@ pub enum Cause {
 #[derive(strum::Display, Deserialize, Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[strum(serialize_all = "kebab-case")]
 #[serde(rename_all = "kebab-case")]
-pub enum UnreadStep {
+pub(crate) enum UnreadStep {
     Ending,
     Head,
     Mergeable,
@@ -71,7 +71,7 @@ pub enum UnreadStep {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-pub struct Kept {
+pub(crate) struct Kept {
     path: PathBuf,
     held: Held,
     merged: NonZeroU32,
@@ -80,7 +80,7 @@ pub struct Kept {
 #[derive(strum::Display, Deserialize, Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[strum(serialize_all = "kebab-case")]
 #[serde(rename_all = "kebab-case")]
-pub enum Held {
+pub(crate) enum Held {
     NoRepository,
     Unviewed,
     Unlisted,
@@ -91,7 +91,7 @@ pub enum Held {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-pub struct Ruling {
+pub(crate) struct Ruling {
     asked: MessageRef,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     ruled: Option<MessageRef>,
@@ -99,14 +99,14 @@ pub struct Ruling {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(try_from = "String", into = "String")]
-pub struct MessageRef(String);
+pub(crate) struct MessageRef(String);
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(try_from = "String", into = "String")]
-pub struct Cited(Attachment);
+pub(crate) struct Cited(Attachment);
 
 #[derive(Debug, Deserialize)]
-pub struct Landed {
+pub(crate) struct Landed {
     number: NonZeroU32,
     state: Settled,
     title: String,
@@ -127,16 +127,16 @@ enum Settled {
 
 #[derive(Debug, thiserror::Error)]
 #[error("a message id is eight or more hexadecimal digits")]
-pub struct Unreferenced;
+pub(crate) struct Unreferenced;
 
-pub trait Named {
+pub(crate) trait Named {
     fn spec(&self, cited: &Attachment) -> Option<String>;
 
     fn owner(&self, message: &str) -> Option<String>;
 }
 
 #[derive(Debug)]
-pub struct Shown<'shown, N: Named> {
+pub(crate) struct Shown<'shown, N: Named> {
     item: &'shown Item,
     landed: &'shown [Landed],
     named: &'shown N,
@@ -146,22 +146,22 @@ pub struct Shown<'shown, N: Named> {
 struct Closed;
 
 impl Queue {
-    pub fn items(&self) -> &[Item] {
+    pub(crate) fn items(&self) -> &[Item] {
         &self.items
     }
 
     #[must_use]
-    pub fn with(self, item: Item) -> Queue {
+    pub(crate) fn with(self, item: Item) -> Queue {
         Queue { items: self.items.into_iter().chain([item]).collect() }
     }
 
     #[must_use]
-    pub fn drained(self, landed: &[Landed], kind: impl Fn(&Path) -> Kind) -> Queue {
+    pub(crate) fn drained(self, landed: &[Landed], kind: impl Fn(&Path) -> Kind) -> Queue {
         Queue { items: self.items.into_iter().filter(|item| item.closed(landed, &kind).is_none()).collect() }
     }
 
     #[must_use]
-    pub fn cleared(self, passed: &[Target]) -> Queue {
+    pub(crate) fn cleared(self, passed: &[Target]) -> Queue {
         let open = |item: &Item| match item {
             Item::Escalation(Escalated { at: Some(target), .. }) => passed.contains(target).not(),
             Item::Escalation(Escalated { at: None, .. })
@@ -175,15 +175,19 @@ impl Queue {
 }
 
 impl Item {
-    pub fn escalated(at: Option<Target>, cause: Cause, from: &Path) -> Item {
+    pub(crate) fn escalated(at: Option<Target>, cause: Cause, from: &Path) -> Item {
         Item::Escalation(Escalated { at, cause, from: from.to_path_buf() })
     }
 
-    pub fn kept(path: PathBuf, held: Held, merged: NonZeroU32) -> Item {
+    pub(crate) fn kept(path: PathBuf, held: Held, merged: NonZeroU32) -> Item {
         Item::Worktree(Kept { path, held, merged })
     }
 
-    pub fn shown<'shown, N: Named>(&'shown self, landed: &'shown [Landed], named: &'shown N) -> Shown<'shown, N> {
+    pub(crate) fn shown<'shown, N: Named>(
+        &'shown self,
+        landed: &'shown [Landed],
+        named: &'shown N,
+    ) -> Shown<'shown, N> {
         Shown { item: self, landed, named }
     }
 
