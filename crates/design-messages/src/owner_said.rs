@@ -1,7 +1,7 @@
 mod boundary;
 
-use port_core::Op;
-use transcript_ports::SessionId;
+use ports::port::Op;
+use ports::transcript::SessionId;
 
 pub use boundary::{Quote, Said, Unabridged};
 

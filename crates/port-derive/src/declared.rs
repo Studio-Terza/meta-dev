@@ -98,7 +98,7 @@ impl Declared {
     }
 
     fn sealed(mut item: ItemTrait) -> ItemTrait {
-        let seal: TypeParamBound = parse_quote!(::port_core::Metered);
+        let seal: TypeParamBound = parse_quote!(::ports::port::Metered);
         item.colon_token.get_or_insert_with(<Token![:]>::default);
         item.supertraits.push(seal);
         item

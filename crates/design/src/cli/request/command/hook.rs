@@ -4,10 +4,10 @@ mod release;
 mod subagent;
 
 use console_ports::Environment;
-use dispatch_ports::{Clock, Dispatch, Shell};
 use file_ports::Files;
 use newtype::Enumerated;
-use store_ports::Store;
+use ports::dispatch::{Clock, Dispatch, Shell};
+use ports::store::Store;
 
 use super::Ground;
 use super::crew::Crew;

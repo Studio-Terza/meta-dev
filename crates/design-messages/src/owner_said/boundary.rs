@@ -2,8 +2,8 @@ use std::fmt;
 
 use grammar::Prose;
 use invariants::Ignoring;
-use store_ports::{Execute, Query, StoreFailure};
-use transcript_ports::{Authorship, Body, Instant, Uuid};
+use ports::store::{Execute, Query, StoreFailure};
+use ports::transcript::{Authorship, Body, Instant, Uuid};
 
 use super::{LastSaid, OwnerHistory};
 use crate::boundary::SaidRow;

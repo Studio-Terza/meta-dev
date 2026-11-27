@@ -1,6 +1,6 @@
-use port_core::Op;
-use store_ports::{Counts, Done, Execute, StoreFailure};
-use transcript_ports::{Authorship, Cursor, Kind, Line, SessionId};
+use ports::port::Op;
+use ports::store::{Counts, Done, Execute, StoreFailure};
+use ports::transcript::{Authorship, Cursor, Kind, Line, SessionId};
 
 use crate::boundary::{CursorRow, MessageRow};
 

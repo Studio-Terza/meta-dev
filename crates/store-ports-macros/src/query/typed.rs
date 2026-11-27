@@ -93,7 +93,7 @@ impl Presence {
 impl ToTokens for Typed {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let Typed { ident, column } = self;
-        let decoded = quote!(::store_ports::FromValue);
+        let decoded = quote!(::ports::store::FromValue);
         tokens.extend(quote! {
             #ident: ::core::convert::Into::into(<#column as #decoded>::from_value(values.taken()?)?),
         });

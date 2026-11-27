@@ -4,9 +4,9 @@ use file_ports::{Bytes, FileFailure, Files};
 use grammar::Lines;
 use grammar::{Attachment, Cited, Heading, Queue};
 use invariants::Ignoring;
-use port_core::{Port, Run};
-use store_ports::Store;
-use transcript_ports::ClaudeCodeDir;
+use ports::port::{Port, Run};
+use ports::store::Store;
+use ports::transcript::ClaudeCodeDir;
 
 use super::ignored::Ignored;
 use super::local::{Local, QueueFile, SpecsFolder};

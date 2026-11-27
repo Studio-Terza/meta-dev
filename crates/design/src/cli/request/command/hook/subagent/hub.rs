@@ -4,13 +4,13 @@ use std::ops::Not;
 use std::path::Path;
 
 use design_messages::{CheckName, PullNumber};
-use dispatch_ports::{Clock, Deadline, Dispatch, Due, Pause, Ran, Shell, Timeout};
 use file_ports::Files;
 use grammar::Attachment;
 use invariants::Ignoring;
+use ports::dispatch::{Clock, Deadline, Dispatch, Due, Pause, Ran, Shell, Timeout};
+use ports::store::Store;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
-use store_ports::Store;
 
 use super::super::super::Ground;
 use super::super::super::crew::Crew;

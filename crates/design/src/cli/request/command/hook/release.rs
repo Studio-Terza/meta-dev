@@ -5,11 +5,11 @@ use std::path::{Path, PathBuf};
 
 use console_ports::Heard;
 use design_messages::PullNumber;
-use dispatch_ports::{Clock, Dispatch, Ran, Shell, Timeout};
 use file_ports::Files;
 use grammar::Worktrees;
 use newtype::Wrapping;
-use store_ports::Store;
+use ports::dispatch::{Clock, Dispatch, Ran, Shell, Timeout};
+use ports::store::Store;
 
 use super::super::Ground;
 use super::super::crew::Crew;

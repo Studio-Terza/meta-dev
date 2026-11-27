@@ -7,8 +7,8 @@ use file_ports::{Bytes, Epoch, Offset, Size, Stamp, Stamps, Tail};
 use grammar::Lines;
 use invariants::Ignoring;
 use newtype::Wrapping;
+use ports::transcript::Body;
 use serde::Deserialize;
-use transcript_ports::Body;
 
 use crate::cli::request::ignored::Ignored;
 

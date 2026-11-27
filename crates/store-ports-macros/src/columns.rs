@@ -42,15 +42,15 @@ impl Expanding for Columns {
         Ok(quote! {
             #[derive(Debug)]
             #vis struct #raw {
-                #(#visible #names: <#columns as ::store_ports::Column>::Raw,)*
+                #(#visible #names: <#columns as ::ports::store::Column>::Raw,)*
             }
 
-            impl ::store_ports::Columns for #ident {
+            impl ::ports::store::Columns for #ident {
                 type Raw = #raw;
 
-                fn from_raw(raw: #raw) -> ::core::result::Result<#ident, ::store_ports::ColumnFailure> {
+                fn from_raw(raw: #raw) -> ::core::result::Result<#ident, ::ports::store::ColumnFailure> {
                     ::core::result::Result::Ok(#ident {
-                        #(#names: <#columns as ::store_ports::Column>::from_raw(raw.#names)?,)*
+                        #(#names: <#columns as ::ports::store::Column>::from_raw(raw.#names)?,)*
                     })
                 }
             }

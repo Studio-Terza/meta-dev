@@ -7,9 +7,9 @@ use std::path::PathBuf;
 
 use console_ports::{Environment, Shown};
 use design_messages::StopTrail;
-use dispatch_ports::{Clock, Dispatch, Shell};
 use file_ports::Files;
-use store_ports::{Opens, Store};
+use ports::dispatch::{Clock, Dispatch, Shell};
+use ports::store::{Opens, Store};
 use strum::VariantArray;
 
 use super::Ground;

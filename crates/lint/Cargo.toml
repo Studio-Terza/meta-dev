@@ -18,13 +18,12 @@ test = false
 console-ports = { path = "../console-ports" }
 file-ports = { path = "../file-ports" }
 invariants = { path = "../invariants" }
-port-core = { path = "../port-core" }
+ports = { path = "../ports" }
 proc-macro2.workspace = true
 rayon = "1.12.0"
 rustc_lexer.workspace = true
 syn.workspace = true
 thiserror.workspace = true
-timer-ports = { path = "../timer-ports" }
 toml.workspace = true
 
 [dev-dependencies]

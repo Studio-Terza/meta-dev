@@ -1,8 +1,8 @@
 use std::sync::LazyLock;
 
-use store_ports::{Migrator, Schema};
+use ports::store::{Migrator, Schema};
 
-static MIGRATOR: LazyLock<Migrator> = LazyLock::new(|| store_ports::migrate!());
+static MIGRATOR: LazyLock<Migrator> = LazyLock::new(|| ports::store::migrate!());
 
 #[derive(Clone, Copy, Debug)]
 pub struct StreamSchema;

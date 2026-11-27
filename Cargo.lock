@@ -137,23 +137,19 @@ version = "0.1.0"
 dependencies = [
  "console-ports",
  "design-messages",
- "dispatch-ports",
  "file-ports",
  "grammar",
  "hex",
  "invariants",
  "newtype",
- "port-core",
+ "ports",
  "serde",
  "serde_json",
- "sqlite-ports",
- "store-ports",
  "strum",
  "tempfile",
  "test-failure",
  "thiserror",
  "toml",
- "transcript-ports",
 ]
 
 [[package]]
@@ -165,11 +161,9 @@ dependencies = [
  "grammar",
  "invariants",
  "newtype",
- "port-core",
- "store-ports",
+ "ports",
  "strum",
  "thiserror",
- "transcript-ports",
 ]
 
 [[package]]
@@ -180,22 +174,6 @@ checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
  "block-buffer",
  "crypto-common",
-]
-
-[[package]]
-name = "dispatch-ports"
-version = "0.1.0"
-dependencies = [
- "grammar",
- "invariants",
- "newtype",
- "port-core",
- "proptest",
- "serde",
- "serde_json",
- "strum",
- "test-failure",
- "thiserror",
 ]
 
 [[package]]
@@ -268,8 +246,8 @@ dependencies = [
  "file-ports",
  "invariants",
  "lint",
+ "ports",
  "proptest",
- "timer-ports",
 ]
 
 [[package]]
@@ -387,14 +365,13 @@ dependencies = [
  "console-ports",
  "file-ports",
  "invariants",
- "port-core",
+ "ports",
  "proc-macro2",
  "ra-ap-rustc_lexer",
  "rayon",
  "syn",
  "test-failure",
  "thiserror",
- "timer-ports",
  "toml",
 ]
 
@@ -486,16 +463,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
 
 [[package]]
-name = "port-core"
-version = "0.1.0"
-dependencies = [
- "invariants",
- "newtype",
- "port-derive",
- "thiserror",
-]
-
-[[package]]
 name = "port-derive"
 version = "0.1.0"
 dependencies = [
@@ -503,6 +470,28 @@ dependencies = [
  "quote",
  "strum",
  "syn",
+]
+
+[[package]]
+name = "ports"
+version = "0.1.0"
+dependencies = [
+ "design-messages",
+ "file-ports",
+ "grammar",
+ "invariants",
+ "newtype",
+ "port-derive",
+ "proptest",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "store-ports-macros",
+ "strum",
+ "tempfile",
+ "test-failure",
+ "thiserror",
 ]
 
 [[package]]
@@ -727,37 +716,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0d5d4b1981b8bbbb7aed204cae5726d683d5d6ac7e74ec54122ea28f315e7c8"
 
 [[package]]
-name = "sqlite-ports"
-version = "0.1.0"
-dependencies = [
- "invariants",
- "port-core",
- "rusqlite",
- "sha2",
- "store-ports",
- "thiserror",
-]
-
-[[package]]
-name = "store-ports"
-version = "0.1.0"
-dependencies = [
- "design-messages",
- "dispatch-ports",
- "file-ports",
- "invariants",
- "newtype",
- "port-core",
- "proptest",
- "sqlite-ports",
- "store-ports-macros",
- "tempfile",
- "test-failure",
- "thiserror",
- "transcript-ports",
-]
-
-[[package]]
 name = "store-ports-macros"
 version = "0.1.0"
 dependencies = [
@@ -841,13 +799,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "timer-ports"
-version = "0.1.0"
-dependencies = [
- "port-core",
-]
-
-[[package]]
 name = "toml"
 version = "1.1.8+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -885,23 +836,6 @@ name = "toml_writer"
 version = "1.1.3+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06bdbd8cfc056b8d2e2e85f29b56a3bdbecb527cef81eb39e3e7b98af4652770"
-
-[[package]]
-name = "transcript-ports"
-version = "0.1.0"
-dependencies = [
- "file-ports",
- "grammar",
- "invariants",
- "newtype",
- "port-core",
- "proptest",
- "serde",
- "serde_json",
- "strum",
- "test-failure",
- "thiserror",
-]
 
 [[package]]
 name = "typenum"

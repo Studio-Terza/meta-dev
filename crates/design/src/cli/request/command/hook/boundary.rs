@@ -8,13 +8,13 @@ use std::path::PathBuf;
 
 use console_ports::{Heard, Shown};
 use design_messages::{Fate, Halt, LastSaid, Overran, Overruns, StopRow, Stopped, Tally};
-use dispatch_ports::{Clock, Dispatch, Moment, Shell, Wall};
 use file_ports::{Epoch, Files};
 use grammar::Queue;
 use newtype::Wrapping;
+use ports::dispatch::{Clock, Dispatch, Moment, Shell, Wall};
+use ports::store::Store;
+use ports::transcript::{Body, SessionId};
 use serde::{Deserialize, Serialize};
-use store_ports::Store;
-use transcript_ports::{Body, SessionId};
 
 use super::super::Ground;
 use super::super::crew::Crew;

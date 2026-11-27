@@ -6,12 +6,12 @@ use std::path::Path;
 
 use console_ports::Heard;
 use design_messages::{CheckName, FailedBefore, Failing};
-use dispatch_ports::{Clock, Dispatch, Shell};
 use file_ports::Files;
 use grammar::Lines;
 use invariants::Ignoring;
 use newtype::Wrapping;
-use store_ports::Store;
+use ports::dispatch::{Clock, Dispatch, Shell};
+use ports::store::Store;
 
 use super::super::Ground;
 use super::super::crew::Crew;

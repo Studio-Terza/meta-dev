@@ -28,12 +28,12 @@ impl Rendered for Ops {
 impl Ops {
     fn op_declaration(op: &Ident, caller: &CallerName, method: &Method) -> TokenStream {
         let path = Spelling::method_path(caller, method.name());
-        let name = quote!(::port_core::OpName);
+        let name = quote!(::ports::port::OpName);
         quote! {
             #[derive(Debug)]
             pub struct #op;
 
-            impl ::port_core::Op for #op {
+            impl ::ports::port::Op for #op {
                 const NAME: #name = #name::new(concat!(module_path!(), #path));
             }
         }

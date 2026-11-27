@@ -4,10 +4,10 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use ::ports::timer::Monotonic;
 use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Memory};
 use lint::{Cli, Verdict};
 use test_failure::Failed;
-use timer_ports::Monotonic;
 
 const FIXTURES: &str = "tests/fixtures";
 const GOLDENS: &str = "tests/goldens";

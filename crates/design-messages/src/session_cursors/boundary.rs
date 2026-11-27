@@ -1,4 +1,4 @@
-use store_ports::{Execute, Query, StoreFailure};
+use ports::store::{Execute, Query, StoreFailure};
 
 use super::SessionCursors;
 use crate::Cursors;

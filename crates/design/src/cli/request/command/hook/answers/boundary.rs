@@ -3,10 +3,10 @@ use std::fmt;
 use std::ops::Not;
 
 use design_messages::{Quote, Said, StopRow, Tally, Unabridged};
-use dispatch_ports::{Prompt, Reply};
+use ports::dispatch::{Prompt, Reply};
+use ports::transcript::{Body, Uuid};
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
-use transcript_ports::{Body, Uuid};
 
 use super::super::super::crew::Heard;
 use crate::cli::request::ignored::Ignored;
