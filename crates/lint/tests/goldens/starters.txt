@@ -2,18 +2,20 @@ Violations
 --- out
 --- err
 free functions are not allowed; make them associated functions or methods:
-src/lib.rs:5: fn globbed; make it an associated function or a method
-src/lib.rs:11: fn ported; make it an associated function or a method
-src/lib.rs:15: fn deeper; make it an associated function or a method
-src/lib.rs:21: fn unimported; make it an associated function or a method
-src/lib.rs:27: fn module; make it an associated function or a method
-src/lib.rs:30: fn renamed; make it an associated function or a method
-src/lib.rs:33: fn spoken; make it an associated function or a method
-src/lib.rs:36: fn typed; make it an associated function or a method
+src/lib.rs:6: fn aliased; make it an associated function or a method
+src/lib.rs:13: fn globbed; make it an associated function or a method
+src/lib.rs:20: fn ported; make it an associated function or a method
+src/lib.rs:24: fn deeper; make it an associated function or a method
+src/lib.rs:30: fn unimported; make it an associated function or a method
+src/lib.rs:36: fn module; make it an associated function or a method
+src/lib.rs:39: fn renamed; make it an associated function or a method
+src/lib.rs:42: fn spoken; make it an associated function or a method
+src/lib.rs:45: fn typed; make it an associated function or a method
 only ports start processes:
-src/lib.rs:6: starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports
 src/lib.rs:7: starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports
-src/lib.rs:28: starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports
-src/lib.rs:31: starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports
-src/lib.rs:34: starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports
-src/lib.rs:34: starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports
+src/lib.rs:14: starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports
+src/lib.rs:15: starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports
+src/lib.rs:37: starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports
+src/lib.rs:40: starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports
+src/lib.rs:43: starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports
+src/lib.rs:43: starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports

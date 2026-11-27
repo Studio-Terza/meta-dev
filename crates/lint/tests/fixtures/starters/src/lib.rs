@@ -1,10 +1,19 @@
 use std::process;
 use std::process::{self as spawning};
+use std::process as launcher;
+use std::fmt as other;
+use core::process as alt;
+fn aliased() {
+    launcher::Command::new("ls");
+    other::Command::new("ls");
+    alt::Command::new("ls");
+}
 mod globbed {
     use std::process::*;
     fn globbed() {
         Command::new("ls");
         run!(Command::new("ls"));
+        run!(Command::new::<u8>("ls"));
     }
 }
 mod ports {

@@ -119,3 +119,38 @@ impl Flow {
 pub fn boxed() -> Vec<u8> {
     vec![Box::new(1) as Box<dyn Fn()>, (dyn_named)]
 }
+mod inner {
+    pub fn inner_flag(out: &mut Vec<u8>) -> bool {
+        loop {}
+    }
+    pub struct Paired;
+    impl Paired {
+        pub fn paired(&self) -> (u8, u8) {
+            (1, 2)
+        }
+    }
+    pub fn gathered(given: Vec<u8>, out: Vec<u8>) {
+        for item in given.iter() {
+            out.push(*item);
+        }
+        for item in given.iter() {
+            out.clear();
+        }
+    }
+    macro_rules! looped {
+        () => {
+            fn short<'q>() {}
+            for item in given {
+                out.push(item);
+            }
+        };
+    }
+}
+pub trait Probe {
+    fn probe(&self) -> bool;
+    fn gather(&self, out: Vec<u8>) {
+        for item in [1] {
+            out.push(item);
+        }
+    }
+}

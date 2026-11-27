@@ -96,15 +96,7 @@ impl TestMark {
     }
 
     fn attribute(mark: &TokenTree, body: &TokenTree) -> Option<Attribute> {
-        match (mark, body) {
-            (TokenTree::Punct(hash), TokenTree::Group(_)) if hash.as_char() == '#' => {
-                let written = TokenStream::from_iter([mark.clone(), body.clone()]);
-                Attribute::parse_outer
-                    .parse2(written)
-                    .ignoring(Ignored::Unparsed)
-                    .and_then(|parsed| parsed.into_iter().next())
-            }
-            _ => None,
-        }
+        let written = TokenStream::from_iter([mark.clone(), body.clone()]);
+        Attribute::parse_outer.parse2(written).ignoring(Ignored::Unparsed).and_then(|parsed| parsed.into_iter().next())
     }
 }

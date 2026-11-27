@@ -14,7 +14,6 @@ use crate::ignored::Ignored;
 pub(crate) struct Expansion(Vec<Stmt>);
 
 impl Expansion {
-    const ARROW_END: char = '>';
     const DOLLAR: char = '$';
     const REPEATS: [char; 3] = ['*', '+', '?'];
 
@@ -39,16 +38,11 @@ impl Expansion {
     }
 
     fn transcribers(rules: TokenStream) -> Vec<TokenStream> {
-        let trees: Vec<TokenTree> = rules.into_iter().collect();
-        let pairs = trees.iter().zip(trees.iter().skip(1));
-        pairs
-            .filter_map(|pair| match pair {
-                (TokenTree::Punct(arrow), TokenTree::Group(body)) if arrow.as_char() == Expansion::ARROW_END => {
-                    Some(body.stream())
-                }
-                _ => None,
-            })
-            .collect()
+        let groups = rules.into_iter().filter_map(|tree| match tree {
+            TokenTree::Group(group) => Some(group.stream()),
+            TokenTree::Ident(_) | TokenTree::Punct(_) | TokenTree::Literal(_) => None,
+        });
+        groups.skip(1).step_by(2).collect()
     }
 
     fn statements(tokens: TokenStream) -> Vec<Stmt> {
@@ -102,7 +96,7 @@ impl Expansion {
     }
 
     fn repeat_end(trees: &[TokenTree], start: usize) -> Option<usize> {
-        (start..start + 2).find(|at| {
+        [start, start + 1].into_iter().find(|at| {
             trees.get(*at).is_some_and(|tree| match tree {
                 TokenTree::Punct(mark) => Expansion::REPEATS.contains(&mark.as_char()),
                 TokenTree::Group(_) | TokenTree::Ident(_) | TokenTree::Literal(_) => false,

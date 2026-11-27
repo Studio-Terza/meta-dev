@@ -13,17 +13,11 @@ pub(crate) enum Place {
     Elsewhere,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Rooted {
-    CrateRoot,
-    Module,
-}
-
 #[derive(Debug)]
 struct Location {
     kind: CrateKind,
     module: Vec<String>,
-    rooted: Rooted,
+    library: Option<()>,
 }
 
 #[derive(Debug)]
@@ -38,10 +32,7 @@ pub(crate) struct Source {
 
 impl Location {
     const SOURCE: &'static str = "src";
-    const BUILD: &'static str = "build.rs";
     const LIBRARY: &'static str = "lib.rs";
-    const MAIN: &'static str = "main.rs";
-    const BINARIES: &'static str = "bin";
     const MODULE: &'static str = "mod";
     const EXTENSION: &'static str = "rs";
     const TARGETS: [(&'static str, CrateKind); 3] =
@@ -53,30 +44,15 @@ impl Location {
             inside.components().map(|component| component.as_os_str().to_string_lossy().into_owned()).collect();
         let target = parts.first().and_then(|first| Location::TARGETS.iter().find(|(name, _)| first == name));
         match (parts.as_slice(), target) {
-            ([source, rest @ ..], _) if source == Location::SOURCE => Location::in_source(rest),
-            ([build], _) if build == Location::BUILD => {
-                Location { kind: CrateKind::Build, module: Vec::new(), rooted: Rooted::CrateRoot }
+            ([source, rest @ ..], _) if source == Location::SOURCE => Location {
+                kind: CrateKind::Library,
+                module: Location::modules(rest),
+                library: (rest == [Location::LIBRARY]).then_some(()),
+            },
+            ([_, rest @ ..], Some((_, kind))) => {
+                Location { kind: *kind, module: Location::modules(rest.get(1..).unwrap_or_default()), library: None }
             }
-            ([_, _, rest @ ..], Some((_, kind))) => {
-                Location { kind: *kind, module: Location::modules(rest), rooted: Rooted::Module }
-            }
-            (_, Some((_, kind))) => Location { kind: *kind, module: Vec::new(), rooted: Rooted::CrateRoot },
-            _ => Location { kind: fallback, module: Vec::new(), rooted: Rooted::Module },
-        }
-    }
-
-    fn in_source(rest: &[String]) -> Location {
-        let binary = |module| Location { kind: CrateKind::Binary, module, rooted: Rooted::CrateRoot };
-        match rest {
-            [library] if library == Location::LIBRARY => {
-                Location { kind: CrateKind::Library, module: Vec::new(), rooted: Rooted::CrateRoot }
-            }
-            [main] if main == Location::MAIN => binary(Vec::new()),
-            [listed, _] if listed == Location::BINARIES => binary(Location::modules(rest)),
-            [listed, _, main] if listed == Location::BINARIES && main == Location::MAIN => {
-                binary(Location::modules(rest))
-            }
-            _ => Location { kind: CrateKind::Library, module: Location::modules(rest), rooted: Rooted::Module },
+            _ => Location { kind: fallback, module: Vec::new(), library: None },
         }
     }
 
@@ -131,7 +107,7 @@ impl Source {
     }
 
     pub(crate) fn library_root(&self) -> Option<()> {
-        (self.location.kind == CrateKind::Library && self.location.rooted == Rooted::CrateRoot).then_some(())
+        self.location.library
     }
 
     pub(crate) fn own_crate(&self) -> Option<String> {

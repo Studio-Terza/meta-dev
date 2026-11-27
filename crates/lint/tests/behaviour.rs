@@ -2,6 +2,7 @@ use std::ffi::OsString;
 use std::fmt;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::process::ExitCode;
 
 use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Memory};
 use lint::{Cli, Verdict};
@@ -100,6 +101,8 @@ fn no_argument_reads_the_current_directory() -> Result<(), Failed> {
     .collect();
     let packaged = Shown::ran(&manifested, &[])?;
     assert_eq!((packaged.verdict, packaged.err.as_str()), (Verdict::Violations, FREE_FN));
+    let exits = [Verdict::Clean, Verdict::Violations, Verdict::Refused].map(ExitCode::from);
+    assert_eq!(format!("{exits:?}"), format!("{:?}", [ExitCode::SUCCESS, ExitCode::FAILURE, ExitCode::FAILURE]));
     Ok(())
 }
 

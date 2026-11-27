@@ -42,6 +42,8 @@ fn gated_free() {}
 #[cfg(test)]
 pub mod tests {
     pub fn inside() {}
+    #[doc(hidden)]
+    pub fn hidden_inside() {}
     macro_rules! hidden {
         () => {
             #[rstest]
@@ -58,6 +60,34 @@ pub struct Fast;
 pub struct AllGated;
 #[cfg(any(test))]
 pub struct AnyGated;
+#[cfg(test)]
+pub const GATED_CONST: u8 = 1;
+#[cfg(test)]
+pub enum GatedEnum {}
+#[cfg(test)]
+pub static GATED_STATIC: u8 = 1;
+#[cfg(test)]
+pub type GatedType = u8;
+#[cfg(test)]
+pub union GatedUnion {
+    field: u8,
+}
+#[cfg(test)]
+pub use std::fmt;
+pub mod open {
+    #[cfg(test)]
+    pub struct Inner;
+}
+#[serde(hidden)]
+pub struct NotHidden;
+#[cfg(target = "test")]
+pub struct Targeted;
+impl Shown {
+    #[cfg(test)]
+    pub const GATED: u8 = 1;
+    #[cfg(test)]
+    pub type Gated = u8;
+}
 pub fn probe() -> bool {
     cfg!(feature = "test-utils") || cfg!(not(feature = "speed"))
 }

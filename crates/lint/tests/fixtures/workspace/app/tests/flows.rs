@@ -10,4 +10,6 @@ fn listed() {}
 proptest! {
     #[test]
     fn property(value in 0..1) {}
+    #[test]
+    fn another(value in 0..1) {}
 }
