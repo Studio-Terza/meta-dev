@@ -17,7 +17,7 @@ serde.workspace = true
 strum.workspace = true
 
 [dev-dependencies]
-dispatch-doubles = { path = "../dispatch-doubles" }
+doubles = { path = "../doubles" }
 dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports" }
 fixture = { path = "../fixture" }

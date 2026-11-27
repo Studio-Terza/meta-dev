@@ -1,7 +1,7 @@
 use std::env;
 use std::path::PathBuf;
 
-use file_doubles::Memory;
+use doubles::Memory;
 use file_ports::Disk;
 use file_ports::files_ops::{Call, Reply};
 use fixture::{Failed, Fixture, Laws, Rows};

@@ -2,11 +2,11 @@ use std::os::unix::process::CommandExt;
 use std::process::Command;
 use std::time::{Duration, Instant};
 
-use dispatch_doubles::{Count, Oversleep, Scripted, Stepped};
 use dispatch_ports::{
     Agent, AgentRun, Call, Clock, Deadline, Dispatch, HeadlessClaude, Job, Model, Output, Pause, Pid, Prompt, Reply,
     Shell, Started, Stderr, SystemClock, SystemShell, Timeout, Wall, Watch, clock_ops, dispatch_ops, shell_ops,
 };
+use doubles::{Count, Oversleep, Scripted, Stepped};
 use fixture::{Cases, Debugged, Failed, Fixture, Spelled};
 use invariants::Ignoring;
 use newtype::Wrapping;

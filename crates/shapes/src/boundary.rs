@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use std::ops::Deref;
 
-use file_doubles::Memory;
+use doubles::Memory;
 use file_ports::Bytes;
 use newtype::{Arbitrary, Newtype};
 use proptest::sample::Index;

@@ -11,7 +11,6 @@ use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::time::{Duration, SystemTime};
 use test_failure::Failed;
 
-use console_doubles::Variables;
 use console_ports::{Complaint, Heard, Shown};
 use design::{Agents, Cli, Failure, HookEvent, Outcome};
 use dispatch_ports::{
@@ -19,6 +18,7 @@ use dispatch_ports::{
     Moment, Output, Pause, Pid, Printed, Prompt, Ran, Reply, ShellFiller, Started, Tokens, Told, Usage, Wall,
     clock_ops, dispatch_ops, shell_ops,
 };
+use doubles::Variables;
 use file_ports::{Bytes, Disk, FileFailure, FilesFiller, Kind, Offset, Size, Stamps, Text, files_ops};
 use grammar::Letters;
 use invariants::{Unpoisoned, invariant, invariants};

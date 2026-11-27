@@ -20,7 +20,7 @@ thiserror.workspace = true
 laws = ["dep:serde", "port-core/laws"]
 
 [dev-dependencies]
-file-doubles = { path = "../file-doubles" }
+doubles = { path = "../doubles" }
 fixture = { path = "../fixture" }
 serde.workspace = true
 tempfile.workspace = true
