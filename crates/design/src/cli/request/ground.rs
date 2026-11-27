@@ -1,14 +1,17 @@
 use std::fmt;
 
 use file_ports::{Bytes, FileFailure, Files};
-use grammar::Queue;
+use grammar::{Cited, Heading, Queue};
+use grammar_lines::Lines;
+use grammar_spec_line::Attachment;
 use invariants::Ignoring;
 use port_core::{Port, Run};
+use serde::de::DeserializeOwned;
 use store_ports::Store;
 use transcript_ports::ClaudeCodeDir;
 
 use super::ignored::Ignored;
-use super::projects::Located;
+use super::projects::{Kept, Located};
 
 #[derive(Debug)]
 pub struct Ground<'run, F: Files, S: Store> {
@@ -38,6 +41,22 @@ impl<'run, F: Files, S: Store> Ground<'run, F, S> {
 
     pub(crate) fn queued(&self, line: impl fmt::Display) -> Result<(), FileFailure> {
         self.files.append(self.located.queue(), &Bytes::new(format!("{line}\n").into_bytes()))
+    }
+
+    pub(crate) fn titled(&self, spec: &Attachment) -> Option<Heading> {
+        let written = spec.to_string();
+        let cited = Cited::read(&written)?;
+        let text = self.files.read_text(&self.located.spec(cited.project())).ignoring(Ignored::Untitled)?;
+        let lines = match text.as_ref().parse::<Lines>() {
+            Ok(lines) => lines,
+            Err(unsplit) => match unsplit {},
+        };
+        lines.into_iter().filter_map(|line| Heading::read(&line)).find(|heading| heading.detail() == cited.detail())
+    }
+
+    pub(crate) fn configured<T: DeserializeOwned>(&self) -> Option<T> {
+        let text = self.files.read_text(&self.located.kept(Kept::Local)).ignoring(Ignored::Unconfigured)?;
+        toml::from_str(text.as_ref()).ignoring(Ignored::Unconfigured)
     }
 
     pub(crate) fn transcripts(self) -> Port<'run, ClaudeCodeDir<F>> {

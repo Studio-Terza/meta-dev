@@ -8,14 +8,14 @@ pub use boundary::{Moment, Pause, Timeout, Wall};
 pub struct Deadline(Wall);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Due {
+pub enum Due {
     Pending,
     Passed,
 }
 
 impl Deadline {
     #[must_use]
-    pub(crate) fn due(self, now: Wall) -> Due {
+    pub fn due(self, now: Wall) -> Due {
         match now.cmp(&self.0) {
             std::cmp::Ordering::Less => Due::Pending,
             std::cmp::Ordering::Equal | std::cmp::Ordering::Greater => Due::Passed,

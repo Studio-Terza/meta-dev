@@ -1,10 +1,11 @@
 use std::fmt;
-use std::num::NonZeroU64;
+use std::num::{NonZeroU32, NonZeroU64};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use design_messages::PullNumber;
-use grammar::{AgentReport, Ended, JobLink};
+use grammar::{AgentReport, BranchName, Ended, JobLink, RepositoryName, SpecTrailer, Target};
+use grammar_spec_line::Attachment;
 use hex::FromHex;
 use invariants::Ignoring;
 use newtype::{Display, Newtype};
@@ -59,7 +60,7 @@ pub(crate) enum Reminder {
     Repeated,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 #[serde(from = "Option<String>")]
 pub enum Said {
     Typed(Report),
@@ -67,16 +68,73 @@ pub enum Said {
     Untyped,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Report {
-    Done(Pushed),
-    Blocked(Pushed),
+    Done(At),
+    Blocked(At),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum At {
+    Pull(Pushed),
+    Branch(Branched),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Pushed {
     pull: PullNumber,
     head: CommitSha,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Branched {
+    branch: Branch,
+    head: CommitSha,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Branch(String);
+
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(from = "String")]
+pub(crate) struct First {
+    spec: Option<Attachment>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct Compared {
+    commits: Vec<Committed>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Committed {
+    commit: Message,
+}
+
+#[derive(Debug, Deserialize)]
+struct Message {
+    message: First,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct Local {
+    repository: Repository,
+}
+
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(try_from = "String")]
+pub struct Repository {
+    owner: String,
+    name: String,
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("not a repository of the form owner/name")]
+pub struct Unrepositoried;
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct Opened {
+    number: NonZeroU32,
 }
 
 #[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
@@ -119,27 +177,106 @@ impl From<Option<String>> for Said {
 impl Report {
     fn typed(read: AgentReport<'_>) -> Option<Report> {
         let head = read.head().parse::<CommitSha>().ignoring(Ignored::Untyped)?;
-        let pushed = Pushed { pull: PullNumber::new(read.pull()), head };
+        let at = match read.target() {
+            Target::Pull(pull) => At::Pull(Pushed::new(PullNumber::new(pull), head)),
+            Target::Branch(branch) => At::Branch(Branched { branch: Branch::from(branch), head }),
+        };
         match read.ended() {
-            Ended::Done => Some(Report::Done(pushed)),
-            Ended::Blocked => Some(Report::Blocked(pushed)),
-        }
-    }
-
-    pub(crate) fn pushed(self) -> Pushed {
-        match self {
-            Report::Done(pushed) | Report::Blocked(pushed) => pushed,
+            Ended::Done => Some(Report::Done(at)),
+            Ended::Blocked => Some(Report::Blocked(at)),
         }
     }
 }
 
 impl Pushed {
+    pub(crate) fn new(pull: PullNumber, head: CommitSha) -> Pushed {
+        Pushed { pull, head }
+    }
+
     pub(crate) fn pull(self) -> PullNumber {
         self.pull
     }
 
     pub(crate) fn head(self) -> CommitSha {
         self.head
+    }
+}
+
+impl Branched {
+    pub(crate) fn branch(&self) -> &Branch {
+        &self.branch
+    }
+
+    pub(crate) fn head(&self) -> CommitSha {
+        self.head
+    }
+}
+
+impl First {
+    pub(crate) fn spec(&self) -> Option<&Attachment> {
+        self.spec.as_ref()
+    }
+}
+
+impl From<String> for First {
+    fn from(message: String) -> First {
+        let trailer = SpecTrailer::read(&message).map(|trailer| trailer.value().to_owned());
+        First { spec: trailer.and_then(|value| Attachment::try_new(value).ignoring(Ignored::Unspecified)) }
+    }
+}
+
+impl Compared {
+    pub(crate) fn first(self) -> Option<First> {
+        self.commits.into_iter().next().map(|committed| committed.commit.message)
+    }
+}
+
+impl Local {
+    pub fn repository(self) -> Repository {
+        self.repository
+    }
+}
+
+impl Repository {
+    pub(crate) fn owner(&self) -> &str {
+        &self.owner
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+impl TryFrom<String> for Repository {
+    type Error = Unrepositoried;
+
+    fn try_from(text: String) -> Result<Repository, Unrepositoried> {
+        let read = RepositoryName::read(&text).ok_or(Unrepositoried)?;
+        Ok(Repository { owner: read.owner().to_owned(), name: read.name().to_owned() })
+    }
+}
+
+impl fmt::Display for Repository {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}/{}", self.owner, self.name)
+    }
+}
+
+impl Opened {
+    pub(crate) fn pull(&self) -> PullNumber {
+        PullNumber::new(self.number)
+    }
+}
+
+impl From<BranchName<'_>> for Branch {
+    fn from(lexed: BranchName<'_>) -> Branch {
+        Branch(lexed.to_string())
+    }
+}
+
+impl fmt::Display for Branch {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
     }
 }
 

@@ -1,7 +1,7 @@
 use design_messages::Tally;
 use dispatch_ports::{
-    Call, Clock, Deadline, Dispatch, DispatchFailure, Finished, Job, Model, Moment, Prompt, Ran, Reply, Shell, Stall,
-    Timeout, Usage, Wall, Watch, Watching,
+    Bell, Call, Clock, Deadline, Dispatch, DispatchFailure, Finished, Job, Model, Moment, Pause, Prompt, Ran, Reply,
+    Shell, Stall, Timeout, Usage, Wall, Watch, Watching,
 };
 use newtype::Wrapping;
 
@@ -38,6 +38,10 @@ impl<'ports, D: Dispatch, C: Clock, G: Shell> Crew<'ports, D, C, G> {
 
     pub(crate) fn moment(&self) -> Moment {
         self.clock.moment()
+    }
+
+    pub(crate) fn paused(&self, pause: Pause) {
+        self.clock.waited(pause, &Bell::hung());
     }
 
     pub(crate) fn replied(&self, prompt: &Prompt, timeout: Timeout, model: Model) -> Result<Heard, Failure> {

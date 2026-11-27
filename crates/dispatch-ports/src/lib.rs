@@ -22,7 +22,7 @@ mod wall;
 mod watch;
 
 pub use agent_run::AgentRun;
-pub(crate) use bell::Bell;
+pub use bell::Bell;
 pub use bell::Woke;
 pub use clock::{Clock, ClockFiller, clock_ops};
 pub use dispatch::{Dispatch, DispatchFiller, dispatch_ops};
@@ -42,7 +42,7 @@ pub use started::Started;
 pub use stderr::Stderr;
 pub use system_clock::SystemClock;
 pub use system_shell::SystemShell;
-pub(crate) use wall::Due;
+pub use wall::Due;
 pub use wall::{Deadline, Moment, Pause, Timeout, Wall};
 pub use watch::{Stall, Watch, Watched, Watching};
 
