@@ -7,7 +7,7 @@ use console_ports::Heard;
 use design_messages::PullNumber;
 use dispatch_ports::{Clock, Dispatch, Ran, Shell, Timeout};
 use file_ports::Files;
-use grammar::Worktrees;
+use grammar_git::Worktrees;
 use newtype::Wrapping;
 use store_ports::Store;
 

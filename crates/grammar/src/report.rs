@@ -1,12 +1,12 @@
 use std::fmt;
 use std::num::{NonZeroU32, NonZeroU64};
 
-use grammar_core::logos::Logos;
+use logos::Logos;
 
 use crate::{Ignoring, Unlexed};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-#[logos(crate = grammar_core::logos)]
+#[logos(crate = logos)]
 #[logos(skip r"[ \t\r\n]+")]
 enum Piece<'text> {
     #[token("DONE", |_lexer| Ended::Done)]
@@ -21,7 +21,7 @@ enum Piece<'text> {
 }
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-#[logos(crate = grammar_core::logos)]
+#[logos(crate = logos)]
 enum Linked {
     #[regex("/job/[0-9]+", |lexer| lexer.slice().get(5..).and_then(Linked::numbered))]
     Job(NonZeroU64),

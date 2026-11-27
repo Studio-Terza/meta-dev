@@ -1,9 +1,9 @@
-use grammar_core::logos::Logos;
+use logos::Logos;
 
 use crate::{Ignoring, Unlexed};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-#[logos(crate = grammar_core::logos)]
+#[logos(crate = logos)]
 enum Piece {
     #[regex("- [^\n]*", priority = 4, allow_greedy = true)]
     Item,

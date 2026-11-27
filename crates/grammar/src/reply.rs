@@ -1,8 +1,8 @@
 use crate::{Ignoring, Unlexed};
-use grammar_core::logos::Logos;
+use logos::Logos;
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-#[logos(crate = grammar_core::logos)]
+#[logos(crate = logos)]
 enum Spelling {
     #[regex(r"[\p{White_Space}]*[^\p{White_Space}\x00][^\x00]*", allow_greedy = true)]
     Inked,

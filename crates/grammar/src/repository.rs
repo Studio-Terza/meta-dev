@@ -1,9 +1,9 @@
-use grammar_core::logos::Logos;
+use logos::Logos;
 
 use crate::{Ignoring, Unlexed};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-#[logos(crate = grammar_core::logos)]
+#[logos(crate = logos)]
 enum Part<'text> {
     #[regex("[A-Za-z0-9_.-]+", |lexer| lexer.slice())]
     Word(&'text str),
@@ -12,7 +12,7 @@ enum Part<'text> {
 }
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-#[logos(crate = grammar_core::logos)]
+#[logos(crate = logos)]
 enum Said<'text> {
     #[regex("Spec: [^\n]+", |lexer| lexer.slice().get(6..), priority = 10, allow_greedy = true)]
     Spec(&'text str),

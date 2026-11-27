@@ -2,7 +2,8 @@ use std::fmt;
 
 use file_ports::{Bytes, FileFailure, Files};
 use grammar::Lines;
-use grammar::{Attachment, Cited, Heading, Queue};
+use grammar::{Cited, Heading, Queue};
+use grammar_spec_line::Attachment;
 use invariants::Ignoring;
 use port_core::{Port, Run};
 use store_ports::Store;

@@ -1,12 +1,12 @@
 use std::fmt;
 use std::num::NonZeroU32;
 
-use grammar_core::logos::Logos;
+use logos::Logos;
 
 use crate::{Ignoring, Unlexed};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-#[logos(crate = grammar_core::logos)]
+#[logos(crate = logos)]
 enum Cite<'text> {
     #[regex("[a-z0-9-]+", |lexer| lexer.slice())]
     Project(&'text str),
@@ -15,7 +15,7 @@ enum Cite<'text> {
 }
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-#[logos(crate = grammar_core::logos)]
+#[logos(crate = logos)]
 enum Mark<'text> {
     #[regex("D[0-9]+", |lexer| lexer.slice(), priority = 10)]
     Detail(&'text str),

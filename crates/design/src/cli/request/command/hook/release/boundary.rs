@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use design_messages::PullNumber;
-use grammar::{MergeCommand, Worktree};
+use grammar_git::{MergeCommand, Worktree};
 use invariants::Ignoring;
 use serde::Deserialize;
 

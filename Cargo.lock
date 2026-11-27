@@ -140,6 +140,8 @@ dependencies = [
  "dispatch-ports",
  "file-ports",
  "grammar",
+ "grammar-git",
+ "grammar-spec-line",
  "hex",
  "invariants",
  "newtype",
@@ -298,10 +300,8 @@ dependencies = [
 name = "grammar"
 version = "0.1.0"
 dependencies = [
- "grammar-core",
  "invariants",
- "newtype",
- "proptest",
+ "logos",
  "serde",
  "test-failure",
  "thiserror",
@@ -309,11 +309,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "grammar-core"
+name = "grammar-git"
 version = "0.1.0"
 dependencies = [
- "invariants",
- "logos",
+ "grammar",
+]
+
+[[package]]
+name = "grammar-spec-line"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "newtype",
+ "proptest",
  "thiserror",
 ]
 
@@ -770,7 +778,7 @@ dependencies = [
 name = "store-ports-macros"
 version = "0.1.0"
 dependencies = [
- "grammar-core",
+ "grammar",
  "invariants",
  "proc-macro2",
  "query-cache",
