@@ -42,13 +42,13 @@ impl Ran {
 
 #[derive(Debug, Default)]
 pub struct AnsweringShell {
-    answers: BTreeMap<Spoken, Ran>,
+    answers: BTreeMap<Spoken, Vec<Ran>>,
     asked: Mutex<Vec<Call>>,
 }
 
 impl AnsweringShell {
     #[must_use]
-    pub fn answering(answers: BTreeMap<Spoken, Ran>) -> AnsweringShell {
+    pub fn answering(answers: BTreeMap<Spoken, Vec<Ran>>) -> AnsweringShell {
         AnsweringShell { answers, asked: Mutex::default() }
     }
 
@@ -60,7 +60,11 @@ impl AnsweringShell {
 
 impl ShellFiller for &AnsweringShell {
     fn ran(&self, _pass: Pass<'_, shell_ops::Ran>, call: &Call) -> Result<Ran, DispatchFailure> {
-        self.asked.lock().unpoisoned().push(call.clone());
-        self.answers.get(&Spoken::from(call)).cloned().ok_or(DispatchFailure::Unanswered)
+        let spoken = Spoken::from(call);
+        let mut asked = self.asked.lock().unpoisoned();
+        let earlier = asked.iter().filter(|before| Spoken::from(*before) == spoken).count();
+        asked.push(call.clone());
+        let answers = self.answers.get(&spoken).ok_or(DispatchFailure::Unanswered)?;
+        answers.get(earlier).or(answers.last()).cloned().ok_or(DispatchFailure::Unanswered)
     }
 }

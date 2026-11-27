@@ -1,1 +1,0 @@
-- [agent outcome] unread no-checks on #12 0123456789abcdef0123456789abcdef01234567, from /work/agent

@@ -1,0 +1,5 @@
+{
+  "gh api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}": [{"Succeeded": "{\"data\":{\"repository\":{\"ref\":{\"target\":{\"oid\":\"0123456789abcdef0123456789abcdef01234567\"}}}}}"}],
+  "gh api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567": [{"Succeeded": "{\"commits\":[{\"commit\":{\"message\":\"Open it\\n\\nSpec: none here\\n\\nWhy.\\n\\nSpec: tools-retirement#D2\\nCo-Authored-By: A\"}},{\"commit\":{\"message\":\"Spec: other#D9\"}}]}"}],
+  "gh pr create --head design/open-pr --base main --title D2 Typed agent outcomes --body spec: tools-retirement#D2\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code) -R o/r": [{"Succeeded": "https://github.com/o/r/pull/12\n"}]
+}

@@ -1,0 +1,10 @@
+{
+  "gh api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}": [{"Succeeded": "{\"data\":{\"repository\":{\"ref\":{\"target\":{\"oid\":\"0123456789abcdef0123456789abcdef01234567\"}}}}}"}],
+  "gh api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567": [{"Succeeded": "{\"commits\":[{\"commit\":{\"message\":\"Open it\\n\\nSpec: none here\\n\\nWhy.\\n\\nSpec: tools-retirement#D2\\nCo-Authored-By: A\"}},{\"commit\":{\"message\":\"Spec: other#D9\"}}]}"}],
+  "gh pr create --head design/open-pr --base main --title D2 Typed agent outcomes --body spec: tools-retirement#D2\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code) -R o/r": [{"Succeeded": "https://github.com/o/r/pull/12\n"}],
+  "gh pr view design/open-pr --json number -R o/r": [{"Succeeded": "{\"number\":12}"}],
+  "gh pr view 12 --json headRefOid -R o/r": [{"Succeeded": "{\"headRefOid\":\"0123456789abcdef0123456789abcdef01234567\"}"}],
+  "gh pr checks 12 --json name,state -R o/r": [{"Failed": "[{\"name\":\"test\",\"state\":\"IN_PROGRESS\"}]"}],
+  "gh pr checks 12 --watch --fail-fast -R o/r": [{"Succeeded": ""}],
+  "gh pr checks 12 --json name,bucket,link -R o/r": [{"Failed": "[{\"name\":\"test\",\"bucket\":\"pass\",\"link\":\"https://github.com/o/r/actions/runs/9/job/456\"}]"}]
+}

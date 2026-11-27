@@ -413,25 +413,27 @@ proptest! {
     }
 
     #[test]
-    fn an_answering_shell_answers_the_calls_it_holds_and_refuses_the_rest(
+    fn an_answering_shell_answers_each_held_call_in_turn_then_repeats_its_last_and_refuses_the_rest(
         arguments in vec("[a-z]{1,8}", 0..4),
         unknown in vec("[A-Z]{1,8}", 1..4),
-        printed in ".*",
+        printed in vec(".*", 1..4),
         name in "[a-z]{1,8}",
     ) {
         let deadline = Deadline::after(Wall::new(i64::default()), Timeout::new(u32::default()));
         let held = Call::new(Program::new(&name, arguments), PathBuf::new(), deadline);
         let other = Call::new(Program::new(&name, unknown), PathBuf::new(), deadline);
-        let answer = Ran::Succeeded(Printed::new(printed));
-        let shell = AnsweringShell::answering(BTreeMap::from([(Spoken::from(&held), answer.clone())]));
+        let answers: Vec<Ran> = printed.into_iter().map(|text| Ran::Succeeded(Printed::new(text))).collect();
+        let shell = AnsweringShell::answering(BTreeMap::from([(Spoken::from(&held), answers.clone())]));
         let run = Run::root();
-        let (answered, refused) = {
+        let (answered, again, refused) = {
             let port = run.port(&shell);
-            (port.ran(&held)?, port.ran(&other))
+            let answered = answers.iter().map(|_| port.ran(&held)).collect::<Result<Vec<Ran>, DispatchFailure>>()?;
+            (answered, port.ran(&held)?, port.ran(&other))
         };
-        prop_assert_eq!(answered, answer);
+        prop_assert_eq!(&answered, &answers);
+        prop_assert_eq!(Some(&again), answers.last());
         prop_assert!(matches!(refused, Err(DispatchFailure::Unanswered)));
-        prop_assert_eq!(shell.asked(), [held, other]);
+        prop_assert_eq!(shell.asked().pop(), Some(other));
     }
 
     #[test]

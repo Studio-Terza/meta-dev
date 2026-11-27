@@ -1,0 +1,10 @@
+{
+  "gh pr view 12 --json headRefOid -R o/r": [{"Succeeded": "{\"headRefOid\":\"0123456789abcdef0123456789abcdef01234567\"}"}],
+  "gh pr checks 12 --json name,state -R o/r": [
+    {"Failed": ""},
+    {"Failed": "[]"},
+    {"Failed": "[{\"name\":\"test\",\"state\":\"IN_PROGRESS\"},{\"name\":\"lint\",\"state\":\"IN_PROGRESS\"}]"}
+  ],
+  "gh pr checks 12 --watch --fail-fast -R o/r": [{"Succeeded": ""}],
+  "gh pr checks 12 --json name,bucket,link -R o/r": [{"Failed": "[{\"name\":\"test\",\"bucket\":\"pass\",\"link\":\"\"},{\"name\":\"lint\",\"bucket\":\"pass\",\"link\":\"\"}]"}]
+}

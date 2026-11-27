@@ -8,8 +8,11 @@ use std::time::{Duration, SystemTime};
 
 use console_ports::{Answer, Complaint, Heard, Shown, Variables};
 use design::{Agents, Arguments, Cli};
-use dispatch_ports::{AnsweringShell, MemoryClock, Output, Pause, Prompt, Ran, ReplayedDispatch, Spoken, Wall};
+use dispatch_ports::{
+    AnsweringShell, MemoryClock, Output, Pause, Prompt, Ran, ReplayedDispatch, Spoken, Timeout, Wall,
+};
 use file_ports::Disk;
+use newtype::Wrapping;
 use serde::Deserialize;
 use sqlite_ports::SqliteOpener;
 use test_failure::Failed;
@@ -50,17 +53,25 @@ fn each_scenario_answers_with_its_golden_output() -> Result<(), Failed> {
                     let replayed = ReplayedDispatch::replaying(
                         serde_json::from_slice::<Vec<Output>>(&fs::read(replies)?)?.into_iter().map(Some),
                     );
-                    let shell = AnsweringShell::answering(serde_json::from_slice::<BTreeMap<Spoken, Ran>>(&fs::read(
-                        answers,
-                    )?)?);
+                    let shell = AnsweringShell::answering(serde_json::from_slice::<BTreeMap<Spoken, Vec<Ran>>>(
+                        &fs::read(answers)?,
+                    )?);
                     let hearing = environment.clone().hearing(heard);
-                    let clock = MemoryClock::starting(Wall::from(at + Duration::from(elapsed)));
+                    let start = Wall::from(at + Duration::from(elapsed));
+                    let clock = MemoryClock::starting(start);
                     let agents = Agents::new(|_kept: PathBuf| &replayed, clock, &shell);
                     let uttered = Cli::new(&hearing, Disk, SqliteOpener, agents).rooted(arguments);
                     let printed = AsRef::<Shown>::as_ref(&uttered).clone();
                     let answer = Answer::reported(uttered.ended()).showing(printed);
                     let complaint = AsRef::<str>::as_ref(AsRef::<Complaint>::as_ref(&answer)).to_owned();
-                    let asked: Vec<Spoken> = shell.asked().iter().map(Spoken::from).collect();
+                    let asked: Vec<(Spoken, Timeout)> = shell
+                        .asked()
+                        .iter()
+                        .map(|call| {
+                            let offset = call.deadline().into_inner().into_inner() - start.into_inner();
+                            Ok((Spoken::from(call), Timeout::new(u32::try_from(offset)?)))
+                        })
+                        .collect::<Result<_, Failed>>()?;
                     let prompts: Vec<Prompt> = replayed.prompts();
                     Ok((AsRef::<Shown>::as_ref(&answer).to_string(), complaint, asked, prompts))
                 })
