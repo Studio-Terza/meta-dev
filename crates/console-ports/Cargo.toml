@@ -12,6 +12,7 @@ doctest = false
 [dependencies]
 invariants = { path = "../invariants" }
 newtype = { path = "../newtype" }
+serde.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true

@@ -1,4 +1,0 @@
-[
-  ["tests/fixtures/transcripts/conversation.jsonl", "home", ".claude/projects/WORKSPACE/s.jsonl"],
-  ["tests/fixtures/tasks/asked.jsonl", "home", ".claude/projects/WORKSPACE/s/subagents/agent-busy.jsonl"]
-]

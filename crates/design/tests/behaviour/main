@@ -1,76 +1,134 @@
+"/private/tmp/design-scenarios"
+
+"tests/goldens/scenarios.json"
+
 [
-  [
-    ["HOME", "PWD", "--workspace", "work"],
-    [".claude/projects", "WORKSPACE", "/private/tmp", "s.jsonl"],
-    ["home", "tmp", "studio-meta-dev/transcripts/queue.md", "tests/goldens/scenarios.txt"],
-    ["=== ", "--- ", "--- shown\n", "--- complaint\n"],
-    ["--- asked\n", "--- prompt\n", "--- queue\n", "\n"]
-  ],
-  [
-    ["ingest", "tests/fixtures/files/answered", "tests/fixtures/empty", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "ingest"],
-    ["ingest", "tests/fixtures/files/none", "tests/fixtures/empty", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "ingest"],
-    ["dry-run", "tests/fixtures/files/answered", "tests/fixtures/empty", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "ingest", "--dry-run"],
-    ["dry-run", "tests/fixtures/files/none", "tests/fixtures/empty", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "ingest"],
-    ["unrecognised", "tests/fixtures/files/odd", "tests/fixtures/empty", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "ingest"],
-    ["grown", "tests/fixtures/files/answered", "tests/fixtures/empty", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "ingest"],
-    ["grown", "tests/fixtures/files/grown", "tests/fixtures/empty", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "ingest"],
-    ["grown", "tests/fixtures/files/none", "tests/fixtures/empty", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "ingest"],
-    ["settings", "tests/fixtures/files/none", "tests/fixtures/empty", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "hook", "--settings"],
-    ["usage", "tests/fixtures/files/none", "tests/fixtures/empty", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "frobnicate"],
-    ["usage", "tests/fixtures/files/none", "tests/fixtures/empty", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "hook"],
-    ["usage", "tests/fixtures/files/none", "tests/fixtures/empty", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "hook", "stop", "--settings"],
-    ["usage", "tests/fixtures/files/none", "tests/fixtures/empty", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "ingest", "--wet"],
-    ["usage", "tests/fixtures/files/none", "tests/fixtures/empty", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0"],
-    ["untyped", "tests/fixtures/files/queued", "tests/fixtures/inputs/untyped-prose.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "hook", "subagent-stop"],
-    ["untyped", "tests/fixtures/files/none", "tests/fixtures/inputs/untyped-more.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "hook", "subagent-stop"],
-    ["untyped", "tests/fixtures/files/none", "tests/fixtures/inputs/untyped-lower.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "hook", "subagent-stop"],
-    ["untyped", "tests/fixtures/files/none", "tests/fixtures/inputs/untyped-zero.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "hook", "subagent-stop"],
-    ["untyped", "tests/fixtures/files/none", "tests/fixtures/inputs/untyped-unmarked.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "hook", "subagent-stop"],
-    ["untyped", "tests/fixtures/files/none", "tests/fixtures/inputs/untyped-short.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "hook", "subagent-stop"],
-    ["untyped", "tests/fixtures/files/none", "tests/fixtures/inputs/untyped-long.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "hook", "subagent-stop"],
-    ["untyped", "tests/fixtures/files/none", "tests/fixtures/inputs/untyped-blank.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "hook", "subagent-stop"],
-    ["untyped", "tests/fixtures/files/none", "tests/fixtures/inputs/prose-reminded.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "hook", "subagent-stop"],
-    ["other-head", "tests/fixtures/files/none", "tests/fixtures/inputs/done-reminded.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/other-head.json", "", "0", "hook", "subagent-stop"],
-    ["green", "tests/fixtures/files/none", "tests/fixtures/inputs/done-upper.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/green.json", "", "0", "hook", "subagent-stop"],
-    ["red", "tests/fixtures/files/none", "tests/fixtures/inputs/done.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/red.json", "", "0", "hook", "subagent-stop"],
-    ["repeated", "tests/fixtures/files/queued", "tests/fixtures/inputs/done.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/red.json", "", "0", "hook", "subagent-stop"],
-    ["repeated", "tests/fixtures/files/none", "tests/fixtures/inputs/done-reminded.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/red.json", "", "0", "hook", "subagent-stop"],
-    ["cleared", "tests/fixtures/files/none", "tests/fixtures/inputs/done-reminded.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/red.json", "", "0", "hook", "subagent-stop"],
-    ["cleared", "tests/fixtures/files/none", "tests/fixtures/inputs/done-reminded.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/green.json", "", "0", "hook", "subagent-stop"],
-    ["cleared", "tests/fixtures/files/none", "tests/fixtures/inputs/done-reminded.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/red.json", "", "0", "hook", "subagent-stop"],
-    ["escalated", "tests/fixtures/files/queued", "tests/fixtures/inputs/blocked.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "hook", "subagent-stop"],
-    ["escalated", "tests/fixtures/files/none", "tests/fixtures/inputs/done.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "hook", "subagent-stop"],
-    ["escalated", "tests/fixtures/files/none", "tests/fixtures/inputs/done.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/head-failed.json", "", "0", "hook", "subagent-stop"],
-    ["escalated", "tests/fixtures/files/none", "tests/fixtures/inputs/done.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/head-blank.json", "", "0", "hook", "subagent-stop"],
-    ["escalated", "tests/fixtures/files/none", "tests/fixtures/inputs/done.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/head-only.json", "", "0", "hook", "subagent-stop"],
-    ["escalated", "tests/fixtures/files/none", "tests/fixtures/inputs/done.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/watch-overdue.json", "", "0", "hook", "subagent-stop"],
-    ["escalated", "tests/fixtures/files/none", "tests/fixtures/inputs/done.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/watched-only.json", "", "0", "hook", "subagent-stop"],
-    ["escalated", "tests/fixtures/files/none", "tests/fixtures/inputs/done.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/checks-overdue.json", "", "0", "hook", "subagent-stop"],
-    ["escalated", "tests/fixtures/files/none", "tests/fixtures/inputs/done.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/checks-none.json", "", "0", "hook", "subagent-stop"],
-    ["escalated", "tests/fixtures/files/none", "tests/fixtures/inputs/done.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/checks-torn.json", "", "0", "hook", "subagent-stop"],
-    ["escalated", "tests/fixtures/files/none", "tests/fixtures/inputs/done.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/checks-pending.json", "", "0", "hook", "subagent-stop"],
-    ["escalated", "tests/fixtures/files/none", "tests/fixtures/inputs/done.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/checks-unjobbed.json", "", "0", "hook", "subagent-stop"],
-    ["unheard-subagent", "tests/fixtures/files/none", "tests/fixtures/inputs/not-json.txt", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "hook", "subagent-stop"],
-    ["unheard-subagent", "tests/fixtures/files/none", "tests/fixtures/inputs/blocked.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "hook", "subagent-stop"],
-    ["continuing", "tests/fixtures/files/answered", "tests/fixtures/inputs/stop-active.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "hook", "stop"],
-    ["stalled", "tests/fixtures/files/answered", "tests/fixtures/inputs/stop.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "transcript_path", "0", "hook", "stop"],
-    ["busy", "tests/fixtures/files/busy", "tests/fixtures/inputs/stop.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "transcript_path", "1140", "hook", "stop"],
-    ["busy", "tests/fixtures/files/none", "tests/fixtures/empty", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "stops"],
-    ["building", "tests/fixtures/files/building", "tests/fixtures/inputs/stop.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "transcript_path", "0", "hook", "stop"],
-    ["building", "tests/fixtures/files/none", "tests/fixtures/empty", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "stops"],
-    ["finished", "tests/fixtures/files/finished", "tests/fixtures/inputs/stop.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "transcript_path", "1300", "hook", "stop"],
-    ["untranscribed", "tests/fixtures/files/answered", "tests/fixtures/inputs/stop-untranscribed.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "hook", "stop"],
-    ["hung", "tests/fixtures/files/hung", "tests/fixtures/inputs/stop.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "transcript_path", "1300", "hook", "stop"],
-    ["hung", "tests/fixtures/files/none", "tests/fixtures/inputs/stop.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "transcript_path", "1300", "hook", "stop"],
-    ["quoted", "tests/fixtures/files/answered", "tests/fixtures/inputs/asking.json", "tests/fixtures/replies/quoting.json", "tests/fixtures/answers/none.json", "transcript_path", "0", "hook", "stop"],
-    ["quoted", "tests/fixtures/files/none", "tests/fixtures/empty", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "stops"],
-    ["unsaid", "tests/fixtures/files/answered", "tests/fixtures/inputs/asking.json", "tests/fixtures/replies/unsaid.json", "tests/fixtures/answers/none.json", "transcript_path", "0", "hook", "stop"],
-    ["refused", "tests/fixtures/files/answered", "tests/fixtures/inputs/asking.json", "tests/fixtures/replies/refusing.json", "tests/fixtures/answers/none.json", "transcript_path", "0", "hook", "stop"],
-    ["refused", "tests/fixtures/files/none", "tests/fixtures/empty", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "stops"],
-    ["stored-words", "tests/fixtures/files/answered", "tests/fixtures/inputs/stop.json", "tests/fixtures/replies/quoting.json", "tests/fixtures/answers/none.json", "transcript_path", "0", "hook", "stop"],
-    ["listed", "tests/fixtures/files/listed", "tests/fixtures/inputs/stop.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "transcript_path", "0", "hook", "stop"],
-    ["listed", "tests/fixtures/files/shell", "tests/fixtures/inputs/stop.json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "transcript_path", "0", "hook", "stop"],
-    ["short-reply", "tests/fixtures/files/short", "tests/fixtures/inputs/asking.json", "tests/fixtures/replies/short.json", "tests/fixtures/answers/none.json", "transcript_path", "0", "hook", "stop"],
-    ["unheard-stop", "tests/fixtures/files/answered", "tests/fixtures/inputs/not-json.txt", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", "", "0", "hook", "stop"]
-  ]
+  ["/private/tmp/design-scenarios/ingest/work", {"HOME": "/private/tmp/design-scenarios/ingest", "PWD": "/private/tmp/design-scenarios/ingest"}, "/private/tmp/design-scenarios/ingest/studio-meta-dev/transcripts/queue.md", [
+    [[["tests/fixtures/transcripts/conversation.jsonl", "/private/tmp/design-scenarios/ingest/.claude/projects/-private-tmp-design-scenarios-ingest-work/s.jsonl"]], "", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "ingest"]],
+    [[], "", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "ingest"]]
+  ]],
+  ["/private/tmp/design-scenarios/dry-run/work", {"HOME": "/private/tmp/design-scenarios/dry-run", "PWD": "/private/tmp/design-scenarios/dry-run"}, "/private/tmp/design-scenarios/dry-run/studio-meta-dev/transcripts/queue.md", [
+    [[["tests/fixtures/transcripts/conversation.jsonl", "/private/tmp/design-scenarios/dry-run/.claude/projects/-private-tmp-design-scenarios-dry-run-work/s.jsonl"]], "", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "ingest", "--dry-run"]],
+    [[], "", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "ingest"]]
+  ]],
+  ["/private/tmp/design-scenarios/unrecognised/work", {"HOME": "/private/tmp/design-scenarios/unrecognised", "PWD": "/private/tmp/design-scenarios/unrecognised"}, "/private/tmp/design-scenarios/unrecognised/studio-meta-dev/transcripts/queue.md", [
+    [[["tests/fixtures/transcripts/odd.jsonl", "/private/tmp/design-scenarios/unrecognised/.claude/projects/-private-tmp-design-scenarios-unrecognised-work/s.jsonl"]], "", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "ingest"]]
+  ]],
+  ["/private/tmp/design-scenarios/grown/work", {"HOME": "/private/tmp/design-scenarios/grown", "PWD": "/private/tmp/design-scenarios/grown"}, "/private/tmp/design-scenarios/grown/studio-meta-dev/transcripts/queue.md", [
+    [[["tests/fixtures/transcripts/conversation.jsonl", "/private/tmp/design-scenarios/grown/.claude/projects/-private-tmp-design-scenarios-grown-work/s.jsonl"]], "", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "ingest"]],
+    [[["tests/fixtures/transcripts/grown.jsonl", "/private/tmp/design-scenarios/grown/.claude/projects/-private-tmp-design-scenarios-grown-work/s.jsonl"]], "", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "ingest"]],
+    [[], "", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "ingest"]]
+  ]],
+  ["/private/tmp/design-scenarios/settings/work", {"HOME": "/private/tmp/design-scenarios/settings", "PWD": "/private/tmp/design-scenarios/settings"}, "/private/tmp/design-scenarios/settings/studio-meta-dev/transcripts/queue.md", [
+    [[], "", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "--settings"]]
+  ]],
+  ["/private/tmp/design-scenarios/usage/work", {"HOME": "/private/tmp/design-scenarios/usage", "PWD": "/private/tmp/design-scenarios/usage"}, "/private/tmp/design-scenarios/usage/studio-meta-dev/transcripts/queue.md", [
+    [[], "", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "frobnicate"]],
+    [[], "", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook"]],
+    [[], "", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "stop", "--settings"]],
+    [[], "", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "ingest", "--wet"]],
+    [[], "", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work"]]
+  ]],
+  ["/private/tmp/design-scenarios/untyped/work", {"HOME": "/private/tmp/design-scenarios/untyped", "PWD": "/private/tmp/design-scenarios/untyped"}, "/private/tmp/design-scenarios/untyped/studio-meta-dev/transcripts/queue.md", [
+    [[["tests/fixtures/empty", "/private/tmp/design-scenarios/untyped/studio-meta-dev/transcripts/queue.md"]], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":false,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"I finished the work; CI should be green.\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "subagent-stop"]],
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":false,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"DONE #12 0123456789abcdef0123456789abcdef01234567 and more\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "subagent-stop"]],
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":false,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"done #12 0123456789abcdef0123456789abcdef01234567\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "subagent-stop"]],
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":false,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"DONE #0 0123456789abcdef0123456789abcdef01234567\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "subagent-stop"]],
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":false,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"DONE 12 0123456789abcdef0123456789abcdef01234567\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "subagent-stop"]],
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":false,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"DONE #12 0123456\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "subagent-stop"]],
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":false,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"DONE #12 0123456789abcdef0123456789abcdef012345670\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "subagent-stop"]],
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":false,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "subagent-stop"]],
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":true,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"Still prose.\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "subagent-stop"]]
+  ]],
+  ["/private/tmp/design-scenarios/other-head/work", {"HOME": "/private/tmp/design-scenarios/other-head", "PWD": "/private/tmp/design-scenarios/other-head"}, "/private/tmp/design-scenarios/other-head/studio-meta-dev/transcripts/queue.md", [
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":true,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"DONE #12 0123456789abcdef0123456789abcdef01234567\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/other-head.json", 0, ["--workspace", "work", "hook", "subagent-stop"]]
+  ]],
+  ["/private/tmp/design-scenarios/green/work", {"HOME": "/private/tmp/design-scenarios/green", "PWD": "/private/tmp/design-scenarios/green"}, "/private/tmp/design-scenarios/green/studio-meta-dev/transcripts/queue.md", [
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":false,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"\\nDONE #12 0123456789ABCDEF0123456789ABCDEF01234567\\n\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/green.json", 0, ["--workspace", "work", "hook", "subagent-stop"]]
+  ]],
+  ["/private/tmp/design-scenarios/red/work", {"HOME": "/private/tmp/design-scenarios/red", "PWD": "/private/tmp/design-scenarios/red"}, "/private/tmp/design-scenarios/red/studio-meta-dev/transcripts/queue.md", [
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":false,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"DONE #12 0123456789abcdef0123456789abcdef01234567\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/red.json", 0, ["--workspace", "work", "hook", "subagent-stop"]]
+  ]],
+  ["/private/tmp/design-scenarios/repeated/work", {"HOME": "/private/tmp/design-scenarios/repeated", "PWD": "/private/tmp/design-scenarios/repeated"}, "/private/tmp/design-scenarios/repeated/studio-meta-dev/transcripts/queue.md", [
+    [[["tests/fixtures/empty", "/private/tmp/design-scenarios/repeated/studio-meta-dev/transcripts/queue.md"]], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":false,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"DONE #12 0123456789abcdef0123456789abcdef01234567\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/red.json", 0, ["--workspace", "work", "hook", "subagent-stop"]],
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":true,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"DONE #12 0123456789abcdef0123456789abcdef01234567\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/red.json", 0, ["--workspace", "work", "hook", "subagent-stop"]]
+  ]],
+  ["/private/tmp/design-scenarios/cleared/work", {"HOME": "/private/tmp/design-scenarios/cleared", "PWD": "/private/tmp/design-scenarios/cleared"}, "/private/tmp/design-scenarios/cleared/studio-meta-dev/transcripts/queue.md", [
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":true,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"DONE #12 0123456789abcdef0123456789abcdef01234567\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/red.json", 0, ["--workspace", "work", "hook", "subagent-stop"]],
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":true,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"DONE #12 0123456789abcdef0123456789abcdef01234567\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/green.json", 0, ["--workspace", "work", "hook", "subagent-stop"]],
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":true,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"DONE #12 0123456789abcdef0123456789abcdef01234567\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/red.json", 0, ["--workspace", "work", "hook", "subagent-stop"]]
+  ]],
+  ["/private/tmp/design-scenarios/escalated/work", {"HOME": "/private/tmp/design-scenarios/escalated", "PWD": "/private/tmp/design-scenarios/escalated"}, "/private/tmp/design-scenarios/escalated/studio-meta-dev/transcripts/queue.md", [
+    [[["tests/fixtures/empty", "/private/tmp/design-scenarios/escalated/studio-meta-dev/transcripts/queue.md"]], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":false,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"BLOCKED #12 0123456789abcdef0123456789abcdef01234567\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "subagent-stop"]],
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":false,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"DONE #12 0123456789abcdef0123456789abcdef01234567\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "subagent-stop"]],
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":false,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"DONE #12 0123456789abcdef0123456789abcdef01234567\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/head-failed.json", 0, ["--workspace", "work", "hook", "subagent-stop"]],
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":false,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"DONE #12 0123456789abcdef0123456789abcdef01234567\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/head-blank.json", 0, ["--workspace", "work", "hook", "subagent-stop"]],
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":false,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"DONE #12 0123456789abcdef0123456789abcdef01234567\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/head-only.json", 0, ["--workspace", "work", "hook", "subagent-stop"]],
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":false,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"DONE #12 0123456789abcdef0123456789abcdef01234567\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/watch-overdue.json", 0, ["--workspace", "work", "hook", "subagent-stop"]],
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":false,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"DONE #12 0123456789abcdef0123456789abcdef01234567\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/watched-only.json", 0, ["--workspace", "work", "hook", "subagent-stop"]],
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":false,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"DONE #12 0123456789abcdef0123456789abcdef01234567\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/checks-overdue.json", 0, ["--workspace", "work", "hook", "subagent-stop"]],
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":false,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"DONE #12 0123456789abcdef0123456789abcdef01234567\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/checks-none.json", 0, ["--workspace", "work", "hook", "subagent-stop"]],
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":false,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"DONE #12 0123456789abcdef0123456789abcdef01234567\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/checks-torn.json", 0, ["--workspace", "work", "hook", "subagent-stop"]],
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":false,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"DONE #12 0123456789abcdef0123456789abcdef01234567\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/checks-pending.json", 0, ["--workspace", "work", "hook", "subagent-stop"]],
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":false,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"DONE #12 0123456789abcdef0123456789abcdef01234567\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/checks-unjobbed.json", 0, ["--workspace", "work", "hook", "subagent-stop"]]
+  ]],
+  ["/private/tmp/design-scenarios/unheard-subagent/work", {"HOME": "/private/tmp/design-scenarios/unheard-subagent", "PWD": "/private/tmp/design-scenarios/unheard-subagent"}, "/private/tmp/design-scenarios/unheard-subagent/studio-meta-dev/transcripts/queue.md", [
+    [[], "not json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "subagent-stop"]],
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"SubagentStop\",\"stop_hook_active\":false,\"cwd\":\"/work/agent\",\"last_assistant_message\":\"BLOCKED #12 0123456789abcdef0123456789abcdef01234567\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "subagent-stop"]]
+  ]],
+  ["/private/tmp/design-scenarios/continuing/work", {"HOME": "/private/tmp/design-scenarios/continuing", "PWD": "/private/tmp/design-scenarios/continuing"}, "/private/tmp/design-scenarios/continuing/studio-meta-dev/transcripts/queue.md", [
+    [[["tests/fixtures/transcripts/conversation.jsonl", "/private/tmp/design-scenarios/continuing/.claude/projects/-private-tmp-design-scenarios-continuing-work/s.jsonl"]], "{\"stop_hook_active\":true,\"session_id\":\"s\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "stop"]]
+  ]],
+  ["/private/tmp/design-scenarios/stalled/work", {"HOME": "/private/tmp/design-scenarios/stalled", "PWD": "/private/tmp/design-scenarios/stalled"}, "/private/tmp/design-scenarios/stalled/studio-meta-dev/transcripts/queue.md", [
+    [[["tests/fixtures/transcripts/conversation.jsonl", "/private/tmp/design-scenarios/stalled/.claude/projects/-private-tmp-design-scenarios-stalled-work/s.jsonl"]], "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":false,\"transcript_path\":\"/private/tmp/design-scenarios/stalled/.claude/projects/-private-tmp-design-scenarios-stalled-work/s.jsonl\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "stop"]]
+  ]],
+  ["/private/tmp/design-scenarios/busy/work", {"HOME": "/private/tmp/design-scenarios/busy", "PWD": "/private/tmp/design-scenarios/busy"}, "/private/tmp/design-scenarios/busy/studio-meta-dev/transcripts/queue.md", [
+    [[["tests/fixtures/transcripts/conversation.jsonl", "/private/tmp/design-scenarios/busy/.claude/projects/-private-tmp-design-scenarios-busy-work/s.jsonl"], ["tests/fixtures/tasks/asked.jsonl", "/private/tmp/design-scenarios/busy/.claude/projects/-private-tmp-design-scenarios-busy-work/s/subagents/agent-busy.jsonl"]], "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":false,\"transcript_path\":\"/private/tmp/design-scenarios/busy/.claude/projects/-private-tmp-design-scenarios-busy-work/s.jsonl\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 1140, ["--workspace", "work", "hook", "stop"]],
+    [[], "", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "stops"]]
+  ]],
+  ["/private/tmp/design-scenarios/building/work", {"HOME": "/private/tmp/design-scenarios/building", "PWD": "/private/tmp/design-scenarios/building"}, "/private/tmp/design-scenarios/building/studio-meta-dev/transcripts/queue.md", [
+    [[["tests/fixtures/transcripts/conversation.jsonl", "/private/tmp/design-scenarios/building/.claude/projects/-private-tmp-design-scenarios-building-work/s.jsonl"], ["tests/fixtures/tasks/building.output", "/private/tmp/design-scenarios/-private-tmp-design-scenarios-building-work/s/tasks/b1.output"]], "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":false,\"transcript_path\":\"/private/tmp/design-scenarios/building/.claude/projects/-private-tmp-design-scenarios-building-work/s.jsonl\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "stop"]],
+    [[], "", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "stops"]]
+  ]],
+  ["/private/tmp/design-scenarios/finished/work", {"HOME": "/private/tmp/design-scenarios/finished", "PWD": "/private/tmp/design-scenarios/finished"}, "/private/tmp/design-scenarios/finished/studio-meta-dev/transcripts/queue.md", [
+    [[
+      ["tests/fixtures/transcripts/conversation.jsonl", "/private/tmp/design-scenarios/finished/.claude/projects/-private-tmp-design-scenarios-finished-work/s.jsonl"],
+      ["tests/fixtures/tasks/exited.output", "/private/tmp/design-scenarios/-private-tmp-design-scenarios-finished-work/s/tasks/b1.output"],
+      ["tests/fixtures/tasks/building.output", "/private/tmp/design-scenarios/-private-tmp-design-scenarios-finished-work/s/tasks/b2.log"],
+      ["tests/fixtures/tasks/killed.output", "/private/tmp/design-scenarios/-private-tmp-design-scenarios-finished-work/s/tasks/b3.output"],
+      ["tests/fixtures/tasks/done.jsonl", "/private/tmp/design-scenarios/finished/.claude/projects/-private-tmp-design-scenarios-finished-work/s/subagents/agent-done.jsonl"],
+      ["tests/fixtures/tasks/meta.json", "/private/tmp/design-scenarios/finished/.claude/projects/-private-tmp-design-scenarios-finished-work/s/subagents/agent-done.meta.json"]
+    ], "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":false,\"transcript_path\":\"/private/tmp/design-scenarios/finished/.claude/projects/-private-tmp-design-scenarios-finished-work/s.jsonl\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 1300, ["--workspace", "work", "hook", "stop"]]
+  ]],
+  ["/private/tmp/design-scenarios/untranscribed/work", {"HOME": "/private/tmp/design-scenarios/untranscribed", "PWD": "/private/tmp/design-scenarios/untranscribed"}, "/private/tmp/design-scenarios/untranscribed/studio-meta-dev/transcripts/queue.md", [
+    [[["tests/fixtures/transcripts/conversation.jsonl", "/private/tmp/design-scenarios/untranscribed/.claude/projects/-private-tmp-design-scenarios-untranscribed-work/s.jsonl"]], "{\"stop_hook_active\":false}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "stop"]]
+  ]],
+  ["/private/tmp/design-scenarios/hung/work", {"HOME": "/private/tmp/design-scenarios/hung", "PWD": "/private/tmp/design-scenarios/hung"}, "/private/tmp/design-scenarios/hung/studio-meta-dev/transcripts/queue.md", [
+    [[["tests/fixtures/transcripts/conversation.jsonl", "/private/tmp/design-scenarios/hung/.claude/projects/-private-tmp-design-scenarios-hung-work/s.jsonl"], ["tests/fixtures/tasks/stopped.jsonl", "/private/tmp/design-scenarios/hung/.claude/projects/-private-tmp-design-scenarios-hung-work/s/subagents/agent-hung.jsonl"]], "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":false,\"transcript_path\":\"/private/tmp/design-scenarios/hung/.claude/projects/-private-tmp-design-scenarios-hung-work/s.jsonl\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 1300, ["--workspace", "work", "hook", "stop"]],
+    [[], "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":false,\"transcript_path\":\"/private/tmp/design-scenarios/hung/.claude/projects/-private-tmp-design-scenarios-hung-work/s.jsonl\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 1300, ["--workspace", "work", "hook", "stop"]]
+  ]],
+  ["/private/tmp/design-scenarios/quoted/work", {"HOME": "/private/tmp/design-scenarios/quoted", "PWD": "/private/tmp/design-scenarios/quoted"}, "/private/tmp/design-scenarios/quoted/studio-meta-dev/transcripts/queue.md", [
+    [[["tests/fixtures/transcripts/conversation.jsonl", "/private/tmp/design-scenarios/quoted/.claude/projects/-private-tmp-design-scenarios-quoted-work/s.jsonl"]], "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":false,\"last_assistant_message\":\"Shall I merge the branch now?\",\"transcript_path\":\"/private/tmp/design-scenarios/quoted/.claude/projects/-private-tmp-design-scenarios-quoted-work/s.jsonl\"}", "tests/fixtures/replies/quoting.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "stop"]],
+    [[], "", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "stops"]]
+  ]],
+  ["/private/tmp/design-scenarios/unsaid/work", {"HOME": "/private/tmp/design-scenarios/unsaid", "PWD": "/private/tmp/design-scenarios/unsaid"}, "/private/tmp/design-scenarios/unsaid/studio-meta-dev/transcripts/queue.md", [
+    [[["tests/fixtures/transcripts/conversation.jsonl", "/private/tmp/design-scenarios/unsaid/.claude/projects/-private-tmp-design-scenarios-unsaid-work/s.jsonl"]], "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":false,\"last_assistant_message\":\"Shall I merge the branch now?\",\"transcript_path\":\"/private/tmp/design-scenarios/unsaid/.claude/projects/-private-tmp-design-scenarios-unsaid-work/s.jsonl\"}", "tests/fixtures/replies/unsaid.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "stop"]]
+  ]],
+  ["/private/tmp/design-scenarios/refused/work", {"HOME": "/private/tmp/design-scenarios/refused", "PWD": "/private/tmp/design-scenarios/refused"}, "/private/tmp/design-scenarios/refused/studio-meta-dev/transcripts/queue.md", [
+    [[["tests/fixtures/transcripts/conversation.jsonl", "/private/tmp/design-scenarios/refused/.claude/projects/-private-tmp-design-scenarios-refused-work/s.jsonl"]], "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":false,\"last_assistant_message\":\"Shall I merge the branch now?\",\"transcript_path\":\"/private/tmp/design-scenarios/refused/.claude/projects/-private-tmp-design-scenarios-refused-work/s.jsonl\"}", "tests/fixtures/replies/refusing.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "stop"]],
+    [[], "", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "stops"]]
+  ]],
+  ["/private/tmp/design-scenarios/stored-words/work", {"HOME": "/private/tmp/design-scenarios/stored-words", "PWD": "/private/tmp/design-scenarios/stored-words"}, "/private/tmp/design-scenarios/stored-words/studio-meta-dev/transcripts/queue.md", [
+    [[["tests/fixtures/transcripts/conversation.jsonl", "/private/tmp/design-scenarios/stored-words/.claude/projects/-private-tmp-design-scenarios-stored-words-work/s.jsonl"]], "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":false,\"transcript_path\":\"/private/tmp/design-scenarios/stored-words/.claude/projects/-private-tmp-design-scenarios-stored-words-work/s.jsonl\"}", "tests/fixtures/replies/quoting.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "stop"]]
+  ]],
+  ["/private/tmp/design-scenarios/listed/work", {"HOME": "/private/tmp/design-scenarios/listed", "PWD": "/private/tmp/design-scenarios/listed"}, "/private/tmp/design-scenarios/listed/studio-meta-dev/transcripts/queue.md", [
+    [[["tests/fixtures/transcripts/conversation.jsonl", "/private/tmp/design-scenarios/listed/.claude/projects/-private-tmp-design-scenarios-listed-work/s.jsonl"], ["tests/fixtures/queue.md", "/private/tmp/design-scenarios/listed/studio-meta-dev/transcripts/queue.md"]], "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":false,\"transcript_path\":\"/private/tmp/design-scenarios/listed/.claude/projects/-private-tmp-design-scenarios-listed-work/s.jsonl\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "stop"]],
+    [[["tests/fixtures/tasks/building.output", "/private/tmp/design-scenarios/-private-tmp-design-scenarios-listed-work/s/tasks/b1.output"]], "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":false,\"transcript_path\":\"/private/tmp/design-scenarios/listed/.claude/projects/-private-tmp-design-scenarios-listed-work/s.jsonl\"}", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "stop"]]
+  ]],
+  ["/private/tmp/design-scenarios/short-reply/work", {"HOME": "/private/tmp/design-scenarios/short-reply", "PWD": "/private/tmp/design-scenarios/short-reply"}, "/private/tmp/design-scenarios/short-reply/studio-meta-dev/transcripts/queue.md", [
+    [[["tests/fixtures/transcripts/short-reply.jsonl", "/private/tmp/design-scenarios/short-reply/.claude/projects/-private-tmp-design-scenarios-short-reply-work/s.jsonl"]], "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":false,\"last_assistant_message\":\"Shall I merge the branch now?\",\"transcript_path\":\"/private/tmp/design-scenarios/short-reply/.claude/projects/-private-tmp-design-scenarios-short-reply-work/s.jsonl\"}", "tests/fixtures/replies/short.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "stop"]]
+  ]],
+  ["/private/tmp/design-scenarios/unheard-stop/work", {"HOME": "/private/tmp/design-scenarios/unheard-stop", "PWD": "/private/tmp/design-scenarios/unheard-stop"}, "/private/tmp/design-scenarios/unheard-stop/studio-meta-dev/transcripts/queue.md", [
+    [[["tests/fixtures/transcripts/conversation.jsonl", "/private/tmp/design-scenarios/unheard-stop/.claude/projects/-private-tmp-design-scenarios-unheard-stop-work/s.jsonl"]], "not json", "tests/fixtures/replies/none.json", "tests/fixtures/answers/none.json", 0, ["--workspace", "work", "hook", "stop"]]
+  ]]
 ]

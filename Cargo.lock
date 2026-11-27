@@ -81,6 +81,7 @@ dependencies = [
  "invariants",
  "newtype",
  "proptest",
+ "serde",
 ]
 
 [[package]]

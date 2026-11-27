@@ -38,7 +38,8 @@ pub struct Errored {
     usage: Usage,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(from = "String")]
 pub enum Output {
     Finished(Finished),
     Errored(Errored),
@@ -110,6 +111,12 @@ impl Output {
             Ok(envelope) => envelope.output().unwrap_or(Output::Unreadable(Unreadable::Unsuccessful { stderr })),
             Err(failure) => Output::Unreadable(Unreadable::Json { failure: failure.to_string(), stderr }),
         }
+    }
+}
+
+impl From<String> for Output {
+    fn from(envelope: String) -> Output {
+        Output::read(&envelope, Stderr::Silent)
     }
 }
 

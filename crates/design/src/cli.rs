@@ -5,6 +5,8 @@ mod request;
 pub(crate) mod uttered;
 
 use std::ffi::OsString;
+
+use crate::Arguments;
 use std::path::PathBuf;
 
 use console_ports::Environment;
@@ -49,13 +51,13 @@ impl<'environment, E: Environment, F: Files, O, H, C: ClockFiller, G: ShellFille
         Cli { environment, files, opened, agents }
     }
 
-    pub fn rooted<D: DispatchFiller>(self, arguments: impl Iterator<Item = OsString>) -> Uttered<Settled>
+    pub fn rooted<D: DispatchFiller>(self, arguments: Arguments) -> Uttered<Settled>
     where
         O: Opens,
         H: FnOnce(PathBuf) -> D,
     {
         let run = Run::root();
-        let uttered = self.report(&run, arguments);
+        let uttered = self.report(&run, arguments.into_iter());
         uttered.settled(run.finish().settled())
     }
 
