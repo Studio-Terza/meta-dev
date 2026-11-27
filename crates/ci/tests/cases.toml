@@ -84,7 +84,7 @@ code = 1
 err = "usage: ci timed "
 
 [[case]]
-arguments = ["plan", "a", "b", "c", "d", "e", "f"]
+arguments = ["plan", "a", "b", "c", "d", "e"]
 code = 1
 err = "usage: ci timed "
 
