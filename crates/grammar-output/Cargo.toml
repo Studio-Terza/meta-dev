@@ -13,12 +13,7 @@ test = false
 doctest = false
 
 [dependencies]
-grammar = { path = "../grammar" }
 record-derive = { path = "../record-derive" }
-thiserror.workspace = true
-
-[dev-dependencies]
-proptest.workspace = true
 
 [lints]
 workspace = true

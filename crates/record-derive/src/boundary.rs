@@ -25,10 +25,9 @@ impl TryFrom<DeriveInput> for Record {
             .ok_or_else(|| Error::new_spanned(&input.ident, "a record is a struct with named fields"))?;
         let readings = named.iter().map(Reading::declared).collect::<syn::Result<Vec<Reading>>>()?;
         let declared = input.attrs.iter().find(|attribute| attribute.path().is_ident("record"));
-        let source = declared.map_or_else(
-            || Ok(syn::parse_quote!(::grammar_output::Fields)),
-            |attribute| Sourced::try_from(attribute).map(|sourced| sourced.source),
-        )?;
+        let source = declared
+            .ok_or_else(|| Error::new_spanned(&input.ident, "a record names its source with #[record(source = ...)]"))
+            .and_then(|attribute| Sourced::try_from(attribute).map(|sourced| sourced.source))?;
         Ok(Record { ident: input.ident, source, readings })
     }
 }

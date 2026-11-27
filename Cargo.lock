@@ -347,16 +347,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "grammar-banner"
-version = "0.1.0"
-dependencies = [
- "grammar",
- "grammar-unspelled",
- "newtype",
- "proptest",
-]
-
-[[package]]
 name = "grammar-cargo-option"
 version = "0.1.0"
 dependencies = [
@@ -407,10 +397,7 @@ dependencies = [
 name = "grammar-output"
 version = "0.1.0"
 dependencies = [
- "grammar",
- "proptest",
  "record-derive",
- "thiserror",
 ]
 
 [[package]]
@@ -617,7 +604,6 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 name = "message-id"
 version = "0.1.0"
 dependencies = [
- "grammar-output",
  "newtype",
  "thiserror",
 ]
@@ -1110,7 +1096,6 @@ version = "0.1.0"
 dependencies = [
  "file-ports",
  "grammar-lines",
- "grammar-output",
  "invariants",
  "message-id",
  "newtype",
