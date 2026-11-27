@@ -5,12 +5,13 @@ use std::ffi::OsString;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::process::ExitCode;
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, SystemTime};
 use test_failure::Failed;
 
-use console_ports::{Heard, Shown, Variables};
+use console_ports::{Complaint, Heard, Shown, Variables};
 use design::{Agents, Cli, Failure, HookEvent, Outcome};
 use dispatch_ports::{
     AgentRun, Bell, Call, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Ended, Errored, Finished, Job,
@@ -248,6 +249,7 @@ struct Refusal(String);
 struct Said {
     shown: String,
     ended: Result<Outcome, Refusal>,
+    answer: console_ports::Answer,
 }
 
 #[derive(Debug)]
@@ -419,8 +421,10 @@ impl Home {
         let clock = Stepping::at(self.at);
         let agents = Agents::new(|_kept: PathBuf| Agent { replies }, clock, Gh { github });
         let uttered = Cli::new(&environment, files, SqliteOpener, agents).rooted(words);
-        let shown = AsRef::<Shown>::as_ref(&uttered).to_string();
-        Said { shown, ended: uttered.ended().map_err(|failure: Failure| Refusal(failure.to_string())) }
+        let shown = AsRef::<Shown>::as_ref(&uttered).clone();
+        let ended = uttered.ended();
+        let answer = console_ports::Answer::reported(ended.as_ref()).showing(&shown);
+        Said { shown: shown.to_string(), ended: ended.map_err(|failure: Failure| Refusal(failure.to_string())), answer }
     }
 
     fn stop(&self, extra: &str) -> String {
@@ -819,10 +823,6 @@ mod ports {
     pub struct Design;
 
     impl Design {
-        pub fn run(home: &Path, arguments: &[&str]) -> Result<Output, Failed> {
-            Design::fed(home, arguments, "")
-        }
-
         pub fn fed(home: &Path, arguments: &[&str], input: &str) -> Result<Output, Failed> {
             let mut child = Command::new(env!("CARGO_BIN_EXE_design"))
                 .env("HOME", home)
@@ -838,29 +838,44 @@ mod ports {
     }
 }
 
+#[derive(Debug, PartialEq)]
+struct Exited {
+    code: ExitCode,
+    out: String,
+    err: String,
+}
+
+impl Said {
+    fn exited(&self) -> Exited {
+        let shown: &Shown = self.answer.as_ref();
+        let complaint: &Complaint = self.answer.as_ref();
+        Exited {
+            code: self.answer.code(),
+            out: AsRef::<str>::as_ref(shown).to_owned(),
+            err: AsRef::<str>::as_ref(complaint).to_owned(),
+        }
+    }
+}
+
 #[test]
 fn an_unknown_command_exits_with_failure_and_prints_the_usage() -> Result<(), Failed> {
-    let home = TempDir::new()?;
-    let output = Design::run(home.path(), &["frobnicate"])?;
-    assert_eq!(
-        (output.status.code(), String::from_utf8(output.stdout)?, String::from_utf8(output.stderr)?),
-        (Some(1_i32), String::new(), format!("{}\n", Failure::Usage))
-    );
+    let exited = Home::new()?.said(&["frobnicate"], "", &Replies::default()).exited();
+    let usage = Exited { code: ExitCode::FAILURE, out: String::new(), err: format!("{}\n", Failure::Usage) };
+    assert_eq!(exited, usage);
     Ok(())
 }
 
 #[test]
 fn the_hook_settings_are_printed_as_json_at_exit_zero() -> Result<(), Failed> {
-    let home = TempDir::new()?;
-    let output = Design::run(home.path(), &["hook", "--settings"])?;
-    let settings: Value = serde_json::from_slice(&output.stdout)?;
-    assert_eq!((output.status.code(), output.stderr), (Some(0_i32), Vec::new()));
+    let exited = Home::new()?.said(&["hook", "--settings"], "", &Replies::default()).exited();
+    let settings: Value = serde_json::from_str(&exited.out)?;
+    assert_eq!((exited.code, exited.err), (ExitCode::SUCCESS, String::new()));
     assert!(settings.pointer("/hooks/Stop/0/hooks/0/command").and_then(Value::as_str).is_some());
     Ok(())
 }
 
 #[test]
-fn a_stop_hook_reads_its_event_from_standard_input() -> Result<(), Failed> {
+fn the_design_binary_wires_the_real_ports_and_reads_its_event_from_standard_input() -> Result<(), Failed> {
     let home = TempDir::new()?;
     let workspace = home.path().join("work");
     let slug = Letters::slugged(&workspace.to_string_lossy());
@@ -868,19 +883,22 @@ fn a_stop_hook_reads_its_event_from_standard_input() -> Result<(), Failed> {
     let rooted = ["--workspace", &workspace.to_string_lossy(), "hook", "stop"].map(str::to_owned);
     let words: Vec<&str> = rooted.iter().map(String::as_str).collect();
     let continuing = Design::fed(home.path(), &words, "{\"stop_hook_active\":true}")?;
-    let unreadable = Design::fed(home.path(), &words, "not json")?;
     assert_eq!((continuing.status.code(), continuing.stdout, continuing.stderr), (Some(0_i32), Vec::new(), Vec::new()));
-    assert!(String::from_utf8(unreadable.stderr)?.contains("cannot read the hook input: "));
+    Ok(())
+}
+
+#[test]
+fn an_unreadable_stop_hook_input_fails_naming_the_hook_input() -> Result<(), Failed> {
+    let exited = Home::new()?.said(&["hook", "stop"], "not json", &Replies::default()).exited();
+    assert_eq!((exited.code, exited.out), (ExitCode::FAILURE, String::new()));
+    assert!(exited.err.contains("cannot read the hook input: "));
     Ok(())
 }
 
 #[test]
 fn ingest_of_a_workspace_without_transcripts_fails_naming_the_transcripts() -> Result<(), Failed> {
-    let home = TempDir::new()?;
-    let workspace = home.path().join("work");
-    fs::create_dir_all(&workspace)?;
-    let output = Design::run(home.path(), &["--workspace", &workspace.to_string_lossy(), "ingest"])?;
-    assert_eq!((output.status.code(), output.stdout), (Some(1_i32), Vec::new()));
-    assert!(String::from_utf8(output.stderr)?.contains("cannot reach the transcripts: "));
+    let exited = Home::new()?.said(&["ingest"], "", &Replies::default()).exited();
+    assert_eq!((exited.code, exited.out), (ExitCode::FAILURE, String::new()));
+    assert!(exited.err.contains("cannot reach the transcripts: "));
     Ok(())
 }
