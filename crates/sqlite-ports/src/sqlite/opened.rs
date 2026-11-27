@@ -1,32 +1,19 @@
+mod boundary;
 mod connected;
 
 use std::path::Path;
 
 use rusqlite::Connection;
 use rusqlite::config::DbConfig;
-use sha2::{Digest, Sha256};
-use store_ports::{Batch, Created, Query, Record, Schema, StoreFailure};
+use store_ports::{Batch, Created, Query, Record, StoreFailure};
 
 use super::failed::{Unbuilt, Unexecuted, Unopened};
+pub(super) use boundary::Stamped;
 pub(super) use connected::Connected;
 
 #[derive(Debug)]
 pub(super) struct Opened {
     connection: Connection,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub(super) struct Stamped {
-    sql: &'static str,
-    stamp: i32,
-}
-
-impl Stamped {
-    pub(super) fn of<S: Schema>() -> Stamped {
-        let digest = Sha256::digest(S::SQL.as_bytes());
-        let [first, second, third, fourth, ..]: [u8; 32] = digest.into();
-        Stamped { sql: S::SQL, stamp: i32::from_be_bytes([first, second, third, fourth]) }
-    }
 }
 
 impl Opened {

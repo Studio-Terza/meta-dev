@@ -22,8 +22,8 @@ impl ClockFiller for Stepped {
     }
 
     fn paused(&self, _pass: Pass<'_, clock_ops::Paused>, pause: Pause) -> Wall {
-        let mut now = self.now.lock().unpoisoned();
-        *now = Stepped::after(*now, pause);
-        *now
+        let next = Stepped::after(*self.now.lock().unpoisoned(), pause);
+        *self.now.lock().unpoisoned() = next;
+        next
     }
 }

@@ -152,23 +152,23 @@
     [
         (
             "process-rebuild#D1",
-            "[(\"process-rebuild\", 1)]",
+            "[\n    (\n        \"process-rebuild\",\n        1,\n    ),\n]\n",
         ),
         (
             "process-rebuild#D1, process-rebuild#D2",
-            "[(\"process-rebuild\", 1), (\"process-rebuild\", 2)]",
+            "[\n    (\n        \"process-rebuild\",\n        1,\n    ),\n    (\n        \"process-rebuild\",\n        2,\n    ),\n]\n",
         ),
         (
             "a#D1,b#D2 c",
-            "[(\"a\", 1), (\"b\", 2)]",
+            "[\n    (\n        \"a\",\n        1,\n    ),\n    (\n        \"b\",\n        2,\n    ),\n]\n",
         ),
         (
             "none",
-            "[]",
+            "[]\n",
         ),
         (
             "",
-            "[]",
+            "[]\n",
         ),
     ],
     [
@@ -498,7 +498,7 @@
                 ),
             ),
             [
-                "Wrote(\"log\") None Started",
+                "(\n    Wrote(\n        \"log\",\n    ),\n    None,\n    Started,\n)\n",
             ],
         ),
         (
@@ -575,7 +575,7 @@
             "{ echo a; echo b; } > log; rm x",
             None,
             [
-                "Wrote(\"log\") None Started",
+                "(\n    Wrote(\n        \"log\",\n    ),\n    None,\n    Started,\n)\n",
             ],
         ),
         (
@@ -587,8 +587,8 @@
             "cat a 2>&1 >/dev/null | tee log; rm x",
             None,
             [
-                "Wrote(\"/dev/null\") None Started",
-                "Wrote(\"log\") None Started",
+                "(\n    Wrote(\n        \"/dev/null\",\n    ),\n    None,\n    Started,\n)\n",
+                "(\n    Wrote(\n        \"log\",\n    ),\n    None,\n    Started,\n)\n",
             ],
         ),
         (
@@ -660,7 +660,7 @@
             "printf 'rm x' > script.sh",
             None,
             [
-                "Wrote(\"script.sh\") None Started",
+                "(\n    Wrote(\n        \"script.sh\",\n    ),\n    None,\n    Started,\n)\n",
             ],
         ),
         (
@@ -697,28 +697,28 @@
             "sed -i 's/a/b/' src/lib.rs",
             None,
             [
-                "InPlace(Sed) None Started",
+                "(\n    InPlace(\n        Sed,\n    ),\n    None,\n    Started,\n)\n",
             ],
         ),
         (
             "sed -i '' -e 's/a/b/' x.rs",
             None,
             [
-                "InPlace(Sed) None Started",
+                "(\n    InPlace(\n        Sed,\n    ),\n    None,\n    Started,\n)\n",
             ],
         ),
         (
             "gsed --in-place=.bak 's/a/b/' x.rs",
             None,
             [
-                "InPlace(Sed) None Started",
+                "(\n    InPlace(\n        Sed,\n    ),\n    None,\n    Started,\n)\n",
             ],
         ),
         (
             "sed -ni 's/a/b/p' x.rs",
             None,
             [
-                "InPlace(Sed) None Started",
+                "(\n    InPlace(\n        Sed,\n    ),\n    None,\n    Started,\n)\n",
             ],
         ),
         (
@@ -730,14 +730,14 @@
             "perl -pi -e 's/a/b/' x.rs",
             None,
             [
-                "InPlace(Perl) None Started",
+                "(\n    InPlace(\n        Perl,\n    ),\n    None,\n    Started,\n)\n",
             ],
         ),
         (
             "perl -i.bak -pe 's/a/b/' x.rs",
             None,
             [
-                "InPlace(Perl) None Started",
+                "(\n    InPlace(\n        Perl,\n    ),\n    None,\n    Started,\n)\n",
             ],
         ),
         (
@@ -749,29 +749,29 @@
             "for f in *.rs; do sed -i 's/a/b/' \"$f\"; done",
             None,
             [
-                "InPlace(Sed) Some(Loop) Started",
+                "(\n    InPlace(\n        Sed,\n    ),\n    Some(\n        Loop,\n    ),\n    Started,\n)\n",
             ],
         ),
         (
             "echo a > src/x.rs",
             None,
             [
-                "Wrote(\"src/x.rs\") None Started",
+                "(\n    Wrote(\n        \"src/x.rs\",\n    ),\n    None,\n    Started,\n)\n",
             ],
         ),
         (
             "cargo test 2>/dev/null >> log.txt",
             None,
             [
-                "Wrote(\"/dev/null\") None Started",
-                "Wrote(\"log.txt\") None Started",
+                "(\n    Wrote(\n        \"/dev/null\",\n    ),\n    None,\n    Started,\n)\n",
+                "(\n    Wrote(\n        \"log.txt\",\n    ),\n    None,\n    Started,\n)\n",
             ],
         ),
         (
             "cat <<'EOF' > notes.md\nhello\nEOF",
             None,
             [
-                "Wrote(\"notes.md\") None Started",
+                "(\n    Wrote(\n        \"notes.md\",\n    ),\n    None,\n    Started,\n)\n",
             ],
         ),
         (
@@ -783,29 +783,29 @@
             "echo a | tee -a out.txt other.txt",
             None,
             [
-                "Wrote(\"out.txt\") None Started",
-                "Wrote(\"other.txt\") None Started",
+                "(\n    Wrote(\n        \"out.txt\",\n    ),\n    None,\n    Started,\n)\n",
+                "(\n    Wrote(\n        \"other.txt\",\n    ),\n    None,\n    Started,\n)\n",
             ],
         ),
         (
             "(cd a && echo b > c)",
             None,
             [
-                "Wrote(\"c\") Some(Subshell) Changed([\"a\"])",
+                "(\n    Wrote(\n        \"c\",\n    ),\n    Some(\n        Subshell,\n    ),\n    Changed(\n        [\n            \"a\",\n        ],\n    ),\n)\n",
             ],
         ),
         (
             "mv src/a.rs /tmp/a.rs",
             None,
             [
-                "Moved { sources: [\"src/a.rs\"], destination: \"/tmp/a.rs\" } None Started",
+                "(\n    Moved {\n        sources: [\n            \"src/a.rs\",\n        ],\n        destination: \"/tmp/a.rs\",\n    },\n    None,\n    Started,\n)\n",
             ],
         ),
         (
             "mv -f a b c dest/",
             None,
             [
-                "Moved { sources: [\"a\", \"b\", \"c\"], destination: \"dest/\" } None Started",
+                "(\n    Moved {\n        sources: [\n            \"a\",\n            \"b\",\n            \"c\",\n        ],\n        destination: \"dest/\",\n    },\n    None,\n    Started,\n)\n",
             ],
         ),
         (
@@ -827,42 +827,42 @@
             "cd src && echo a > x.rs",
             None,
             [
-                "Wrote(\"x.rs\") None Changed([\"src\"])",
+                "(\n    Wrote(\n        \"x.rs\",\n    ),\n    None,\n    Changed(\n        [\n            \"src\",\n        ],\n    ),\n)\n",
             ],
         ),
         (
             "cd /a; cd b; echo a > x",
             None,
             [
-                "Wrote(\"x\") None Changed([\"/a\", \"b\"])",
+                "(\n    Wrote(\n        \"x\",\n    ),\n    None,\n    Changed(\n        [\n            \"/a\",\n            \"b\",\n        ],\n    ),\n)\n",
             ],
         ),
         (
             "cd $HOME/repo && echo a > x",
             None,
             [
-                "Wrote(\"x\") None Unknown",
+                "(\n    Wrote(\n        \"x\",\n    ),\n    None,\n    Unknown,\n)\n",
             ],
         ),
         (
             "cd - && echo a > x",
             None,
             [
-                "Wrote(\"x\") None Unknown",
+                "(\n    Wrote(\n        \"x\",\n    ),\n    None,\n    Unknown,\n)\n",
             ],
         ),
         (
             "cd && echo a > x",
             None,
             [
-                "Wrote(\"x\") None Unknown",
+                "(\n    Wrote(\n        \"x\",\n    ),\n    None,\n    Unknown,\n)\n",
             ],
         ),
         (
             "cd ~/r; cd /abs && echo a > x",
             None,
             [
-                "Wrote(\"x\") None Changed([\"/abs\"])",
+                "(\n    Wrote(\n        \"x\",\n    ),\n    None,\n    Changed(\n        [\n            \"/abs\",\n        ],\n    ),\n)\n",
             ],
         ),
     ],

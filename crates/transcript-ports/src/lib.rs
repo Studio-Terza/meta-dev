@@ -9,11 +9,10 @@ mod read_failure;
 mod record;
 mod session;
 mod skipped;
-mod task_id;
 mod transcripts;
 mod unrecognised;
 
-pub use boundary::{Authorship, Body, Instant, Kind, SessionId, Uuid};
+pub use boundary::{Authorship, Body, Instant, Kind, SessionId, TaskId, Uuid};
 pub use claude_code_dir::ClaudeCodeDir;
 pub use cursor::Cursor;
 pub use line::Line;
@@ -21,8 +20,7 @@ pub use read::Read;
 pub use read_failure::ReadFailure;
 pub use record::Record;
 pub use session::Session;
-pub use skipped::Skipped;
-pub use task_id::TaskId;
+use skipped::Skipped;
 pub use transcripts::{Transcripts, transcripts_ops};
 use unrecognised::Unrecognised;
 

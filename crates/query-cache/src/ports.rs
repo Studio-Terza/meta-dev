@@ -1,3 +1,3 @@
 mod boundary;
 
-pub use boundary::Disk;
+pub(crate) use boundary::Disk;

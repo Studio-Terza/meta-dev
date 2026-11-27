@@ -42,7 +42,7 @@ fn every_lexer_reads_its_fixture_texts_as_its_golden_says() -> Result<(), Failed
             .map(|text| {
                 let each: Vec<_> =
                     Cited::each(text.as_str()).iter().map(|cited| (cited.project(), cited.detail())).collect();
-                (text, format!("{each:?}"))
+                (text, Debugged(each).to_string())
             })
             .collect();
         let slugs: Vec<_> = texts.slugs.iter().map(|text| (text, Letters::slugged(text.as_str()))).collect();
@@ -53,7 +53,7 @@ fn every_lexer_reads_its_fixture_texts_as_its_golden_says() -> Result<(), Failed
             .map(|text| {
                 let edited: Vec<String> = Edited::read(text.as_str())
                     .iter()
-                    .map(|edited| format!("{:?} {:?} {:?}", edited.edit(), edited.construct(), edited.directory()))
+                    .map(|edited| Debugged((edited.edit(), edited.construct(), edited.directory())).to_string())
                     .collect();
                 (text, Nested::read(text.as_str()).map(|nested| (nested.flagged(), nested.construct())), edited)
             })

@@ -4,6 +4,7 @@ mod instant;
 mod kind;
 mod lossy_text;
 mod session_id;
+mod task_id;
 mod uuid;
 
 pub use authorship::Authorship;
@@ -12,4 +13,5 @@ pub use instant::Instant;
 pub use kind::Kind;
 pub(crate) use lossy_text::LossyText;
 pub use session_id::SessionId;
+pub use task_id::TaskId;
 pub use uuid::Uuid;

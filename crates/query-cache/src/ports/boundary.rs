@@ -4,12 +4,12 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Copy, Debug)]
-pub struct Disk;
+pub(crate) struct Disk;
 
 impl Disk {
     const MANIFEST: &'static str = "CARGO_MANIFEST_DIR";
 
-    pub fn manifest() -> PathBuf {
+    pub(crate) fn manifest() -> PathBuf {
         env::var_os(Self::MANIFEST).map_or_default(PathBuf::from)
     }
 

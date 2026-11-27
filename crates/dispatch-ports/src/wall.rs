@@ -1,15 +1,8 @@
 mod boundary;
 
-use newtype::{Arbitrary, Deserialize, Newtype};
+use newtype::{Arbitrary, Newtype};
 
-#[derive(Newtype, Arbitrary, Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Wall(i64);
-
-#[derive(Newtype, Arbitrary, Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Timeout(u32);
-
-#[derive(Newtype, Arbitrary, Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Pause(u32);
+pub use boundary::{Pause, Timeout, Wall};
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Deadline(Wall);
