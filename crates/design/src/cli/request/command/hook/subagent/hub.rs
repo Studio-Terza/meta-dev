@@ -4,7 +4,7 @@ use std::ops::Not;
 use std::path::Path;
 
 use design_messages::{CheckName, PullNumber};
-use dispatch_ports::{Clock, Deadline, Dispatch, Due, Pause, Ran, Shell, Timeout};
+use dispatch_ports::{Clock, Deadline, Due, Pause, Ran, Shell, Timeout};
 use file_ports::Files;
 use grammar_spec_line::Attachment;
 use invariants::Ignoring;
@@ -17,11 +17,11 @@ use super::super::super::crew::Crew;
 use super::boundary::{Branch, Branched, CommitSha, Compared, First, JobId, Opened, Pushed};
 use super::{FailedJob, UnreadStep};
 use crate::cli::request::ignored::Ignored;
-use crate::cli::request::{Local, Repository};
+use crate::cli::request::{Landed, Local, Repository};
 
 #[derive(Debug)]
-pub struct Hub<'crew, D: Dispatch, C: Clock, G: Shell> {
-    crew: &'crew Crew<'crew, D, C, G>,
+pub struct Hub<'crew, C: Clock, G: Shell> {
+    crew: &'crew Crew<'crew, C, G>,
     directory: &'crew Path,
     repository: &'crew Repository,
 }
@@ -51,12 +51,6 @@ pub enum Mergeability {
     Conflicting,
     #[serde(rename = "UNKNOWN")]
     Unknown,
-}
-
-#[derive(Debug, Deserialize)]
-struct Listed {
-    #[serde(rename = "name")]
-    _name: CheckName,
 }
 
 #[derive(Debug, Deserialize)]
@@ -122,22 +116,22 @@ struct Oid {
     oid: CommitSha,
 }
 
-impl<'crew, D: Dispatch, C: Clock, G: Shell> Hub<'crew, D, C, G> {
+impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
     const PROGRAM: &'static str = "gh";
     const QUICK: Timeout = Timeout::new(60);
     const WATCH: Timeout = Timeout::new(20 * 60);
-    const REGISTERING: Timeout = Timeout::new(5 * 60);
     const POLL: Pause = Pause::new(10);
+    const LANDED: &'static str = "100";
     const UNLOGGED: &'static str = "(the log could not be read)";
     const BASE: &'static str = "main";
     const REMOTE: &'static str = "query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name)\
                                   {ref(qualifiedName:$ref){target{oid}}}}";
 
     pub fn new(
-        crew: &'crew Crew<'crew, D, C, G>,
+        crew: &'crew Crew<'crew, C, G>,
         directory: &'crew Path,
         repository: &'crew Repository,
-    ) -> Hub<'crew, D, C, G> {
+    ) -> Hub<'crew, C, G> {
         Hub { crew, directory, repository }
     }
 
@@ -147,13 +141,21 @@ impl<'crew, D: Dispatch, C: Clock, G: Shell> Hub<'crew, D, C, G> {
     }
 
     fn spoke(&self, arguments: &[&str], timeout: Timeout) -> Option<Ran> {
-        self.crew.spoke(Hub::<D, C, G>::PROGRAM, arguments, self.directory, timeout)
+        self.crew.spoke(Hub::<C, G>::PROGRAM, arguments, self.directory, timeout)
     }
 
     pub fn viewed<T: DeserializeOwned>(&self, pull: PullNumber, fields: &str) -> Option<T> {
         let ran = self.ran(&["pr", "view", &pull.to_string(), "--json", fields], Self::QUICK);
         let printed = ran.as_ref().and_then(Ran::succeeded)?;
         serde_json::from_str(printed.as_ref()).ignoring(Ignored::Unviewed)
+    }
+
+    pub fn landed(&self) -> Option<Vec<Landed>> {
+        let asked =
+            ["pr", "list", "--state", "all", "--limit", Self::LANDED, "--json", "number,state,headRefName,body"];
+        let ran = self.ran(&asked, Self::QUICK);
+        let printed = ran.as_ref().and_then(Ran::succeeded)?;
+        serde_json::from_str(printed.as_ref()).ignoring(Ignored::Undrained)
     }
 
     pub fn opened<F: Files, S: Store>(
@@ -171,7 +173,7 @@ impl<'crew, D: Dispatch, C: Clock, G: Shell> Hub<'crew, D, C, G> {
         let branch = branched.branch().to_string();
         let body = Body(spec).to_string();
         let asked =
-            ["pr", "create", "--head", &branch, "--base", Hub::<D, C, G>::BASE, "--title", &title, "--body", &body];
+            ["pr", "create", "--head", &branch, "--base", Hub::<C, G>::BASE, "--title", &title, "--body", &body];
         self.ran(&asked, Self::QUICK).as_ref().and_then(Ran::succeeded).ok_or(UnreadStep::Open)?;
         let viewed = self.ran(&["pr", "view", &branch, "--json", "number"], Self::QUICK);
         let printed = viewed.as_ref().and_then(Ran::succeeded).ok_or(UnreadStep::Open)?;
@@ -181,7 +183,7 @@ impl<'crew, D: Dispatch, C: Clock, G: Shell> Hub<'crew, D, C, G> {
 
     fn remote(&self, branch: &Branch) -> Result<Option<CommitSha>, UnreadStep> {
         let reference = format!("ref=refs/heads/{branch}");
-        let query = format!("query={}", Hub::<D, C, G>::REMOTE);
+        let query = format!("query={}", Hub::<C, G>::REMOTE);
         let owner = format!("owner={}", self.repository.owner());
         let name = format!("name={}", self.repository.name());
         let asked = ["api", "graphql", "-F", &owner, "-F", &name, "-f", &reference, "-f", &query];
@@ -192,7 +194,7 @@ impl<'crew, D: Dispatch, C: Clock, G: Shell> Hub<'crew, D, C, G> {
     }
 
     fn first(&self, head: CommitSha) -> Result<First, UnreadStep> {
-        let compare = format!("repos/{}/compare/{}...{head}", self.repository, Hub::<D, C, G>::BASE);
+        let compare = format!("repos/{}/compare/{}...{head}", self.repository, Hub::<C, G>::BASE);
         let ran = self.spoke(&["api", &compare], Self::QUICK);
         let printed = ran.as_ref().and_then(Ran::succeeded).ok_or(UnreadStep::Commits)?;
         let compared: Compared = serde_json::from_str(printed.as_ref()).map_err(|_unread| UnreadStep::Commits)?;
@@ -207,59 +209,47 @@ impl<'crew, D: Dispatch, C: Clock, G: Shell> Hub<'crew, D, C, G> {
         self.viewed::<Merging>(pull, "mergeable").map(|read| read.mergeable).ok_or(UnreadStep::Mergeable)
     }
 
-    pub fn registered(&self, pull: PullNumber) -> Result<(), UnreadStep> {
-        let deadline = Deadline::after(self.crew.now(), Self::REGISTERING);
+    pub fn settled(&self, pull: PullNumber) -> Result<Verdict, UnreadStep> {
+        let deadline = Deadline::after(self.crew.now(), Self::WATCH);
         iter::repeat_with(|| self.crew.now())
             .take_while(|now| deadline.due(*now) == Due::Pending)
-            .find_map(|_now| self.listed(pull).or_else(|| self.paused()))
-            .ok_or(UnreadStep::NoChecks)
+            .find_map(|_now| self.checks(pull).map(|read| read.or_else(|| self.watched(pull))).transpose())
+            .unwrap_or(Err(UnreadStep::Overdue))
     }
 
-    fn paused(&self) -> Option<()> {
+    fn watched(&self, pull: PullNumber) -> Option<Verdict> {
+        self.ran(&["pr", "checks", &pull.to_string(), "--watch", "--fail-fast"], Self::WATCH);
         self.crew.paused(Self::POLL);
         None
     }
 
-    fn listed(&self, pull: PullNumber) -> Option<()> {
-        let ran = self.ran(&["pr", "checks", &pull.to_string(), "--json", "name,state"], Self::QUICK);
-        let printed = ran.as_ref().and_then(Ran::printed)?;
-        let listed: Vec<Listed> = serde_json::from_str(printed.as_ref()).ignoring(Ignored::Unlisted)?;
-        listed.first().map(|_check| ())
-    }
-
-    pub fn watched(&self, pull: PullNumber) -> Result<(), UnreadStep> {
-        match self.ran(&["pr", "checks", &pull.to_string(), "--watch", "--fail-fast"], Self::WATCH) {
-            Some(Ran::Succeeded(_) | Ran::Failed(_)) => Ok(()),
-            Some(Ran::Overdue) => Err(UnreadStep::Overdue),
-            None => Err(UnreadStep::Watch),
-        }
-    }
-
-    pub fn checks(&self, pull: PullNumber) -> Result<Verdict, UnreadStep> {
+    fn checks(&self, pull: PullNumber) -> Result<Option<Verdict>, UnreadStep> {
         let ran = self.ran(&["pr", "checks", &pull.to_string(), "--json", "name,bucket,link"], Self::QUICK);
-        let printed = ran.as_ref().and_then(Ran::printed).ok_or(UnreadStep::Checks)?;
-        let checks: Vec<Check> = serde_json::from_str(printed.as_ref()).map_err(|_unread| UnreadStep::Checks)?;
-        Verdict::read(&checks).ok_or(UnreadStep::Checks)
+        let printed = ran.as_ref().and_then(Ran::printed);
+        let listed: Option<Vec<Check>> =
+            printed.and_then(|read| serde_json::from_str(read.as_ref()).ignoring(Ignored::Unlisted));
+        listed.map_or(Ok(None), |checks| Verdict::read(&checks))
     }
 
     pub fn log(&self, job: JobId) -> String {
         let ran = self.ran(&["run", "view", "--job", &job.to_string(), "--log-failed"], Self::QUICK);
-        ran.as_ref().and_then(Ran::succeeded).map_or_else(|| Hub::<D, C, G>::UNLOGGED.to_owned(), ToString::to_string)
+        ran.as_ref().and_then(Ran::succeeded).map_or_else(|| Hub::<C, G>::UNLOGGED.to_owned(), ToString::to_string)
     }
 }
 
 impl Verdict {
-    fn read(checks: &[Check]) -> Option<Verdict> {
+    fn read(checks: &[Check]) -> Result<Option<Verdict>, UnreadStep> {
         let failed = checks
             .iter()
             .filter(|check| check.bucket.state() == State::Failed)
             .map(Check::failed)
-            .collect::<Option<Vec<FailedJob>>>()?;
+            .collect::<Option<Vec<FailedJob>>>()
+            .ok_or(UnreadStep::Checks)?;
         let settled = checks.is_empty().not() && checks.iter().all(|check| check.bucket.state() == State::Passed);
-        match failed.first() {
+        Ok(match failed.first() {
             Some(_first) => Some(Verdict::Red(failed)),
             None => settled.then_some(Verdict::Green),
-        }
+        })
     }
 
     pub fn failed(self) -> Vec<FailedJob> {

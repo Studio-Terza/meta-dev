@@ -2,15 +2,13 @@ mod harness;
 
 use std::collections::BTreeMap;
 use std::fmt;
-
 use std::ops::Not;
 use std::path::PathBuf;
 
 use console_ports::{Heard, Shown};
-use design_messages::{Fate, Halt, LastSaid, Overran, Overruns, StopRow, Stopped, Tally};
-use dispatch_ports::{Clock, Dispatch, Moment, Shell, Wall};
+use design_messages::{LastSaid, Overran, Overruns};
+use dispatch_ports::{Clock, Shell, Wall};
 use file_ports::{Epoch, Files};
-use grammar::Queue;
 use newtype::Wrapping;
 use serde::{Deserialize, Serialize};
 use store_ports::Store;
@@ -18,12 +16,15 @@ use transcript_ports::{Body, SessionId};
 
 use super::super::Ground;
 use super::super::crew::Crew;
-use super::answers::{Answering, Answers, Search};
+use super::answers::{Answering, Answers};
+use super::subagent::Hub;
 use crate::cli::failure::Failure;
 use crate::cli::request::ignored::Ignored;
+use crate::cli::request::{Local, Queue};
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
-use harness::{Harness, Tasks};
+pub use harness::Stopped;
+use harness::{Halt, Harness, Tasks};
 use invariants::Ignoring;
 
 #[derive(Debug, Serialize)]
@@ -64,11 +65,9 @@ pub struct Stopping {
 }
 
 #[derive(Debug)]
-pub struct Observed<'store, S: Store> {
-    store: &'store S,
+pub struct Observed<'ground, 'run, F: Files, S: Store> {
+    ground: &'ground Ground<'run, F, S>,
     tasks: Option<Tasks>,
-    started: Moment,
-    queue: Option<Queue>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -152,10 +151,10 @@ impl Stopping {
         self.transcript.as_deref().map(|transcript| harness.tasks(transcript))
     }
 
-    pub fn decided<S: Store, D: Dispatch, C: Clock, G: Shell>(
+    pub fn decided<F: Files, S: Store, C: Clock, G: Shell>(
         &self,
-        crew: &Crew<'_, D, C, G>,
-        observed: &Observed<'_, S>,
+        crew: &Crew<'_, C, G>,
+        observed: &Observed<'_, '_, F, S>,
     ) -> Result<Uttered, Failure> {
         match self.continuation.0 {
             Some(Continuing) => Ok(Uttered::silent(Ok(Outcome::Hooked(HookEvent::Stop)))),
@@ -181,45 +180,49 @@ impl Stopping {
     }
 }
 
-impl<'store, S: Store> Observed<'store, S> {
-    pub fn new(store: &'store S, tasks: Option<Tasks>, started: Moment, queue: Option<Queue>) -> Observed<'store, S> {
-        Observed { store, tasks, started, queue }
+impl<'ground, 'run, F: Files, S: Store> Observed<'ground, 'run, F, S> {
+    pub fn new(ground: &'ground Ground<'run, F, S>, tasks: Option<Tasks>) -> Observed<'ground, 'run, F, S> {
+        Observed { ground, tasks }
     }
 
-    fn queued(&self) -> Option<Queued<'_>> {
-        let idle = self.tasks.as_ref().map(Halt::from).filter(|halt| *halt == Halt::Stalled);
-        idle.and(self.queue.as_ref()).filter(|queue| queue.items().is_empty().not()).map(Queued)
-    }
-
-    fn blocking<D: Dispatch, C: Clock, G: Shell>(&self, crew: &Crew<'_, D, C, G>, stopping: &Stopping) -> Vec<String> {
-        let store = self.store;
+    fn blocking<C: Clock, G: Shell>(&self, crew: &Crew<'_, C, G>, stopping: &Stopping) -> Vec<String> {
+        let store = self.ground.store();
         let last = stopping.said.clone().or_else(|| stopping.stored(store));
-        let search =
-            last.as_ref().and_then(|said| Answering::new(store, crew).searched(said).ignoring(Ignored::Unanswered));
+        let answers = last
+            .as_ref()
+            .and_then(|said| Answering::new(store, crew).searched(said).ignoring(Ignored::Unanswered))
+            .flatten();
         let reported: Vec<Body> = store.read(Overruns).ignoring(Ignored::Unanswered).unwrap_or_default();
         let hung = self.tasks.as_ref().map_or_default(Tasks::hung);
-        let live = self.tasks.as_ref().map_or_default(Tasks::live);
         let fresh: Vec<Body> = hung.iter().filter(|task| reported.contains(task).not()).cloned().collect();
         let halt =
             fresh.first().map_or_else(|| self.tasks.as_ref().map_or(Halt::Live, Halt::from), |_first| Halt::Overrun);
-        let stopped: Vec<String> = Stopping::lead(halt, &fresh)
-            .into_iter()
-            .chain(search.as_ref().and_then(Search::answers).map(Answers::to_string))
-            .chain(self.queued().map(|queued| queued.to_string()))
-            .collect();
-        let fate = stopped.first().map_or(Fate::Passed, |_first| Fate::Blocked);
-        let ran = stopping.session.clone().map(|session| StopRow::ran(session, live, halt));
-        let millis = Tally::new(crew.moment().since(self.started).max(0));
-        let trailed =
-            ran.map(|row| search.as_ref().map_or(row.clone(), |found| found.trailed(row)).ended(fate, millis));
-        store.write(Overran::from(fresh)).ignoring(Ignored::Unanswered);
-        trailed.map(|row| store.write(Stopped::from(row))).and_then(|written| written.ignoring(Ignored::Unanswered));
-        stopped
+        let queued = (halt == Halt::Stalled).then(|| self.queued(crew)).flatten();
+        store.write(Overran::from(fresh.clone())).ignoring(Ignored::Unanswered);
+        Stopping::lead(halt, &fresh).into_iter().chain(answers.as_ref().map(Answers::to_string)).chain(queued).collect()
+    }
+
+    fn queued<C: Clock, G: Shell>(&self, crew: &Crew<'_, C, G>) -> Option<String> {
+        let local = self.ground.local();
+        let file = local.queue()?;
+        match self.ground.queue(file) {
+            Ok(queue) => self.drained(crew, &local, &queue),
+            Err(unread) => Some(unread.to_string()),
+        }
+    }
+
+    fn drained<C: Clock, G: Shell>(&self, crew: &Crew<'_, C, G>, local: &Local, queue: &Queue) -> Option<String> {
+        queue.items().first()?;
+        let landed = local.repository().and_then(|repository| Hub::new(crew, crew.scratch(), repository).landed());
+        let drained = queue.clone().drained(&landed.unwrap_or_default(), |path| self.ground.kind(path));
+        let file = local.queue().filter(|_file| drained != *queue);
+        file.map(|rewritten| self.ground.queued(rewritten, &drained).ignoring(Ignored::Unrewritten));
+        drained.items().first().map(|_open| Queued(&drained).to_string())
     }
 }
 
 impl Queued<'_> {
-    const HEADER: &'static str = "Open items in transcripts/queue.md:";
+    const HEADER: &'static str = "Open items in the queue:";
 }
 
 impl fmt::Display for Queued<'_> {

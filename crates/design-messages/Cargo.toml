@@ -5,8 +5,6 @@ edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
-[package.metadata.store]
-
 [lib]
 test = false
 doctest = false
@@ -18,12 +16,8 @@ grammar = { path = "../grammar" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 store-ports = { path = "../store-ports" }
-strum.workspace = true
 thiserror.workspace = true
 transcript-ports = { path = "../transcript-ports" }
-
-[build-dependencies]
-console-ports = { path = "../console-ports" }
 
 [lints]
 workspace = true

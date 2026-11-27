@@ -2,7 +2,11 @@ invariants::ignored! {
     pub(crate) enum Ignored {
         Untasked => "a task folder, task file or task time that cannot be read holds no running task",
         Unpicked => "a selection reply that does not parse as the asked JSON quotes nothing, so the stop proceeds",
-        Unqueued => "a missing or unreadable queue file adds no queue section to a stalled stop",
+        Unreplied => "model output that does not parse as claude's JSON result is no reply, so it quotes nothing",
+        Unqueued => "a missing or unreadable queue file is an empty queue",
+        Unbodied => "a pull request body whose first line is not a spec line closes no spec item",
+        Undrained => "pull requests that cannot be listed close no queue item, so every item stays",
+        Unrewritten => "a drained queue that cannot be written back stays as it was, and the next stop drains it again",
         Untyped => "a last message that does not parse as DONE or BLOCKED is untyped and is sent back once",
         Unrun => "a gh or git call that cannot be started leaves its step unread, and an unread step is escalated",
         Unheaded => "a worktree head that does not read as a full commit sha counts as unpushed, so the worktree is kept",

@@ -2,7 +2,6 @@ use std::ffi::OsString;
 use std::io;
 use std::path::PathBuf;
 
-use dispatch_ports::DispatchFailure;
 use file_ports::FileFailure;
 use port_core::{ReleaseFailures, Snapshot};
 use store_ports::{Busy, StoreFailure, Unlock};
@@ -13,7 +12,7 @@ use crate::Outcome;
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
     #[error(
-        "usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | subagent-stop | pre-tool-use | post-tool-use | --settings))"
+        "usage: design [--workspace <dir>] (ingest [--dry-run] | hook (stop | subagent-stop | pre-tool-use | post-tool-use | --settings))"
     )]
     Usage,
     #[error("the environment does not name {0:?}")]
@@ -30,16 +29,18 @@ pub enum Failure {
     Store(#[from] StoreFailure),
     #[error("cannot release the design store lock: {0}")]
     Unlock(#[from] Unlock),
-    #[error("the reading agent could not be run: {0}")]
-    Dispatch(#[from] DispatchFailure),
     #[error("cannot hear the hook input: {0}")]
     Deaf(#[source] io::Error),
     #[error("cannot read the hook input: {0}")]
     Unheard(#[source] serde_json::Error),
-    #[error("cannot add the escalation to the discussion queue: {0}")]
+    #[error("cannot write the queue: {0}")]
     Unqueued(#[source] FileFailure),
-    #[error("cannot add the escalation to the discussion queue: the workspace local.toml names no absolute queue path")]
+    #[error("cannot write the queue: the workspace local.toml names no absolute queue path")]
     Unplaced,
+    #[error("the queue does not read as its typed TOML, so it is left as it is: {0}")]
+    Unparsed(#[source] toml::de::Error),
+    #[error("cannot render the queue as TOML: {0}")]
+    Unwritten(#[source] toml::ser::Error),
     #[error("cannot render the hook settings: {0}")]
     Render(#[source] serde_json::Error),
     #[error("a resource was not released cleanly: {0}")]

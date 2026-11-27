@@ -4,6 +4,7 @@ mod ignored;
 mod local;
 mod persistence;
 mod projects;
+mod queue;
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -18,6 +19,7 @@ pub use ground::Ground;
 pub use local::{Local, Repository};
 use projects::Projects;
 pub use projects::{Kept, Located};
+pub use queue::{Item, Landed, Queue, Target, Waits};
 
 #[derive(Debug)]
 pub struct Request {

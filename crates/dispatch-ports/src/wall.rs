@@ -6,9 +6,6 @@ use newtype::{Arbitrary, Newtype};
 pub struct Wall(i64);
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Moment(i64);
-
-#[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Timeout(u32);
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]

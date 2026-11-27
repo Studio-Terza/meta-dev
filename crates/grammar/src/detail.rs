@@ -27,6 +27,14 @@ enum Mark<'text> {
     Space,
 }
 
+#[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
+#[logos(crate = logos)]
+#[logos(skip r"[, ]+")]
+enum Listed<'text> {
+    #[regex("[a-z0-9-]+#D[0-9]+", |lexer| lexer.slice())]
+    Cite(&'text str),
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Cited<'text> {
     project: &'text str,
@@ -47,6 +55,14 @@ impl<'text> Cited<'text> {
             [Cite::Project(project), Cite::Detail(detail)] => Some(Cited { project, detail }),
             [Cite::Project(_) | Cite::Detail(_), _] => None,
         }
+    }
+
+    #[must_use]
+    pub fn each(text: &'text str) -> Vec<Cited<'text>> {
+        Listed::lexer(text)
+            .filter_map(|listed| listed.ignoring(Unlexed::NotThisGrammar))
+            .filter_map(|Listed::Cite(cite)| Cited::read(cite))
+            .collect()
     }
 
     fn numbered(digits: &str) -> Option<NonZeroU32> {

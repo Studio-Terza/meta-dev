@@ -3,23 +3,16 @@ use std::path::{Path, PathBuf};
 
 use grammar::RepositoryName;
 use invariants::Ignoring;
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Deserializer};
+use serde::Deserialize;
 
 use super::ignored::Ignored;
 
 #[derive(Debug, Default, Deserialize)]
 pub struct Local {
-    #[serde(default)]
-    repository: Keyed<Repository>,
-    #[serde(default)]
-    queue: Keyed<QueueFile>,
-    #[serde(default)]
-    specs: Keyed<SpecsFolder>,
+    repository: Option<Repository>,
+    queue: Option<Rooted>,
+    specs: Option<Rooted>,
 }
-
-#[derive(Debug)]
-struct Keyed<T>(Option<T>);
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(try_from = "String")]
@@ -30,19 +23,15 @@ pub struct Repository {
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(try_from = "PathBuf")]
-pub struct QueueFile(PathBuf);
-
-#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(try_from = "PathBuf")]
-pub struct SpecsFolder(PathBuf);
+pub struct Rooted(PathBuf);
 
 #[derive(Debug, thiserror::Error)]
-#[error("not a repository of the form owner/name")]
-pub struct Unrepositoried;
-
-#[derive(Debug, thiserror::Error)]
-#[error("not an absolute path")]
-pub struct Unrooted;
+pub enum Unconfigured {
+    #[error("not a repository of the form owner/name")]
+    Unrepositoried,
+    #[error("not an absolute path")]
+    Unrooted,
+}
 
 impl Local {
     pub fn written(text: &str) -> Local {
@@ -50,28 +39,15 @@ impl Local {
     }
 
     pub fn repository(&self) -> Option<&Repository> {
-        self.repository.0.as_ref()
+        self.repository.as_ref()
     }
 
-    pub fn queue(&self) -> Option<&QueueFile> {
-        self.queue.0.as_ref()
+    pub fn queue(&self) -> Option<&Rooted> {
+        self.queue.as_ref()
     }
 
-    pub fn specs(&self) -> Option<&SpecsFolder> {
-        self.specs.0.as_ref()
-    }
-}
-
-impl<T> Default for Keyed<T> {
-    fn default() -> Keyed<T> {
-        Keyed(None)
-    }
-}
-
-impl<'de, T: DeserializeOwned> Deserialize<'de> for Keyed<T> {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Keyed<T>, D::Error> {
-        let value = toml::Value::deserialize(deserializer)?;
-        Ok(Keyed(value.try_into().ignoring(Ignored::Unconfigured)))
+    pub fn specs(&self) -> Option<&Rooted> {
+        self.specs.as_ref()
     }
 }
 
@@ -86,10 +62,10 @@ impl Repository {
 }
 
 impl TryFrom<String> for Repository {
-    type Error = Unrepositoried;
+    type Error = Unconfigured;
 
-    fn try_from(text: String) -> Result<Repository, Unrepositoried> {
-        let read = RepositoryName::read(&text).ok_or(Unrepositoried)?;
+    fn try_from(text: String) -> Result<Repository, Unconfigured> {
+        let read = RepositoryName::read(&text).ok_or(Unconfigured::Unrepositoried)?;
         Ok(Repository { owner: read.owner().to_owned(), name: read.name().to_owned() })
     }
 }
@@ -100,32 +76,24 @@ impl fmt::Display for Repository {
     }
 }
 
-impl TryFrom<PathBuf> for QueueFile {
-    type Error = Unrooted;
+impl TryFrom<PathBuf> for Rooted {
+    type Error = Unconfigured;
 
-    fn try_from(path: PathBuf) -> Result<QueueFile, Unrooted> {
-        path.is_absolute().then_some(QueueFile(path)).ok_or(Unrooted)
+    fn try_from(path: PathBuf) -> Result<Rooted, Unconfigured> {
+        path.is_absolute().then_some(Rooted(path)).ok_or(Unconfigured::Unrooted)
     }
 }
 
-impl TryFrom<PathBuf> for SpecsFolder {
-    type Error = Unrooted;
-
-    fn try_from(path: PathBuf) -> Result<SpecsFolder, Unrooted> {
-        path.is_absolute().then_some(SpecsFolder(path)).ok_or(Unrooted)
-    }
-}
-
-impl AsRef<Path> for QueueFile {
+impl AsRef<Path> for Rooted {
     fn as_ref(&self) -> &Path {
         &self.0
     }
 }
 
-impl SpecsFolder {
+impl Rooted {
     const SPEC: &'static str = "md";
 
     pub fn spec(&self, project: &str) -> PathBuf {
-        self.0.join(project).with_extension(SpecsFolder::SPEC)
+        self.0.join(project).with_extension(Rooted::SPEC)
     }
 }

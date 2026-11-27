@@ -14,6 +14,7 @@ mod record;
 mod session;
 mod session_id;
 mod skipped;
+mod task_id;
 mod transcripts;
 mod unrecognised;
 mod uuid;
@@ -31,6 +32,7 @@ pub use record::Record;
 pub use session::Session;
 pub use session_id::SessionId;
 pub use skipped::Skipped;
+pub use task_id::TaskId;
 pub use transcripts::{Transcripts, transcripts_ops};
 pub use unrecognised::Unrecognised;
 pub use uuid::Uuid;
@@ -39,6 +41,7 @@ invariants::ignored! {
     pub(crate) enum Ignored {
         Unparsed => "a line that does not parse as an entry is kept as an unreadable unrecognised line",
         NotKnown => "a body whose tag is not a known kind, or that does not read as its kind, is read as unrecognised",
+        Unstopped => "a tool use that does not read as a TaskStop naming a task stops no task",
         Oversized => "text pieces whose join passes u32::MAX bytes say nothing",
     }
 }

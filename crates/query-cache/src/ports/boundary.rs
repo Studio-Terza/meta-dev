@@ -21,8 +21,4 @@ impl Disk {
     pub fn held(path: PathBuf) -> Option<PathBuf> {
         Some(path).filter(|candidate| candidate.is_file())
     }
-
-    pub fn listed(directory: &Path) -> io::Result<Vec<PathBuf>> {
-        fs::read_dir(directory)?.map(|entry| entry.map(|found| found.path())).collect()
-    }
 }

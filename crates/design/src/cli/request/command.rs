@@ -1,13 +1,11 @@
 mod crew;
 mod hook;
 mod ingest;
-mod stops;
 
 use std::path::PathBuf;
 
 use console_ports::{Environment, Shown};
-use design_messages::StopTrail;
-use dispatch_ports::{Clock, Dispatch, Shell};
+use dispatch_ports::{Clock, Shell};
 use file_ports::Files;
 use store_ports::{Opens, Store};
 use strum::VariantArray;
@@ -20,19 +18,16 @@ use crate::{HookEvent, Outcome};
 pub use crew::Crew;
 use hook::Hook;
 use ingest::Ingest;
-use stops::Trail;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Command {
     Ingest(Persistence),
-    Stops,
     Hook(Hook),
 }
 
 impl Command {
     const INGEST: &'static str = "ingest";
     const DRY_RUN: &'static str = "--dry-run";
-    const STOPS: &'static str = "stops";
     const HOOK: &'static str = "hook";
     const SETTINGS: &'static str = "--settings";
 
@@ -40,7 +35,6 @@ impl Command {
         match words {
             [Self::INGEST] => Ok(Command::Ingest(Persistence::File)),
             [Self::INGEST, Self::DRY_RUN] => Ok(Command::Ingest(Persistence::DryRun)),
-            [Self::STOPS] => Ok(Command::Stops),
             [Self::HOOK, Self::SETTINGS] => Ok(Command::Hook(Hook::Settings)),
             [Self::HOOK, event] => Hook::named(event).map(Command::Hook),
             _ => Err(Failure::Usage),
@@ -50,24 +44,19 @@ impl Command {
     pub fn opened<O: Opens>(self, path: PathBuf, opens: &O) -> O::Store {
         match self {
             Command::Ingest(persistence) => persistence.opened(path, opens),
-            Command::Stops | Command::Hook(_) => Persistence::File.opened(path, opens),
+            Command::Hook(_) => Persistence::File.opened(path, opens),
         }
     }
 
-    pub fn written<F: Files, S: Store, D: Dispatch, C: Clock, G: Shell>(
+    pub fn written<F: Files + Clone, S: Store, C: Clock, G: Shell>(
         self,
         environment: &impl Environment,
-        ground: Ground<'_, F, S>,
-        crew: &Crew<'_, D, C, G>,
+        ground: &Ground<'_, F, S>,
+        crew: &Crew<'_, C, G>,
     ) -> Result<Uttered, Failure> {
         match self {
             Command::Ingest(_) => Ingest::read(ground.store(), &ground.transcripts())
                 .map(|tally| Uttered::new(Shown::said(tally), Ok(Outcome::Ingested))),
-            Command::Stops => ground
-                .store()
-                .read(StopTrail)
-                .map(|rows| Uttered::new(Shown::said(Trail::from(rows)), Ok(Outcome::Trailed)))
-                .map_err(Failure::from),
             Command::Hook(hook) => hook.answered(environment, ground, crew),
         }
     }

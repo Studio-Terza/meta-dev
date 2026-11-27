@@ -1,9 +1,10 @@
+use grammar::TaskNotice;
 use invariants::Ignoring;
 
 use super::object::Object;
 use super::said::Hears;
 use super::stamp::Stamp;
-use crate::{Authorship, Body, Ignored, Line, Skipped, Unrecognised};
+use crate::{Authorship, Body, Ignored, Line, Skipped, TaskId, Unrecognised};
 
 #[derive(strum::EnumString, Clone, Copy, Debug)]
 #[strum(serialize_all = "kebab-case")]
@@ -32,11 +33,12 @@ impl Source {
     fn spoke(self, stamp: Stamp, text: Body) -> Line {
         match self {
             Source::Human => stamp.said(Authorship::Owner, text),
-            Source::TaskNotification
-            | Source::Unclassified
-            | Source::Coordinator
-            | Source::Peer
-            | Source::AutoContinuation => Line::Skipped(Skipped::from(stamp)),
+            Source::TaskNotification => TaskNotice::read(text.as_ref())
+                .and_then(|notice| TaskId::try_new(notice.task().to_owned()).ignoring(Ignored::Unstopped))
+                .map_or_else(|| Line::Skipped(Skipped::from(stamp)), Line::Ended),
+            Source::Unclassified | Source::Coordinator | Source::Peer | Source::AutoContinuation => {
+                Line::Skipped(Skipped::from(stamp))
+            }
         }
     }
 }

@@ -1,40 +1,29 @@
 lines "": [] [] []
 lines "a\tb\n\nc\r\nd": ["a\tb", "", "c\r", "d"] ["a\tb\n", "\n", "c\r\n", "d"] [["a", "b"], [], ["c\r"], ["d"]]
 lines "\t\tx\t\n": ["\t\tx\t"] ["\t\tx\t\n"] [["x"]]
-stamp "Fri Nov  6 01:16:00 2026    \n": Ok((["Fri", "Nov"], [6, 1, 16, 0, 2026]))
-stamp "Wed Sep 30 22:11:39 2026": Ok((["Wed", "Sep"], [30, 22, 11, 39, 2026]))
-stamp "Fri Nov  6 01:16 2026": Err(Unshaped("Fri Nov  6 01:16 2026"))
-stamp "Fri Nov  6 01:16:00": Err(Unshaped("Fri Nov  6 01:16:00"))
-stamp "Fri Nov  6 01:16:00 2026 2027": Err(Unshaped("Fri Nov  6 01:16:00 2026 2027"))
-stamp "Fri Nov  6 01:16 00:2026": Err(Unshaped("Fri Nov  6 01:16 00:2026"))
-stamp "Fri Nov  6 01:16:00 Sat": Err(Misplaced("Fri Nov  6 01:16:00 Sat"))
-stamp "Fri 11  6 01:16:00 2026": Err(Misplaced("Fri 11  6 01:16:00 2026"))
-stamp "fri Nov  6 01:16:00 2026": Err(Unshaped("fri Nov  6 01:16:00 2026"))
-stamp "Fri Nov  6 01:16:00 99999": Err(Unshaped("Fri Nov  6 01:16:00 99999"))
-stamp "": Err(Unshaped(""))
-reply "place(a.0, n1, about)": Some(21)
-reply "  x  ": Some(5)
-reply "x\ny": Some(3)
-reply "": None
-reply " \n\t": None
-reply "x\0y": None
-reply "\0": None
+notice "<task-notification>\n<task-id>bhyzfnpyp</task-id>\n<status>killed</status>\n</task-notification>": Some("bhyzfnpyp")
+notice "<task-id>a26ca09f4c3ef4cfd</task-id><task-id>second</task-id>": Some("a26ca09f4c3ef4cfd")
+notice "<task-id></task-id>": None
+notice "<task-id>open": None
+notice "no notice here": None
+notice "": None
+stem "bjjcy92fd": Some([Some("bjjcy92fd"), None])
+stem "a26ca09f4c3ef4cfd": Some([Some("a26ca09f4c3ef4cfd"), None])
+stem "agent-a26ca09f4c3ef4cfd": Some([Some("a26ca09f4c3ef4cfd"), None])
+stem "agent-anoskip-0bb9aacb9e503d6c": Some([Some("anoskip-0bb9aacb9e503d6c"), Some("noskip")])
+stem "agent-ab0-sample-83f6552a698d193e": Some([Some("ab0-sample-83f6552a698d193e"), Some("b0-sample")])
+stem "agent-abusy": Some([Some("agent-abusy"), None])
+stem "a/b": None
+stem "": None
+cited "process-rebuild#D1": ["process-rebuild 1"]
+cited "process-rebuild#D1, process-rebuild#D2": ["process-rebuild 1", "process-rebuild 2"]
+cited "a#D1,b#D2 c": ["a 1", "b 2"]
+cited "none": []
+cited "": []
 slug "/Users/me/my_repo": "-Users-me-my-repo"
 slug "abc123": "abc123"
 slug "a.b é": "a-b--"
 slug "": ""
-migration "20261106000000_stream.sql": Some((20261106000000, "stream"))
-migration "20261106000005_applied_files.sql": Some((20261106000005, "applied files"))
-migration "20261107000002_unicode_trimmed_segments.sql": Some((20261107000002, "unicode trimmed segments"))
-migration "1_a2b.sql": Some((1, "a2b"))
-migration "20261106000000.sql": None
-migration "20261106000000_.sql": None
-migration "20261106000000_stream": None
-migration "20261106000000_stream.up.sql": None
-migration "stream_20261106000000.sql": None
-migration "20261106000000__stream.sql": None
-migration "99999999999999999999_stream.sql": None
-migration "": None
 bare "abc": Some("abc")
 bare "_a-9": Some("_a-9")
 bare "msg:1": None

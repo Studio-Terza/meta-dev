@@ -2,7 +2,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use invariants::Ignoring;
 
-use super::{Deadline, Moment, Pause, Timeout, Wall};
+use super::{Deadline, Pause, Timeout, Wall};
 use crate::Ignored;
 
 impl Deadline {
@@ -12,39 +12,10 @@ impl Deadline {
     }
 }
 
-impl Wall {
-    #[must_use]
-    pub fn after(self, pause: Pause) -> Wall {
-        Wall(self.0.saturating_add(i64::from(pause.0)))
-    }
-}
-
 impl From<SystemTime> for Wall {
     fn from(time: SystemTime) -> Wall {
         let seconds = time.duration_since(UNIX_EPOCH).ignoring(Ignored::BeforeEpoch).unwrap_or_default().as_secs();
         Wall(i64::try_from(seconds).ignoring(Ignored::BeyondRange).unwrap_or(i64::MAX))
-    }
-}
-
-impl From<SystemTime> for Moment {
-    fn from(time: SystemTime) -> Moment {
-        let millis = time.duration_since(UNIX_EPOCH).ignoring(Ignored::BeforeEpoch).unwrap_or_default().as_millis();
-        Moment(i64::try_from(millis).ignoring(Ignored::BeyondRange).unwrap_or(i64::MAX))
-    }
-}
-
-impl From<Wall> for Moment {
-    fn from(wall: Wall) -> Moment {
-        Moment(wall.0.saturating_mul(Moment::PER_SECOND))
-    }
-}
-
-impl Moment {
-    const PER_SECOND: i64 = 1000;
-
-    #[must_use]
-    pub fn since(self, start: Moment) -> i64 {
-        self.0.saturating_sub(start.0)
     }
 }
 
