@@ -1,12 +1,23 @@
 use std::path::{Path, PathBuf};
 
 use design_messages::PullNumber;
+use dispatch_ports::{Clock, Dispatch, Ran, Shell, Timeout};
 use grammar_git::{MergeCommand, Worktree};
 use invariants::Ignoring;
 use serde::Deserialize;
 
 use super::super::subagent::{Branch, CommitSha};
+use super::Releasing;
 use crate::cli::request::ignored::Ignored;
+
+impl<D: Dispatch, C: Clock, G: Shell> Releasing<'_, '_, D, C, G> {
+    const PROGRAM: &'static str = "git";
+    const QUICK: Timeout = Timeout::new(60);
+
+    pub(super) fn git(&self, arguments: &[&str], directory: &Path) -> Option<Ran> {
+        self.crew.spoke(Self::PROGRAM, arguments, directory, Self::QUICK)
+    }
+}
 
 #[derive(Debug, Deserialize)]
 pub struct Used {

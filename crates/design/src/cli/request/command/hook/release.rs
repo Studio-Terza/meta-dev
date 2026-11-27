@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use console_ports::Heard;
 use design_messages::PullNumber;
-use dispatch_ports::{Clock, Dispatch, Ran, Shell, Timeout};
+use dispatch_ports::{Clock, Dispatch, Ran, Shell};
 use file_ports::Files;
 use grammar_git::Worktrees;
 use newtype::Wrapping;
@@ -93,9 +93,6 @@ impl Used {
 }
 
 impl<D: Dispatch, C: Clock, G: Shell> Releasing<'_, '_, D, C, G> {
-    const PROGRAM: &'static str = "git";
-    const QUICK: Timeout = Timeout::new(60);
-
     fn released(&self, local: &Local) -> Result<Released, Holding> {
         let repository = local.repository().ok_or(Holding::from(Held::NoRepository))?;
         let hub = Hub::new(self.crew, self.directory, repository);
@@ -124,10 +121,6 @@ impl<D: Dispatch, C: Clock, G: Shell> Releasing<'_, '_, D, C, G> {
         let path = pushed.as_ref().to_string_lossy();
         let removed = self.git(&["worktree", "remove", &path], self.directory);
         removed.as_ref().and_then(Ran::succeeded).map(|_removed| Released::Removed).ok_or_else(|| held(Held::Unremoved))
-    }
-
-    fn git(&self, arguments: &[&str], directory: &Path) -> Option<Ran> {
-        self.crew.spoke(Self::PROGRAM, arguments, directory, Self::QUICK)
     }
 }
 

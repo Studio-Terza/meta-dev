@@ -1,5 +1,4 @@
 mod boundary;
-mod hub;
 
 use std::fmt;
 use std::path::Path;
@@ -8,7 +7,6 @@ use console_ports::Heard;
 use design_messages::{CheckName, FailedBefore, Failing};
 use dispatch_ports::{Clock, Dispatch, Shell};
 use file_ports::Files;
-use grammar::Lines;
 use invariants::Ignoring;
 use newtype::Wrapping;
 use store_ports::Store;
@@ -21,10 +19,8 @@ use crate::cli::request::Local;
 use crate::cli::request::ignored::Ignored;
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
-use boundary::{At, Branched, JobId, Pushed, Reminder, Report, Said};
-pub use boundary::{Branch, CommitSha, Finishing};
-pub use hub::Hub;
-use hub::{Mergeability, Unopened, Verdict};
+use boundary::{At, Branched, JobId, Mergeability, Pushed, Reminder, Report, Said, Tail, Unopened, Verdict};
+pub use boundary::{Branch, CommitSha, Finishing, Hub};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ending {
@@ -103,7 +99,7 @@ struct Logged {
 #[derive(Debug)]
 struct Excerpt {
     failed: FailedJob,
-    lines: Vec<String>,
+    lines: Tail,
 }
 
 #[derive(Debug)]
@@ -217,26 +213,13 @@ impl FailedJob {
 }
 
 impl Logged {
-    const LINES: usize = 40;
-
     fn fetched<D: Dispatch, C: Clock, G: Shell>(
         pushed: Pushed,
         failed: &[FailedJob],
         hub: &Hub<'_, D, C, G>,
     ) -> Logged {
-        let jobs = failed.iter().map(|job| Excerpt::tailed(job.clone(), &hub.log(job.job))).collect();
+        let jobs = failed.iter().map(|job| Excerpt { failed: job.clone(), lines: hub.log(job.job) }).collect();
         Logged { pushed, jobs }
-    }
-}
-
-impl Excerpt {
-    fn tailed(failed: FailedJob, log: &str) -> Excerpt {
-        let whole: Vec<String> = match log.parse::<Lines>() {
-            Ok(lines) => lines.into_iter().collect(),
-            Err(unsplit) => match unsplit {},
-        };
-        let skipped = whole.len().saturating_sub(Logged::LINES);
-        Excerpt { failed, lines: whole.into_iter().skip(skipped).collect() }
     }
 }
 
@@ -305,8 +288,7 @@ impl fmt::Display for Logged {
             self.pushed.head()
         )?;
         self.jobs.iter().try_for_each(|Excerpt { failed: FailedJob { check, job }, lines }| {
-            write!(formatter, "\n{check} (job {job}):\n")?;
-            lines.iter().try_for_each(|line| writeln!(formatter, "{line}"))
+            write!(formatter, "\n{check} (job {job}):\n{lines}")
         })
     }
 }

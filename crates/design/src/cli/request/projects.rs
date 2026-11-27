@@ -1,4 +1,4 @@
-mod slug;
+mod boundary;
 
 use std::ffi::{OsStr, OsString};
 use std::path::{Component, Path, PathBuf};
@@ -8,7 +8,7 @@ use file_ports::Files;
 use transcript_ports::ClaudeCodeDir;
 
 use crate::cli::failure::Failure;
-use slug::Slug;
+use boundary::Slug;
 
 #[derive(Debug)]
 pub(crate) struct Projects;

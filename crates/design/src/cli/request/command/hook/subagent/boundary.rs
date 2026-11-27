@@ -1,3 +1,5 @@
+mod hub;
+
 use std::fmt;
 use std::num::{NonZeroU32, NonZeroU64};
 use std::path::{Path, PathBuf};
@@ -12,6 +14,30 @@ use newtype::{Display, Newtype};
 use serde::Deserialize;
 
 use crate::cli::request::ignored::Ignored;
+pub use hub::Hub;
+pub(super) use hub::{Mergeability, Unopened, Verdict};
+
+#[derive(Debug)]
+pub(crate) struct Tail(Vec<String>);
+
+impl Tail {
+    const LINES: usize = 40;
+
+    fn of(log: &str) -> Tail {
+        let whole: Vec<String> = match log.parse::<grammar::Lines>() {
+            Ok(lines) => lines.into_iter().collect(),
+            Err(unsplit) => match unsplit {},
+        };
+        let skipped = whole.len().saturating_sub(Tail::LINES);
+        Tail(whole.into_iter().skip(skipped).collect())
+    }
+}
+
+impl fmt::Display for Tail {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.iter().try_for_each(|line| writeln!(formatter, "{line}"))
+    }
+}
 
 #[derive(Debug, Deserialize)]
 pub struct Finishing {

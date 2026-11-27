@@ -1,4 +1,4 @@
-mod count;
+mod boundary;
 mod failure;
 pub(crate) mod outcome;
 mod request;
@@ -13,7 +13,7 @@ use file_ports::Files;
 use port_core::Run;
 use store_ports::Opens;
 
-pub(crate) use count::Count;
+pub(crate) use boundary::Count;
 pub use failure::Failure;
 use request::{Crew, Ground, Kept, Request};
 use uttered::{Settled, Uttered};

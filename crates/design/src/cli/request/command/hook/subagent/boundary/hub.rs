@@ -12,10 +12,10 @@ use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use store_ports::Store;
 
-use super::super::super::Ground;
-use super::super::super::crew::Crew;
-use super::boundary::{Branch, Branched, CommitSha, Compared, First, JobId, Opened, Pushed};
-use super::{FailedJob, UnreadStep};
+use super::super::super::super::Ground;
+use super::super::super::super::crew::Crew;
+use super::super::{FailedJob, UnreadStep};
+use super::{Branch, Branched, CommitSha, Compared, First, JobId, Opened, Pushed, Tail};
 use crate::cli::request::ignored::Ignored;
 use crate::cli::request::{Local, Repository};
 
@@ -242,9 +242,10 @@ impl<'crew, D: Dispatch, C: Clock, G: Shell> Hub<'crew, D, C, G> {
         Verdict::read(&checks).ok_or(UnreadStep::Checks)
     }
 
-    pub(crate) fn log(&self, job: JobId) -> String {
+    pub(crate) fn log(&self, job: JobId) -> Tail {
         let ran = self.ran(&["run", "view", "--job", &job.to_string(), "--log-failed"], Self::QUICK);
-        ran.as_ref().and_then(Ran::succeeded).map_or_else(|| Hub::<D, C, G>::UNLOGGED.to_owned(), ToString::to_string)
+        let printed = ran.as_ref().and_then(Ran::succeeded);
+        Tail::of(printed.map_or(Hub::<D, C, G>::UNLOGGED, AsRef::as_ref))
     }
 }
 
