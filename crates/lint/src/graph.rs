@@ -1,14 +1,10 @@
 use std::sync::Arc;
 
-use syn::visit::Visit;
-
-use crate::finding::{Finding, Rule};
+use crate::finding::Finding;
 use crate::source::Source;
 use crate::workspace::Package;
 
-pub(crate) trait Graph<'file>: Sized + for<'ast> Visit<'ast> {
-    const RULE: Rule;
-
+pub(crate) trait Graph<'file>: Sized {
     type Fact: Send;
 
     fn new(source: &'file Source) -> Self;

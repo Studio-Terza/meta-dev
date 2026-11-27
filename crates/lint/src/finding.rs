@@ -3,12 +3,7 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::sync::Arc;
 
-mod boundary;
-
 use proc_macro2::Span;
-
-use boundary::Problem;
-pub(crate) use boundary::{Fix, Line};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Rule {
@@ -25,14 +20,11 @@ pub(crate) enum Rule {
     NoTestOnlyApi,
     BoolMethods,
     NoDyn,
-    PrimitiveBoundary,
-    TestShape,
-    DeadCode,
 }
 
-impl fmt::Display for Rule {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
+impl Rule {
+    fn headline(self) -> &'static str {
+        match self {
             Rule::NoComments => "comments are not allowed in this repository",
             Rule::NoFreeFns => "free functions are not allowed; make them associated functions or methods",
             Rule::VecOutParams => {
@@ -52,43 +44,24 @@ impl fmt::Display for Rule {
             Rule::NoDyn => {
                 "no dyn: every type is known at compile time, so code takes a generic, returns impl Trait or names an enum instead of a trait object"
             }
-            Rule::PrimitiveBoundary => {
-                "primitives stay at the boundary: outside a module named boundary, signatures, fields and variants carry types with meaning"
-            }
-            Rule::TestShape => {
-                "tests run production code paths: no literals in a test body and no test helpers beyond a test table"
-            }
-            Rule::DeadCode => "every pub item is named by another workspace crate",
-        })
-    }
-}
-
-impl fmt::Display for Fix {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(self.0)
-    }
-}
-
-impl Line {
-    pub(crate) fn of(span: Span) -> Line {
-        Line::new(span.start().line)
+        }
     }
 }
 
 #[derive(Debug)]
 pub(crate) struct Found {
-    line: Line,
-    problem: Problem,
-    fix: Fix,
+    line: usize,
+    problem: String,
+    fix: &'static str,
 }
 
 impl Found {
-    pub(crate) fn at(line: Line, problem: impl fmt::Display, fix: Fix) -> Found {
-        Found { line, problem: Problem(problem.to_string()), fix }
+    pub(crate) fn at(line: usize, problem: impl fmt::Display, fix: &'static str) -> Found {
+        Found { line, problem: problem.to_string(), fix }
     }
 
-    pub(crate) fn spanned(span: Span, problem: impl fmt::Display, fix: Fix) -> Found {
-        Found::at(Line::of(span), problem, fix)
+    pub(crate) fn spanned(span: Span, problem: impl fmt::Display, fix: &'static str) -> Found {
+        Found::at(span.start().line, problem, fix)
     }
 
     pub(crate) fn in_file(self, rule: Rule, path: &Arc<Path>) -> Finding {
@@ -112,9 +85,9 @@ impl Findings {
             (earlier.rule, &earlier.path, earlier.found.line).cmp(&(later.rule, &later.path, later.found.line))
         });
         self.0.chunk_by(|earlier, later| earlier.rule == later.rule).try_for_each(|group| {
-            group.first().map_or(Ok(()), |leading| writeln!(err, "{}:", leading.rule))?;
+            group.first().map_or(Ok(()), |leading| writeln!(err, "{}:", leading.rule.headline()))?;
             group.iter().try_for_each(|finding| {
-                let Found { line, problem: Problem(problem), fix } = &finding.found;
+                let Found { line, problem, fix } = &finding.found;
                 writeln!(err, "{}:{line}: {problem}; {fix}", finding.path.display())
             })
         })

@@ -13,12 +13,12 @@ impl Disk {
         env::var_os(Self::MANIFEST).map_or_default(PathBuf::from)
     }
 
-    pub(crate) fn text(path: &Path) -> io::Result<String> {
+    pub fn text(path: &Path) -> io::Result<String> {
         fs::read_to_string(path)
     }
 
     #[must_use]
-    pub(crate) fn held(path: PathBuf) -> Option<PathBuf> {
+    pub fn held(path: PathBuf) -> Option<PathBuf> {
         Some(path).filter(|candidate| candidate.is_file())
     }
 

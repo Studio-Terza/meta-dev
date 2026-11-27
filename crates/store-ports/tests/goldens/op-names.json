@@ -1,5 +1,0 @@
-[
-  "design_messages::session_cursors::SessionCursors",
-  "store_ports::store::store_ops::Store::lock",
-  "store_ports::store_lock::StoreLock::release"
-]

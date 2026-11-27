@@ -16,7 +16,7 @@ use query_cache::{Entry, Unexpanded};
 use typed::{ColumnName, Typed};
 
 #[derive(Debug)]
-pub(crate) struct Query {
+pub struct Query {
     row: Option<Type>,
     source: LitStr,
     bounds: Punctuated<Bound, Token![,]>,

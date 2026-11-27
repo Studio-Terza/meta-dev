@@ -1,22 +1,29 @@
-use std::fmt;
+use std::ptr;
 
 use syn::spanned::Spanned;
-use syn::visit::{self, Visit};
 use syn::{
     Field, FnArg, GenericArgument, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, Macro, PathArguments, ReturnType,
     Signature, Type, TypePath, TypeTuple,
 };
 
-use crate::expansion::Expansion;
-use crate::finding::{Fix, Found, Rule};
+use crate::finding::{Found, Rule};
 use crate::gate::Gate;
 use crate::source::Source;
 use crate::style::{Reads, Style};
-use crate::word::Word;
+use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Debug, Default)]
 pub(crate) struct TypeShape {
     found: Vec<Found>,
+    roots: Vec<*const Type>,
+    marks: Vec<usize>,
+    open: Option<Root>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Root {
+    at: *const Type,
+    line: usize,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -25,75 +32,89 @@ enum Shape {
     StringError,
 }
 
-#[derive(Debug, Default)]
-struct Shapes(Vec<Shape>);
-
-impl fmt::Display for Shape {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
+impl Shape {
+    fn problem(self) -> &'static str {
+        match self {
             Shape::Tuple => "tuple in a signature or field",
             Shape::StringError => "Result with a String error",
-        })
+        }
     }
-}
 
-impl Shape {
-    fn fix(self) -> Fix {
+    fn fix(self) -> &'static str {
         match self {
-            Shape::Tuple => Fix("values that travel together are a struct"),
-            Shape::StringError => Fix("errors are an enum with thiserror"),
+            Shape::Tuple => "values that travel together are a struct",
+            Shape::StringError => "errors are an enum with thiserror",
         }
     }
 }
 
 impl TypeShape {
-    const BOOL_FIX: Fix = Fix("a stored flag is a stored mode, make it an enum or a type parameter");
-    const BOOL: Word = Word("bool");
-    const STRING: Word = Word("String");
+    const BOOL_FIX: &'static str = "a stored flag is a stored mode, make it an enum or a type parameter";
 
-    fn rooted(&mut self, ty: &Type) {
-        let mut shapes = Shapes::default();
-        shapes.visit_type(ty);
-        let span = ty.span();
-        self.found.extend(shapes.0.into_iter().map(|shape| Found::spanned(span, shape, shape.fix())));
+    fn rooted<'ty>(&mut self, roots: impl Iterator<Item = &'ty Type>) -> Descent {
+        self.marks.push(self.roots.len());
+        self.roots.extend(roots.map(ptr::from_ref));
+        Descent::Into
     }
 
-    fn fields<'field>(&mut self, fields: impl Iterator<Item = &'field Field>) {
-        fields.for_each(|field| {
-            let flag = TypeShape::BOOL.last(&field.ty);
-            let span = field.ident.as_ref().map_or_else(|| field.ty.span(), syn::Ident::span);
-            self.found.extend(flag.map(|_| Found::spanned(span, "bool field", TypeShape::BOOL_FIX)));
-            self.rooted(&field.ty);
-        });
+    fn unrooted(&mut self) {
+        let mark = self.marks.pop().unwrap_or_default();
+        self.roots.truncate(mark);
+    }
+
+    fn shaped(&mut self, seen: Option<Shape>) {
+        let found = self.open.zip(seen).map(|(root, shape)| Found::at(root.line, shape.problem(), shape.fix()));
+        self.found.extend(found);
+    }
+
+    fn last_named(ty: &Type, name: &str) -> Option<()> {
+        match ty {
+            Type::Path(TypePath { path, .. }) => {
+                path.segments.last().filter(|segment| segment.ident == name).map(|_| ())
+            }
+            _ => None,
+        }
     }
 }
 
-impl<'ast> Visit<'ast> for TypeShape {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Gate::of(&module.attrs).entered().map_or_default(|()| visit::visit_item_mod(self, module));
+impl Hooks for TypeShape {
+    fn item_mod(&mut self, module: &ItemMod) -> Descent {
+        Descent::from(Gate::of(&module.attrs).entered())
     }
 
-    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        Gate::inherent(item).entered().map_or_default(|()| visit::visit_item_impl(self, item));
+    fn item_impl(&mut self, item: &ItemImpl) -> Descent {
+        Descent::from(Gate::inherent(item).entered())
     }
 
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Expansion::of(invocation).walk(self);
+    fn macro_called(&mut self, _: &Macro) -> Expanded {
+        self.open.map_or(Expanded::Statements, |_| Expanded::Nothing)
     }
 
-    fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
-        self.fields(item.fields.iter());
+    fn item_struct(&mut self, item: &ItemStruct) -> Descent {
+        self.rooted(item.fields.iter().map(|field| &field.ty))
     }
 
-    fn visit_item_enum(&mut self, item: &'ast ItemEnum) {
-        self.fields(item.variants.iter().flat_map(|variant| variant.fields.iter()));
+    fn left_item_struct(&mut self, _: &ItemStruct) {
+        self.unrooted();
     }
 
-    fn visit_item_type(&mut self, item: &'ast ItemType) {
-        self.rooted(&item.ty);
+    fn item_enum(&mut self, item: &ItemEnum) -> Descent {
+        self.rooted(item.variants.iter().flat_map(|variant| variant.fields.iter()).map(|field| &field.ty))
     }
 
-    fn visit_signature(&mut self, signature: &'ast Signature) {
+    fn left_item_enum(&mut self, _: &ItemEnum) {
+        self.unrooted();
+    }
+
+    fn item_type(&mut self, item: &ItemType) -> Descent {
+        self.rooted([&*item.ty].into_iter())
+    }
+
+    fn left_item_type(&mut self, _: &ItemType) {
+        self.unrooted();
+    }
+
+    fn signature(&mut self, signature: &Signature) -> Descent {
         let inputs = signature.inputs.iter().filter_map(|input| match input {
             FnArg::Typed(typed) => Some(&*typed.ty),
             FnArg::Receiver(_) => None,
@@ -102,17 +123,39 @@ impl<'ast> Visit<'ast> for TypeShape {
             ReturnType::Type(_, returned) => Some(&**returned),
             ReturnType::Default => None,
         };
-        inputs.chain(output).for_each(|ty| self.rooted(ty));
-    }
-}
-
-impl<'ast> Visit<'ast> for Shapes {
-    fn visit_type_tuple(&mut self, tuple: &'ast TypeTuple) {
-        self.0.extend(tuple.elems.first().map(|_| Shape::Tuple));
-        visit::visit_type_tuple(self, tuple);
+        self.rooted(inputs.chain(output))
     }
 
-    fn visit_type_path(&mut self, path: &'ast TypePath) {
+    fn left_signature(&mut self, _: &Signature) {
+        self.unrooted();
+    }
+
+    fn field(&mut self, field: &Field) -> Descent {
+        let rooted = self.roots.contains(&ptr::from_ref(&field.ty));
+        let flag = Some(()).filter(|()| rooted).and_then(|()| TypeShape::last_named(&field.ty, "bool"));
+        let span = field.ident.as_ref().map_or_else(|| field.ty.span(), syn::Ident::span);
+        self.found.extend(flag.map(|()| Found::spanned(span, "bool field", TypeShape::BOOL_FIX)));
+        Descent::Into
+    }
+
+    fn ty(&mut self, ty: &Type) -> Descent {
+        let at = ptr::from_ref(ty);
+        let opened = self.open.xor(Some(Root { at, line: ty.span().start().line }));
+        self.open = self.open.or(opened.filter(|_| self.roots.contains(&at)));
+        Descent::Into
+    }
+
+    fn left_ty(&mut self, ty: &Type) {
+        let closing = self.open.filter(|root| ptr::eq(root.at, ty));
+        self.open = self.open.xor(closing);
+    }
+
+    fn type_tuple(&mut self, tuple: &TypeTuple) -> Descent {
+        self.shaped(tuple.elems.first().map(|_| Shape::Tuple));
+        Descent::Into
+    }
+
+    fn type_path(&mut self, path: &TypePath) -> Descent {
         let result = path.path.segments.last().filter(|segment| segment.ident == "Result");
         let error = result
             .and_then(|segment| match &segment.arguments {
@@ -120,11 +163,11 @@ impl<'ast> Visit<'ast> for Shapes {
                 PathArguments::None | PathArguments::Parenthesized(_) => None,
             })
             .and_then(|argument| match argument {
-                GenericArgument::Type(error) => TypeShape::STRING.last(error),
+                GenericArgument::Type(error) => TypeShape::last_named(error, "String"),
                 _ => None,
             });
-        self.0.extend(error.map(|_| Shape::StringError));
-        visit::visit_type_path(self, path);
+        self.shaped(error.map(|()| Shape::StringError));
+        Descent::Into
     }
 }
 

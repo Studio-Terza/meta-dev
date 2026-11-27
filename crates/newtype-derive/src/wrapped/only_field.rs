@@ -2,7 +2,7 @@ use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{Data, DataStruct, DeriveInput, Error, Field, Fields, FieldsNamed, FieldsUnnamed, Index, Member, Type};
 
-pub(crate) struct OnlyField {
+pub struct OnlyField {
     member: Member,
     inner: Type,
 }
@@ -12,7 +12,7 @@ impl OnlyField {
     const ONLY: usize = 1;
     const FIRST: u32 = 0;
 
-    pub(crate) fn taken(data: Data) -> Result<OnlyField, Data> {
+    pub fn taken(data: Data) -> Result<OnlyField, Data> {
         match data {
             Data::Struct(DataStruct { struct_token, fields, semi_token }) => Self::among(fields)
                 .map_err(|returned| Data::Struct(DataStruct { struct_token, fields: returned, semi_token })),
@@ -20,15 +20,15 @@ impl OnlyField {
         }
     }
 
-    pub(crate) fn refused(input: DeriveInput) -> Error {
+    pub fn refused(input: DeriveInput) -> Error {
         Error::new_spanned(input, Self::REFUSED)
     }
 
-    pub(crate) fn member(&self) -> &Member {
+    pub fn member(&self) -> &Member {
         &self.member
     }
 
-    pub(crate) fn inner(&self) -> &Type {
+    pub fn inner(&self) -> &Type {
         &self.inner
     }
 

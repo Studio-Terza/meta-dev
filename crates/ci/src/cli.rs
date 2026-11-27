@@ -1,43 +1,60 @@
-mod command;
-mod ignored;
-pub mod ports;
-
 use std::ffi::OsString;
+use std::io::Write;
+use std::path::PathBuf;
+use std::process::ExitCode;
 
-use console_ports::Teller;
+use invariants::Ignoring;
 
-pub use command::Unfolding;
-use command::{Command, Failure, Telling};
-use ports::Ports;
+use crate::failure::Failure;
+use crate::ignored::Ignored;
+use crate::mutants::{Plan, Prior};
+use crate::timed::Timed;
 
 #[derive(Debug)]
-pub struct Cli<'ports, P: Ports> {
-    command: Result<Command, Failure<'static>>,
-    ports: &'ports P,
+pub enum Cli {
+    Timed(Timed),
+    Plan(Plan),
+    Usage,
 }
 
-impl<'ports, P: Ports> Cli<'ports, P> {
-    pub fn parsed(arguments: impl Iterator<Item = OsString>, ports: &'ports P) -> Cli<'ports, P> {
-        Cli { command: Command::parse(arguments), ports }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Exit {
+    Passed,
+    Failed,
+}
+
+impl Cli {
+    const TIMED: &'static str = "timed";
+    const PLAN: &'static str = "mutants-plan";
+    const SINCE: &'static str = "--since";
+
+    #[must_use]
+    pub fn from_args(arguments: &[OsString]) -> Cli {
+        match arguments {
+            [name, limits, stage, flag, mark, program, rest @ ..] if name == Cli::TIMED && flag == Cli::SINCE => {
+                Cli::Timed(Timed::new([limits, stage], Some(mark), program, rest))
+            }
+            [name, limits, stage, program, rest @ ..] if name == Cli::TIMED => {
+                Cli::Timed(Timed::new([limits, stage], None, program, rest))
+            }
+            [name, workspace, diff, changed, reused, caught, output, prior @ ..] if name == Cli::PLAN => {
+                let given = [workspace, diff, changed, reused, caught, output].map(PathBuf::from);
+                Cli::Plan(Plan::new(given, Prior::given(prior)))
+            }
+            _ => Cli::Usage,
+        }
     }
-}
 
-impl<P: Ports> Teller for Cli<'_, P> {
-    type Told<'teller>
-        = Unfolding<'teller, P>
-    where
-        Self: 'teller;
-
-    fn told(&self) -> Unfolding<'_, P> {
-        Unfolding::new(self.telling(), self.ports)
-    }
-}
-
-impl<P: Ports> Cli<'_, P> {
-    fn telling(&self) -> Telling<'_> {
-        match &self.command {
-            Ok(command) => command.carry_out(self.ports),
-            Err(refusal) => Telling::refused(refusal),
+    pub fn exit(self, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
+        let ran = match self {
+            Cli::Timed(timed) => timed.run(out),
+            Cli::Plan(plan) => plan.run(out),
+            Cli::Usage => Err(Failure::Usage),
+        };
+        let exit = ran.or_else(|failure| writeln!(err, "{failure}").map(|()| Exit::Failed));
+        match exit.ignoring(Ignored::Unwritable) {
+            Some(Exit::Passed) => ExitCode::SUCCESS,
+            Some(Exit::Failed) | None => ExitCode::FAILURE,
         }
     }
 }

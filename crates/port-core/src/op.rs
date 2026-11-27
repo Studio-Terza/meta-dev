@@ -1,8 +1,21 @@
-mod boundary;
-
+use std::fmt::{self, Display};
 use std::marker::PhantomData;
 
-pub use boundary::OpName;
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct OpName(&'static str);
+
+impl OpName {
+    #[must_use]
+    pub const fn new(path: &'static str) -> OpName {
+        OpName(path)
+    }
+}
+
+impl Display for OpName {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.0)
+    }
+}
 
 pub trait Op {
     const NAME: OpName;

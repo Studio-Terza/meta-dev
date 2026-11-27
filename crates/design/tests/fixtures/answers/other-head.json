@@ -1,3 +1,0 @@
-{
-  "gh pr view 12 --json headRefOid -R o/r": [{"Succeeded": "{\"headRefOid\":\"fedcba9876543210fedcba9876543210fedcba98\"}"}]
-}

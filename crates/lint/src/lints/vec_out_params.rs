@@ -1,13 +1,11 @@
 use syn::spanned::Spanned;
-use syn::visit::{self, Visit};
-use syn::{FnArg, GenericArgument, ItemImpl, ItemMod, Macro, PathArguments, Signature, Type};
+use syn::{FnArg, GenericArgument, ItemImpl, ItemMod, Macro, PathArguments, Signature, Type, TypePath};
 
-use crate::expansion::Expansion;
-use crate::finding::{Fix, Found, Rule};
+use crate::finding::{Found, Rule};
 use crate::gate::Gate;
 use crate::source::Source;
 use crate::style::{Reads, Style};
-use crate::word::Word;
+use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Debug, Default)]
 pub(crate) struct VecOutParams {
@@ -15,17 +13,14 @@ pub(crate) struct VecOutParams {
 }
 
 impl VecOutParams {
-    const FIX: Fix = Fix("give the collection a type that owns its rules");
-    const VEC: Word = Word("Vec");
-    const OPTION: Word = Word("Option");
+    const FIX: &'static str = "give the collection a type that owns its rules";
 
     fn vec_out(parameter: &Type) -> Option<()> {
         match parameter {
             Type::Reference(reference) => {
-                reference.mutability.and_then(|_| VecOutParams::VEC.last(&reference.elem)).map(|_| ())
+                reference.mutability.and_then(|_| VecOutParams::last_named(&reference.elem, "Vec")).map(|_| ())
             }
-            Type::Path(_) => VecOutParams::OPTION
-                .last(parameter)
+            Type::Path(_) => VecOutParams::last_named(parameter, "Option")
                 .and_then(|option| match &option.arguments {
                     PathArguments::AngleBracketed(arguments) => arguments.args.first(),
                     PathArguments::None | PathArguments::Parenthesized(_) => None,
@@ -37,22 +32,29 @@ impl VecOutParams {
             _ => None,
         }
     }
+
+    fn last_named<'ty>(ty: &'ty Type, name: &str) -> Option<&'ty syn::PathSegment> {
+        match ty {
+            Type::Path(TypePath { path, .. }) => path.segments.last().filter(|segment| segment.ident == name),
+            _ => None,
+        }
+    }
 }
 
-impl<'ast> Visit<'ast> for VecOutParams {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Gate::of(&module.attrs).entered().map_or_default(|()| visit::visit_item_mod(self, module));
+impl Hooks for VecOutParams {
+    fn item_mod(&mut self, module: &ItemMod) -> Descent {
+        Descent::from(Gate::of(&module.attrs).entered())
     }
 
-    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        Gate::inherent(item).entered().map_or_default(|()| visit::visit_item_impl(self, item));
+    fn item_impl(&mut self, item: &ItemImpl) -> Descent {
+        Descent::from(Gate::inherent(item).entered())
     }
 
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Expansion::of(invocation).walk(self);
+    fn macro_called(&mut self, _: &Macro) -> Expanded {
+        Expanded::Statements
     }
 
-    fn visit_signature(&mut self, signature: &'ast Signature) {
+    fn signature(&mut self, signature: &Signature) -> Descent {
         let name = &signature.ident;
         let parameters = signature.inputs.iter().filter_map(|input| match input {
             FnArg::Typed(typed) => Some(typed),
@@ -63,6 +65,7 @@ impl<'ast> Visit<'ast> for VecOutParams {
             .map(|parameter| Found::spanned(parameter.pat.span(), format_args!("fn {name}"), VecOutParams::FIX))
             .collect();
         self.found.extend(found);
+        Descent::Over
     }
 }
 

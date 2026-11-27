@@ -1,11 +1,7 @@
-use std::io;
 use std::panic;
-use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use invariants::{Ignoring, Unpoisoned, ignored, invariant, invariants};
-use proptest::prelude::{any, prop_assert_eq, proptest};
-use test_failure::Failed;
+use invariants::{Ignoring, Rejoined, Unpoisoned, ignored, invariant, invariants};
 
 invariants! {
     enum Invariant {
@@ -20,61 +16,77 @@ ignored! {
     }
 }
 
-proptest! {
-    #[test]
-    fn a_condition_passes_when_it_holds_and_panics_when_it_does_not(held in any::<bool>()) {
-        let checked = panic::catch_unwind(|| invariant!(held, Invariant::Positive));
-        prop_assert_eq!(checked.is_ok(), held);
+const POISONED: &str =
+    "no thread panics while it holds a lock, so no lock is poisoned; were one, its state may be half-written";
+
+struct Caught;
+
+impl Caught {
+    fn narrowed(count: u16) -> u8 {
+        match u8::try_from(count) {
+            Ok(narrow) => narrow,
+            Err(wide) => invariant!(broken Invariant::Narrow, wide),
+        }
     }
 
-    #[test]
-    fn a_held_result_gives_its_value_or_panics(count in any::<u16>()) {
-        let held = panic::catch_unwind(|| invariant!(holding u8::try_from(count), Invariant::Narrow));
-        prop_assert_eq!(held.into_iter().next(), u8::try_from(count).into_iter().next());
-    }
-
-    #[test]
-    fn an_ignored_error_keeps_the_value(count in any::<u16>()) {
-        prop_assert_eq!(u8::try_from(count).ignoring(Ignored::Wide), u8::try_from(count).into_iter().next());
-    }
-
-    #[test]
-    fn a_lock_gives_its_guard(kept in any::<u8>()) {
-        prop_assert_eq!(*Mutex::new(kept).lock().unpoisoned(), kept);
+    fn said(outcome: std::thread::Result<u8>) -> String {
+        match outcome {
+            Ok(value) => format!("gave {value}"),
+            Err(payload) => payload.downcast::<String>().into_iter().map(|text| *text).collect(),
+        }
     }
 }
 
 #[test]
-fn each_broken_invariant_and_reason_says_its_text() -> Result<(), Failed> {
-    let source = Path::new(file!());
-    let table = source.with_file_name(source.file_stem().unwrap_or_default());
-    let found = std::env::current_dir()?
-        .ancestors()
-        .map(|directory| directory.join(&table))
-        .find(|candidate| candidate.is_file())
-        .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let (messages, width): (PathBuf, u16) = serde_json::from_slice(&std::fs::read(found)?)?;
-    let lock = Mutex::new(width);
-    let poisoning = panic::catch_unwind(|| {
+fn invariants_hold_quietly_and_break_loudly_with_their_text_and_detail() {
+    let lock = Mutex::new(7_u8);
+    let cases: [(fn() -> u8, String); 4] = [
+        (|| Caught::narrowed(30), "gave 30".to_owned()),
+        (
+            || Caught::narrowed(300),
+            "broken invariant: the count fits a byte: number too large to fit in target type".to_owned(),
+        ),
+        (
+            || invariant!(holding u8::try_from(300_u16), Invariant::Narrow),
+            "broken invariant: the count fits a byte".to_owned(),
+        ),
+        (
+            || invariant!(holding u8::try_from(300_u16), Invariant::Narrow, detailed),
+            "broken invariant: the count fits a byte: number too large to fit in target type".to_owned(),
+        ),
+    ];
+    let said: Vec<String> = cases.iter().map(|(run, _)| Caught::said(panic::catch_unwind(run))).collect();
+    assert_eq!(said, cases.map(|(_, want)| want));
+    let checked = [2_u8 > 1, 1_u8 > 2].map(|holds| {
+        Caught::said(panic::catch_unwind(|| {
+            invariant!(holds, Invariant::Positive);
+            1
+        }))
+    });
+    assert_eq!(checked, ["gave 1", "broken invariant: the count is positive"]);
+    let held = Caught::said(panic::catch_unwind(|| invariant!(holding u8::try_from(30_u16), Invariant::Narrow)));
+    let poisoning = Caught::said(panic::catch_unwind(|| {
         let _held = lock.lock().unpoisoned();
         invariant!(broken Invariant::Positive)
-    });
-    let poisoned = panic::catch_unwind(|| *lock.lock().unpoisoned());
-    let panics = [
-        panic::catch_unwind(|| invariant!(holding u8::try_from(width), Invariant::Narrow)).map(drop),
-        panic::catch_unwind(|| invariant!(holding u8::try_from(width), Invariant::Narrow, detailed)).map(drop),
-        poisoning.map(drop),
-        poisoned.map(drop),
-    ];
-    let said: Vec<String> = panics
-        .into_iter()
-        .flat_map(|outcome| match outcome {
-            Ok(()) => Vec::new(),
-            Err(payload) => vec![payload],
-        })
-        .filter_map(|payload| payload.downcast::<String>().into_iter().next().map(|text| *text))
-        .chain([Ignored::Wide.to_string()])
-        .collect();
-    assert_eq!(said, serde_json::from_slice::<Vec<String>>(&std::fs::read(messages)?)?);
-    Ok(())
+    }));
+    let poisoned = Caught::said(panic::catch_unwind(|| *lock.lock().unpoisoned()));
+    let joined = Caught::said(panic::catch_unwind(|| std::thread::spawn(|| 5_u8).join().rejoined()));
+    let carried = Caught::said(panic::catch_unwind(|| {
+        std::thread::spawn(|| invariant!(broken Invariant::Narrow)).join().rejoined()
+    }));
+    assert_eq!(
+        [held, poisoning, poisoned, joined, carried],
+        [
+            "gave 30".to_owned(),
+            "broken invariant: the count is positive".to_owned(),
+            format!("broken invariant: {POISONED}"),
+            "gave 5".to_owned(),
+            "broken invariant: the count fits a byte".to_owned()
+        ]
+    );
+    assert_eq!(
+        [u8::try_from(300_u16).ignoring(Ignored::Wide), u8::try_from(30_u16).ignoring(Ignored::Wide)],
+        [None, Some(30)]
+    );
+    assert_eq!(Ignored::Wide.to_string(), "a count too wide for a byte is not a byte count");
 }

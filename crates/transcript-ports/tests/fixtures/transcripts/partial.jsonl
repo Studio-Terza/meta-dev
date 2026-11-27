@@ -1,2 +1,0 @@
-{"type":"user","uuid":"1","parentUuid":null,"sessionId":"s1","timestamp":"2026-01-01T00:00:01Z","origin":{"kind":"human"},"message":{"model":"claude","content":"typed words"}}
-{"type":"assistant","uuid":"2","parentUuid":null,"sessionId":"s1","timestamp":"2026-01-01T00:00:02Z","origin":null,"message":{"model":"cl

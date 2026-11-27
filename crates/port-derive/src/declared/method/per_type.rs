@@ -1,12 +1,12 @@
 use proc_macro2::TokenStream;
 use syn::{Attribute, Meta, MetaList, TraitItemFn};
 
-pub(crate) struct PerType;
+pub struct PerType;
 
 impl PerType {
     const ATTRIBUTE: &'static str = "op";
 
-    pub(crate) fn stripped(function: &mut TraitItemFn) -> Option<TokenStream> {
+    pub fn stripped(function: &mut TraitItemFn) -> Option<TokenStream> {
         function
             .attrs
             .iter()

@@ -6,27 +6,27 @@ use super::Wrapped;
 use crate::marked::Marked;
 use crate::settings::Checking;
 
-pub(crate) trait Expansion {
+pub trait Expansion {
     fn of(wrapped: Wrapped) -> TokenStream;
 }
 
 #[derive(Debug)]
-pub(crate) struct Constructors;
+pub struct Constructors;
 
 #[derive(Debug)]
-pub(crate) struct Strategy;
+pub struct Strategy;
 
 #[derive(Debug)]
-pub(crate) struct Formatting;
+pub struct Formatting;
 
 #[derive(Debug)]
-pub(crate) struct Deserializing;
+pub struct Deserializing;
 
 #[derive(Debug)]
-pub(crate) struct CheckedDeserializing;
+pub struct CheckedDeserializing;
 
 #[derive(Debug)]
-pub(crate) struct Serializing;
+pub struct Serializing;
 
 impl Constructors {
     fn chosen(checking: Checking, opened: TokenStream, guarded: TokenStream) -> TokenStream {

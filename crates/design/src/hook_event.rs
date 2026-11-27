@@ -9,4 +9,5 @@ use strum::{Display, IntoStaticStr, VariantArray};
 pub enum HookEvent {
     Stop,
     SubagentStop,
+    PostToolUse,
 }

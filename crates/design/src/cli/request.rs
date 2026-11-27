@@ -1,6 +1,7 @@
 mod command;
 mod ground;
 mod ignored;
+mod local;
 mod persistence;
 mod projects;
 
@@ -14,12 +15,12 @@ use super::failure::Failure;
 use command::Command;
 pub use command::Crew;
 pub use ground::Ground;
-pub(crate) use projects::Kept;
-pub use projects::Located;
+pub use local::{Local, Repository};
 use projects::Projects;
+pub use projects::{Kept, Located};
 
 #[derive(Debug)]
-pub(crate) struct Request {
+pub struct Request {
     command: Command,
     workspace: Option<PathBuf>,
 }
@@ -31,7 +32,7 @@ struct Words {
 }
 
 impl Request {
-    pub(crate) fn parsed(arguments: impl Iterator<Item = OsString>) -> Result<Request, Failure> {
+    pub fn parsed(arguments: impl Iterator<Item = OsString>) -> Result<Request, Failure> {
         let words = Words::heard(&arguments.collect::<Vec<OsString>>())?;
         let spoken = words.spoken.iter().map(|word| word.to_str()).collect::<Option<Vec<&str>>>();
         let command = spoken.ok_or(Failure::Usage).and_then(|said| Command::spoken(&said))?;

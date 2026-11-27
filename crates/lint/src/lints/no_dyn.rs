@@ -1,10 +1,10 @@
 use proc_macro2::{TokenStream, TokenTree};
-use syn::visit::{self, Visit};
 use syn::{Macro, TypeTraitObject};
 
-use crate::finding::{Fix, Found, Rule};
+use crate::finding::{Found, Rule};
 use crate::source::Source;
 use crate::style::{Reads, Style};
+use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Debug, Default)]
 pub(crate) struct NoDyn {
@@ -29,19 +29,20 @@ impl NoDyn {
         Found::spanned(
             span,
             "dyn trait object",
-            Fix("take a generic, return impl Trait, or list the known types in an enum"),
+            "take a generic, return impl Trait, or list the known types in an enum",
         )
     }
 }
 
-impl<'ast> Visit<'ast> for NoDyn {
-    fn visit_type_trait_object(&mut self, object: &'ast TypeTraitObject) {
+impl Hooks for NoDyn {
+    fn type_trait_object(&mut self, object: &TypeTraitObject) -> Descent {
         self.found.extend(object.dyn_token.map(|keyword| NoDyn::flagged(keyword.span)));
-        visit::visit_type_trait_object(self, object);
+        Descent::Into
     }
 
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
+    fn macro_called(&mut self, invocation: &Macro) -> Expanded {
         self.found.extend(NoDyn::written(invocation.tokens.clone()));
+        Expanded::Nothing
     }
 }
 

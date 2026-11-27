@@ -9,7 +9,7 @@ use crate::expanded::Expanding;
 use boundary::Directory;
 
 #[derive(Debug)]
-pub(crate) struct Migrations(Option<LitStr>);
+pub struct Migrations(Option<LitStr>);
 
 impl Parse for Migrations {
     fn parse(input: ParseStream<'_>) -> syn::Result<Migrations> {

@@ -1,194 +1,148 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
-use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
-
-use file_ports::{Bytes, Disk, Memory};
-use newtype::Counter;
-use port_core::Run;
-use proptest::prelude::{any, prop_assert, prop_assert_eq, proptest};
-use proptest::sample::Index;
-use serde::Deserialize;
-use serde::de::IgnoredAny;
 use test_failure::Failed;
+
+use file_ports::{Bytes, Disk, Files, Memory};
+use grammar::KeptLines;
+use invariants::{Ignoring, ignored};
+use port_core::{Calls, Run};
+use proptest::prelude::{any, prop_assert_eq, proptest};
+use proptest::test_runner::{Config, RngSeed};
 use transcript_ports::transcripts_ops::{ReadFrom, Sessions};
 use transcript_ports::{
-    Authorship, Body, ClaudeCodeDir, Cursor, Instant, Kind, Line, Read, Record, SessionId, Transcripts, Uuid,
+    Authorship, Body, ClaudeCodeDir, Cursor, Instant, Kind, Line, Read, Record, SessionId, Skipped, Transcripts,
+    Unrecognised,
 };
 
-#[test]
-fn each_transcript_line_reads_as_who_said_it_the_edge_it_leaves_or_the_kind_nobody_knows() -> Result<(), Failed> {
-    let source = Path::new(file!());
-    let table = source.with_file_name(source.file_stem().unwrap_or_default());
-    let found = std::env::current_dir()?
-        .ancestors()
-        .map(|directory| directory.join(&table))
-        .find(|candidate| candidate.is_file())
-        .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let bytes = fs::read(found)?;
-    let mut rows = serde_json::Deserializer::from_slice(&bytes);
-    let (fixtures, golden) = <(PathBuf, PathBuf)>::deserialize(&mut rows)?;
-    let run = Run::root();
-    let read = {
-        let port = run.port(ClaudeCodeDir::new(Disk, std::env::current_dir()?.join(fixtures)));
-        port.sessions()?
-            .iter()
-            .map(|session| {
-                let lines: Vec<Line> = port.read_from(session, Cursor::default())?.into_iter().collect();
-                let said: Vec<(Authorship, Uuid, SessionId, Option<Uuid>, Instant, Body)> = lines
-                    .iter()
-                    .filter_map(|line| match line {
-                        Line::Said(record) => Some((
-                            record.author(),
-                            record.uuid().clone(),
-                            record.session().clone(),
-                            record.parent().cloned(),
-                            record.stamp().clone(),
-                            record.text().clone(),
-                        )),
-                        Line::Skipped(_) | Line::Unrecognised(_) => None,
-                    })
-                    .collect();
-                let edges: Vec<(Option<Uuid>, Uuid)> = lines
-                    .iter()
-                    .filter_map(|line| match line {
-                        Line::Skipped(skipped) => Some((skipped.parent().cloned(), skipped.uuid().clone())),
-                        Line::Said(_) | Line::Unrecognised(_) => None,
-                    })
-                    .collect();
-                let unknown: Vec<Kind> = lines
-                    .iter()
-                    .filter_map(|line| match line {
-                        Line::Unrecognised(unrecognised) => Some(unrecognised.kind().clone()),
-                        Line::Said(_) | Line::Skipped(_) => None,
-                    })
-                    .collect();
-                Ok((session.stem().clone(), said, edges, unknown))
+ignored! {
+    enum Ignored {
+        Unseeded => "seeding a fresh in-memory store does not fail; were it to, the read finds no session",
+        Refused => "a text the check or parse refuses is the None the case expects",
+    }
+}
+
+const DIRECTORY: &str = "/projects/work";
+const SESSION: &str = "/projects/work/s1.jsonl";
+const FIXTURE: &str = "tests/lines.jsonl";
+const GOLDEN: &str = "tests/lines.txt";
+const RECORD: &str = "RECORD_GOLDENS";
+
+struct Transcript(String);
+
+impl Transcript {
+    fn fixture() -> Result<String, Failed> {
+        Ok(Disk.read_text(&Path::new(env!("CARGO_MANIFEST_DIR")).join(FIXTURE))?.as_ref().to_owned())
+    }
+
+    fn read(&self, cursor: Cursor) -> Result<Read, Failed> {
+        let memory = Memory::default();
+        memory.create_directories(Path::new(DIRECTORY)).ignoring(Ignored::Unseeded);
+        memory.append(Path::new(SESSION), &Bytes::from(&self.0)).ignoring(Ignored::Unseeded);
+        let run = Run::root();
+        let port = run.port(ClaudeCodeDir::new(memory, PathBuf::from(DIRECTORY)));
+        let sessions = Transcripts::sessions(&port)?;
+        let read = Transcripts::read_from(&port, sessions.first().ok_or("no session")?, cursor)?;
+        drop(port);
+        let measured = run.finish();
+        let calls = [measured.snapshot().calls::<Sessions>(), measured.snapshot().calls::<ReadFrom>()];
+        assert_eq!(
+            (sessions.first().map(|session| session.stem().to_string()), calls),
+            (Some("s1".to_owned()), [Calls::new(1); 2])
+        );
+        measured.settled()?;
+        Ok(read)
+    }
+
+    fn shown(line: Line) -> Vec<String> {
+        let edge = |skipped: &Skipped| skipped.parent().map(|above| format!("{} after {above}", skipped.uuid()));
+        match line {
+            Line::Said(record) => vec![Transcript::said(&record)],
+            Line::Skipped(skipped) => edge(&skipped).into_iter().collect(),
+            Line::Unrecognised(unrecognised) => {
+                let unknown: &Unrecognised = &unrecognised;
+                let passing = unknown.passing().as_ref().and_then(edge);
+                [format!("unrecognised {}", unknown.kind())].into_iter().chain(passing).collect()
+            }
+        }
+    }
+
+    fn said(record: &Record) -> String {
+        let parent = record.parent().map(ToString::to_string);
+        format!(
+            "{:?} {} [{} in {} after {parent:?} at {}]",
+            record.author(),
+            record.text(),
+            record.uuid(),
+            record.session(),
+            record.stamp()
+        )
+    }
+
+    fn uuids(read: Read) -> Vec<String> {
+        read.into_iter()
+            .filter_map(|line| match line {
+                Line::Said(record) => Some(record.uuid().to_string()),
+                Line::Skipped(_) | Line::Unrecognised(_) => None,
             })
-            .collect::<Result<Vec<_>, Failed>>()?
-    };
-    run.finish().settled()?;
-    assert_eq!(read, serde_json::from_slice::<Vec<_>>(&fs::read(golden)?)?);
+            .collect()
+    }
+}
+
+#[test]
+fn every_fixture_line_reads_as_its_golden_classification() -> Result<(), Failed> {
+    let read = Transcript(Transcript::fixture()?).read(Cursor::default())?;
+    let shown: String =
+        read.into_iter().flat_map(Transcript::shown).flat_map(|class| [class, "\n".to_owned()]).collect();
+    let golden = Path::new(env!("CARGO_MANIFEST_DIR")).join(GOLDEN);
+    std::env::var_os(RECORD).map_or(Ok(()), |_| Disk.write(&golden, Bytes::new(shown.clone().into_bytes())))?;
+    assert_eq!(shown, Disk.read_text(&golden)?.as_ref());
     Ok(())
 }
 
 #[test]
-fn each_text_reads_as_an_instant_a_kind_a_session_a_body_and_an_author_or_is_refused() -> Result<(), Failed> {
-    let source = Path::new(file!());
-    let table = source.with_file_name(source.file_stem().unwrap_or_default());
-    let found = std::env::current_dir()?
-        .ancestors()
-        .map(|directory| directory.join(&table))
-        .find(|candidate| candidate.is_file())
-        .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let bytes = fs::read(found)?;
-    let mut rows = serde_json::Deserializer::from_slice(&bytes);
-    IgnoredAny::deserialize(&mut rows)?;
-    let (fixture, golden) = <(PathBuf, PathBuf)>::deserialize(&mut rows)?;
-    let texts: Vec<String> = serde_json::from_slice(&fs::read(fixture)?)?;
-    let read: Vec<_> = texts
-        .iter()
-        .map(|text| {
-            (
-                Instant::try_new(text.clone()).map_err(|refused| refused.to_string()),
-                Kind::try_new(text.clone()).map_err(|refused| refused.to_string()),
-                SessionId::try_new(text.clone()).map_err(|refused| refused.to_string()),
-                Body::try_new(text.clone()).map_err(|refused| refused.to_string()),
-                text.parse::<Authorship>().map_err(|refused| refused.to_string()),
-            )
-        })
-        .collect();
-    assert_eq!(read, serde_json::from_slice::<Vec<_>>(&fs::read(golden)?)?);
-    Ok(())
+fn resuming_from_the_cursor_yields_every_record_exactly_once() -> Result<(), Failed> {
+    let lines: Vec<String> = Transcript::fixture()?.parse::<KeptLines>().into_iter().flatten().take(4).collect();
+    let text = lines.concat();
+    (0..=text.len()).try_for_each(|cut| {
+        let first = Transcript(text.chars().take(cut).collect()).read(Cursor::default())?;
+        let second = Transcript(text.clone()).read(first.cursor())?;
+        let together: Vec<String> = Transcript::uuids(first).into_iter().chain(Transcript::uuids(second)).collect();
+        assert_eq!(together, ["1", "2"], "cut at {cut}");
+        Ok(())
+    })
 }
 
 proptest! {
+    #![proptest_config(Config { failure_persistence: None, rng_seed: RngSeed::Fixed(0), ..Config::default() })]
     #[test]
-    fn resuming_from_the_cursor_reads_every_record_exactly_once(cut in any::<Index>()) {
-        let source = Path::new(file!());
-        let table = source.with_file_name(source.file_stem().unwrap_or_default());
-        let found = std::env::current_dir()?
-            .ancestors()
-            .map(|directory| directory.join(&table))
-            .find(|candidate| candidate.is_file())
-            .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-        let bytes = fs::read(found)?;
-        let mut rows = serde_json::Deserializer::from_slice(&bytes);
-        IgnoredAny::deserialize(&mut rows)?;
-        IgnoredAny::deserialize(&mut rows)?;
-        let (fixture, path) = <(PathBuf, PathBuf)>::deserialize(&mut rows)?;
-        let directory = path.parent().map_or_default(Path::to_path_buf);
-        let text = fs::read_to_string(fixture)?;
-        let kept: String = text.chars().take(cut.index(text.chars().count())).collect();
-        let run = Run::root();
-        let (first, second, whole) = {
-            let cut_port = run.port(ClaudeCodeDir::new(Memory::from_iter([(path.clone(), Bytes::from(&kept))]), directory.clone()));
-            let whole_port = run.port(ClaudeCodeDir::new(Memory::from_iter([(path, Bytes::from(&text))]), directory));
-            let sessions = whole_port.sessions()?;
-            let session = sessions.first().ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-            let first: Read = cut_port.read_from(session, Cursor::default())?;
-            let second = whole_port.read_from(session, first.cursor())?;
-            let whole = whole_port.read_from(session, Cursor::default())?;
-            (first, second, whole)
-        };
-        run.finish().settled()?;
-        let records = |read: Read| -> Vec<Record> {
-            read.into_iter().filter_map(|line| match line {
-                Line::Said(record) => Some(record),
-                Line::Skipped(_) | Line::Unrecognised(_) => None,
-            }).collect()
-        };
-        let together: Vec<Record> = records(first).into_iter().chain(records(second)).collect();
-        prop_assert_eq!(together, records(whole));
+    fn unknown_kinds_and_blocks_are_unrecognised_and_values_rebuild_from_their_display(kind in "[a-z]{1,8}-unheard", block in "[a-z]{1,8}_unheard", instant in any::<Instant>(), named in any::<Kind>(), session in any::<SessionId>()) {
+        let head = "\"uuid\":\"8\",\"parentUuid\":\"1\",\"sessionId\":\"s1\",\"timestamp\":\"2026-01-01T00:00:08Z\"";
+        let unknown = format!("{{\"type\":\"{kind}\",{head},\"message\":{{\"content\":\"hi\"}}}}\n");
+        let blocked = format!("{{\"type\":\"assistant\",{head},\"message\":{{\"model\":\"claude\",\"content\":[{{\"type\":\"{block}\"}}]}}}}\n");
+        let shown = |text: String| Transcript(text).read(Cursor::default()).map(|read| read.into_iter().flat_map(Transcript::shown).collect::<Vec<String>>());
+        prop_assert_eq!(shown(unknown), Ok(vec![format!("unrecognised {kind}"), "8 after 1".to_owned()]));
+        prop_assert_eq!(shown(blocked), Ok(vec![format!("unrecognised {block}"), "8 after 1".to_owned()]));
+        prop_assert_eq!(Instant::try_new(instant.to_string()).ignoring(Ignored::Refused), Some(instant));
+        prop_assert_eq!(Kind::try_new(named.to_string()).ignoring(Ignored::Refused), Some(named));
+        prop_assert_eq!(SessionId::try_new(session.to_string()).ignoring(Ignored::Refused), Some(session));
     }
+}
 
-    #[test]
-    fn each_listing_and_each_read_is_counted_once(listings in 1..4_usize) {
-        let source = Path::new(file!());
-        let table = source.with_file_name(source.file_stem().unwrap_or_default());
-        let found = std::env::current_dir()?
-            .ancestors()
-            .map(|directory| directory.join(&table))
-            .find(|candidate| candidate.is_file())
-            .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-        let bytes = fs::read(found)?;
-        let mut rows = serde_json::Deserializer::from_slice(&bytes);
-        let (fixtures, _) = <(PathBuf, IgnoredAny)>::deserialize(&mut rows)?;
-        let run = Run::root();
-        let sessions = {
-            let port = run.port(ClaudeCodeDir::new(Disk, std::env::current_dir()?.join(fixtures)));
-            let listed = std::iter::repeat_with(|| port.sessions()).take(listings).collect::<Result<Vec<_>, _>>()?;
-            listed.iter().flatten().try_for_each(|session| port.read_from(session, Cursor::default()).map(drop))?;
-            listed.into_iter().flatten().count()
-        };
-        let settled = run.finish().settled()?;
-        prop_assert_eq!(settled.calls::<Sessions>().count(), listings);
-        prop_assert_eq!(settled.calls::<ReadFrom>().count(), sessions);
-    }
-
-    #[test]
-    fn a_body_holding_a_nul_is_refused_and_any_other_text_is_kept_whole(
-        before in "[^\u{0}]{0,8}",
-        after in "[^\u{0}]{0,8}",
-        nul in "\u{0}",
-    ) {
-        prop_assert!(Body::try_new([before.clone(), nul, after.clone()].concat()).is_err());
-        prop_assert_eq!(Body::try_new([before.clone(), after.clone()].concat())?.to_string(), [before, after].concat());
-    }
-
-    #[test]
-    fn an_instant_is_rebuilt_from_its_display(instant in any::<Instant>()) {
-        prop_assert_eq!(Instant::try_new(instant.to_string())?, instant);
-    }
-
-    #[test]
-    fn a_kind_is_rebuilt_from_its_display(kind in any::<Kind>()) {
-        prop_assert_eq!(Kind::try_new(kind.to_string())?, kind);
-    }
-
-    #[test]
-    fn a_session_id_is_rebuilt_from_its_display(session in any::<SessionId>()) {
-        prop_assert_eq!(SessionId::try_new(session.to_string())?, session);
-    }
+#[test]
+fn values_are_built_only_from_the_texts_they_admit() {
+    let built = |text: &str| {
+        [
+            Instant::try_new(text.to_owned()).ignoring(Ignored::Refused).map(|made| made.to_string()),
+            Kind::try_new(text.to_owned()).ignoring(Ignored::Refused).map(|made| made.to_string()),
+            SessionId::try_new(text.to_owned()).ignoring(Ignored::Refused).map(|made| made.to_string()),
+            Body::try_new(text.to_owned()).ignoring(Ignored::Refused).map(|made| made.to_string()),
+            text.parse::<Authorship>().ignoring(Ignored::Refused).map(|made| made.to_string()),
+        ]
+    };
+    let all = |text: &str, admitted: [u8; 5]| admitted.map(|admits| (admits == 1).then(|| text.to_owned()));
+    assert_eq!(built(""), all("", [0, 0, 0, 1, 0]));
+    assert_eq!(built("s1"), all("s1", [1, 1, 1, 1, 0]));
+    assert_eq!(built("said\0plainly"), all("said\0plainly", [1, 1, 1, 0, 0]));
+    assert_eq!([built("owner"), built("lead")], [all("owner", [1; 5]), all("lead", [1; 5])]);
 }

@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{Ident, Type};
 
-pub(crate) struct Parameter {
+pub struct Parameter {
     name: Ident,
     tree: Type,
 }
@@ -16,11 +16,11 @@ impl ToTokens for Parameter {
 }
 
 impl Parameter {
-    pub(crate) fn named(name: Ident, tree: &Type) -> Parameter {
+    pub fn named(name: Ident, tree: &Type) -> Parameter {
         Parameter { name, tree: tree.clone() }
     }
 
-    pub(crate) fn name(&self) -> &Ident {
+    pub fn name(&self) -> &Ident {
         &self.name
     }
 }

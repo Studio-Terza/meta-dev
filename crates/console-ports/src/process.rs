@@ -6,7 +6,7 @@ use std::io::{self, Stderr, Stdout, Write};
 use std::process::ExitCode;
 
 use crate::process::ignored::Ignored;
-use crate::{Answer, Complaint, Environment, Heard, Shown, Tale, Teller};
+use crate::{Answer, Complaint, Environment, Heard, Shown};
 use invariants::Ignoring;
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -17,11 +17,8 @@ impl Process {
         respond(env::args_os().skip(1).collect(), &mut io::stdout(), &mut io::stderr())
     }
 
-    pub fn tell<Told: Teller>(parse: impl FnOnce(Vec<OsString>) -> Told) -> ExitCode {
-        let teller = parse(env::args_os().skip(1).collect());
-        let mut tale = teller.told();
-        let printed = tale.by_ref().try_for_each(|line| io::stdout().write_all(AsRef::<str>::as_ref(&line).as_bytes()));
-        printed.ignoring(Ignored::Unwritable).map_or(ExitCode::FAILURE, |()| Process::written(&tale.ended()))
+    pub fn tell(parse: impl FnOnce(Vec<OsString>) -> Answer) -> ExitCode {
+        Process::written(&parse(env::args_os().skip(1).collect()))
     }
 
     fn written(answer: &Answer) -> ExitCode {

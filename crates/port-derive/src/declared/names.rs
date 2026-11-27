@@ -5,28 +5,28 @@ use quote::ToTokens;
 
 use super::boundary::{Derivation, Spelling};
 
-pub(crate) trait Role {
+pub trait Role {
     fn spelled(caller: &Ident) -> Ident;
 }
 
 #[derive(Debug)]
-pub(crate) struct CallerRole;
+pub struct CallerRole;
 
 #[derive(Debug)]
-pub(crate) struct FillerRole;
+pub struct FillerRole;
 
 #[derive(Debug)]
-pub(crate) struct OpsRole;
+pub struct OpsRole;
 
 #[derive(Debug)]
-pub(crate) struct Name<Of: Role> {
+pub struct Name<Of: Role> {
     ident: Ident,
     role: PhantomData<Of>,
 }
 
-pub(crate) type CallerName = Name<CallerRole>;
-pub(crate) type FillerName = Name<FillerRole>;
-pub(crate) type OpsName = Name<OpsRole>;
+pub type CallerName = Name<CallerRole>;
+pub type FillerName = Name<FillerRole>;
+pub type OpsName = Name<OpsRole>;
 
 impl Role for CallerRole {
     fn spelled(caller: &Ident) -> Ident {

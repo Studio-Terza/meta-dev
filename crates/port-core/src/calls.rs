@@ -1,3 +1,4 @@
-mod boundary;
+use newtype::{Arbitrary, Newtype};
 
-pub use boundary::*;
+#[derive(Newtype, Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Calls(usize);

@@ -4,20 +4,18 @@ use invariants::Ignoring;
 use proc_macro2::Ident;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::visit::{self, Visit};
 use syn::{
     Attribute, BinOp, Block, Expr, ExprAssign, ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprWhile, ImplItemConst,
     ImplItemFn, ItemConst, ItemFn, ItemImpl, ItemMod, ItemTrait, Local, Macro, Pat, Signature, Stmt, Token,
     TraitItemFn,
 };
 
-use crate::expansion::Expansion;
-use crate::finding::{Fix, Found, Line, Rule};
+use crate::finding::{Found, Rule};
 use crate::gate::Gate;
 use crate::ignored::Ignored;
-use crate::name::Name;
 use crate::source::Source;
 use crate::style::{Reads, Style};
+use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Debug, Default)]
 pub(crate) struct ExpressionFlow {
@@ -27,42 +25,37 @@ pub(crate) struct ExpressionFlow {
 
 #[derive(Debug, Default)]
 struct Locals {
-    declared: BTreeMap<Name, Line>,
-    touched: BTreeSet<Name>,
+    declared: BTreeMap<String, usize>,
+    touched: BTreeSet<String>,
 }
 
 impl ExpressionFlow {
     const WRITING_MACROS: [&'static str; 2] = ["write", "writeln"];
-    const LOOP_FIX: Fix = Fix("drive an iterator with combinators, const fns excepted");
-    const ASSIGN_FIX: Fix = Fix("build the value in one expression or give its type an updater method");
+    const LOOP_FIX: &'static str = "drive an iterator with combinators, const fns excepted";
+    const ASSIGN_FIX: &'static str = "build the value in one expression or give its type an updater method";
 
-    fn function(
-        &mut self,
-        attributes: &[Attribute],
-        signature: &Signature,
-        body: Option<&Block>,
-        walk: impl FnOnce(&mut ExpressionFlow),
-    ) {
+    fn opened(&mut self, attributes: &[Attribute], signature: &Signature, body: Option<&Block>) -> Descent {
         let scanned = Gate::of(attributes).entered().and(body).filter(|_| signature.constness.is_none());
-        scanned.map_or_default(|_| {
-            self.scopes.push(Locals::default());
-            walk(self);
-            let closed = self.scopes.pop().unwrap_or_default();
-            let reassigned = closed.declared.into_iter().filter(|(name, _)| !closed.touched.contains(name));
-            self.found.extend(reassigned.map(|(_, line)| {
-                Found::at(
-                    line,
-                    "mutable local that is only reassigned",
-                    Fix("a mutable binding is borrowed as &mut or has methods called on it"),
-                )
-            }));
-        });
+        self.scopes.extend(scanned.map(|_| Locals::default()));
+        Descent::from(scanned.map(|_| ()))
+    }
+
+    fn closed(&mut self) {
+        let closed = self.scopes.pop().unwrap_or_default();
+        let reassigned = closed.declared.into_iter().filter(|(name, _)| !closed.touched.contains(name));
+        self.found.extend(reassigned.map(|(_, line)| {
+            Found::at(
+                line,
+                "mutable local that is only reassigned",
+                "a mutable binding is borrowed as &mut or has methods called on it",
+            )
+        }));
     }
 
     fn touched(&mut self, name: Option<&Ident>) {
         let scope = self.scopes.last_mut();
         scope.zip(name).map_or_default(|(locals, ident)| {
-            locals.touched.insert(Name::of(ident));
+            locals.touched.insert(ident.to_string());
         });
     }
 
@@ -123,47 +116,57 @@ impl ExpressionFlow {
     }
 }
 
-impl<'ast> Visit<'ast> for ExpressionFlow {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Gate::of(&module.attrs).entered().map_or_default(|()| visit::visit_item_mod(self, module));
+impl Hooks for ExpressionFlow {
+    fn item_mod(&mut self, module: &ItemMod) -> Descent {
+        Descent::from(Gate::of(&module.attrs).entered())
     }
 
-    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        Gate::of(&item.attrs).entered().map_or_default(|()| visit::visit_item_impl(self, item));
+    fn item_impl(&mut self, item: &ItemImpl) -> Descent {
+        Descent::from(Gate::of(&item.attrs).entered())
     }
 
-    fn visit_item_trait(&mut self, item: &'ast ItemTrait) {
-        Gate::of(&item.attrs).entered().map_or_default(|()| visit::visit_item_trait(self, item));
+    fn item_trait(&mut self, item: &ItemTrait) -> Descent {
+        Descent::from(Gate::of(&item.attrs).entered())
     }
 
-    fn visit_item_const(&mut self, _: &'ast ItemConst) {}
-
-    fn visit_impl_item_const(&mut self, _: &'ast ImplItemConst) {}
-
-    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        self.function(&function.attrs, &function.sig, Some(&function.block), |flow| {
-            visit::visit_item_fn(flow, function);
-        });
+    fn item_const(&mut self, _: &ItemConst) -> Descent {
+        Descent::Over
     }
 
-    fn visit_impl_item_fn(&mut self, function: &'ast ImplItemFn) {
-        self.function(&function.attrs, &function.sig, Some(&function.block), |flow| {
-            visit::visit_impl_item_fn(flow, function);
-        });
+    fn impl_item_const(&mut self, _: &ImplItemConst) -> Descent {
+        Descent::Over
     }
 
-    fn visit_trait_item_fn(&mut self, function: &'ast TraitItemFn) {
-        self.function(&function.attrs, &function.sig, function.default.as_ref(), |flow| {
-            visit::visit_trait_item_fn(flow, function);
-        });
+    fn item_fn(&mut self, function: &ItemFn) -> Descent {
+        self.opened(&function.attrs, &function.sig, Some(&function.block))
     }
 
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
+    fn left_item_fn(&mut self, _: &ItemFn) {
+        self.closed();
+    }
+
+    fn impl_item_fn(&mut self, function: &ImplItemFn) -> Descent {
+        self.opened(&function.attrs, &function.sig, Some(&function.block))
+    }
+
+    fn left_impl_item_fn(&mut self, _: &ImplItemFn) {
+        self.closed();
+    }
+
+    fn trait_item_fn(&mut self, function: &TraitItemFn) -> Descent {
+        self.opened(&function.attrs, &function.sig, function.default.as_ref())
+    }
+
+    fn left_trait_item_fn(&mut self, _: &TraitItemFn) {
+        self.closed();
+    }
+
+    fn macro_called(&mut self, invocation: &Macro) -> Expanded {
         self.touched(ExpressionFlow::written_to(invocation).as_ref());
-        Expansion::of(invocation).walk(self);
+        Expanded::Statements
     }
 
-    fn visit_block(&mut self, block: &'ast Block) {
+    fn block(&mut self, block: &Block) -> Descent {
         let last = block.stmts.last();
         let dropped = block.stmts.iter().filter(|statement| ExpressionFlow::dropped(statement, last).is_some());
         let found: Vec<Found> = dropped
@@ -171,76 +174,76 @@ impl<'ast> Visit<'ast> for ExpressionFlow {
                 Found::spanned(
                     statement.span(),
                     "if or match whose value is dropped",
-                    Fix("let it produce the value the function returns"),
+                    "let it produce the value the function returns",
                 )
             })
             .collect();
         self.found.extend(found);
-        visit::visit_block(self, block);
+        Descent::Into
     }
 
-    fn visit_expr_if(&mut self, expr: &'ast ExprIf) {
+    fn expr_if(&mut self, expr: &ExprIf) -> Descent {
         self.found.extend(expr.else_branch.is_none().then(|| {
             Found::spanned(
                 expr.if_token.span,
                 "if without else yields nothing",
-                Fix("use then_some, filter, or an else branch that produces the value"),
+                "use then_some, filter, or an else branch that produces the value",
             )
         }));
-        visit::visit_expr_if(self, expr);
+        Descent::Into
     }
 
-    fn visit_expr_loop(&mut self, expr: &'ast ExprLoop) {
+    fn expr_loop(&mut self, expr: &ExprLoop) -> Descent {
         self.found.push(Found::spanned(expr.loop_token.span, "loop", ExpressionFlow::LOOP_FIX));
-        visit::visit_expr_loop(self, expr);
+        Descent::Into
     }
 
-    fn visit_expr_for_loop(&mut self, expr: &'ast ExprForLoop) {
+    fn expr_for_loop(&mut self, expr: &ExprForLoop) -> Descent {
         self.found.push(Found::spanned(
             expr.for_token.span,
             "for loop",
-            Fix("drive the iterator with combinators, const fns excepted"),
+            "drive the iterator with combinators, const fns excepted",
         ));
-        visit::visit_expr_for_loop(self, expr);
+        Descent::Into
     }
 
-    fn visit_expr_while(&mut self, expr: &'ast ExprWhile) {
+    fn expr_while(&mut self, expr: &ExprWhile) -> Descent {
         self.found.push(Found::spanned(expr.while_token.span, "while loop", ExpressionFlow::LOOP_FIX));
-        visit::visit_expr_while(self, expr);
+        Descent::Into
     }
 
-    fn visit_expr_assign(&mut self, expr: &'ast ExprAssign) {
+    fn expr_assign(&mut self, expr: &ExprAssign) -> Descent {
         let local = ExpressionFlow::assigned_local(&expr.left);
         self.found.extend(
             local.map(|_| Found::spanned(expr.eq_token.span, "assignment to a local", ExpressionFlow::ASSIGN_FIX)),
         );
-        visit::visit_expr_assign(self, expr);
+        Descent::Into
     }
 
-    fn visit_expr_binary(&mut self, expr: &'ast ExprBinary) {
+    fn expr_binary(&mut self, expr: &ExprBinary) -> Descent {
         let local = ExpressionFlow::assigned_local(&expr.left).and(ExpressionFlow::compound(expr.op));
         self.found.extend(
             local.map(|op| Found::spanned(op.span(), "compound assignment to a local", ExpressionFlow::ASSIGN_FIX)),
         );
-        visit::visit_expr_binary(self, expr);
+        Descent::Into
     }
 
-    fn visit_local(&mut self, local: &'ast Local) {
+    fn local(&mut self, local: &Local) -> Descent {
         let declared = match &local.pat {
             Pat::Ident(binding) => binding.mutability.map(|_| &binding.ident),
             _ => None,
         };
-        let line = Line::of(local.let_token.span);
+        let line = local.let_token.span.start().line;
         let scope = self.scopes.last_mut();
         scope.zip(declared).map_or_default(|(locals, name)| {
-            locals.declared.insert(Name::of(name), line);
+            locals.declared.insert(name.to_string(), line);
         });
-        visit::visit_local(self, local);
+        Descent::Into
     }
 
-    fn visit_expr(&mut self, expr: &'ast Expr) {
+    fn expr(&mut self, expr: &Expr) -> Descent {
         self.touched(ExpressionFlow::touched_by(expr));
-        visit::visit_expr(self, expr);
+        Descent::Into
     }
 }
 

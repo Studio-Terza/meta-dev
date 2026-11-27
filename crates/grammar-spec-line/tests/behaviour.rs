@@ -5,14 +5,21 @@ use grammar_spec_line::{Attachment, Line};
 use proptest::prelude::{Just, Strategy, any, prop_assert_eq, prop_oneof, proptest};
 use proptest::test_runner::{Config, RngSeed};
 
+struct Spec;
+
+impl Spec {
+    fn read(text: &str) -> Option<Line> {
+        text.parse::<Line>().ignoring(Unlexed::NotThisGrammar)
+    }
+}
+
 proptest! {
     #![proptest_config(Config { failure_persistence: None, rng_seed: RngSeed::Fixed(0), ..Config::default() })]
     #[test]
     fn a_spec_line_without_trailing_space_is_parsed_and_shown_back_as_written(
         text in "repair: main|spec: ( ?[!-~]{1,8})( [!-~]{1,8}){0,3}"
     ) {
-        let read = text.parse::<Line>().ignoring(Unlexed::NotThisGrammar);
-        prop_assert_eq!(read.as_ref().map(ToString::to_string), Some(text));
+        prop_assert_eq!(Spec::read(&text).as_ref().map(ToString::to_string), Some(text));
     }
 
     #[test]
@@ -23,8 +30,13 @@ proptest! {
             "[!-~]([ -~]{0,20}[!-~])?".prop_map(|value| format!("spec: {value}")),
         ]
     ) {
-        let read = text.parse::<Line>().ignoring(Unlexed::NotThisGrammar);
-        prop_assert_eq!(read.as_ref().map(ToString::to_string), Some(text));
+        prop_assert_eq!(Spec::read(&text).as_ref().map(ToString::to_string), Some(text));
+    }
+
+    #[test]
+    fn a_spec_line_of_one_attachment_carries_that_attachment(attachment in any::<Attachment>()) {
+        let line = Spec::read(&format!("spec: {attachment}"));
+        prop_assert_eq!(line.as_ref().and_then(Line::spec).and_then(|spec| spec.attachment()), Some(&attachment));
     }
 
     #[test]
@@ -35,8 +47,8 @@ proptest! {
             any::<Attachment>().prop_map(|attachment| format!("spec: {attachment}")),
         ]
     ) {
-        let line = text.parse::<Line>().ignoring(Unlexed::NotThisGrammar);
-        let again = line.as_ref().and_then(|read| read.to_string().parse::<Line>().ignoring(Unlexed::NotThisGrammar));
+        let line = Spec::read(&text);
+        let again = line.as_ref().and_then(|read| Spec::read(&read.to_string()));
         prop_assert_eq!(again, line);
     }
 }

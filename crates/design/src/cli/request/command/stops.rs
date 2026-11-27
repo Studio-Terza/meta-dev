@@ -3,7 +3,7 @@ use std::fmt;
 use design_messages::StopRow;
 
 #[derive(Debug)]
-pub(crate) struct Trail(Vec<StopRow>);
+pub struct Trail(Vec<StopRow>);
 
 impl From<Vec<StopRow>> for Trail {
     fn from(rows: Vec<StopRow>) -> Trail {

@@ -1,9 +1,10 @@
+Violations
+--- out
+test budget: 0 of 6 lines are tests, at most 18% may be
+--- err
 comments are not allowed in this repository:
-tests/.fixtures/no_comments/src/commented.rs:2: comment; delete it and say the same in the names of the code
-tests/.fixtures/no_comments/src/commented.rs:3: comment; delete it and say the same in the names of the code
+src/commented.rs:2: comment; delete it and say the same in the names of the code
+src/commented.rs:3: comment; delete it and say the same in the names of the code
 free functions are not allowed; make them associated functions or methods:
-tests/.fixtures/no_comments/src/commented.rs:1: fn a; make it an associated function or a method
-tests/.fixtures/no_comments/src/commented.rs:3: fn b; make it an associated function or a method
-every pub item is named by another workspace crate:
-tests/.fixtures/no_comments/src/lib.rs:1: pub commented is named by no other crate; make it private or delete it
-tests/.fixtures/no_comments/src/lib.rs:2: pub strings is named by no other crate; make it private or delete it
+src/commented.rs:1: fn a; make it an associated function or a method
+src/commented.rs:3: fn b; make it an associated function or a method

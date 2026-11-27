@@ -1,67 +1,28 @@
+Violations
+--- out
+test budget: 4 of 37 lines are tests, at most 18% may be
+--- err
 free functions are not allowed; make them associated functions or methods:
-tests/.fixtures/type_shape/src/errors.rs:1: fn f; make it an associated function or a method
-tests/.fixtures/type_shape/src/fine.rs:2: fn f; make it an associated function or a method
-tests/.fixtures/type_shape/src/fine.rs:3: fn g; make it an associated function or a method
-tests/.fixtures/type_shape/src/macros.rs:1: fn f; make it an associated function or a method
-tests/.fixtures/type_shape/src/spellings.rs:1: fn f; make it an associated function or a method
-tests/.fixtures/type_shape/src/tuples.rs:1: fn f; make it an associated function or a method
-tests/.fixtures/type_shape/src/tuples.rs:2: fn g; make it an associated function or a method
+src/errors.rs:1: fn f; make it an associated function or a method
+src/fine.rs:2: fn f; make it an associated function or a method
+src/fine.rs:3: fn g; make it an associated function or a method
+src/macros.rs:1: fn f; make it an associated function or a method
+src/spellings.rs:1: fn f; make it an associated function or a method
+src/tuples.rs:1: fn f; make it an associated function or a method
+src/tuples.rs:2: fn g; make it an associated function or a method
 types carry their meaning: no bool fields, no tuples in signatures, no String errors:
-tests/.fixtures/type_shape/src/errors.rs:1: Result with a String error; errors are an enum with thiserror
-tests/.fixtures/type_shape/src/fields.rs:4: bool field; a stored flag is a stored mode, make it an enum or a type parameter
-tests/.fixtures/type_shape/src/macros.rs:1: tuple in a signature or field; values that travel together are a struct
-tests/.fixtures/type_shape/src/real.rs:3: bool field; a stored flag is a stored mode, make it an enum or a type parameter
-tests/.fixtures/type_shape/src/spellings.rs:1: Result with a String error; errors are an enum with thiserror
-tests/.fixtures/type_shape/src/spellings.rs:2: bool field; a stored flag is a stored mode, make it an enum or a type parameter
-tests/.fixtures/type_shape/src/spellings.rs:3: Result with a String error; errors are an enum with thiserror
-tests/.fixtures/type_shape/src/spellings.rs:4: tuple in a signature or field; values that travel together are a struct
-tests/.fixtures/type_shape/src/tuples.rs:1: tuple in a signature or field; values that travel together are a struct
-tests/.fixtures/type_shape/src/tuples.rs:2: tuple in a signature or field; values that travel together are a struct
-tests/.fixtures/type_shape/src/variants.rs:2: bool field; a stored flag is a stored mode, make it an enum or a type parameter
-tests/.fixtures/type_shape/src/variants.rs:3: tuple in a signature or field; values that travel together are a struct
-tests/.fixtures/type_shape/src/variants.rs:4: Result with a String error; errors are an enum with thiserror
+src/errors.rs:1: Result with a String error; errors are an enum with thiserror
+src/fields.rs:4: bool field; a stored flag is a stored mode, make it an enum or a type parameter
+src/macros.rs:1: tuple in a signature or field; values that travel together are a struct
+src/real.rs:3: bool field; a stored flag is a stored mode, make it an enum or a type parameter
+src/spellings.rs:1: Result with a String error; errors are an enum with thiserror
+src/spellings.rs:2: bool field; a stored flag is a stored mode, make it an enum or a type parameter
+src/spellings.rs:3: Result with a String error; errors are an enum with thiserror
+src/spellings.rs:4: tuple in a signature or field; values that travel together are a struct
+src/tuples.rs:1: tuple in a signature or field; values that travel together are a struct
+src/tuples.rs:2: tuple in a signature or field; values that travel together are a struct
+src/variants.rs:2: bool field; a stored flag is a stored mode, make it an enum or a type parameter
+src/variants.rs:3: tuple in a signature or field; values that travel together are a struct
+src/variants.rs:4: Result with a String error; errors are an enum with thiserror
 tests go through public APIs:
-tests/.fixtures/type_shape/src/fine.rs:5: test code in src; move it to the package's tests directory and call the public API from there
-primitives stay at the boundary: outside a module named boundary, signatures, fields and variants carry types with meaning:
-tests/.fixtures/type_shape/src/errors.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/type_shape/src/errors.rs:1: String in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/type_shape/src/fields.rs:4: bool in a field; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/type_shape/src/fine.rs:1: u8 in a field; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/type_shape/src/fine.rs:2: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/type_shape/src/fine.rs:6: bool in a field; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/type_shape/src/macros.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/type_shape/src/macros.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/type_shape/src/real.rs:3: bool in a field; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/type_shape/src/spellings.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/type_shape/src/spellings.rs:1: String in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/type_shape/src/spellings.rs:2: bool in a field; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/type_shape/src/spellings.rs:3: u8 in a type alias; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/type_shape/src/spellings.rs:3: String in a type alias; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/type_shape/src/spellings.rs:4: u8 in a type alias; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/type_shape/src/spellings.rs:4: u8 in a type alias; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/type_shape/src/tuples.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/type_shape/src/tuples.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/type_shape/src/tuples.rs:2: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/type_shape/src/tuples.rs:2: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/type_shape/src/variants.rs:2: bool in a variant; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/type_shape/src/variants.rs:3: u8 in a variant; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/type_shape/src/variants.rs:3: u8 in a variant; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/type_shape/src/variants.rs:4: u8 in a variant; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/type_shape/src/variants.rs:4: String in a variant; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests run production code paths: no literals in a test body and no test helpers beyond a test table:
-tests/.fixtures/type_shape/src/fine.rs:6: test helper type B; test through the production code path; a test file holds tests and their table
-every pub item is named by another workspace crate:
-tests/.fixtures/type_shape/src/lib.rs:1: pub fields is named by no other crate; make it private or delete it
-tests/.fixtures/type_shape/src/lib.rs:2: pub tuples is named by no other crate; make it private or delete it
-tests/.fixtures/type_shape/src/lib.rs:3: pub errors is named by no other crate; make it private or delete it
-tests/.fixtures/type_shape/src/lib.rs:4: pub fine is named by no other crate; make it private or delete it
-tests/.fixtures/type_shape/src/lib.rs:5: pub variants is named by no other crate; make it private or delete it
-tests/.fixtures/type_shape/src/lib.rs:6: pub spellings is named by no other crate; make it private or delete it
-tests/.fixtures/type_shape/src/lib.rs:7: pub macros is named by no other crate; make it private or delete it
-tests/.fixtures/type_shape/src/lib.rs:8: pub real is named by no other crate; make it private or delete it
-tests/.fixtures/type_shape/src/real.rs:3: pub S is named by no other crate; make it private or delete it
-tests/.fixtures/type_shape/src/spellings.rs:1: pub f is named by no other crate; make it private or delete it
-tests/.fixtures/type_shape/src/spellings.rs:2: pub A is named by no other crate; make it private or delete it
-tests/.fixtures/type_shape/src/spellings.rs:3: pub R is named by no other crate; make it private or delete it
-tests/.fixtures/type_shape/src/spellings.rs:4: pub P is named by no other crate; make it private or delete it
-tests/.fixtures/type_shape/src/variants.rs:1: pub Cmd is named by no other crate; make it private or delete it
+src/fine.rs:5: test code in src; move it to the package's tests directory and call the public API from there

@@ -4,15 +4,7 @@ pub trait Ignore: Copy + fmt::Display {}
 
 pub trait Ignoring<Value, Failure>: Into<Result<Value, Failure>> {
     fn ignoring(self, _: impl Ignore) -> Option<Value> {
-        match self.into() {
-            Ok(value) => Some(value),
-            Err(failure) => Self::dropped(failure),
-        }
-    }
-
-    fn dropped(failure: Failure) -> Option<Value> {
-        drop(failure);
-        None
+        self.into().into_iter().next()
     }
 }
 
@@ -88,3 +80,14 @@ pub trait Unpoisoned<Guard>: Into<Result<Guard, std::sync::PoisonError<Guard>>> 
 }
 
 impl<Guard> Unpoisoned<Guard> for std::sync::LockResult<Guard> {}
+
+pub trait Rejoined<Value>: Into<std::thread::Result<Value>> {
+    fn rejoined(self) -> Value {
+        match self.into() {
+            Ok(value) => value,
+            Err(payload) => std::panic::resume_unwind(payload),
+        }
+    }
+}
+
+impl<Value> Rejoined<Value> for std::thread::Result<Value> {}

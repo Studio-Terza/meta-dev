@@ -1,22 +1,37 @@
+use std::ptr;
+
 use syn::spanned::Spanned;
-use syn::visit::{self, Visit};
 use syn::{
     Block, Expr, ExprForLoop, ExprMethodCall, ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, Local, Macro, Pat, Stmt,
 };
 
-use crate::expansion::Expansion;
-use crate::finding::{Fix, Found, Rule};
+use crate::finding::{Found, Rule};
 use crate::gate::Gate;
 use crate::source::Source;
 use crate::style::{Reads, Style};
+use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Debug, Default)]
 pub(crate) struct ManualIteration {
     found: Vec<Found>,
+    counting: Vec<Counting>,
 }
 
-#[derive(Debug, Default)]
-struct Constructed(Option<()>);
+#[derive(Debug)]
+struct Counting {
+    local: *const Local,
+    init: *const Expr,
+    at: usize,
+    calls: usize,
+    reading: Reading,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Reading {
+    Waiting,
+    Inside,
+    Read,
+}
 
 impl ManualIteration {
     const ITERATOR_CONSTRUCTORS: [&'static str; 16] = [
@@ -59,6 +74,11 @@ impl ManualIteration {
         }
     }
 
+    fn read(&mut self, expr: &Expr, reading: Reading) {
+        let current = self.counting.last_mut().filter(|counting| ptr::eq(counting.init, expr));
+        current.map_or_default(|counting| counting.reached(reading));
+    }
+
     fn mutable_init(local: &Local) -> Option<&Expr> {
         let mutable = match &local.pat {
             Pat::Ident(binding) => binding.mutability.map(|_| local),
@@ -68,68 +88,90 @@ impl ManualIteration {
     }
 }
 
-impl<'ast> Visit<'ast> for ManualIteration {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Gate::of(&module.attrs).entered().map_or_default(|()| visit::visit_item_mod(self, module));
+impl Hooks for ManualIteration {
+    fn item_mod(&mut self, module: &ItemMod) -> Descent {
+        Descent::from(Gate::of(&module.attrs).entered())
     }
 
-    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        Gate::of(&item.attrs).entered().map_or_default(|()| visit::visit_item_impl(self, item));
+    fn item_impl(&mut self, item: &ItemImpl) -> Descent {
+        Descent::from(Gate::of(&item.attrs).entered())
     }
 
-    fn visit_item_trait(&mut self, item: &'ast ItemTrait) {
-        Gate::of(&item.attrs).entered().map_or_default(|()| visit::visit_item_trait(self, item));
+    fn item_trait(&mut self, item: &ItemTrait) -> Descent {
+        Descent::from(Gate::of(&item.attrs).entered())
     }
 
-    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        Gate::of(&function.attrs).entered().map_or_default(|()| visit::visit_item_fn(self, function));
+    fn item_fn(&mut self, function: &ItemFn) -> Descent {
+        Descent::from(Gate::of(&function.attrs).entered())
     }
 
-    fn visit_impl_item_fn(&mut self, function: &'ast ImplItemFn) {
-        Gate::of(&function.attrs).entered().map_or_default(|()| visit::visit_impl_item_fn(self, function));
+    fn impl_item_fn(&mut self, function: &ImplItemFn) -> Descent {
+        Descent::from(Gate::of(&function.attrs).entered())
     }
 
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Expansion::of(invocation).walk(self);
+    fn macro_called(&mut self, _: &Macro) -> Expanded {
+        Expanded::Statements
     }
 
-    fn visit_expr_for_loop(&mut self, expr: &'ast ExprForLoop) {
+    fn expr_for_loop(&mut self, expr: &ExprForLoop) -> Descent {
         self.found.extend(ManualIteration::accumulator(&expr.body).map(|_| {
             Found::spanned(
                 expr.for_token.span,
                 "loop that only accumulates",
-                Fix("extend or collect from an iterator instead"),
+                "extend or collect from an iterator instead",
             )
         }));
-        visit::visit_expr_for_loop(self, expr);
+        Descent::Into
     }
 
-    fn visit_local(&mut self, local: &'ast Local) {
-        let constructed = ManualIteration::mutable_init(local).filter(|init| {
-            let mut calls = Constructed::default();
-            calls.visit_expr(init);
-            calls.0.is_some()
+    fn local(&mut self, local: &Local) -> Descent {
+        let at = self.found.len();
+        let counting = ManualIteration::mutable_init(local).map(|init| Counting {
+            local,
+            init,
+            at,
+            calls: 0,
+            reading: Reading::Waiting,
         });
-        self.found.extend(constructed.map(|_| {
-            Found::spanned(
+        self.counting.extend(counting);
+        Descent::Into
+    }
+
+    fn left_local(&mut self, local: &Local) {
+        let counted = self.counting.pop_if(|counting| ptr::eq(counting.local, local)).filter(|ended| ended.calls > 0);
+        counted.map_or_default(|ended| {
+            let found = Found::spanned(
                 local.span(),
                 "mutable iterator local",
-                Fix("drive it with combinators such as format, collect, or fold"),
-            )
-        }));
-        visit::visit_local(self, local);
+                "drive it with combinators such as format, collect, or fold",
+            );
+            self.found.insert(ended.at, found);
+        });
+    }
+
+    fn expr(&mut self, expr: &Expr) -> Descent {
+        self.read(expr, Reading::Inside);
+        Descent::Into
+    }
+
+    fn left_expr(&mut self, expr: &Expr) {
+        self.read(expr, Reading::Read);
+    }
+
+    fn expr_method_call(&mut self, call: &ExprMethodCall) -> Descent {
+        let constructs = ManualIteration::ITERATOR_CONSTRUCTORS.iter().any(|name| call.method == name);
+        self.counting.iter_mut().for_each(|counting| counting.counted(constructs));
+        Descent::Into
     }
 }
 
-impl<'ast> Visit<'ast> for Constructed {
-    fn visit_expr_method_call(&mut self, call: &'ast ExprMethodCall) {
-        let constructs = ManualIteration::ITERATOR_CONSTRUCTORS.iter().find(|name| call.method == **name);
-        self.0 = self.0.or(constructs.map(|_| ()));
-        visit::visit_expr_method_call(self, call);
+impl Counting {
+    fn reached(&mut self, reading: Reading) {
+        self.reading = reading;
     }
 
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Expansion::of(invocation).walk(self);
+    fn counted(&mut self, constructs: bool) {
+        self.calls += usize::from(constructs && self.reading == Reading::Inside);
     }
 }
 

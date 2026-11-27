@@ -1,13 +1,10 @@
-mod boundary;
-
 use std::collections::BTreeMap;
 use std::ffi::{OsStr, OsString};
 use std::io;
 
 use crate::{Environment, Heard};
 
-#[derive(serde::Deserialize, Clone, Debug, Default)]
-#[serde(from = "BTreeMap<String, String>")]
+#[derive(Debug, Default)]
 pub struct Variables {
     named: BTreeMap<OsString, OsString>,
     heard: Heard,

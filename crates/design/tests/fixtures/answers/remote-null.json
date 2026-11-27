@@ -1,3 +1,0 @@
-{
-  "gh api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}": [{"Succeeded": "{\"data\":{\"repository\":{\"ref\":null}}}"}]
-}

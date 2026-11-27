@@ -1,8 +1,0 @@
-{"type":"assistant","uuid":"a1","parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","origin":null,"message":{"model":"claude","content":[{"type":"text","text":"I checked CI\nShall I merge #12 now?"}]}}
-{"type":"user","uuid":"a2","parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","origin":{"kind":"human"},"message":{"model":"claude","content":"yes"}}
-{"type":"assistant","uuid":"a3","parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","origin":null,"message":{"model":"claude","content":[{"type":"text","text":"Merged."}]}}
-{"type":"user","uuid":"a4","parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","origin":{"kind":"human"},"message":{"model":"claude","content":"Next, port the hook and keep every quote it reads exactly as it is today."}}
-{"type":"assistant","uuid":"a5","parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","origin":null,"message":{"model":"claude","content":[{"type":"text","text":"Done. Ship it?"}]}}
-{"type":"user","uuid":"a6","parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","origin":{"kind":"human"},"message":{"model":"claude","content":"sure"}}
-{"type":"assistant","uuid":"a7","parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","origin":null,"message":{"model":"claude","content":[{"type":"text","text":"Anything else?"}]}}
-{"type":"user","uuid":"a8","parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","origin":{"kind":"human"},"message":{"model":"claude","content":"yes, merge it and then port the hook"}}

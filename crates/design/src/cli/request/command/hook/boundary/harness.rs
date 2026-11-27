@@ -16,7 +16,7 @@ pub struct Harness<'files, F: Files> {
 }
 
 impl<'files, F: Files> Harness<'files, F> {
-    const TEMPORARY: &'static str = "/tmp";
+    const TEMPORARY: &'static str = "/private/tmp";
     const TASKS: &'static str = "tasks";
     const SUBAGENTS: &'static str = "subagents";
 

@@ -1,4 +1,0 @@
-[
-  "{\"subtype\":\"success\",\"result\":\"[{\\\"uuid\\\": \\\"a2\\\", \\\"quote\\\": \\\"yes\\\"}, {\\\"uuid\\\": \\\"a4\\\", \\\"quote\\\": \\\"Next, port the hook\\\"}, {\\\"uuid\\\": \\\"a6\\\", \\\"quote\\\": \\\"sure\\\"}, {\\\"uuid\\\": \\\"a8\\\", \\\"quote\\\": \\\"yes, merge it and then port the hook\\\"}]\",\"usage\":{\"input_tokens\":3,\"output_tokens\":4}}",
-  "{\"subtype\":\"success\",\"result\":\"[1, 2, 3, 4]\",\"usage\":{\"input_tokens\":3,\"output_tokens\":4}}"
-]

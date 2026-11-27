@@ -4,44 +4,14 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use design_messages::PullNumber;
-use grammar::{AgentReport, BranchName, Ended, JobLink, RepositoryName, SpecTrailer, Target};
+use grammar::{AgentReport, BranchName, Ended, JobLink, SpecTrailer, Target};
 use grammar_spec_line::Attachment;
 use hex::FromHex;
 use invariants::Ignoring;
 use newtype::{Display, Newtype};
 use serde::Deserialize;
 
-use grammar_lines::Lines;
-
-use super::FailedJob;
 use crate::cli::request::ignored::Ignored;
-
-#[derive(Debug)]
-pub(crate) struct Excerpt {
-    failed: FailedJob,
-    lines: Vec<String>,
-}
-
-impl Excerpt {
-    const LINES: usize = 40;
-
-    pub(crate) fn tailed(failed: FailedJob, log: &str) -> Excerpt {
-        let whole: Vec<String> = match log.parse::<Lines>() {
-            Ok(lines) => lines.into_iter().collect(),
-            Err(unsplit) => match unsplit {},
-        };
-        let skipped = whole.len().saturating_sub(Excerpt::LINES);
-        Excerpt { failed, lines: whole.into_iter().skip(skipped).collect() }
-    }
-}
-
-impl fmt::Display for Excerpt {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Excerpt { failed: FailedJob { check, job }, lines } = self;
-        write!(formatter, "\n{check} (job {job}):\n")?;
-        lines.iter().try_for_each(|line| writeln!(formatter, "{line}"))
-    }
-}
 
 #[derive(Debug, Deserialize)]
 pub struct Finishing {
@@ -54,7 +24,7 @@ pub struct Finishing {
 
 #[derive(Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(from = "bool")]
-pub(crate) enum Reminder {
+pub enum Reminder {
     #[default]
     First,
     Repeated,
@@ -92,17 +62,22 @@ pub struct Branched {
     head: CommitSha,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(try_from = "String")]
 pub struct Branch(String);
+
+#[derive(Debug, thiserror::Error)]
+#[error("not a branch name of the form area/topic")]
+pub struct Unbranched;
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(from = "String")]
-pub(crate) struct First {
+pub struct First {
     spec: Option<Attachment>,
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct Compared {
+pub struct Compared {
     commits: Vec<Committed>,
 }
 
@@ -117,43 +92,27 @@ struct Message {
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct Local {
-    repository: Repository,
-}
-
-#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(try_from = "String")]
-pub struct Repository {
-    owner: String,
-    name: String,
-}
-
-#[derive(Debug, thiserror::Error)]
-#[error("not a repository of the form owner/name")]
-pub struct Unrepositoried;
-
-#[derive(Debug, Deserialize)]
-pub(crate) struct Opened {
+pub struct Opened {
     number: NonZeroU32,
 }
 
 #[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(try_from = "String")]
-pub(crate) struct CommitSha([u8; 20]);
+pub struct CommitSha([u8; 20]);
 
 #[derive(Newtype, Display, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct JobId(NonZeroU64);
 
 #[derive(Debug, thiserror::Error)]
 #[error("not a full commit sha of forty hexadecimal digits")]
-pub(crate) struct Unhexed;
+pub struct Unhexed;
 
 impl Finishing {
     pub fn said(&self) -> &Said {
         &self.said
     }
 
-    pub(crate) fn reminder(&self) -> Reminder {
+    pub fn reminder(&self) -> Reminder {
         self.reminder
     }
 
@@ -189,31 +148,31 @@ impl Report {
 }
 
 impl Pushed {
-    pub(crate) fn new(pull: PullNumber, head: CommitSha) -> Pushed {
+    pub fn new(pull: PullNumber, head: CommitSha) -> Pushed {
         Pushed { pull, head }
     }
 
-    pub(crate) fn pull(self) -> PullNumber {
+    pub fn pull(self) -> PullNumber {
         self.pull
     }
 
-    pub(crate) fn head(self) -> CommitSha {
+    pub fn head(self) -> CommitSha {
         self.head
     }
 }
 
 impl Branched {
-    pub(crate) fn branch(&self) -> &Branch {
+    pub fn branch(&self) -> &Branch {
         &self.branch
     }
 
-    pub(crate) fn head(&self) -> CommitSha {
+    pub fn head(&self) -> CommitSha {
         self.head
     }
 }
 
 impl First {
-    pub(crate) fn spec(&self) -> Option<&Attachment> {
+    pub fn spec(&self) -> Option<&Attachment> {
         self.spec.as_ref()
     }
 }
@@ -226,44 +185,13 @@ impl From<String> for First {
 }
 
 impl Compared {
-    pub(crate) fn first(self) -> Option<First> {
+    pub fn first(self) -> Option<First> {
         self.commits.into_iter().next().map(|committed| committed.commit.message)
     }
 }
 
-impl Local {
-    pub fn repository(self) -> Repository {
-        self.repository
-    }
-}
-
-impl Repository {
-    pub(crate) fn owner(&self) -> &str {
-        &self.owner
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-}
-
-impl TryFrom<String> for Repository {
-    type Error = Unrepositoried;
-
-    fn try_from(text: String) -> Result<Repository, Unrepositoried> {
-        let read = RepositoryName::read(&text).ok_or(Unrepositoried)?;
-        Ok(Repository { owner: read.owner().to_owned(), name: read.name().to_owned() })
-    }
-}
-
-impl fmt::Display for Repository {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{}/{}", self.owner, self.name)
-    }
-}
-
 impl Opened {
-    pub(crate) fn pull(&self) -> PullNumber {
+    pub fn pull(&self) -> PullNumber {
         PullNumber::new(self.number)
     }
 }
@@ -271,6 +199,14 @@ impl Opened {
 impl From<BranchName<'_>> for Branch {
     fn from(lexed: BranchName<'_>) -> Branch {
         Branch(lexed.to_string())
+    }
+}
+
+impl TryFrom<String> for Branch {
+    type Error = Unbranched;
+
+    fn try_from(text: String) -> Result<Branch, Unbranched> {
+        BranchName::read(&text).map(Branch::from).ok_or(Unbranched)
     }
 }
 
@@ -303,7 +239,7 @@ impl fmt::Display for CommitSha {
 }
 
 impl JobId {
-    pub(crate) fn linked(link: &str) -> Option<JobId> {
+    pub fn linked(link: &str) -> Option<JobId> {
         JobLink::read(link).map(|linked| JobId::new(linked.job()))
     }
 }

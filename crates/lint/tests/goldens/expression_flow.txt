@@ -1,42 +1,28 @@
+Violations
+--- out
+test budget: 0 of 57 lines are tests, at most 18% may be
+--- err
 free functions are not allowed; make them associated functions or methods:
-tests/.fixtures/expression_flow/src/dropped.rs:1: fn f; make it an associated function or a method
-tests/.fixtures/expression_flow/src/early.rs:1: fn f; make it an associated function or a method
-tests/.fixtures/expression_flow/src/lonely.rs:1: fn f; make it an associated function or a method
-tests/.fixtures/expression_flow/src/loops.rs:1: fn f; make it an associated function or a method
-tests/.fixtures/expression_flow/src/loops.rs:6: fn g; make it an associated function or a method
-tests/.fixtures/expression_flow/src/mutated.rs:1: fn f; make it an associated function or a method
-tests/.fixtures/expression_flow/src/reassigned.rs:1: fn f; make it an associated function or a method
-tests/.fixtures/expression_flow/src/reassigned.rs:6: fn g; make it an associated function or a method
-tests/.fixtures/expression_flow/src/tail.rs:1: fn f; make it an associated function or a method
+src/dropped.rs:1: fn f; make it an associated function or a method
+src/early.rs:1: fn f; make it an associated function or a method
+src/lonely.rs:1: fn f; make it an associated function or a method
+src/loops.rs:1: fn f; make it an associated function or a method
+src/loops.rs:6: fn g; make it an associated function or a method
+src/mutated.rs:1: fn f; make it an associated function or a method
+src/reassigned.rs:1: fn f; make it an associated function or a method
+src/reassigned.rs:6: fn g; make it an associated function or a method
+src/tail.rs:1: fn f; make it an associated function or a method
 control flow is an expression; every branch yields the value the function returns:
-tests/.fixtures/expression_flow/src/dropped.rs:2: if or match whose value is dropped; let it produce the value the function returns
-tests/.fixtures/expression_flow/src/early.rs:2: if or match whose value is dropped; let it produce the value the function returns
-tests/.fixtures/expression_flow/src/early.rs:2: if without else yields nothing; use then_some, filter, or an else branch that produces the value
-tests/.fixtures/expression_flow/src/lonely.rs:2: if or match whose value is dropped; let it produce the value the function returns
-tests/.fixtures/expression_flow/src/lonely.rs:2: if without else yields nothing; use then_some, filter, or an else branch that produces the value
-tests/.fixtures/expression_flow/src/loops.rs:2: for loop; drive the iterator with combinators, const fns excepted
-tests/.fixtures/expression_flow/src/loops.rs:3: while loop; drive an iterator with combinators, const fns excepted
-tests/.fixtures/expression_flow/src/loops.rs:4: loop; drive an iterator with combinators, const fns excepted
-tests/.fixtures/expression_flow/src/loops.rs:7: for loop; drive the iterator with combinators, const fns excepted
-tests/.fixtures/expression_flow/src/reassigned.rs:2: mutable local that is only reassigned; a mutable binding is borrowed as &mut or has methods called on it
-tests/.fixtures/expression_flow/src/reassigned.rs:3: assignment to a local; build the value in one expression or give its type an updater method
-tests/.fixtures/expression_flow/src/reassigned.rs:7: mutable local that is only reassigned; a mutable binding is borrowed as &mut or has methods called on it
-tests/.fixtures/expression_flow/src/reassigned.rs:8: compound assignment to a local; build the value in one expression or give its type an updater method
-primitives stay at the boundary: outside a module named boundary, signatures, fields and variants carry types with meaning:
-tests/.fixtures/expression_flow/src/dropped.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/expression_flow/src/early.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/expression_flow/src/early.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/expression_flow/src/lonely.rs:1: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/expression_flow/src/mutated.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/expression_flow/src/reassigned.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/expression_flow/src/reassigned.rs:6: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/expression_flow/src/tail.rs:1: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/expression_flow/src/tail.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-every pub item is named by another workspace crate:
-tests/.fixtures/expression_flow/src/lib.rs:1: pub early is named by no other crate; make it private or delete it
-tests/.fixtures/expression_flow/src/lib.rs:2: pub loops is named by no other crate; make it private or delete it
-tests/.fixtures/expression_flow/src/lib.rs:3: pub dropped is named by no other crate; make it private or delete it
-tests/.fixtures/expression_flow/src/lib.rs:4: pub lonely is named by no other crate; make it private or delete it
-tests/.fixtures/expression_flow/src/lib.rs:5: pub reassigned is named by no other crate; make it private or delete it
-tests/.fixtures/expression_flow/src/lib.rs:6: pub tail is named by no other crate; make it private or delete it
-tests/.fixtures/expression_flow/src/lib.rs:7: pub mutated is named by no other crate; make it private or delete it
+src/dropped.rs:2: if or match whose value is dropped; let it produce the value the function returns
+src/early.rs:2: if or match whose value is dropped; let it produce the value the function returns
+src/early.rs:2: if without else yields nothing; use then_some, filter, or an else branch that produces the value
+src/lonely.rs:2: if or match whose value is dropped; let it produce the value the function returns
+src/lonely.rs:2: if without else yields nothing; use then_some, filter, or an else branch that produces the value
+src/loops.rs:2: for loop; drive the iterator with combinators, const fns excepted
+src/loops.rs:3: while loop; drive an iterator with combinators, const fns excepted
+src/loops.rs:4: loop; drive an iterator with combinators, const fns excepted
+src/loops.rs:7: for loop; drive the iterator with combinators, const fns excepted
+src/reassigned.rs:2: mutable local that is only reassigned; a mutable binding is borrowed as &mut or has methods called on it
+src/reassigned.rs:3: assignment to a local; build the value in one expression or give its type an updater method
+src/reassigned.rs:7: mutable local that is only reassigned; a mutable binding is borrowed as &mut or has methods called on it
+src/reassigned.rs:8: compound assignment to a local; build the value in one expression or give its type an updater method

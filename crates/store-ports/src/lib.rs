@@ -20,7 +20,7 @@ pub use busy::Busy;
 pub use cause::Cause;
 pub use column::{Column, ColumnFailure, Columns};
 pub use migrator::{Migration, Migrator};
-pub use opens::Opens;
+pub use opens::{Opens, Provenance};
 pub use prepared::{Execute, Prepared, Values};
 pub use query::Query;
 pub use record::{Created, Record};

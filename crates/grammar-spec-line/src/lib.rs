@@ -2,4 +2,4 @@
 
 mod boundary;
 
-pub use boundary::{Attachment, Line, Spec};
+pub use boundary::{Attachment, Line};

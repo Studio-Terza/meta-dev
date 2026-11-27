@@ -1,3 +1,4 @@
-mod boundary;
+use newtype::{Arbitrary, Newtype};
 
-pub use boundary::*;
+#[derive(Newtype, Arbitrary, Clone, Debug, Default, PartialEq, Eq)]
+pub struct Heard(String);

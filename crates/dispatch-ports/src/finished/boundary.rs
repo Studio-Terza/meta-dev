@@ -1,26 +1,8 @@
-use grammar_reply::Inked;
-use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype};
+use grammar::Inked;
+use newtype::Checked;
 use serde::Deserialize;
 
-use super::{Finished, Usage};
-
-#[derive(Newtype, Arbitrary, Display, CheckedDeserialize, Clone, Debug, PartialEq, Eq)]
-#[newtype(checked)]
-pub struct Told(String);
-
-#[derive(Newtype, Arbitrary, Display, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-#[serde(transparent)]
-pub struct Tokens(u32);
-
-#[derive(Newtype, Arbitrary, Display, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(transparent)]
-pub struct Reply(String);
-
-impl From<Told> for Reply {
-    fn from(told: Told) -> Reply {
-        Reply(told.0)
-    }
-}
+use super::{Finished, Reply, Told, Usage};
 use crate::{Stall, Stderr, Watched};
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -38,8 +20,7 @@ pub struct Errored {
     usage: Usage,
 }
 
-#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(from = "String")]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Output {
     Finished(Finished),
     Errored(Errored),
@@ -111,12 +92,6 @@ impl Output {
             Ok(envelope) => envelope.output().unwrap_or(Output::Unreadable(Unreadable::Unsuccessful { stderr })),
             Err(failure) => Output::Unreadable(Unreadable::Json { failure: failure.to_string(), stderr }),
         }
-    }
-}
-
-impl From<String> for Output {
-    fn from(envelope: String) -> Output {
-        Output::read(&envelope, Stderr::Silent)
     }
 }
 

@@ -23,7 +23,7 @@ impl<'ports, S: Store, D: Dispatch, C: Clock, G: Shell> Answering<'ports, S, D, 
         Answering { store, crew }
     }
 
-    pub(crate) fn searched(&self, said: &Body) -> Result<Search, Failure> {
+    pub fn searched(&self, said: &Body) -> Result<Search, Failure> {
         let asked = Asked::from(said);
         let history: Vec<Said> = self.store.read(OwnerHistory)?;
         let reading = asked.reading(&history);

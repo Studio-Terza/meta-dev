@@ -1,14 +1,13 @@
-mod boundary;
-
+use std::io::{self, Read};
 use std::iter;
 use std::os::unix::process::CommandExt;
-use std::process::{Child, Command, ExitStatus, Stdio};
-use std::thread;
+use std::process::{Child, ChildStdout, Command, ExitStatus, Stdio};
+use std::thread::{self, JoinHandle};
 use std::time::{Duration, SystemTime};
 
 use port_core::Pass;
 
-use crate::{Call, Deadline, DispatchFailure, Due, Pid, Ran, ShellFiller, Wall, shell_ops};
+use crate::{Call, Deadline, DispatchFailure, Due, Pid, Printed, Ran, ShellFiller, Wall, shell_ops};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SystemShell;
@@ -23,21 +22,34 @@ impl SystemShell {
     const POLL: Duration = Duration::from_millis(50);
 
     fn waited(child: &mut Child, deadline: Deadline) -> Result<Waited, DispatchFailure> {
-        iter::repeat_with(|| SystemShell::checked(child, deadline))
-            .find_map(Result::transpose)
+        iter::repeat_with(|| Wall::from(SystemTime::now()))
+            .take_while(|now| deadline.due(*now) == Due::Pending)
+            .find_map(|_| SystemShell::checked(child).transpose())
             .unwrap_or(Ok(Waited::Overdue))
     }
 
-    fn checked(child: &mut Child, deadline: Deadline) -> Result<Option<Waited>, DispatchFailure> {
+    fn checked(child: &mut Child) -> Result<Option<Waited>, DispatchFailure> {
         let exited = child.try_wait().map_err(DispatchFailure::Collect)?;
-        let due = deadline.due(Wall::from(SystemTime::now()));
-        Ok(exited.map(Waited::Exited).or_else(|| match due {
-            Due::Passed => Some(Waited::Overdue),
-            Due::Pending => {
-                thread::sleep(SystemShell::POLL);
-                None
-            }
+        Ok(exited.map(Waited::Exited).or_else(|| {
+            thread::sleep(SystemShell::POLL);
+            None
         }))
+    }
+
+    fn read(mut stdout: ChildStdout) -> JoinHandle<io::Result<String>> {
+        thread::spawn(move || {
+            let mut text = String::new();
+            stdout.read_to_string(&mut text).map(|_read| text)
+        })
+    }
+
+    fn collected(reading: Option<JoinHandle<io::Result<String>>>) -> Result<Printed, DispatchFailure> {
+        let text = reading
+            .map(|handle| handle.join().map_err(|_panicked| DispatchFailure::Unjoined))
+            .transpose()?
+            .transpose()
+            .map_err(DispatchFailure::Collect)?;
+        Ok(Printed::new(text.unwrap_or_default()))
     }
 
     fn killed(child: &mut Child) -> Result<Ran, DispatchFailure> {

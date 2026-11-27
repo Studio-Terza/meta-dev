@@ -2,7 +2,7 @@ use strum::{IntoStaticStr, VariantArray};
 use syn::{AngleBracketedGenericArguments, GenericArgument, PathArguments, PathSegment, Type, TypePath};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Spine {
+pub enum Spine {
     Wrapper,
     Held,
 }
@@ -15,17 +15,17 @@ enum Spelled {
 }
 
 #[derive(Clone, Copy)]
-pub(crate) struct Named<'tree>(&'tree PathSegment);
+pub struct Named<'tree>(&'tree PathSegment);
 
-pub(crate) struct NamedMut<'tree>(&'tree mut PathSegment);
+pub struct NamedMut<'tree>(&'tree mut PathSegment);
 
-pub(crate) struct Slot<'tree> {
+pub struct Slot<'tree> {
     slot: &'tree mut Type,
     resource: Type,
 }
 
 impl Spine {
-    pub(crate) fn named(segment: &PathSegment) -> Option<Spine> {
+    pub fn named(segment: &PathSegment) -> Option<Spine> {
         Spelled::VARIANTS.iter().find(|spelled| segment.ident == <&str>::from(**spelled)).map(|spelled| spelled.spine())
     }
 }
@@ -40,14 +40,14 @@ impl Spelled {
 }
 
 impl<'tree> Named<'tree> {
-    pub(crate) fn read(tree: &'tree Type) -> Option<Named<'tree>> {
+    pub fn read(tree: &'tree Type) -> Option<Named<'tree>> {
         match tree {
             Type::Path(TypePath { qself: None, path }) => path.segments.last().map(Named),
             _ => None,
         }
     }
 
-    pub(crate) fn resource(self) -> Option<&'tree Type> {
+    pub fn resource(self) -> Option<&'tree Type> {
         Some(self.0)
             .filter(|segment| Spine::named(segment) == Some(Spine::Held))
             .and_then(|segment| Self::angled(&segment.arguments))
@@ -70,14 +70,14 @@ impl<'tree> Named<'tree> {
 }
 
 impl<'tree> NamedMut<'tree> {
-    pub(crate) fn read(tree: &'tree mut Type) -> Option<NamedMut<'tree>> {
+    pub fn read(tree: &'tree mut Type) -> Option<NamedMut<'tree>> {
         match tree {
             Type::Path(TypePath { qself: None, path }) => path.segments.last_mut().map(NamedMut),
             _ => None,
         }
     }
 
-    pub(crate) fn held_slot(self) -> Option<Slot<'tree>> {
+    pub fn held_slot(self) -> Option<Slot<'tree>> {
         Some(self.0)
             .filter(|segment| Spine::named(segment) == Some(Spine::Wrapper))
             .and_then(|segment| Self::angled(&mut segment.arguments))
@@ -106,7 +106,7 @@ impl<'tree> Slot<'tree> {
         found.map(|resource| Slot { slot, resource })
     }
 
-    pub(crate) fn unwrapped(mut rebuilt: Type) -> Option<Type> {
+    pub fn unwrapped(mut rebuilt: Type) -> Option<Type> {
         NamedMut::read(&mut rebuilt).and_then(NamedMut::held_slot).map(Slot::filled)?;
         Some(rebuilt)
     }

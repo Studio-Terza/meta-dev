@@ -1,6 +1,0 @@
-[test-run]
-warn = 3
-block = 5
-[clippy]
-warn = 10.5
-block = 20

@@ -33,7 +33,14 @@ pub struct Settings {
 
 #[derive(Debug, Serialize)]
 struct Matcher {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    matcher: Option<Tool>,
     hooks: [Handler; 1],
+}
+
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+enum Tool {
+    Bash,
 }
 
 #[derive(Debug, Serialize)]
@@ -75,13 +82,13 @@ struct Continuing;
 struct Continuation(Option<Continuing>);
 
 #[derive(Debug, Serialize)]
-pub(crate) struct Decision {
+pub struct Decision {
     decision: Verdict,
     reason: String,
 }
 
 #[derive(Debug, Serialize)]
-pub(crate) enum Verdict {
+pub enum Verdict {
     #[serde(rename = "block")]
     Block,
 }
@@ -89,9 +96,21 @@ pub(crate) enum Verdict {
 impl Settings {
     const KIND: &'static str = "command";
 
-    pub(crate) fn listed(events: &[HookEvent]) -> Settings {
+    pub fn listed(events: &[HookEvent]) -> Settings {
         Settings {
-            hooks: events.iter().map(|event| (*event, [Matcher { hooks: [Settings::handler(*event)] }])).collect(),
+            hooks: events
+                .iter()
+                .map(|event| {
+                    (*event, [Matcher { matcher: Settings::matcher(*event), hooks: [Settings::handler(*event)] }])
+                })
+                .collect(),
+        }
+    }
+
+    const fn matcher(event: HookEvent) -> Option<Tool> {
+        match event {
+            HookEvent::Stop | HookEvent::SubagentStop => None,
+            HookEvent::PostToolUse => Some(Tool::Bash),
         }
     }
 
@@ -107,10 +126,11 @@ impl Settings {
         match event {
             HookEvent::Stop => 3600,
             HookEvent::SubagentStop => 1500,
+            HookEvent::PostToolUse => 300,
         }
     }
 
-    pub(crate) fn written(&self) -> Result<Uttered, Failure> {
+    pub fn written(&self) -> Result<Uttered, Failure> {
         let json = serde_json::to_string_pretty(self).map_err(Failure::Render)?;
         Ok(Uttered::new(Shown::said(format_args!("{json}\n")), Ok(Outcome::Settings)))
     }
@@ -131,7 +151,7 @@ impl Stopping {
         self.transcript.as_deref().map(|transcript| harness.tasks(transcript))
     }
 
-    pub(crate) fn decided<S: Store, D: Dispatch, C: Clock, G: Shell>(
+    pub fn decided<S: Store, D: Dispatch, C: Clock, G: Shell>(
         &self,
         crew: &Crew<'_, D, C, G>,
         observed: &Observed<'_, S>,
@@ -221,7 +241,7 @@ impl Decision {
         })
     }
 
-    pub(crate) fn blocked(reason: String) -> Result<Uttered, Failure> {
+    pub fn blocked(reason: String) -> Result<Uttered, Failure> {
         let json = serde_json::to_string(&Decision { decision: Verdict::Block, reason }).map_err(Failure::Render)?;
         Ok(Uttered::new(Shown::said(format_args!("{json}\n")), Ok(Outcome::Blocked)))
     }

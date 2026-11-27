@@ -1,10 +1,9 @@
-use syn::visit::{self, Visit};
 use syn::{LifetimeParam, Macro};
 
-use crate::expansion::Expansion;
-use crate::finding::{Fix, Found, Rule};
+use crate::finding::{Found, Rule};
 use crate::source::Source;
 use crate::style::{Reads, Style};
+use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Debug, Default)]
 pub(crate) struct NamedLifetimes {
@@ -13,19 +12,19 @@ pub(crate) struct NamedLifetimes {
 
 impl NamedLifetimes {
     const SHORTEST: usize = 2;
-    const FIX: Fix = Fix("name the lifetime with a word that says what it borrows from");
+    const FIX: &'static str = "name the lifetime with a word that says what it borrows from";
 }
 
-impl<'ast> Visit<'ast> for NamedLifetimes {
-    fn visit_lifetime_param(&mut self, parameter: &'ast LifetimeParam) {
+impl Hooks for NamedLifetimes {
+    fn lifetime_param(&mut self, parameter: &LifetimeParam) -> Descent {
         let name = &parameter.lifetime.ident;
         let short = name.to_string().chars().count() < NamedLifetimes::SHORTEST;
         self.found.extend(short.then(|| Found::spanned(name.span(), format_args!("'{name}"), NamedLifetimes::FIX)));
-        visit::visit_lifetime_param(self, parameter);
+        Descent::Into
     }
 
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Expansion::of(invocation).walk(self);
+    fn macro_called(&mut self, _: &Macro) -> Expanded {
+        Expanded::Statements
     }
 }
 

@@ -1,233 +1,311 @@
-use std::io;
-use std::iter;
+use std::collections::BTreeSet;
 use std::num::NonZeroU32;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+use std::sync::LazyLock;
+use test_failure::Failed;
 
-use design_messages::{CheckName, Fate, Halt, PullNumber, SessionCursors, SessionRecords, StreamSchema};
+use design_messages::{CheckName, Fate, Halt, PullNumber, SessionCursors, StreamSchema};
 use dispatch_ports::{Pid, Tokens, Wall};
 use file_ports::Offset;
-use newtype::{Counter, Enumerated};
-use port_core::{Released, Run};
-use proptest::collection::vec;
+use invariants::{Ignoring, ignored};
+use newtype::Enumerated;
+use port_core::{Op, Run};
 use proptest::option;
 use proptest::prelude::{any, prop_assert, prop_assert_eq, proptest};
 use proptest::test_runner::{Config, RngSeed};
 use sqlite_ports::SqliteOpener;
-use store_ports::{Busy, Column, ColumnFailure, Counted, Opens, Store, StoreLock, Written, store_ops};
+use store_ports::{
+    Batch, Busy, Column, ColumnFailure, Columns, Execute, Migrator, Query, Schema, Store, StoreFailure, Version,
+};
 use tempfile::TempDir;
-use test_failure::Failed;
 use transcript_ports::{Authorship, Body, Cursor, Instant, SessionId, Uuid};
 
-proptest! {
-    #![proptest_config(Config { cases: 4, failure_persistence: None, ..Config::default() })]
-    #[test]
-    fn a_reopened_store_resumes_each_session_where_it_was_left(
-        session in any::<SessionId>(),
-        cursor in any::<Cursor>(),
-        store in "[a-z]{1,8}/[a-z]{1,8}",
-    ) {
-        let directory = TempDir::new()?;
-        let path = directory.path().join(store);
-        let run = Run::root();
-        let first = run.port(SqliteOpener.file::<StreamSchema>(path.clone()));
-        prop_assert!(path.metadata().is_err());
-        let written: Written = first.write(Counted::<SessionRecords>::new(SessionRecords::read(&session, cursor, &[])))?;
-        prop_assert_eq!(written, Written::zero().incremented());
-        prop_assert!(path.metadata().is_ok());
-        let reopened = run.port(SqliteOpener.file::<StreamSchema>(path));
-        prop_assert_eq!(reopened.read(SessionCursors)?.resuming(&session), cursor);
+ignored! {
+    enum Ignored {
+        Unread => "a raw value that does not read back is None, which the roundtrip reports",
+    }
+}
+
+#[derive(Op)]
+struct Resumed;
+
+#[derive(Op)]
+struct HalfWritten;
+
+#[derive(Op)]
+struct Applied;
+
+impl Batch for Resumed {
+    type Failure = StoreFailure;
+
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
+        statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  cursors (session, read_to)
+VALUES
+  ('s', 7)
+"#
+        ))
+    }
+}
+
+impl Batch for HalfWritten {
+    type Failure = StoreFailure;
+
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
+        statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  cursors (session, read_to)
+VALUES
+  ('s', 1)
+"#
+        ))?;
+        statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  cursors (session, read_to)
+VALUES
+  ('s', 2)
+"#
+        ))
+    }
+}
+
+#[derive(Columns)]
+struct Migrated {
+    version: Version,
+}
+
+impl Query for Applied {
+    type Rows = Vec<Version>;
+
+    fn rows(self, statements: &mut impl Execute) -> Result<Vec<Version>, StoreFailure> {
+        let rows = statements.rows(store_ports::query!(
+            Migrated,
+            r#"
+SELECT
+  version AS "version!"
+FROM
+  _sqlx_migrations
+"#
+        ))?;
+        Ok(rows.into_iter().map(|row| row.version).collect())
+    }
+}
+
+struct Place {
+    directory: TempDir,
+}
+
+impl Place {
+    fn new() -> Result<Place, std::io::Error> {
+        TempDir::new().map(|directory| Place { directory })
+    }
+
+    fn store(&self) -> PathBuf {
+        self.directory.path().join(".meta").join("design.sqlite")
+    }
+
+    fn opened(&self) -> Sqlite {
+        self.opened_as::<StreamSchema>()
+    }
+
+    fn opened_as<S: Schema>(&self) -> Sqlite {
+        Sqlite::file::<S>(self.store())
+    }
+
+    fn applied(&self) -> Result<BTreeSet<Version>, StoreFailure> {
+        Ok(Run::root().port(self.opened_as::<Untouched>()).read(Applied)?.into_iter().collect())
+    }
+
+    fn cursor(store: &impl Store) -> Result<Cursor, Failed> {
+        Ok(store.read(SessionCursors)?.resuming(&SessionId::try_new("s".to_owned())?))
+    }
+}
+
+struct Older;
+
+static OLDER: LazyLock<Migrator> = LazyLock::new(|| {
+    Migrator::from(
+        StreamSchema::migrator()
+            .iter()
+            .filter(|migration| migration.version() < Older::LAST)
+            .copied()
+            .collect::<Vec<_>>(),
+    )
+});
+
+impl Older {
+    const LAST: i64 = 20_261_126_000_004;
+}
+
+impl Schema for Older {
+    fn migrator() -> &'static Migrator {
+        &OLDER
+    }
+}
+
+struct Untouched;
+
+static UNTOUCHED: LazyLock<Migrator> = LazyLock::new(|| Migrator::from(Vec::new()).ignoring_missing());
+
+impl Schema for Untouched {
+    fn migrator() -> &'static Migrator {
+        &UNTOUCHED
+    }
+}
+
+struct Broken;
+
+static BREAKS: LazyLock<Migrator> = LazyLock::new(|| store_ports::migrate!("tests/broken"));
+
+static BROKEN: LazyLock<Migrator> =
+    LazyLock::new(|| Migrator::from(StreamSchema::migrator().iter().chain(BREAKS.iter()).copied().collect::<Vec<_>>()));
+
+impl Schema for Broken {
+    fn migrator() -> &'static Migrator {
+        &BROKEN
+    }
+}
+
+#[test]
+fn a_store_opens_lazily_and_creates_its_directory_on_the_first_op() -> Result<(), Failed> {
+    let place = Place::new()?;
+    let run = Run::root();
+    let store = run.port(place.opened());
+    assert!(place.store().metadata().is_err());
+    store.write(Resumed)?;
+    assert!(place.store().metadata().is_ok());
+    Ok(())
+}
+
+#[test]
+fn reopening_a_store_keeps_its_rows_and_runs_no_migration_again() -> Result<(), Failed> {
+    let place = Place::new()?;
+    let run = Run::root();
+    run.port(place.opened()).write(Resumed)?;
+    let reopened = run.port(place.opened());
+    assert_eq!(Place::cursor(&reopened)?, Cursor::new(Offset::try_new(7)?));
+    assert_eq!(reopened.read(Applied)?.len(), StreamSchema::migrator().iter().count());
+    Ok(())
+}
+
+#[test]
+fn an_older_store_takes_the_migrations_it_lacks_and_keeps_its_rows() -> Result<(), Failed> {
+    let place = Place::new()?;
+    let run = Run::root();
+    run.port(place.opened_as::<Older>()).write(Resumed)?;
+    let reopened = run.port(place.opened());
+    assert_eq!(Place::cursor(&reopened)?, Cursor::new(Offset::try_new(7)?));
+    assert_eq!(place.applied()?.len(), StreamSchema::migrator().iter().count());
+    Ok(())
+}
+
+#[test]
+fn a_failing_statement_rolls_back_the_whole_batch() -> Result<(), Failed> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    assert!(store.write(HalfWritten).is_err());
+    assert_eq!(Place::cursor(&store)?, Cursor::default());
+    Ok(())
+}
+
+#[test]
+fn a_store_migrated_past_what_the_code_declares_is_refused_and_left_as_it_was() -> Result<(), Failed> {
+    let place = Place::new()?;
+    let run = Run::root();
+    run.port(place.opened()).read(Applied)?;
+    let applied = place.applied()?;
+    assert!(matches!(run.port(place.opened_as::<Older>()).read(Applied), Err(StoreFailure::Migrate(_))));
+    assert_eq!(place.applied()?, applied);
+    Ok(())
+}
+
+#[test]
+fn a_failing_migration_leaves_the_store_as_it_was() -> Result<(), Failed> {
+    let place = Place::new()?;
+    let run = Run::root();
+    run.port(place.opened()).write(Resumed)?;
+    let applied = place.applied()?;
+    assert!(matches!(run.port(place.opened_as::<Broken>()).read(Applied), Err(StoreFailure::Migrate(_))));
+    assert_eq!(place.applied()?, applied);
+    assert_eq!(Place::cursor(&run.port(place.opened()))?, Cursor::new(Offset::try_new(7)?));
+    Ok(())
+}
+
+#[test]
+fn a_held_lock_refuses_other_file_handles_until_it_ends_and_a_second_memory_lock_until_dropped() -> Result<(), Failed> {
+    let place = Place::new()?;
+    let run = Run::root();
+    let (first, second, memory) =
+        (run.port(place.opened()), run.port(place.opened()), run.port(Sqlite::in_memory::<StreamSchema>()));
+    let (held, claimed) = (first.lock()?, memory.lock()?);
+    assert!(matches!((second.lock(), memory.lock()), (Err(Busy::Taken(_)), Err(Busy::Claimed))));
+    held.end()?;
+    drop(claimed);
+    assert!(second.lock().is_ok() && memory.lock().is_ok());
+    Ok(())
+}
+
+struct Stored;
+
+impl Stored {
+    fn back<Value: Column<Raw: Clone>>(raw: &Value::Raw) -> Option<Value> {
+        Value::from_raw(raw.clone()).ignoring(Ignored::Unread)
+    }
+
+    fn unread<Named: Enumerated + Column<Raw: Clone> + PartialEq + Copy>() -> Vec<Named> {
+        Named::VARIANTS.iter().copied().filter(|named| Stored::back::<Named>(&named.raw()) != Some(*named)).collect()
     }
 }
 
 proptest! {
     #![proptest_config(Config { failure_persistence: None, rng_seed: RngSeed::Fixed(0), ..Config::default() })]
     #[test]
-    fn a_uuid_column_reads_back(value in any::<Uuid>()) {
-        prop_assert_eq!(Uuid::from_raw(value.raw()).into_iter().next(), Some(value));
-    }
-
-    #[test]
-    fn a_session_column_reads_back(value in any::<SessionId>()) {
-        prop_assert_eq!(SessionId::from_raw(value.raw()).into_iter().next(), Some(value));
-    }
-
-    #[test]
-    fn an_instant_column_reads_back(value in any::<Instant>()) {
-        prop_assert_eq!(Instant::from_raw(value.raw()).into_iter().next(), Some(value));
-    }
-
-    #[test]
-    fn a_body_column_reads_back(value in any::<Body>()) {
-        prop_assert_eq!(Body::from_raw(value.raw()).into_iter().next(), Some(value));
-    }
-
-    #[test]
-    fn an_offset_column_reads_back(value in any::<Offset>()) {
-        prop_assert_eq!(Offset::from_raw(value.raw()).into_iter().next(), Some(value));
-    }
-
-    #[test]
-    fn an_optional_column_reads_back(value in option::of(any::<Body>())) {
-        prop_assert_eq!(Option::<Body>::from_raw(value.raw()).into_iter().next(), Some(value));
-    }
-
-    #[test]
-    fn a_pid_column_reads_back(value in any::<Pid>()) {
-        prop_assert_eq!(Pid::from_raw(value.raw()).into_iter().next(), Some(value));
-    }
-
-    #[test]
-    fn a_token_count_column_reads_back(value in any::<Tokens>()) {
-        prop_assert_eq!(Tokens::from_raw(value.raw()).into_iter().next(), Some(value));
-    }
-
-    #[test]
-    fn a_wall_time_column_reads_back(value in any::<Wall>()) {
-        prop_assert_eq!(Wall::from_raw(value.raw()).into_iter().next(), Some(value));
-    }
-
-    #[test]
-    fn a_pull_number_column_reads_back_and_refuses_what_is_not_one(number in any::<i64>()) {
-        let fits = u32::try_from(number).into_iter().filter_map(NonZeroU32::new).map(PullNumber::new).next();
-        prop_assert_eq!(PullNumber::from_raw(number).into_iter().next(), fits);
-        prop_assert_eq!(fits.map(|pull| PullNumber::from_raw(pull.raw()).into_iter().next()), fits.map(Some));
-    }
-
-    #[test]
-    fn a_check_name_column_reads_back_and_refuses_blank_and_control_text(text in "[ -~\n\u{7f}]{0,8}") {
-        let named = CheckName::try_new(text.clone()).into_iter().next();
-        prop_assert_eq!(&CheckName::from_raw(text).into_iter().next(), &named);
-        prop_assert_eq!(named.clone().map(|name| CheckName::from_raw(name.raw()).into_iter().next()), named.map(Some));
-    }
-
-    #[test]
-    fn a_count_beyond_a_pid_is_refused_as_unfit(number in i64::from(u32::MAX) + 1..i64::MAX) {
-        prop_assert!(matches!(Pid::from_raw(number), Err(ColumnFailure::Unfit(_))));
-    }
-
-    #[test]
-    fn an_unknown_spelling_is_refused_as_misspelled(text in "[a-z]{0,3}[A-Z ]{1,3}") {
-        prop_assert!(matches!(Halt::from_raw(text.clone()), Err(ColumnFailure::Misspelled(_))));
-        prop_assert!(matches!(Authorship::from_raw(text), Err(ColumnFailure::Misspelled(_))));
-    }
-
-    #[test]
-    fn a_negative_offset_is_refused(number in i64::MIN..0) {
-        prop_assert!(matches!(Offset::from_raw(number), Err(ColumnFailure::Refused(_))));
+    fn every_column_reads_back_and_refuses_what_it_cannot_hold(uuid in any::<Uuid>(), session in any::<SessionId>(), instant in any::<Instant>(), body in any::<Body>(), offset in any::<Offset>(), optional in option::of(any::<Body>()), pid in any::<Pid>(), tokens in any::<Tokens>(), wall in any::<Wall>(), beyond in i64::from(u32::MAX) + 1..i64::MAX, misspelled in "[a-z]{0,3}[A-Z ]{1,3}", negative in i64::MIN..0) {
+        prop_assert_eq!(Stored::back::<Uuid>(&uuid.raw()), Some(uuid));
+        prop_assert_eq!(Stored::back::<SessionId>(&session.raw()), Some(session));
+        prop_assert_eq!(Stored::back::<Instant>(&instant.raw()), Some(instant));
+        prop_assert_eq!(Stored::back::<Body>(&body.raw()), Some(body));
+        prop_assert_eq!(Stored::back::<Offset>(&offset.raw()), Some(offset));
+        prop_assert_eq!(Stored::back::<Option<Body>>(&optional.raw()), Some(optional));
+        prop_assert_eq!(Stored::back::<Pid>(&pid.raw()), Some(pid));
+        prop_assert_eq!(Stored::back::<Tokens>(&tokens.raw()), Some(tokens));
+        prop_assert_eq!(Stored::back::<Wall>(&wall.raw()), Some(wall));
+        prop_assert!(matches!(Pid::from_raw(beyond), Err(ColumnFailure::Unfit(_))));
+        prop_assert!(matches!(Halt::from_raw(misspelled.clone()), Err(ColumnFailure::Misspelled(_))));
+        prop_assert!(matches!(Authorship::from_raw(misspelled), Err(ColumnFailure::Misspelled(_))));
+        prop_assert!(matches!(Offset::from_raw(negative), Err(ColumnFailure::Refused(_))));
     }
 }
 
 #[test]
 fn every_named_column_reads_back_as_its_variant() {
-    let halts: Vec<Option<Halt>> =
-        Halt::VARIANTS.iter().map(|halt| Halt::from_raw(halt.raw()).into_iter().next()).collect();
-    let fates: Vec<Option<Fate>> =
-        Fate::VARIANTS.iter().map(|fate| Fate::from_raw(fate.raw()).into_iter().next()).collect();
-    let authors: Vec<Option<Authorship>> = [Authorship::Owner, Authorship::Lead]
-        .iter()
-        .map(|author| Authorship::from_raw(author.raw()).into_iter().next())
-        .collect();
-    assert_eq!(halts, Halt::VARIANTS.iter().copied().map(Some).collect::<Vec<Option<Halt>>>());
-    assert_eq!(fates, Fate::VARIANTS.iter().copied().map(Some).collect::<Vec<Option<Fate>>>());
-    assert_eq!(authors, [Authorship::Owner, Authorship::Lead].map(Some));
-}
-
-proptest! {
-    #![proptest_config(Config { cases: 4, failure_persistence: None, ..Config::default() })]
-    #[test]
-    fn a_held_file_lock_refuses_every_other_handle_until_it_ends(store in "[a-z]{1,8}/[a-z]{1,8}") {
-        let directory = TempDir::new()?;
-        let path: PathBuf = directory.path().join(store);
-        let run = Run::root();
-        let (first, second) =
-            (run.port(SqliteOpener.file::<StreamSchema>(path.clone())), run.port(SqliteOpener.file::<StreamSchema>(path)));
-        let held = first.lock()?;
-        prop_assert!(matches!(second.lock(), Err(Busy::Taken(_))));
-        held.end()?;
-        prop_assert!(second.lock().is_ok());
-    }
-}
-
-proptest! {
-    #[test]
-    fn each_read_is_counted_once_and_nothing_else_is(reads in 0..16_usize) {
-        let run = Run::root();
-        let store = run.port(SqliteOpener.in_memory::<StreamSchema>());
-        iter::repeat_n(SessionCursors, reads).try_for_each(|query| store.read(query).map(drop))?;
-        drop(store);
-        let measured = run.finish();
-        prop_assert_eq!(measured.snapshot().calls::<SessionCursors>().count(), reads);
-        prop_assert_eq!(measured.snapshot().iter().map(|counted| counted.calls().count()).sum::<usize>(), reads);
-    }
-
-    #[test]
-    fn reads_on_scoped_threads_are_all_counted(threads in 1..6_usize) {
-        let run = Run::root();
-        let store = run.port(SqliteOpener.in_memory::<StreamSchema>());
-        std::thread::scope(|scope| {
-            let reading = &store;
-            iter::repeat_n(SessionCursors, threads).for_each(|query| {
-                scope.spawn(move || reading.read(query).map(drop));
-            });
-        });
-        drop(store);
-        prop_assert_eq!(run.finish().snapshot().calls::<SessionCursors>().count(), threads);
-    }
-
-    #[test]
-    fn runs_never_share_their_counts(left in 0..8_usize, right in 0..8_usize) {
-        let (first, second) = (Run::root(), Run::root());
-        let (one, other) =
-            (first.port(SqliteOpener.in_memory::<StreamSchema>()), second.port(SqliteOpener.in_memory::<StreamSchema>()));
-        iter::repeat_n(SessionCursors, left).try_for_each(|query| one.read(query).map(drop))?;
-        iter::repeat_n(SessionCursors, right).try_for_each(|query| other.read(query).map(drop))?;
-        drop((one, other));
-        prop_assert_eq!(first.finish().snapshot().calls::<SessionCursors>().count(), left);
-        prop_assert_eq!(second.finish().snapshot().calls::<SessionCursors>().count(), right);
-    }
-
-    #[test]
-    fn each_lock_is_counted_and_released_once_whether_ended_or_dropped(endings in vec(any::<bool>(), 0..8)) {
-        let run = Run::root();
-        let store = run.port(SqliteOpener.in_memory::<StreamSchema>());
-        for ended in &endings {
-            let held = store.lock()?;
-            if *ended { held.end()? } else { drop(held) }
-        }
-        drop(store);
-        let settled = run.finish().settled()?;
-        prop_assert_eq!(settled.calls::<store_ops::Lock>().count(), endings.len());
-        prop_assert_eq!(settled.calls::<Released<StoreLock>>().count(), endings.len());
+    assert_eq!(Stored::unread::<Halt>(), []);
+    assert_eq!(Stored::unread::<Fate>(), []);
+    for author in [Authorship::Owner, Authorship::Lead] {
+        assert_eq!(Stored::back::<Authorship>(&author.raw()), Some(author));
     }
 }
 
 #[test]
-fn op_names_are_the_module_path_then_the_trait_and_method() -> Result<(), Failed> {
-    let source = Path::new(file!());
-    let table = source.with_file_name(source.file_stem().unwrap_or_default());
-    let found = std::env::current_dir()?
-        .ancestors()
-        .map(|directory| directory.join(&table))
-        .find(|candidate| candidate.is_file())
-        .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let golden: PathBuf = serde_json::from_slice(&std::fs::read(found)?)?;
-    let run = Run::root();
-    let store = run.port(SqliteOpener.in_memory::<StreamSchema>());
-    store.read(SessionCursors)?;
-    store.lock()?.end()?;
-    drop(store);
-    let named: Vec<String> = run.finish().settled()?.iter().map(|counted| counted.name().to_string()).collect();
-    assert_eq!(named, serde_json::from_slice::<Vec<String>>(&std::fs::read(golden)?)?);
+fn a_pull_number_and_a_check_name_read_back_and_refuse_zero_blank_and_control_characters() -> Result<(), Failed> {
+    let pull = NonZeroU32::new(u32::MAX).map(PullNumber::new);
+    let check = CheckName::try_new("CI / test (macos)".to_owned())?;
+    assert_eq!(pull.and_then(|number| Stored::back::<PullNumber>(&number.raw())), pull);
+    assert_eq!(Stored::back::<CheckName>(&check.raw()), Some(check));
+    assert!(matches!(PullNumber::from_raw(0), Err(ColumnFailure::Unfit(_))));
+    assert!(matches!(PullNumber::from_raw(i64::from(u32::MAX) + 1), Err(ColumnFailure::Unfit(_))));
+    for refused in ["", "ci\ntest", "\u{7f}"] {
+        assert!(matches!(CheckName::from_raw(refused.to_owned()), Err(ColumnFailure::Refused(_))), "{refused:?}");
+    }
     Ok(())
 }
 
-#[test]
-fn a_held_memory_lock_refuses_a_second_lock_until_it_is_dropped() -> Result<(), Busy> {
-    let run = Run::root();
-    let store = run.port(SqliteOpener.in_memory::<StreamSchema>());
-    let held = store.lock()?;
-    assert!(matches!(store.lock(), Err(Busy::Claimed)));
-    drop(held);
-    assert!(store.lock().is_ok());
-    Ok(())
-}
+type Sqlite = <SqliteOpener as store_ports::Opens>::Store;

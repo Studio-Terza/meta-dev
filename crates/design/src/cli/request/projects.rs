@@ -1,4 +1,3 @@
-mod boundary;
 mod slug;
 
 use std::ffi::{OsStr, OsString};
@@ -12,10 +11,10 @@ use crate::cli::failure::Failure;
 use slug::Slug;
 
 #[derive(Debug)]
-pub(crate) struct Projects;
+pub struct Projects;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Kept {
+pub enum Kept {
     Store,
     Agents,
     Local,
@@ -25,8 +24,6 @@ pub(crate) enum Kept {
 pub struct Located {
     transcripts: PathBuf,
     workspace: PathBuf,
-    queue: PathBuf,
-    specs: PathBuf,
 }
 
 impl Located {
@@ -34,19 +31,12 @@ impl Located {
     const STORE: &'static str = "design.sqlite";
     const AGENTS: &'static str = "agents";
     const LOCAL: &'static str = "local.toml";
-    const QUEUE: &'static str = "studio-meta-dev/transcripts/queue.md";
-    const SPECS: &'static str = "studio-meta-dev/transcripts/specs";
-    const SPEC: &'static str = "md";
 
-    pub(crate) fn transcripts<F: Files>(&self, files: F) -> ClaudeCodeDir<F> {
+    pub fn transcripts<F: Files>(&self, files: F) -> ClaudeCodeDir<F> {
         ClaudeCodeDir::new(files, self.transcripts.clone())
     }
 
-    pub fn queue(&self) -> &Path {
-        &self.queue
-    }
-
-    pub(crate) fn kept(&self, kept: Kept) -> PathBuf {
+    pub fn kept(&self, kept: Kept) -> PathBuf {
         self.workspace.join(Self::META).join(kept.name())
     }
 }
@@ -74,12 +64,7 @@ impl Projects {
             .ok_or(Failure::Unset(OsString::from("PWD")))?;
         let root = Self::resolved(&chosen);
         let slug = Slug::try_from(root.as_path())?;
-        Ok(Located {
-            transcripts: home.join(".claude").join("projects").join(PathBuf::from(slug)),
-            workspace: root,
-            queue: home.join(Located::QUEUE),
-            specs: home.join(Located::SPECS),
-        })
+        Ok(Located { transcripts: home.join(".claude").join("projects").join(PathBuf::from(slug)), workspace: root })
     }
 
     fn resolved(path: &Path) -> PathBuf {

@@ -1,453 +1,368 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
-use std::collections::BTreeMap;
-use std::fs;
-use std::io;
-use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant, SystemTime};
+mod ignored;
+mod ports;
 
-use proptest::char::range;
-use proptest::collection::vec;
-use proptest::prelude::{any, prop_assert, prop_assert_eq, proptest};
-use proptest::test_runner::Config;
-use serde::Deserialize;
-use serde::de::IgnoredAny;
 use test_failure::Failed;
 
+use std::fs;
+use std::iter;
+use std::ops::Range;
+use std::path::Path;
+
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Duration;
+
+use proptest::prelude::{Strategy, prop_assert_eq, proptest};
+use proptest::sample::select;
+use proptest::test_runner::{Config, RngSeed};
+
 use dispatch_ports::{
-    AgentRun, AnsweringShell, Call, Clock, Deadline, Dispatch, DispatchFailure, Ended, Finished, HeadlessClaude, Job,
-    MemoryClock, Model, Moment, Output, Pause, Pid, Printed, Program, Prompt, Ran, ReplayedDispatch, Reply, Shell,
-    Spoken, Stall, Started, Stderr, SystemClock, SystemShell, Timeout, Tokens, Usage, Wall, Watch, Watched, Woke,
-    clock_ops, dispatch_ops, shell_ops,
+    AgentRun, Bell, ClockFiller, Deadline, Dispatch, DispatchFailure, DispatchFiller, Due, Ended, Errored, Fault,
+    Finished, Job, Model, Output, Pause, Pid, Prompt, Reply, Stall, Stalled, Started, Stderr, Timeout, Told,
+    Unreadable, Usage, Wall, Watch, Watched, Woke, clock_ops, dispatch_ops,
 };
-use newtype::Counter;
-use port_core::{Released, Run};
+use invariants::{Ignoring, Unpoisoned, invariant, invariants};
+use port_core::{Calls, Pass, Port, Released, Run, Snapshot};
+
+use ignored::Ignored;
+
+invariants! {
+    enum Invariant {
+        Endless => "a watch over the fake clock ends within ten thousand reads of it",
+    }
+}
 
 #[test]
-fn each_envelope_reads_as_its_reply_and_usage_or_its_stall() -> Result<(), Failed> {
-    let source = Path::new(file!());
-    let table = source.with_file_name(source.file_stem().unwrap_or_default());
-    let found = std::env::current_dir()?
-        .ancestors()
-        .map(|directory| directory.join(&table))
-        .find(|candidate| candidate.is_file())
-        .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let bytes = fs::read(found)?;
-    let mut rows = serde_json::Deserializer::from_slice(&bytes);
-    let (fixture, golden) = <(PathBuf, PathBuf)>::deserialize(&mut rows)?;
-    let outputs: Vec<Output> = serde_json::from_slice(&fs::read(fixture)?)?;
-    let read: Vec<Result<(Reply, Vec<Tokens>), String>> = outputs
+fn every_agent_result_reads_as_its_golden_reply_usage_or_error() -> Result<(), Failed> {
+    let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/behaviour");
+    let texts: Vec<String> = serde_json::from_str(&fs::read_to_string(directory.join("envelopes.json"))?)?;
+    let read: String = texts
         .into_iter()
-        .map(|output| match Watched::from(output) {
-            Watched::Finished(finished) => Ok((finished.reply().clone(), finished.usage().spent().to_vec())),
-            Watched::Stalled(stall) => Err(stall.to_string()),
-        })
+        .flat_map(|text| [format!("{:?}", Output::read(&text, Stderr::Silent)), "\n".to_owned()])
         .collect();
-    assert_eq!(read, serde_json::from_slice::<Vec<_>>(&fs::read(golden)?)?);
+    let golden = directory.join("envelopes.txt");
+    std::env::var_os("RECORD_GOLDENS").map_or(Ok(()), |_| fs::write(&golden, &read))?;
+    assert_eq!(read, fs::read_to_string(golden)?);
     Ok(())
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Sleep {
+    after: usize,
+    slept: Pause,
+}
+
+impl Sleep {
+    const STILL: Sleep = Sleep { after: 0, slept: Pause::new(0) };
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Wait {
+    pause: Pause,
+    woke: Woke,
+}
+
+impl Wait {
+    fn granted(self) -> Pause {
+        match self.woke {
+            Woke::Lapsed => self.pause,
+            Woke::Rung => Pause::new(0),
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct Waits(Mutex<Vec<Wait>>);
+
+impl Waits {
+    fn recorded(self) -> Vec<Wait> {
+        self.0.into_inner().unpoisoned()
+    }
+}
+
+#[derive(Debug)]
+struct FakeClock<'waits> {
+    now: Mutex<Wall>,
+    reads: AtomicUsize,
+    sleep: Sleep,
+    waits: &'waits Waits,
+}
+
+impl<'waits> FakeClock<'waits> {
+    const READS: usize = 10_000;
+
+    fn new(sleep: Sleep, waits: &'waits Waits) -> FakeClock<'waits> {
+        FakeClock { now: Mutex::new(Watching::START), reads: AtomicUsize::new(0), sleep, waits }
+    }
+}
+
+impl ClockFiller for FakeClock<'_> {
+    fn now(&self, _pass: Pass<'_, clock_ops::Now>) -> Wall {
+        invariant!(self.reads.fetch_add(1, Ordering::Relaxed) < FakeClock::READS, Invariant::Endless);
+        *self.now.lock().unpoisoned()
+    }
+
+    fn moment(&self, _pass: Pass<'_, clock_ops::Moment>) -> dispatch_ports::Moment {
+        dispatch_ports::Moment::from(*self.now.lock().unpoisoned())
+    }
+
+    fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause, bell: &Bell) -> Wall {
+        let wait = Wait { pause, woke: bell.waited(Duration::ZERO) };
+        let mut waits = self.waits.0.lock().unpoisoned();
+        let slept =
+            Some(self.sleep).filter(|sleep| sleep.after == waits.len()).map_or(Pause::new(0), |sleep| sleep.slept);
+        waits.push(wait);
+        let mut now = self.now.lock().unpoisoned();
+        *now = now.after(wait.granted()).after(slept);
+        *now
+    }
+}
+
+#[derive(Debug)]
+struct FakeDispatch {
+    finishing: Option<usize>,
+    polls: Mutex<usize>,
+}
+
+impl FakeDispatch {
+    fn finished() -> Finished {
+        Finished::new(Reply::new("conversational(a.0)".to_owned()), Usage::default())
+    }
+}
+
+impl DispatchFiller for FakeDispatch {
+    fn dispatch(
+        &self,
+        _pass: Pass<'_, dispatch_ops::Dispatch>,
+        job: &Job,
+        _prompt: &Prompt,
+    ) -> Result<AgentRun, DispatchFailure> {
+        Ok(AgentRun::new(Pid::new(7), *job.as_ref()))
+    }
+
+    fn output(
+        &self,
+        _pass: Pass<'_, dispatch_ops::Output>,
+        _run: &mut AgentRun,
+    ) -> Result<Option<Output>, DispatchFailure> {
+        let mut polls = self.polls.lock().unpoisoned();
+        *polls = polls.saturating_add(1);
+        Ok(self.finishing.filter(|finishing| *finishing == *polls).map(|_| Output::Finished(FakeDispatch::finished())))
+    }
+
+    fn started(&self, _pass: Pass<'_, dispatch_ops::Started>, _pid: Pid) -> Result<Option<Started>, DispatchFailure> {
+        Ok(None)
+    }
+
+    fn kill(&self, _pass: Pass<'_, dispatch_ops::Kill>, _pid: Pid) -> Result<Ended, DispatchFailure> {
+        Ok(Ended::Absent)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct Observed {
+    watched: Watched,
+    calls: [Calls; 3],
+    waits: Vec<Wait>,
+}
+
+impl Observed {
+    fn read(watched: Watched, snapshot: &Snapshot, waits: Waits) -> Observed {
+        Observed {
+            watched,
+            calls: [
+                snapshot.calls::<dispatch_ops::Output>(),
+                snapshot.calls::<clock_ops::Waited>(),
+                snapshot.calls::<Released<AgentRun>>(),
+            ],
+            waits: waits.recorded(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Watching {
+    timeout: u32,
+    sleeping_after: usize,
+    finishing: Option<usize>,
+}
+
+impl Watching {
+    const START: Wall = Wall::new(1_800_000_000);
+    const PAUSE: Pause = Watch::<Port<'static, FakeDispatch>, Port<'static, FakeClock<'static>>>::PAUSE;
+    const LAPSED: Wait = Wait { pause: Watching::PAUSE, woke: Woke::Lapsed };
+    const RUNG: Wait = Wait { pause: Watching::PAUSE, woke: Woke::Rung };
+
+    fn watched(self) -> Result<Observed, Failed> {
+        let waits = Waits::default();
+        let run = Run::root();
+        let watched = {
+            let slept = Pause::new(self.timeout.saturating_add(1));
+            let clock = run.port(FakeClock::new(Sleep { after: self.sleeping_after, slept }, &waits));
+            let dispatch = run.port(FakeDispatch { finishing: self.finishing, polls: Mutex::new(0) });
+            let deadline = Deadline::after(Watching::START, Timeout::new(self.timeout));
+            let held = dispatch.dispatch(&Job::due_by(deadline, Model::Haiku), &Prompt::new(String::new()))?;
+            Watch::over(&dispatch, &clock).watched(held)?
+        };
+        Ok(Observed::read(watched, run.finish().snapshot(), waits))
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Drawn {
+    timeout: u32,
+    count: usize,
+}
+
+impl Watching {
+    fn drawn(counts: Range<usize>) -> impl Iterator<Item = Drawn> {
+        (20..200_u32).step_by(30).flat_map(move |timeout| counts.clone().map(move |count| Drawn { timeout, count }))
+    }
 }
 
 #[test]
-fn each_start_time_is_rendered_as_it_reads_or_is_refused() -> Result<(), Failed> {
-    let source = Path::new(file!());
-    let table = source.with_file_name(source.file_stem().unwrap_or_default());
-    let found = std::env::current_dir()?
-        .ancestors()
-        .map(|directory| directory.join(&table))
-        .find(|candidate| candidate.is_file())
-        .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let bytes = fs::read(found)?;
-    let mut rows = serde_json::Deserializer::from_slice(&bytes);
-    IgnoredAny::deserialize(&mut rows)?;
-    let (fixture, golden) = <(PathBuf, PathBuf)>::deserialize(&mut rows)?;
-    let texts: Vec<String> = serde_json::from_slice(&fs::read(fixture)?)?;
-    let read: Vec<Result<Started, String>> =
-        texts.iter().map(|text| text.parse::<Started>().map_err(|refused| refused.to_string())).collect();
-    let rendered: Vec<Result<String, String>> =
-        read.iter().map(|started| started.as_ref().map(ToString::to_string).map_err(Clone::clone)).collect();
-    let reread: Vec<Started> = read.iter().flatten().flat_map(|start| start.to_string().parse::<Started>()).collect();
-    assert_eq!((read.clone(), rendered), serde_json::from_slice(&fs::read(golden)?)?);
-    assert_eq!(reread, read.into_iter().flatten().collect::<Vec<Started>>());
-    Ok(())
+fn a_deadline_that_passes_during_a_sleep_kills_the_run_on_the_next_check() -> Result<(), Failed> {
+    Watching::drawn(0..9).try_for_each(|Drawn { timeout, count: sleeping_after }| {
+        let watching = Watching { timeout, sleeping_after, finishing: None };
+        let checks = Calls::new(sleeping_after.saturating_add(1));
+        assert_eq!(
+            watching.watched()?,
+            Observed {
+                watched: Watched::Stalled(Stall::Overdue),
+                calls: [checks, checks, Calls::new(1)],
+                waits: vec![Watching::LAPSED; sleeping_after.saturating_add(1)],
+            }
+        );
+        Ok(())
+    })
 }
 
 #[test]
-fn a_live_process_group_has_a_start_time_until_it_is_killed() -> Result<(), Failed> {
-    let source = Path::new(file!());
-    let table = source.with_file_name(source.file_stem().unwrap_or_default());
-    let found = std::env::current_dir()?
-        .ancestors()
-        .map(|directory| directory.join(&table))
-        .find(|candidate| candidate.is_file())
-        .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let bytes = fs::read(found)?;
-    let mut rows = serde_json::Deserializer::from_slice(&bytes);
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    let (program, timeout, prompt) = <(Program, Timeout, Prompt)>::deserialize(&mut rows)?;
-    let run = Run::root();
-    let (before, killed, after, again) = {
-        let claude = run.port(HeadlessClaude::new(std::env::current_dir()?, program));
-        let clock = run.port(SystemClock);
-        let sleeping = claude.dispatch(&Job::due_by(Deadline::after(clock.now(), timeout), Model::Haiku), &prompt)?;
-        let pid = sleeping.pid();
-        let before = claude.started(pid)?;
-        let killed = claude.kill(pid)?;
-        sleeping.end()?;
-        (before, killed, claude.started(pid)?, claude.kill(pid)?)
-    };
-    run.finish().settled()?;
-    assert_eq!(before.clone().map(|started| started.to_string().parse::<Started>()).transpose()?, before);
-    assert!(before.is_some());
-    assert_eq!((killed, after, again), (Ended::Killed, None, Ended::Absent));
-    Ok(())
+fn a_run_that_replies_before_its_deadline_is_finished_and_released_once() -> Result<(), Failed> {
+    Watching::drawn(1..9).try_for_each(|Drawn { timeout, count: finishing }| {
+        let watching = Watching { timeout, sleeping_after: 9, finishing: Some(finishing) };
+        assert_eq!(
+            watching.watched()?,
+            Observed {
+                watched: Watched::Finished(FakeDispatch::finished()),
+                calls: [Calls::new(finishing), Calls::new(finishing.saturating_sub(1)), Calls::new(1)],
+                waits: vec![Watching::LAPSED; finishing.saturating_sub(1)],
+            }
+        );
+        Ok(())
+    })
 }
 
-#[test]
-fn an_agent_that_prints_its_result_is_watched_to_what_the_result_reads_as() -> Result<(), Failed> {
-    let source = Path::new(file!());
-    let table = source.with_file_name(source.file_stem().unwrap_or_default());
-    let found = std::env::current_dir()?
-        .ancestors()
-        .map(|directory| directory.join(&table))
-        .find(|candidate| candidate.is_file())
-        .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let bytes = fs::read(found)?;
-    let mut rows = serde_json::Deserializer::from_slice(&bytes);
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    let (program, timeout, printed) = <(Program, Timeout, Prompt)>::deserialize(&mut rows)?;
-    let run = Run::root();
-    let watched = {
-        let echo = run.port(HeadlessClaude::new(std::env::current_dir()?, program));
-        let clock = run.port(SystemClock);
-        let held = echo.dispatch(&Job::due_by(Deadline::after(clock.now(), timeout), Model::Haiku), &printed)?;
-        Watch::over(&echo, &clock).watched(held)?
-    };
-    run.finish().settled()?;
-    let envelope = String::from_utf8(printed.as_ref().to_vec())?;
-    assert_eq!(watched, Watched::from(Output::read(&envelope, Stderr::Silent)));
-    Ok(())
-}
+struct Lingering;
 
-#[test]
-fn an_agent_is_told_the_model_its_job_names() -> Result<(), Failed> {
-    let source = Path::new(file!());
-    let table = source.with_file_name(source.file_stem().unwrap_or_default());
-    let found = std::env::current_dir()?
-        .ancestors()
-        .map(|directory| directory.join(&table))
-        .find(|candidate| candidate.is_file())
-        .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let bytes = fs::read(found)?;
-    let mut rows = serde_json::Deserializer::from_slice(&bytes);
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    let (program, timeout, golden) = <(Program, Timeout, PathBuf)>::deserialize(&mut rows)?;
-    let directory = std::env::current_dir()?;
-    let run = Run::root();
-    let replies = [Model::Haiku, Model::Sonnet]
-        .into_iter()
-        .map(|model| {
-            let echo = run.port(HeadlessClaude::new(directory.clone(), program.clone()));
-            let clock = run.port(SystemClock);
-            let held =
-                echo.dispatch(&Job::due_by(Deadline::after(clock.now(), timeout), model), &Prompt::new(String::new()))?;
-            Watch::over(&echo, &clock).watched(held).map(|watched| match watched {
-                Watched::Finished(finished) => Ok(finished.reply().clone()),
-                Watched::Stalled(stall) => Err(stall.to_string()),
-            })
-        })
-        .collect::<Result<Vec<Result<Reply, String>>, DispatchFailure>>()?;
-    run.finish().settled()?;
-    assert_eq!(replies, serde_json::from_slice::<Vec<_>>(&fs::read(golden)?)?);
-    Ok(())
-}
+impl Lingering {
+    fn watched(timeout: Timeout) -> Result<Observed, Failed> {
+        let waits = Waits::default();
+        let run = Run::root();
+        let watched = {
+            let clock = run.port(FakeClock::new(Sleep::STILL, &waits));
+            let replying = Lingering::pauses(timeout).saturating_add(2);
+            let dispatch = run.port(FakeDispatch { finishing: Some(replying), polls: Mutex::new(0) });
+            let deadline = Deadline::after(Watching::START, timeout);
+            let held = dispatch.dispatch(&Job::due_by(deadline, Model::Haiku), &Prompt::new(String::new()))?;
+            held.bell().ringer().ring();
+            Watch::over(&dispatch, &clock).watched(held)?
+        };
+        Ok(Observed::read(watched, run.finish().snapshot(), waits))
+    }
 
-proptest! {
-    #![proptest_config(Config { cases: 2, ..Config::default() })]
-    #[test]
-    fn an_agent_that_leaves_a_large_prompt_unread_is_killed_and_reaped_at_its_deadline(
-        letters in vec(range('a', 'z'), 0x0001_0000..0x0002_0000),
-    ) {
-        let source = Path::new(file!());
-        let table = source.with_file_name(source.file_stem().unwrap_or_default());
-        let found = std::env::current_dir()?
-            .ancestors()
-            .map(|directory| directory.join(&table))
-            .find(|candidate| candidate.is_file())
-            .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-        let bytes = fs::read(found)?;
-        let mut rows = serde_json::Deserializer::from_slice(&bytes);
-        IgnoredAny::deserialize(&mut rows)?;
-        IgnoredAny::deserialize(&mut rows)?;
-        IgnoredAny::deserialize(&mut rows)?;
-        IgnoredAny::deserialize(&mut rows)?;
-        IgnoredAny::deserialize(&mut rows)?;
-        let (programs, timeout) = <(Vec<Program>, Timeout)>::deserialize(&mut rows)?;
-        let prompt = Prompt::new(letters.into_iter().collect());
-        let directory = std::env::current_dir()?;
-        for program in programs {
-            let run = Run::root();
-            let ended = {
-                let dispatch = run.port(HeadlessClaude::new(directory.clone(), program));
-                let clock = run.port(MemoryClock::starting(Wall::from(SystemTime::now())));
-                let deadline = Deadline::after(clock.now(), timeout);
-                let held = dispatch.dispatch(&Job::due_by(deadline, Model::Haiku), &prompt)?;
-                let pid = held.pid();
-                let watched = Watch::over(&dispatch, &clock).watched(held)?;
-                (watched, dispatch.started(pid)?)
-            };
-            run.finish().settled()?;
-            prop_assert_eq!(ended, (Watched::Stalled(Stall::Overdue), None));
+    fn pauses(timeout: Timeout) -> usize {
+        let deadline = Deadline::after(Watching::START, timeout);
+        iter::successors(Some(Watching::START), |now| Some(now.after(Watching::PAUSE)))
+            .take_while(|now| deadline.due(*now) == Due::Pending)
+            .count()
+    }
+
+    fn observed(timeout: Timeout) -> Observed {
+        let pauses = Lingering::pauses(timeout);
+        let checks = Calls::new(pauses.saturating_add(1));
+        Observed {
+            watched: Watched::Stalled(Stall::Overdue),
+            calls: [checks, checks, Calls::new(1)],
+            waits: iter::once(Watching::RUNG).chain(iter::repeat_n(Watching::LAPSED, pauses)).collect(),
         }
     }
 }
 
 #[test]
-fn a_wait_nobody_rings_lasts_its_full_pause() -> Result<(), Failed> {
-    let source = Path::new(file!());
-    let table = source.with_file_name(source.file_stem().unwrap_or_default());
-    let found = std::env::current_dir()?
-        .ancestors()
-        .map(|directory| directory.join(&table))
-        .find(|candidate| candidate.is_file())
-        .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let bytes = fs::read(found)?;
-    let mut rows = serde_json::Deserializer::from_slice(&bytes);
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    let (program, timeout, prompt, pause) = <(Program, Timeout, Prompt, Pause)>::deserialize(&mut rows)?;
-    let start = Wall::from(SystemTime::now());
-    let run = Run::root();
-    let waited = {
-        let dispatch = run.port(HeadlessClaude::new(std::env::current_dir()?, program));
-        let clock = run.port(MemoryClock::starting(start));
-        let silent = dispatch.dispatch(&Job::due_by(Deadline::after(clock.now(), timeout), Model::Haiku), &prompt)?;
-        let waited = clock.waited(pause, silent.bell());
-        silent.end()?;
-        waited
-    };
-    run.finish().settled()?;
-    assert_eq!(waited, start.after(pause));
-    Ok(())
+fn a_ring_left_on_the_bell_neither_cuts_a_run_short_nor_carries_it_past_its_deadline() -> Result<(), Failed> {
+    (1..200_u32).step_by(7).map(Timeout::new).try_for_each(|timeout| {
+        assert_eq!(Lingering::watched(timeout)?, Lingering::observed(timeout));
+        Ok(())
+    })
 }
 
-#[test]
-fn a_quiet_bell_waits_out_its_pause() -> Result<(), Failed> {
-    let source = Path::new(file!());
-    let table = source.with_file_name(source.file_stem().unwrap_or_default());
-    let found = std::env::current_dir()?
-        .ancestors()
-        .map(|directory| directory.join(&table))
-        .find(|candidate| candidate.is_file())
-        .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let bytes = fs::read(found)?;
-    let mut rows = serde_json::Deserializer::from_slice(&bytes);
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    let (pause, timeout) = <(Duration, Timeout)>::deserialize(&mut rows)?;
-    let deadline = Deadline::after(Wall::from(SystemTime::now()), timeout);
-    let quiet = AgentRun::new(Pid::new(std::process::id()), deadline);
-    let started = Instant::now();
-    let woke = quiet.bell().waited(pause);
-    assert_eq!(woke, Woke::Lapsed);
-    assert!(started.elapsed() >= pause);
-    Ok(())
-}
+struct Starts;
 
-#[test]
-fn a_dispatched_agent_rings_its_own_bell_when_it_finishes() -> Result<(), Failed> {
-    let source = Path::new(file!());
-    let table = source.with_file_name(source.file_stem().unwrap_or_default());
-    let found = std::env::current_dir()?
-        .ancestors()
-        .map(|directory| directory.join(&table))
-        .find(|candidate| candidate.is_file())
-        .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let bytes = fs::read(found)?;
-    let mut rows = serde_json::Deserializer::from_slice(&bytes);
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    let (program, timeout, prompt, waiting) = <(Program, Timeout, Prompt, Pause)>::deserialize(&mut rows)?;
-    let run = Run::root();
-    let woke = {
-        let dispatch = run.port(HeadlessClaude::new(std::env::current_dir()?, program));
-        let clock = run.port(MemoryClock::starting(Wall::from(SystemTime::now())));
-        let finished = dispatch.dispatch(&Job::due_by(Deadline::after(clock.now(), timeout), Model::Haiku), &prompt)?;
-        let woke = finished.bell().waited(Duration::from(waiting));
-        finished.end()?;
-        woke
-    };
-    run.finish().settled()?;
-    assert_eq!(woke, Woke::Rung);
-    Ok(())
-}
-
-#[test]
-fn a_shell_call_returns_its_printing_and_whether_it_succeeded_failed_or_ran_past_its_deadline() -> Result<(), Failed> {
-    let source = Path::new(file!());
-    let table = source.with_file_name(source.file_stem().unwrap_or_default());
-    let found = std::env::current_dir()?
-        .ancestors()
-        .map(|directory| directory.join(&table))
-        .find(|candidate| candidate.is_file())
-        .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let bytes = fs::read(found)?;
-    let mut rows = serde_json::Deserializer::from_slice(&bytes);
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    IgnoredAny::deserialize(&mut rows)?;
-    let calls = Vec::<(Program, Timeout, Ran)>::deserialize(&mut rows)?;
-    let directory = std::env::current_dir()?;
-    let run = Run::root();
-    let ran = {
-        let shell = run.port(SystemShell);
-        let clock = run.port(SystemClock);
-        calls
-            .iter()
-            .map(|(program, timeout, _)| {
-                let call = Call::new(program.clone(), directory.clone(), Deadline::after(clock.now(), *timeout));
-                shell.ran(&call)
+impl Starts {
+    fn any() -> impl Strategy<Value = Started> {
+        (
+            select(vec!["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+            select(vec!["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]),
+            1..32_u8,
+            0..24_u8,
+            0..60_u8,
+            0..60_u8,
+            1970..2200_u16,
+        )
+            .prop_filter_map("a start time", |(weekday, month, day, hour, minute, second, year)| {
+                format!("{weekday} {month} {day:>2} {hour:02}:{minute:02}:{second:02} {year}")
+                    .parse()
+                    .ignoring(Ignored::Unparsed)
             })
-            .collect::<Result<Vec<Ran>, DispatchFailure>>()?
-    };
-    let counted = run.finish().settled()?.calls::<shell_ops::Ran>();
-    assert_eq!(ran, calls.iter().map(|(_, _, expected)| expected.clone()).collect::<Vec<Ran>>());
-    assert_eq!(counted.count(), ran.len());
-    Ok(())
+    }
 }
 
 proptest! {
+    #![proptest_config(Config { failure_persistence: None, rng_seed: RngSeed::Fixed(0), ..Config::default() })]
     #[test]
-    fn a_run_that_never_replies_is_watched_until_its_deadline_passes_then_released_once(
-        start in any::<i32>(),
-        seconds in 0..120_u32,
-    ) {
-        let replayed = ReplayedDispatch::replaying([None]);
-        let run = Run::root();
-        let (watched, now, deadline) = {
-            let dispatch = run.port(&replayed);
-            let clock = run.port(MemoryClock::starting(Wall::new(i64::from(start))));
-            let deadline = Deadline::after(clock.now(), Timeout::new(seconds));
-            let held = dispatch.dispatch(&Job::due_by(deadline, Model::Haiku), &Prompt::new(String::new()))?;
-            (Watch::over(&dispatch, &clock).watched(held)?, clock.now(), deadline)
-        };
-        let settled = run.finish().settled()?;
-        prop_assert_eq!(watched, Watched::Stalled(Stall::Overdue));
-        prop_assert!(Deadline::after(now, Timeout::new(u32::default())) >= deadline);
-        prop_assert_eq!(settled.calls::<clock_ops::Waited>(), settled.calls::<dispatch_ops::Output>());
-        prop_assert_eq!(settled.calls::<Released<AgentRun>>(), settled.calls::<dispatch_ops::Dispatch>());
+    fn a_start_time_reads_back_as_it_is_rendered(started in Starts::any()) {
+        prop_assert_eq!(started.to_string().parse::<Started>().ignoring(Ignored::Unparsed), Some(started));
     }
+}
 
-    #[test]
-    fn a_run_that_replies_is_finished_on_its_first_poll_and_released_once(
-        reply in any::<Reply>(),
-        spent in vec(any::<Tokens>(), 4),
-        seconds in 1..120_u32,
-    ) {
-        let usage = match spent.as_slice() {
-            [input, output, written, read] => Usage::new(*input, *output, *written, *read),
-            _ => Usage::default(),
-        };
-        let finished = Finished::new(reply, usage);
-        let replayed = ReplayedDispatch::replaying([Some(Output::Finished(finished.clone()))]);
-        let run = Run::root();
-        let watched = {
-            let dispatch = run.port(&replayed);
-            let clock = run.port(MemoryClock::starting(Wall::new(i64::default())));
-            let deadline = Deadline::after(clock.now(), Timeout::new(seconds));
-            let held = dispatch.dispatch(&Job::due_by(deadline, Model::Sonnet), &Prompt::new(String::new()))?;
-            Watch::over(&dispatch, &clock).watched(held)?
-        };
-        let settled = run.finish().settled()?;
-        prop_assert_eq!(watched, Watched::Finished(finished));
-        prop_assert_eq!(settled.calls::<clock_ops::Waited>().count(), usize::default());
-        prop_assert_eq!(settled.calls::<dispatch_ops::Output>(), settled.calls::<dispatch_ops::Dispatch>());
-        prop_assert_eq!(settled.calls::<Released<AgentRun>>(), settled.calls::<dispatch_ops::Dispatch>());
-    }
+#[test]
+fn pauses_last_whole_seconds_and_moments_count_milliseconds_either_way() {
+    assert_eq!([3, 0].map(|seconds| Duration::from(Pause::new(seconds))), [Duration::from_secs(3), Duration::ZERO]);
+    let [early, late] = [Wall::new(2), Wall::new(5)].map(dispatch_ports::Moment::from);
+    assert_eq!([late.since(early), early.since(late), late.since(late)], [3000, -3000, 0]);
+}
 
-    #[test]
-    fn a_fanned_job_hands_each_prompt_to_its_own_run_and_watches_each_to_its_reply(
-        prompts in vec(any::<Prompt>(), 0..6),
-        replies in vec(any::<Reply>(), 0..6),
-    ) {
-        let outputs: Vec<Output> =
-            replies.iter().map(|reply| Output::Finished(Finished::new(reply.clone(), Usage::default()))).collect();
-        let replayed = ReplayedDispatch::replaying(outputs.iter().cloned().map(Some));
-        let fanned = prompts.len().min(outputs.len());
-        let run = Run::root();
-        let watched = {
-            let dispatch = run.port(&replayed);
-            let clock = run.port(MemoryClock::starting(Wall::new(i64::default())));
-            let job = Job::due_by(Deadline::after(clock.now(), Timeout::new(u32::MAX)), Model::Haiku);
-            Watch::over(&dispatch, &clock).fanned(&job, prompts.get(..fanned).unwrap_or_default())?
-        };
-        run.finish().settled()?;
-        prop_assert_eq!(watched, outputs.into_iter().take(fanned).map(Watched::from).collect::<Vec<Watched>>());
-        prop_assert_eq!(replayed.prompts(), prompts.into_iter().take(fanned).collect::<Vec<Prompt>>());
-    }
+#[derive(Debug, PartialEq, Eq)]
+enum Cause {
+    Errored,
+    Unreadable,
+    Overdue,
+    Unspawned,
+    Failed,
+}
 
-    #[test]
-    fn an_answering_shell_answers_each_held_call_in_turn_then_repeats_its_last_and_refuses_the_rest(
-        arguments in vec("[a-z]{1,8}", 0..4),
-        unknown in vec("[A-Z]{1,8}", 1..4),
-        printed in vec(".*", 1..4),
-        name in "[a-z]{1,8}",
-    ) {
-        let deadline = Deadline::after(Wall::new(i64::default()), Timeout::new(u32::default()));
-        let held = Call::new(Program::new(&name, arguments), PathBuf::new(), deadline);
-        let other = Call::new(Program::new(&name, unknown), PathBuf::new(), deadline);
-        let answers: Vec<Ran> = printed.into_iter().map(|text| Ran::Succeeded(Printed::new(text))).collect();
-        let shell = AnsweringShell::answering(BTreeMap::from([(Spoken::from(&held), answers.clone())]));
-        let run = Run::root();
-        let (answered, again, refused) = {
-            let port = run.port(&shell);
-            let answered = answers.iter().map(|_| port.ran(&held)).collect::<Result<Vec<Ran>, DispatchFailure>>()?;
-            (answered, port.ran(&held)?, port.ran(&other))
-        };
-        prop_assert_eq!(&answered, &answers);
-        prop_assert_eq!(Some(&again), answers.last());
-        prop_assert!(matches!(refused, Err(DispatchFailure::Unanswered)));
-        prop_assert_eq!(shell.asked().pop(), Some(other));
-    }
+impl Stalled for Cause {
+    const ERRORED: Cause = Cause::Errored;
+    const UNREADABLE: Cause = Cause::Unreadable;
+    const OVERDUE: Cause = Cause::Overdue;
+    const UNSPAWNED: Cause = Cause::Unspawned;
+    const FAILED: Cause = Cause::Failed;
+}
 
-    #[test]
-    fn a_pause_lasts_its_whole_seconds(seconds in any::<u32>()) {
-        prop_assert_eq!(Duration::from(Pause::new(seconds)), Duration::from_secs(u64::from(seconds)));
-    }
-
-    #[test]
-    fn a_moment_counts_the_milliseconds_between_two_walls(start in any::<i32>(), seconds in any::<u32>()) {
-        let early = Wall::new(i64::from(start));
-        let late = early.after(Pause::new(seconds));
-        let [first, last] = [early, late].map(Moment::from);
-        prop_assert_eq!(i128::from(last.since(first)), i128::try_from(Duration::from(Pause::new(seconds)).as_millis())?);
-        prop_assert_eq!(first.since(last), last.since(first).saturating_neg());
-        prop_assert_eq!(last.since(last), i64::default());
-    }
+#[test]
+fn each_stall_names_its_own_cause() -> Result<(), Failed> {
+    let fault = || Fault::from(DispatchFailure::Spawn(std::io::Error::from_raw_os_error(2)));
+    let stalls = [
+        Stall::Errored(Errored::new(Told::try_new("refused".to_owned())?, Usage::default())),
+        Stall::Unreadable(Unreadable::Unsuccessful { stderr: Stderr::Silent }),
+        Stall::Overdue,
+        Stall::Unspawned(fault()),
+        Stall::Failed(fault()),
+    ];
+    let causes: Vec<Cause> = stalls.iter().map(Stall::stalled).collect();
+    assert_eq!(causes, [Cause::Errored, Cause::Unreadable, Cause::Overdue, Cause::Unspawned, Cause::Failed]);
+    Ok(())
 }

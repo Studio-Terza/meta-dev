@@ -1,7 +1,0 @@
-{"type":"user","uuid":"1","parentUuid":null,"sessionId":"s1","timestamp":"2026-01-01T00:00:01Z","origin":{"kind":"human"},"message":{"content":"typed words"}}
-{"type":"user","uuid":"2","mess
-{"type":"user","uuid":"1","parentUuid":null,"sessionId":"s1","timestamp":"2026-01-01T00:00:01Z","origin":{"kind":"human"},"message":{"content":"typed words"}}
-{"foo":1}
-{"type":"user","uuid":"1","parentUuid":null,"sessionId":"s1","timestamp":"2026-01-01T00:00:01Z","origin":{"kind":"human"},"message":{"content":"typed words"}}
-
-{"type":"user","uuid":"1","parentUuid":null,"sessionId":"s1","timestamp":"2026-01-01T00:00:01Z","origin":{"kind":"human"},"message":{"content":"typed words"}}

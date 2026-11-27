@@ -1,3 +1,4 @@
-mod boundary;
+use newtype::{Arbitrary, Display, Newtype};
 
-pub(crate) use boundary::*;
+#[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Count(usize);

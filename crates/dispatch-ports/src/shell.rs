@@ -1,25 +1,58 @@
-mod boundary;
+use std::path::{Path, PathBuf};
 
-use std::collections::BTreeMap;
-use std::sync::Mutex;
+use newtype::{Display, Newtype};
+use port_core::port;
 
-use invariants::Unpoisoned;
-use port_core::{Pass, port};
-use serde::Deserialize;
-
-use crate::DispatchFailure;
-pub use boundary::{Call, Printed, Spoken};
+use crate::{Deadline, DispatchFailure};
 
 #[port]
 pub trait Shell {
     fn ran(&self, call: &Call) -> Result<Ran, DispatchFailure>;
 }
 
-#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Call {
+    program: &'static str,
+    arguments: Vec<String>,
+    directory: PathBuf,
+    deadline: Deadline,
+}
+
+#[derive(Newtype, Display, Clone, Debug, Default, PartialEq, Eq)]
+pub struct Printed(String);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ran {
     Succeeded(Printed),
     Failed(Printed),
     Overdue,
+}
+
+impl Call {
+    #[must_use]
+    pub fn new(program: &'static str, arguments: Vec<String>, directory: PathBuf, deadline: Deadline) -> Call {
+        Call { program, arguments, directory, deadline }
+    }
+
+    #[must_use]
+    pub fn program(&self) -> &'static str {
+        self.program
+    }
+
+    #[must_use]
+    pub fn arguments(&self) -> &[String] {
+        &self.arguments
+    }
+
+    #[must_use]
+    pub fn directory(&self) -> &Path {
+        &self.directory
+    }
+
+    #[must_use]
+    pub fn deadline(&self) -> Deadline {
+        self.deadline
+    }
 }
 
 impl Ran {
@@ -40,31 +73,8 @@ impl Ran {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct AnsweringShell {
-    answers: BTreeMap<Spoken, Vec<Ran>>,
-    asked: Mutex<Vec<Call>>,
-}
-
-impl AnsweringShell {
-    #[must_use]
-    pub fn answering(answers: BTreeMap<Spoken, Vec<Ran>>) -> AnsweringShell {
-        AnsweringShell { answers, asked: Mutex::default() }
-    }
-
-    #[must_use]
-    pub fn asked(&self) -> Vec<Call> {
-        self.asked.lock().unpoisoned().clone()
-    }
-}
-
-impl ShellFiller for &AnsweringShell {
-    fn ran(&self, _pass: Pass<'_, shell_ops::Ran>, call: &Call) -> Result<Ran, DispatchFailure> {
-        let spoken = Spoken::from(call);
-        let mut asked = self.asked.lock().unpoisoned();
-        let earlier = asked.iter().filter(|before| Spoken::from(*before) == spoken).count();
-        asked.push(call.clone());
-        let answers = self.answers.get(&spoken).ok_or(DispatchFailure::Unanswered)?;
-        answers.get(earlier).or(answers.last()).cloned().ok_or(DispatchFailure::Unanswered)
+impl AsRef<str> for Printed {
+    fn as_ref(&self) -> &str {
+        &self.0
     }
 }

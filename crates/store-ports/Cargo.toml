@@ -27,7 +27,6 @@ design-messages = { path = "../design-messages" }
 dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports" }
 proptest.workspace = true
-serde_json.workspace = true
 tempfile.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 

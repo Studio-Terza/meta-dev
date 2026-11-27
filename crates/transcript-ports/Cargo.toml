@@ -11,10 +11,8 @@ doctest = false
 
 [dependencies]
 file-ports = { path = "../file-ports" }
-grammar-lines = { path = "../grammar-lines" }
-text-lines = { path = "../text-lines" }
+grammar = { path = "../grammar" }
 invariants = { path = "../invariants" }
-message-id = { path = "../message-id" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 serde.workspace = true

@@ -7,7 +7,7 @@ use syn::{WherePredicate, parse_quote};
 use crate::settings::{Checking, Expressed, Settings};
 use crate::wrapped::{Strategy, Wrapped};
 
-pub(crate) struct Generated<'input> {
+pub struct Generated<'input> {
     ident: &'input Ident,
     generics: &'input Generics,
 }
@@ -28,7 +28,7 @@ impl Generated<'_> {
     const CONSTRUCTED_ENUM: &str = "`from` names a struct's constructor; an enum generates its variants";
     const EMPTY_ENUM: &str = "an enum with no variants has no values to generate";
 
-    pub(crate) fn expanded(tokens: TokenStream) -> TokenStream {
+    pub fn expanded(tokens: TokenStream) -> TokenStream {
         let expansion = syn::parse2(tokens).and_then(|input: DeriveInput| {
             Settings::declared(&input.attrs).and_then(|settings| Generator::from(&settings).routed(&input))
         });

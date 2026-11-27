@@ -1,7 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-use grammar_lstart::Stamp;
+use grammar::Stamp;
 use invariants::Ignoring;
 use newtype::{Listed, Spelled};
 use strum::{Display, IntoStaticStr, VariantArray};
@@ -54,8 +54,7 @@ enum Month {
     December,
 }
 
-#[derive(Spelled, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(try_from = "String")]
+#[derive(Spelled, Clone, Debug, PartialEq, Eq)]
 pub struct Started {
     weekday: Weekday,
     month: Month,
@@ -69,14 +68,6 @@ pub struct Started {
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 #[error("{0:?} is not a process start time, which reads as in Fri Nov  6 01:16:00 2026")]
 pub struct Unstarted(String);
-
-impl TryFrom<String> for Started {
-    type Error = Unstarted;
-
-    fn try_from(text: String) -> Result<Started, Unstarted> {
-        text.parse()
-    }
-}
 
 impl Started {
     fn read(text: &str) -> Option<Started> {

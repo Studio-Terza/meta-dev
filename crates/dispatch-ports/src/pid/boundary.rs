@@ -1,12 +1,7 @@
 use std::ffi::{OsStr, OsString};
 use std::process::ExitStatus;
 
-use newtype::{Arbitrary, Display, Newtype};
-
-use super::Ended;
-
-#[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Pid(u32);
+use super::{Ended, Pid};
 
 #[derive(Debug)]
 pub(crate) struct Group(OsString);
