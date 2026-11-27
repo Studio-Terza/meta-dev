@@ -22,7 +22,8 @@ fn a_record_table_spells_its_statements() -> Result<(), Failed> {
         .zip(COLUMNS)
         .zip(OVERWRITTEN)
         .flat_map(|((name, columns), overwritten)| {
-            let table = columns.iter().fold(Table::named(name), |table, (column, origin)| table.column(column, *origin));
+            let table =
+                columns.iter().fold(Table::named(name), |table, (column, origin)| table.column(column, *origin));
             table.statements().into_iter().chain([Table::named(name).overwrite(overwritten)])
         })
         .collect();

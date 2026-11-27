@@ -1,0 +1,9 @@
+failed
+--- out
+--- err
+cannot parse measured: TOML parse error at line 1, column 12
+  |
+1 | test-run = "fast"
+  |            ^^^^^^
+invalid type: string "fast", expected f64
+

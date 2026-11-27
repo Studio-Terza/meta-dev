@@ -1,0 +1,4 @@
+failed
+--- out
+BLOCK: test-run took 3s, warn above 1s, block above 2s
+--- err

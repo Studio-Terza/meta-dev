@@ -310,6 +310,7 @@ dependencies = [
  "newtype",
  "serde",
  "strum",
+ "test-failure",
  "text-lines",
  "thiserror",
  "toml",
@@ -618,9 +619,7 @@ dependencies = [
  "newtype-derive",
  "proptest",
  "serde",
- "serde_json",
  "strum",
- "thiserror",
 ]
 
 [[package]]

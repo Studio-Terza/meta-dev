@@ -62,9 +62,9 @@ fn each_broken_invariant_and_reason_says_its_text() -> Result<(), std::io::Error
     ];
     let said: Vec<String> = panics
         .into_iter()
-        .filter_map(|outcome| match outcome {
-            Ok(()) => None,
-            Err(payload) => Some(payload),
+        .flat_map(|outcome| match outcome {
+            Ok(()) => Vec::new(),
+            Err(payload) => vec![payload],
         })
         .filter_map(|payload| payload.downcast::<String>().into_iter().next().map(|text| *text))
         .chain([Ignored::Wide.to_string()])

@@ -1,0 +1,5 @@
+passed
+--- out
+ok: clippy took 10.5s, warn above 10.5s, block above 20s
+WARN: test-run took 5s, warn above 3s, block above 5s
+--- err

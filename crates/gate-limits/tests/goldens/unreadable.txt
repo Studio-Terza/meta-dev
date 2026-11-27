@@ -1,0 +1,4 @@
+failed
+--- out
+--- err
+cannot read tests/fixtures/measured/no-such-measured.toml: No such file or directory (os error 2)

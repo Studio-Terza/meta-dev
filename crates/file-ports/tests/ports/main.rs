@@ -17,7 +17,7 @@ proptest! {
         memory.create_directories(scratch.path())?;
         Disk.write(&path, bytes.clone())?;
         memory.write(&path, bytes.clone())?;
-        prop_assert_eq!(Disk.read(&path)?, bytes.clone());
+        prop_assert_eq!(&Disk.read(&path)?, &bytes);
         prop_assert_eq!(memory.read(&path)?, bytes);
         prop_assert_eq!(Disk.kind(&path), memory.kind(&path));
     }
@@ -31,7 +31,7 @@ proptest! {
         let joined = Bytes::new(first.clone().into_inner().into_iter().chain(second.clone().into_inner()).collect());
         Disk.append(&path, &first).and_then(|()| Disk.append(&path, &second))?;
         memory.append(&path, &first).and_then(|()| memory.append(&path, &second))?;
-        prop_assert_eq!(Disk.read(&path)?, joined.clone());
+        prop_assert_eq!(&Disk.read(&path)?, &joined);
         prop_assert_eq!(memory.read(&path)?, joined);
     }
 
@@ -45,7 +45,7 @@ proptest! {
         Disk.create_directories(&inner)?;
         Disk.write(&from, bytes.clone()).and_then(|()| Disk.copy(&from, &to))?;
         memory.write(&from, bytes.clone()).and_then(|()| memory.copy(&from, &to))?;
-        prop_assert_eq!(Disk.read(&to)?, bytes.clone());
+        prop_assert_eq!(&Disk.read(&to)?, &bytes);
         prop_assert_eq!(memory.read(&to)?, bytes);
         let mut on_disk = Disk.entries(scratch.path())?;
         let mut in_memory = memory.entries(scratch.path())?;
@@ -74,9 +74,9 @@ proptest! {
         memory.create_directories(scratch.path())?;
         Disk.write(&path, bytes.clone())?;
         memory.write(&path, bytes.clone())?;
-        let skipped = usize::try_from(offset.position()).unwrap_or(usize::MAX);
+        let skipped = usize::try_from(offset.position()).into_iter().next().unwrap_or(usize::MAX);
         let tail = Bytes::new(bytes.into_inner().into_iter().skip(skipped).collect());
-        prop_assert_eq!(Disk.read_from(&path, offset)?, tail.clone());
+        prop_assert_eq!(&Disk.read_from(&path, offset)?, &tail);
         prop_assert_eq!(memory.read_from(&path, offset)?, tail);
     }
 
@@ -88,7 +88,7 @@ proptest! {
         let cached = Cached::new(&memory);
         prop_assert_eq!(cached.read(&path)?, first);
         cached.write(&path, second.clone())?;
-        prop_assert_eq!(cached.read(&path)?, second.clone());
+        prop_assert_eq!(&cached.read(&path)?, &second);
         prop_assert_eq!(memory.read(&path)?, second);
     }
 

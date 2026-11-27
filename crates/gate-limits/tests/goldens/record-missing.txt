@@ -1,0 +1,4 @@
+failed
+--- out
+--- err
+stage cold-test-compile has no usable limit: it needs numeric warn and block with warn not above block

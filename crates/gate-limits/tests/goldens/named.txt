@@ -1,0 +1,4 @@
+passed
+--- out
+WARN: test-run took 4s, warn above 3s, block above 5s
+--- err

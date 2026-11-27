@@ -1,0 +1,4 @@
+failed
+--- out
+--- err
+stage clippy has no usable limit: it needs numeric warn and block with warn not above block

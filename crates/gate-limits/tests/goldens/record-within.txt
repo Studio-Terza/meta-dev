@@ -1,0 +1,4 @@
+passed
+--- out
+ok: cold-clippy took 50s, record 50s, lowered only by ci ratchet-lower
+--- err

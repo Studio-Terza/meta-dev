@@ -1,0 +1,3 @@
+test-run = 1
+clippy = 1
+lint = 1

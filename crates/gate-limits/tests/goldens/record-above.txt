@@ -1,0 +1,4 @@
+failed
+--- out
+BLOCK: cold-clippy took 50.1s, record 50s, lowered only by ci ratchet-lower
+--- err
