@@ -1,6 +1,3 @@
-Violations
---- out
---- err
 free functions are not allowed; make them associated functions or methods:
 tests/.fixtures/bool_methods/src/lib.rs:19: fn outer; make it an associated function or a method
 tests/.fixtures/bool_methods/src/lib.rs:20: fn inner; make it an associated function or a method

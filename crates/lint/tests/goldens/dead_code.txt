@@ -1,6 +1,3 @@
-Violations
---- out
---- err
 free functions are not allowed; make them associated functions or methods:
 tests/.fixtures/dead_code/library/src/lib.rs:17: fn called; make it an associated function or a method
 tests/.fixtures/dead_code/library/src/lib.rs:20: fn uncalled; make it an associated function or a method

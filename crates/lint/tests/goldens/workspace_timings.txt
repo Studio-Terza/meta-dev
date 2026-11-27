@@ -1,5 +1,3 @@
-Violations
---- out
 lint timings in milliseconds, each stage summed over files and threads:
 run: wall time of the whole run
 find: list the packages and their crate roots
@@ -22,7 +20,6 @@ visit: TestShape
 visit: DeadCode
 visit: test budget
 reduce: join the graph lints' facts
---- err
 free functions are not allowed; make them associated functions or methods:
 tests/.fixtures/workspace/app/benches/timed.rs:1: fn timed; make it an associated function or a method
 tests/.fixtures/workspace/app/build.rs:2: fn helper; make it an associated function or a method

@@ -1,6 +1,3 @@
-Violations
---- out
---- err
 free functions are not allowed; make them associated functions or methods:
 tests/.fixtures/primitive_boundary/src/boundary.rs:4: fn parsed; make it an associated function or a method
 tests/.fixtures/primitive_boundary/src/inline.rs:15: fn read; make it an associated function or a method

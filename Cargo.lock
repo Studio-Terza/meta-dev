@@ -555,6 +555,7 @@ dependencies = [
  "quote",
  "ra-ap-rustc_lexer",
  "rayon",
+ "serde",
  "serde_json",
  "syn 2.0.119",
  "test-failure",

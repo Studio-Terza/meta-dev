@@ -1,6 +1,3 @@
-Violations
---- out
---- err
 comments are not allowed in this repository:
 tests/.fixtures/no_comments/src/commented.rs:2: comment; delete it and say the same in the names of the code
 tests/.fixtures/no_comments/src/commented.rs:3: comment; delete it and say the same in the names of the code

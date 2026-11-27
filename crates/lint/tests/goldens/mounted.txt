@@ -1,6 +1,3 @@
-Violations
---- out
---- err
 no dyn: every type is known at compile time, so code takes a generic, returns impl Trait or names an enum instead of a trait object:
 ./tests/.fixtures/no_dyn/src/shapes.rs:4: dyn trait object; take a generic, return impl Trait, or list the known types in an enum
 every pub item is named by another workspace crate:

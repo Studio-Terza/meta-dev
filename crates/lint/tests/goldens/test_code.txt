@@ -1,6 +1,3 @@
-Violations
---- out
---- err
 free functions are not allowed; make them associated functions or methods:
 tests/.fixtures/test_code/src/lib.rs:41: fn gated_free; make it an associated function or a method
 tests/.fixtures/test_code/src/lib.rs:44: fn inside; make it an associated function or a method

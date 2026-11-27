@@ -1,6 +1,3 @@
-Violations
---- out
---- err
 free functions are not allowed; make them associated functions or methods:
 tests/.fixtures/expression_flow/src/dropped.rs:1: fn f; make it an associated function or a method
 tests/.fixtures/expression_flow/src/early.rs:1: fn f; make it an associated function or a method

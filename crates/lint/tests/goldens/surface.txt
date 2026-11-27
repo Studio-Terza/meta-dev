@@ -1,6 +1,3 @@
-Violations
---- out
---- err
 free functions are not allowed; make them associated functions or methods:
 tests/.fixtures/surface/provider/src/inner.rs:9: fn own; make it an associated function or a method
 a crate exports exactly what another crate uses:

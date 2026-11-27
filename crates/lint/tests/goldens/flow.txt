@@ -1,6 +1,3 @@
-Violations
---- out
---- err
 free functions are not allowed; make them associated functions or methods:
 tests/.fixtures/flow/src/lib.rs:42: fn inner; make it an associated function or a method
 tests/.fixtures/flow/src/lib.rs:119: fn boxed; make it an associated function or a method

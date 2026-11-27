@@ -1,6 +1,3 @@
-Violations
---- out
---- err
 free functions are not allowed; make them associated functions or methods:
 tests/.fixtures/no_free_fns/src/free.rs:1: fn helper; make it an associated function or a method
 tests/.fixtures/no_free_fns/src/free.rs:3: fn nested; make it an associated function or a method

@@ -1,3 +1,5 @@
+mod boundary;
+
 use std::ffi::OsString;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -16,7 +18,8 @@ use crate::reading::{Read, Reader};
 use crate::spent::Stage;
 use crate::workspace::{Tree, Workspace};
 
-#[derive(Debug)]
+#[derive(Debug, serde::Deserialize)]
+#[serde(from = "Vec<String>")]
 pub struct Cli {
     roots: Vec<PathBuf>,
     mode: Mode,
@@ -29,7 +32,7 @@ enum Mode {
     Report,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Deserialize)]
 pub enum Verdict {
     Clean,
     Violations,

@@ -1,6 +1,3 @@
-Violations
---- out
---- err
 free functions are not allowed; make them associated functions or methods:
 tests/.fixtures/test_shape/src/lib.rs:10: fn helper; make it an associated function or a method
 tests go through public APIs:

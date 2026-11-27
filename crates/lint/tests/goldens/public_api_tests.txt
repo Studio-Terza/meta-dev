@@ -1,6 +1,3 @@
-Violations
---- out
---- err
 tests go through public APIs:
 tests/.fixtures/public_api_tests/src/lib.rs:3: test code in src; move it to the package's tests directory and call the public API from there
 tests/.fixtures/public_api_tests/tests/peek.rs:2: test file includes a module from src with #[path]; call the public API instead

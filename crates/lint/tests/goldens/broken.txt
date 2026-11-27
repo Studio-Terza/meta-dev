@@ -1,6 +1,3 @@
-Refused
---- out
---- err
 cannot parse tests/.fixtures/broken/src/bad.rs:1: cannot parse string into token stream
 cannot read tests/.fixtures/broken/src/missing.rs: entity not found
 free functions are not allowed; make them associated functions or methods:
