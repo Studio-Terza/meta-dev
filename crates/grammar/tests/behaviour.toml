@@ -1,4 +1,4 @@
-# Texts each lexer reads; tests/lexed.txt holds what it reads them as.
+[Texts.lexed]
 lines = ["", "a\tb\n\nc\r\nd", "\t\tx\t\n"]
 stamps = [
     "Fri Nov  6 01:16:00 2026    \n",

@@ -36,6 +36,44 @@ pub struct Drift {
     printed: String,
 }
 
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, serde::Deserialize)]
+#[serde(transparent)]
+pub struct Spelled(String);
+
+impl fmt::Debug for Spelled {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&self.0, formatter)
+    }
+}
+
+#[derive(Debug)]
+pub struct Debugged<Shown>(pub Shown);
+
+impl Spelled {
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<str> for Spelled {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for Spelled {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+impl<Shown: fmt::Debug> fmt::Display for Debugged<Shown> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(formatter, "{:#?}", self.0)
+    }
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct Entry {
     directory: Option<PathBuf>,
