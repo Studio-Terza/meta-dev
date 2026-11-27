@@ -1,0 +1,4 @@
+[
+  ["tests/fixtures/transcripts/conversation.jsonl", "home", ".claude/projects/WORKSPACE/s.jsonl"],
+  ["tests/fixtures/queue.md", "home", "studio-meta-dev/transcripts/queue.md"]
+]

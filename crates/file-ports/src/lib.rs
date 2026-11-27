@@ -1,4 +1,3 @@
-mod absent;
 mod bytes;
 mod cached;
 mod disk;
@@ -12,7 +11,6 @@ mod stamps;
 mod tail;
 mod text;
 
-pub use absent::Absent;
 pub use bytes::Bytes;
 pub use cached::Cached;
 pub use disk::Disk;

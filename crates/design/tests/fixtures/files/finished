@@ -1,0 +1,8 @@
+[
+  ["tests/fixtures/transcripts/conversation.jsonl", "home", ".claude/projects/WORKSPACE/s.jsonl"],
+  ["tests/fixtures/tasks/exited.output", "tmp", "WORKSPACE/s/tasks/b1.output"],
+  ["tests/fixtures/tasks/building.output", "tmp", "WORKSPACE/s/tasks/b2.log"],
+  ["tests/fixtures/tasks/killed.output", "tmp", "WORKSPACE/s/tasks/b3.output"],
+  ["tests/fixtures/tasks/done.jsonl", "home", ".claude/projects/WORKSPACE/s/subagents/agent-done.jsonl"],
+  ["tests/fixtures/tasks/meta.json", "home", ".claude/projects/WORKSPACE/s/subagents/agent-done.meta.json"]
+]

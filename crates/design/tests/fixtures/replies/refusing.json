@@ -1,0 +1,4 @@
+[
+  "{\"subtype\":\"success\",\"is_error\":true,\"result\":\"refused\",\"usage\":{\"input_tokens\":3,\"output_tokens\":4}}",
+  "{\"subtype\":\"success\",\"is_error\":true,\"result\":\"refused\",\"usage\":{\"input_tokens\":3,\"output_tokens\":4}}"
+]

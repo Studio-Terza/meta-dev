@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use file_ports::{Absent, Bytes, Cached, Disk, Files, Kind, Memory, Offset};
+use file_ports::{Bytes,Cached, Disk, Files, Kind, Memory, Offset};
 use newtype::Wrapping;
 use proptest::prelude::{any, prop_assert_eq, proptest};
 
@@ -86,13 +86,5 @@ proptest! {
         cached.write(&path, second.clone())?;
         prop_assert_eq!(&cached.read(&path)?, &second);
         prop_assert_eq!(memory.read(&path)?, second);
-    }
-
-    #[test]
-    fn absent_holds_nothing_and_takes_nothing(name in "[a-z]{1,8}", bytes in any::<Bytes>()) {
-        let path = PathBuf::from(&name);
-        prop_assert_eq!(Absent.write(&path, bytes.clone()).is_err(), Absent.read(&path).is_err());
-        prop_assert_eq!(Absent.append(&path, &bytes).is_err(), Absent.entries(&path).is_err());
-        prop_assert_eq!(Absent.kind(&path), Kind::Missing);
     }
 }

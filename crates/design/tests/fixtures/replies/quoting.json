@@ -1,0 +1,4 @@
+[
+  "{\"subtype\":\"success\",\"result\":\"[{\\\"uuid\\\": \\\"o1\\\", \\\"quote\\\": \\\"Merge only when CI is green.\\\"}]\",\"usage\":{\"input_tokens\":3,\"output_tokens\":4}}",
+  "{\"subtype\":\"success\",\"result\":\"[1]\",\"usage\":{\"input_tokens\":3,\"output_tokens\":4}}"
+]

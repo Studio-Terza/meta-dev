@@ -3,6 +3,6 @@
 mod cli;
 mod hook_event;
 
-pub use cli::outcome::Outcome;
-pub use cli::{Agents, Cli, Failure};
-pub use hook_event::HookEvent;
+pub(crate) use cli::outcome::Outcome;
+pub use cli::{Agents, Cli};
+pub(crate) use hook_event::HookEvent;
