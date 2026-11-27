@@ -54,9 +54,12 @@ const BRANCH: &str = "design/open-pr";
 const REMOTE: &str = "api graphql -F owner={owner} -F name={repo} -f ref=refs/heads/design/open-pr -f \
                       query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(\
                       qualifiedName:$ref){target{oid}}}}";
-const FIRST: &str = "log --reverse --format=%s%n%(trailers:key=Spec,valueonly,separator=%x2c) origin/main..0123456789abcdef0123456789abcdef01234567";
-const CREATE: &str = "pr create --head design/open-pr --base main --title Open the pull request in code --body spec: \
+const FIRST: &str = "log --reverse --format=%(trailers:key=Spec,valueonly,separator=%x2c) \
+                     origin/main..0123456789abcdef0123456789abcdef01234567";
+const CREATE: &str = "pr create --head design/open-pr --base main --title D2 Typed agent outcomes --body spec: \
                       tools-retirement#D2\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)";
+const SPEC: &str = "# Tools retirement\n\nD1 Dropped until missed (D2 later): waits.\n\nD2 Typed agent outcomes (owner \
+                    de7a042f): the hook refuses (with D3) other endings.\nD20 Later work (owner 1).\n";
 const VIEW: &str = "pr view design/open-pr --json number";
 
 #[derive(Debug)]
@@ -396,6 +399,13 @@ impl Home {
         Ok(())
     }
 
+    fn specified(&self, text: &str) -> Result<(), Failed> {
+        let folder = self.path().join("studio-meta-dev/transcripts/specs");
+        fs::create_dir_all(&folder)?;
+        fs::write(folder.join("tools-retirement.md"), text)?;
+        Ok(())
+    }
+
     fn golden(name: &str) -> Result<String, Failed> {
         Ok(fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(GOLDENS).join(name))?)
     }
@@ -527,7 +537,7 @@ impl GitHub {
     }
 
     fn first(trailer: &str) -> Answer {
-        let log = format!("Open the pull request in code\n{trailer}\nLater work\nspec: other#D9\n");
+        let log = format!("{trailer}\nother#D9\n");
         Answer::git(FIRST, Ran::Succeeded(Printed::new(log)))
     }
 
@@ -668,7 +678,9 @@ fn a_done_on_a_pushed_branch_opens_its_pull_request_from_the_first_commit_and_wa
     let viewed = Answer::new(VIEW, Ran::Succeeded(Printed::new("{\"number\":12}".to_owned())));
     let green = GitHub::checks(&[["test", "pass", "https://github.com/o/r/actions/runs/9/job/456"]]);
     let github = GitHub::opening(&[viewed, GitHub::head(SHA), GitHub::watched(), green]);
-    let said = Home::new()?.finished(&format!("DONE {BRANCH} {SHA}"), false, &github);
+    let home = Home::new()?;
+    home.specified(SPEC)?;
+    let said = home.finished(&format!("DONE {BRANCH} {SHA}"), false, &github);
     assert_eq!((said.shown.as_str(), said.ended), ("", Ok(Outcome::Hooked(HookEvent::SubagentStop))));
     let asked = [format!("gh {REMOTE}"), format!("git {FIRST}"), format!("gh {CREATE}"), format!("gh {VIEW}")];
     let checked = [HEAD, WATCH, CHECKS].map(|step| format!("gh {step}"));
@@ -697,6 +709,7 @@ fn a_done_on_a_branch_whose_remote_head_differs_is_sent_back_to_push() -> Result
 fn a_branch_that_cannot_be_read_or_opened_is_escalated_on_the_branch() -> Result<(), Failed> {
     let home = Home::new()?;
     home.queued("")?;
+    home.specified(SPEC)?;
     let unviewed = Answer::new(VIEW, Ran::Succeeded(Printed::new("{}".to_owned())));
     let cases = [
         (format!("BLOCKED {BRANCH} {SHA}"), GitHub::default()),
@@ -720,6 +733,24 @@ fn a_branch_that_cannot_be_read_or_opened_is_escalated_on_the_branch() -> Result
         assert_eq!((escalated.shown.as_str(), escalated.ended), ("", Ok(Outcome::Escalated)), "{said} {github:?}");
     }
     assert_eq!(home.queue()?, Home::golden("escalated-branch-queue.md")?);
+    Ok(())
+}
+
+#[test]
+fn a_branch_whose_spec_detail_has_no_heading_is_escalated_and_never_opened() -> Result<(), Failed> {
+    let home = Home::new()?;
+    home.queued("")?;
+    let done = format!("DONE {BRANCH} {SHA}");
+    let cited = |trailer: &str| GitHub::answering(&[GitHub::pushed(SHA), GitHub::first(trailer)]);
+    let unspecified = home.finished(&done, false, &cited("tools-retirement#D2"));
+    home.specified("D1 Dropped (D2 later).\nD20 Later work (owner 1).\nD2\n D2 Indented (owner 2).\n")?;
+    let cases = [cited("tools-retirement#D2"), cited("tools-retirement#D2, other#D3"), cited("owner 3c84f560")];
+    let escalated = cases.iter().map(|github| home.finished(&done, false, github)).collect::<Vec<_>>();
+    let first = [unspecified];
+    let ended = first.iter().chain(&escalated).map(|said| (said.shown.as_str(), said.ended == Ok(Outcome::Escalated)));
+    assert_eq!(ended.collect::<Vec<_>>(), [("", true); 4]);
+    assert!(cases.iter().all(|github| github.asked().len() == 2));
+    assert_eq!(home.queue()?, Home::golden("escalated-detail-queue.md")?);
     Ok(())
 }
 

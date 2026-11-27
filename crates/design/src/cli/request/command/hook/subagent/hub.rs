@@ -4,10 +4,13 @@ use std::path::Path;
 
 use design_messages::{CheckName, PullNumber};
 use dispatch_ports::{Call, Clock, Deadline, Dispatch, Ran, Shell, Timeout};
+use file_ports::Files;
 use grammar_spec_line::Attachment;
 use invariants::Ignoring;
 use serde::Deserialize;
+use store_ports::Store;
 
+use super::super::super::Ground;
 use super::super::super::crew::Crew;
 use super::boundary::{Branch, Branched, CommitSha, First, JobId, Opened, Pushed};
 use super::{FailedJob, UnreadStep};
@@ -102,7 +105,7 @@ impl<'crew, D: Dispatch, C: Clock, G: Shell> Hub<'crew, D, C, G> {
     const GIT: &'static str = "git";
     const BASE: &'static str = "main";
     const MAIN: &'static str = "origin/main";
-    const FIRST: &'static str = "--format=%s%n%(trailers:key=Spec,valueonly,separator=%x2c)";
+    const FIRST: &'static str = "--format=%(trailers:key=Spec,valueonly,separator=%x2c)";
     const REMOTE: &'static str = "query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name)\
                                   {ref(qualifiedName:$ref){target{oid}}}}";
 
@@ -121,14 +124,18 @@ impl<'crew, D: Dispatch, C: Clock, G: Shell> Hub<'crew, D, C, G> {
         self.crew.ran(&call).ignoring(Ignored::Unrun)
     }
 
-    pub fn opened(&self, branched: &Branched) -> Result<Pushed, Unopened> {
+    pub fn opened<F: Files, S: Store>(
+        &self,
+        branched: &Branched,
+        ground: &Ground<'_, F, S>,
+    ) -> Result<Pushed, Unopened> {
         let held = self.remote(branched.branch())?;
         (held == Some(branched.head())).then_some(()).ok_or(Unopened::Unpushed(held))?;
         let first = self.first(branched.head())?;
-        let spec = first.spec().ok_or(Unopened::Unread(UnreadStep::Spec))?;
+        let spec = first.spec().ok_or(UnreadStep::Spec)?;
+        let title = ground.titled(spec).ok_or(UnreadStep::Detail)?.to_string();
         let branch = branched.branch().to_string();
         let body = Body(spec).to_string();
-        let title = first.subject().to_string();
         let asked =
             ["pr", "create", "--head", &branch, "--base", Hub::<D, C, G>::BASE, "--title", &title, "--body", &body];
         self.ran(&asked, Self::QUICK).as_ref().and_then(Ran::succeeded).ok_or(UnreadStep::Open)?;

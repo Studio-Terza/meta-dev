@@ -24,6 +24,7 @@ pub struct Located {
     transcripts: PathBuf,
     workspace: PathBuf,
     queue: PathBuf,
+    specs: PathBuf,
 }
 
 impl Located {
@@ -31,6 +32,8 @@ impl Located {
     const STORE: &'static str = "design.sqlite";
     const AGENTS: &'static str = "agents";
     const QUEUE: &'static str = "studio-meta-dev/transcripts/queue.md";
+    const SPECS: &'static str = "studio-meta-dev/transcripts/specs";
+    const SPEC: &'static str = "md";
 
     pub fn transcripts<F: Files>(&self, files: F) -> ClaudeCodeDir<F> {
         ClaudeCodeDir::new(files, self.transcripts.clone())
@@ -38,6 +41,10 @@ impl Located {
 
     pub fn queue(&self) -> &Path {
         &self.queue
+    }
+
+    pub fn spec(&self, project: &str) -> PathBuf {
+        self.specs.join(project).with_extension(Located::SPEC)
     }
 
     pub fn kept(&self, kept: Kept) -> PathBuf {
@@ -71,6 +78,7 @@ impl Projects {
             transcripts: home.join(".claude").join("projects").join(PathBuf::from(slug)),
             workspace: root,
             queue: home.join(Located::QUEUE),
+            specs: home.join(Located::SPECS),
         })
     }
 

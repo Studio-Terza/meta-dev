@@ -67,13 +67,8 @@ pub struct Branched {
 #[newtype(checked)]
 pub struct Branch(String);
 
-#[derive(Newtype, Display, Clone, Debug, PartialEq, Eq)]
-#[newtype(checked)]
-pub struct Subject(String);
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct First {
-    subject: Subject,
     spec: Option<Attachment>,
 }
 
@@ -96,10 +91,6 @@ pub struct Unhexed;
 #[derive(Debug, thiserror::Error)]
 #[error("not a branch name of lowercase words joined by hyphens and slashes")]
 pub struct Unbranched;
-
-#[derive(Debug, thiserror::Error)]
-#[error("a commit subject is blank or holds a control character")]
-pub struct Unsubjected;
 
 impl Finishing {
     pub fn said(&self) -> &Said {
@@ -169,17 +160,11 @@ impl Branched {
 
 impl First {
     pub fn read(printed: &str) -> Option<First> {
-        let lines: Vec<String> = match printed.parse::<Lines>() {
-            Ok(lines) => lines.into_iter().collect(),
+        let trailer = match printed.parse::<Lines>() {
+            Ok(lines) => lines.into_iter().next(),
             Err(unsplit) => match unsplit {},
-        };
-        let subject = Subject::try_new(lines.first()?.clone()).ignoring(Ignored::Unspecified)?;
-        let spec = lines.get(1).and_then(|trailer| Attachment::try_new(trailer.clone()).ignoring(Ignored::Unspecified));
-        Some(First { subject, spec })
-    }
-
-    pub fn subject(&self) -> &Subject {
-        &self.subject
+        }?;
+        Some(First { spec: Attachment::try_new(trailer).ignoring(Ignored::Unspecified) })
     }
 
     pub fn spec(&self) -> Option<&Attachment> {
@@ -201,15 +186,6 @@ impl Checked for Branch {
             Some(Target::Branch(_branch)) => Ok(text),
             Some(Target::Pull(_)) | None => Err(Unbranched),
         }
-    }
-}
-
-impl Checked for Subject {
-    type Error = Unsubjected;
-
-    fn checked(text: &String) -> Result<&String, Unsubjected> {
-        let said = text.chars().next().is_some() && text.chars().all(|letter| !letter.is_control());
-        said.then_some(text).ok_or(Unsubjected)
     }
 }
 

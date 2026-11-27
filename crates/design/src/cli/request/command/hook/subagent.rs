@@ -56,6 +56,7 @@ pub enum UnreadStep {
     Remote,
     Commits,
     Spec,
+    Detail,
     Open,
 }
 
@@ -120,7 +121,7 @@ impl Finishing {
         match report {
             Report::Blocked(at) => self.escalated(ground, Some(at.clone()), Escalation::Blocked),
             Report::Done(At::Pull(pushed)) => self.done(*pushed, ground, hub),
-            Report::Done(At::Branch(branched)) => match hub.opened(branched) {
+            Report::Done(At::Branch(branched)) => match hub.opened(branched, ground) {
                 Ok(pushed) => self.done(pushed, ground, hub),
                 Err(Unopened::Unpushed(held)) => Decision::blocked(Stale { branched, held }.to_string()),
                 Err(Unopened::Unread(step)) => {
