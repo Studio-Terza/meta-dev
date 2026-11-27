@@ -6,7 +6,7 @@ use super::title::Title;
 use newtype::Wrapping;
 
 #[derive(Debug, Deserialize)]
-pub struct Listed {
+pub(crate) struct Listed {
     number: Number,
     title: OneLine,
 }

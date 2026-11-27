@@ -24,7 +24,7 @@ pub enum Hook {
 }
 
 impl Hook {
-    pub fn answered<F: Files, S: Store, D: Dispatch, C: Clock, G: Shell>(
+    pub(crate) fn answered<F: Files, S: Store, D: Dispatch, C: Clock, G: Shell>(
         self,
         environment: &impl Environment,
         ground: Ground<'_, F, S>,

@@ -13,7 +13,7 @@ impl<D: Dispatch, C: Clock, G: Shell> Hub<'_, D, C, G> {
         self.crew.ran(&call).ignoring(Ignored::Unrun)
     }
 
-    pub fn log(&self, job: JobId) -> String {
+    pub(crate) fn log(&self, job: JobId) -> String {
         let ran = self.ran(&["run", "view", "--job", &job.to_string(), "--log-failed"], Self::QUICK);
         ran.as_ref().and_then(Ran::succeeded).map_or_else(|| Hub::<D, C, G>::UNLOGGED.to_owned(), ToString::to_string)
     }

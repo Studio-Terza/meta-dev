@@ -24,7 +24,7 @@ struct Entry<'journal> {
 }
 
 #[derive(Debug)]
-pub struct Show {
+pub(crate) struct Show {
     journals: Vec<Journal>,
 }
 

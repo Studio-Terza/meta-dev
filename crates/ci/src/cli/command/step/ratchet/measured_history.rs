@@ -11,7 +11,7 @@ use grammar_output::Record;
 
 #[derive(Debug, Record)]
 #[record(source = Arguments)]
-pub struct MeasuredHistory {
+pub(crate) struct MeasuredHistory {
     #[field(Recording)]
     measured: Measured,
     #[field(Journaled)]

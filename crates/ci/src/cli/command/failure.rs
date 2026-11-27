@@ -7,7 +7,7 @@ use file_ports::FileFailure;
 use crate::cli::ports::Invocation;
 
 #[derive(Debug, thiserror::Error)]
-pub enum Failure<'path> {
+pub(crate) enum Failure<'path> {
     #[error(
         "usage: ci timed <measured file> <stage> <program> [<argument>...] | ci clippy-targets <measured file> <stage> [<clippy argument>...] | ci logged <log file> <program> [<argument>...] | ci libtest-seconds <measured file> <stage> <test output> | ci measured-history <measured file> <history file> <revision> | ci ratchet-lower <record file> <measured file> | ci tools <built directory> <tools directory> | ci mutants-plan <diff file> <output file> [--prior <directory> <metadata file>] [<scope>...] | ci mutants-prior <repository> <branch> <directory> | ci mutants-changed <diff file> <output directory> <shard> [--selected <names file>] [--kept <result file>] [<scope>...] | ci wall-times <repository> <run> <job> | ci compile-times <timings page> <report file> | ci graph-path <timings page> <measured file> <report file> | ci show <file>... | ci summarize <report file> <summary file> | ci stage-issues <limits file> <measured file> | ci compile-trend <cold build directory> <downloads directory> | ci spec-line <pull request> | ci cold-size <directory> <output file> | ci sqlite <library directory>"
     )]

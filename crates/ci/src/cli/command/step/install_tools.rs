@@ -15,7 +15,7 @@ use tool::Tool;
 
 #[derive(Debug, Record)]
 #[record(source = Arguments)]
-pub struct InstallTools {
+pub(crate) struct InstallTools {
     #[field(Location)]
     built: PathBuf,
     #[field(Location)]

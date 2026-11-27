@@ -19,7 +19,7 @@ use workspace::Workspace;
 
 #[derive(Debug, Record)]
 #[record(source = Arguments)]
-pub struct ClippyTargets {
+pub(crate) struct ClippyTargets {
     #[field(Recording)]
     measured: Measured,
     #[field(Utf8, via = Stage::new)]

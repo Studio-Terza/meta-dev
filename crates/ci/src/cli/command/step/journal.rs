@@ -8,7 +8,7 @@ use crate::cli::command::failure::Failure;
 use crate::cli::ports::Text;
 
 #[derive(Debug)]
-pub struct Journal(PathBuf);
+pub(crate) struct Journal(PathBuf);
 
 impl Journal {
     pub(crate) fn file(path: &Path) -> Journal {

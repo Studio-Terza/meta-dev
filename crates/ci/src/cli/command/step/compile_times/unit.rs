@@ -6,7 +6,7 @@ use crate::cli::command::step::seconds::Seconds;
 use text_lines::OneLine;
 
 #[derive(Debug, Deserialize)]
-pub struct Unit {
+pub(crate) struct Unit {
     name: OneLine,
     duration: Seconds,
 }

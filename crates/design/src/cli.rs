@@ -13,7 +13,7 @@ use file_ports::Files;
 use port_core::Run;
 use store_ports::Opens;
 
-pub use count::Count;
+pub(crate) use count::Count;
 pub use failure::Failure;
 use request::{Crew, Ground, Kept, Request};
 use uttered::{Settled, Uttered};
@@ -59,7 +59,7 @@ impl<'environment, E: Environment, F: Files, O, H, C: ClockFiller, G: ShellFille
         uttered.settled(run.finish().settled())
     }
 
-    pub fn report<D: DispatchFiller>(self, run: &Run, arguments: impl Iterator<Item = OsString>) -> Uttered
+    pub(crate) fn report<D: DispatchFiller>(self, run: &Run, arguments: impl Iterator<Item = OsString>) -> Uttered
     where
         O: Opens,
         H: FnOnce(PathBuf) -> D,

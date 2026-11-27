@@ -55,7 +55,7 @@ impl AsRef<Path> for Source {
 }
 
 #[derive(Debug, Default)]
-pub struct Build {
+pub(crate) struct Build {
     total: Seconds,
     crates: BTreeMap<OneLine, Seconds>,
 }

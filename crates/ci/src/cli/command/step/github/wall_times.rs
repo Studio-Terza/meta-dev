@@ -18,7 +18,7 @@ use run_id::RunId;
 
 #[derive(Debug, Record)]
 #[record(source = Arguments)]
-pub struct WallTimes {
+pub(crate) struct WallTimes {
     #[field(Utf8, via = Repository::new)]
     repository: Repository,
     #[field(Utf8, via = RunId::new)]

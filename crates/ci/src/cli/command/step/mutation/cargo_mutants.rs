@@ -5,7 +5,7 @@ use std::path::Path;
 use crate::cli::ports::Invocation;
 
 #[derive(Debug)]
-pub struct CargoMutants;
+pub(crate) struct CargoMutants;
 
 impl CargoMutants {
     pub(crate) const MISSED: NonZeroU8 = NonZeroU8::MIN.saturating_add(1);

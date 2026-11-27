@@ -7,7 +7,7 @@ use super::super::Pace;
 use crate::cli::command::step::seconds::Seconds;
 
 #[derive(Clone, Copy, Debug)]
-pub struct Range {
+pub(crate) struct Range {
     least: Seconds,
     most: Seconds,
 }

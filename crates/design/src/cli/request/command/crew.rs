@@ -32,20 +32,20 @@ impl<'ports, D: Dispatch, C: Clock, G: Shell> Crew<'ports, D, C, G> {
         self.clock.now()
     }
 
-    pub fn ran(&self, call: &Call) -> Result<Ran, DispatchFailure> {
+    pub(crate) fn ran(&self, call: &Call) -> Result<Ran, DispatchFailure> {
         self.shell.ran(call)
     }
 
-    pub fn moment(&self) -> Moment {
+    pub(crate) fn moment(&self) -> Moment {
         self.clock.moment()
     }
 
-    pub fn replied(&self, prompt: &Prompt, timeout: Timeout, model: Model) -> Result<Heard, Failure> {
+    pub(crate) fn replied(&self, prompt: &Prompt, timeout: Timeout, model: Model) -> Result<Heard, Failure> {
         let held = self.dispatch.dispatch(&Job::due_by(Deadline::after(self.clock.now(), timeout), model), prompt)?;
         Ok(Watch::over(self.dispatch, self.clock).watched(held)?.visited(Replying))
     }
 
-    pub fn fanned(&self, prompts: &[Prompt], timeout: Timeout) -> Result<Vec<Heard>, Failure> {
+    pub(crate) fn fanned(&self, prompts: &[Prompt], timeout: Timeout) -> Result<Vec<Heard>, Failure> {
         let job = Job::due_by(Deadline::after(self.clock.now(), timeout), Model::Haiku);
         let watched = Watch::over(self.dispatch, self.clock).fanned(&job, prompts)?;
         Ok(watched.iter().map(|each| each.visited(Replying)).collect())

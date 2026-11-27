@@ -9,10 +9,10 @@ use crate::cli::ports::{Exit, Invocation, Ports, Run, Text};
 use listed::Listed;
 use newtype::Wrapping;
 use number::Number;
-pub use title::Title;
+pub(crate) use title::Title;
 
 #[derive(Debug)]
-pub struct Issue<'title> {
+pub(crate) struct Issue<'title> {
     title: Title<'title>,
     number: Option<Number>,
 }

@@ -16,7 +16,7 @@ use super::FailedJob;
 use crate::cli::request::ignored::Ignored;
 
 #[derive(Debug)]
-pub struct Excerpt {
+pub(crate) struct Excerpt {
     failed: FailedJob,
     lines: Vec<String>,
 }
@@ -24,7 +24,7 @@ pub struct Excerpt {
 impl Excerpt {
     const LINES: usize = 40;
 
-    pub fn tailed(failed: FailedJob, log: &str) -> Excerpt {
+    pub(crate) fn tailed(failed: FailedJob, log: &str) -> Excerpt {
         let whole: Vec<String> = match log.parse::<Lines>() {
             Ok(lines) => lines.into_iter().collect(),
             Err(unsplit) => match unsplit {},
@@ -53,7 +53,7 @@ pub struct Finishing {
 
 #[derive(Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(from = "bool")]
-pub enum Reminder {
+pub(crate) enum Reminder {
     #[default]
     First,
     Repeated,
@@ -81,21 +81,21 @@ pub struct Pushed {
 
 #[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(try_from = "String")]
-pub struct CommitSha([u8; 20]);
+pub(crate) struct CommitSha([u8; 20]);
 
 #[derive(Newtype, Display, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct JobId(NonZeroU64);
 
 #[derive(Debug, thiserror::Error)]
 #[error("not a full commit sha of forty hexadecimal digits")]
-pub struct Unhexed;
+pub(crate) struct Unhexed;
 
 impl Finishing {
     pub fn said(&self) -> &Said {
         &self.said
     }
 
-    pub fn reminder(&self) -> Reminder {
+    pub(crate) fn reminder(&self) -> Reminder {
         self.reminder
     }
 
@@ -126,7 +126,7 @@ impl Report {
         }
     }
 
-    pub fn pushed(self) -> Pushed {
+    pub(crate) fn pushed(self) -> Pushed {
         match self {
             Report::Done(pushed) | Report::Blocked(pushed) => pushed,
         }
@@ -134,11 +134,11 @@ impl Report {
 }
 
 impl Pushed {
-    pub fn pull(self) -> PullNumber {
+    pub(crate) fn pull(self) -> PullNumber {
         self.pull
     }
 
-    pub fn head(self) -> CommitSha {
+    pub(crate) fn head(self) -> CommitSha {
         self.head
     }
 }
@@ -166,7 +166,7 @@ impl fmt::Display for CommitSha {
 }
 
 impl JobId {
-    pub fn linked(link: &str) -> Option<JobId> {
+    pub(crate) fn linked(link: &str) -> Option<JobId> {
         JobLink::read(link).map(|linked| JobId::new(linked.job()))
     }
 }

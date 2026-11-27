@@ -12,7 +12,7 @@ use growth::Growth;
 use range::Range;
 
 #[derive(Debug)]
-pub struct Notice<'builds> {
+pub(crate) struct Notice<'builds> {
     today: &'builds Build,
     earlier: &'builds [Build],
     fortnight: &'builds Fortnight,
@@ -20,7 +20,7 @@ pub struct Notice<'builds> {
 }
 
 #[derive(Debug)]
-pub struct Report<'notice> {
+pub(crate) struct Report<'notice> {
     notice: &'notice Notice<'notice>,
     merged: &'notice Text,
 }

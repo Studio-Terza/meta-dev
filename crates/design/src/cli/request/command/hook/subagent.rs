@@ -24,7 +24,7 @@ use boundary::{CommitSha, Excerpt, JobId, Pushed, Reminder, Report, Said};
 use hub::{Hub, Verdict};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Ending {
+pub(crate) enum Ending {
     Stop,
     Unpushed { held: CommitSha },
     Failing(Vec<FailedJob>),
@@ -38,7 +38,7 @@ pub struct FailedJob {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Escalation {
+pub(crate) enum Escalation {
     Blocked,
     RepeatFailure(CheckName),
     Unread(UnreadStep),
@@ -46,7 +46,7 @@ pub enum Escalation {
 
 #[derive(strum::Display, Clone, Copy, Debug, PartialEq, Eq)]
 #[strum(serialize_all = "kebab-case")]
-pub enum UnreadStep {
+pub(crate) enum UnreadStep {
     Ending,
     Head,
     Watch,
@@ -81,7 +81,7 @@ impl Finishing {
         serde_json::from_str(&heard.into_inner()).map_err(Failure::Unheard)
     }
 
-    pub fn answered<F: Files, S: Store, D: Dispatch, C: Clock, G: Shell>(
+    pub(crate) fn answered<F: Files, S: Store, D: Dispatch, C: Clock, G: Shell>(
         &self,
         ground: &Ground<'_, F, S>,
         crew: &Crew<'_, D, C, G>,

@@ -6,7 +6,7 @@ use newtype::{Arbitrary, Newtype};
 use serde::Deserialize;
 
 #[derive(Newtype, Arbitrary, Deserialize, Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
-pub struct Seconds(f64);
+pub(crate) struct Seconds(f64);
 
 impl From<Duration> for Seconds {
     fn from(elapsed: Duration) -> Seconds {

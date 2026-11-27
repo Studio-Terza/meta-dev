@@ -17,11 +17,12 @@ use super::ports::Ports;
 use crate::cli::ignored::Ignored;
 pub(crate) use failure::Failure;
 use invariants::Ignoring;
+pub(crate) use telling::Telling;
 pub(crate) use telling::Told;
-pub use telling::{Telling, Unfolding};
+pub use telling::Unfolding;
 
 #[derive(Debug)]
-pub enum Command {
+pub(crate) enum Command {
     Timed(Timed),
     ClippyTargets(ClippyTargets),
     LibtestSeconds(LibtestSeconds),
@@ -66,7 +67,7 @@ impl Command {
     const COLD_SIZE: &'static str = "cold-size";
     const SQLITE: &'static str = "sqlite";
 
-    pub fn parse(mut arguments: impl Iterator<Item = OsString>) -> Result<Command, Failure<'static>> {
+    pub(crate) fn parse(mut arguments: impl Iterator<Item = OsString>) -> Result<Command, Failure<'static>> {
         match arguments.next().and_then(|name| name.into_string().ignoring(Ignored::NotUnicode)).as_deref() {
             Some(Self::TIMED) => Self::parsed(arguments.collect(), Command::Timed),
             Some(Self::CLIPPY_TARGETS) => Self::parsed(arguments.collect(), Command::ClippyTargets),
@@ -96,7 +97,7 @@ impl Command {
         S::from_arguments(arguments).map(variant)
     }
 
-    pub fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Telling<'step> {
+    pub(crate) fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Telling<'step> {
         match self.told(ports) {
             Ok(telling) => telling,
             Err(failure) => Telling::ended(Err(failure)),

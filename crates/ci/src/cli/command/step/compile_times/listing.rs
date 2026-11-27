@@ -11,7 +11,7 @@ use rows::Rows;
 use text_lines::OneLine;
 
 #[derive(Debug)]
-pub struct Listing(Vec<Entry>);
+pub(crate) struct Listing(Vec<Entry>);
 
 impl Listing {
     pub(super) fn totalled(totals: BTreeMap<OneLine, Seconds>) -> Listing {

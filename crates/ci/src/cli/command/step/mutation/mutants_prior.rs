@@ -17,7 +17,7 @@ use grammar_output::Record;
 
 #[derive(Debug, Record)]
 #[record(source = Arguments)]
-pub struct MutantsPrior {
+pub(crate) struct MutantsPrior {
     #[field(Word)]
     repository: OsString,
     #[field(Word)]

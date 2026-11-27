@@ -15,7 +15,7 @@ use grammar_output::Record;
 
 #[derive(Debug, Record)]
 #[record(source = Arguments)]
-pub struct BuildSqlite {
+pub(crate) struct BuildSqlite {
     #[field(Location)]
     library: PathBuf,
 }

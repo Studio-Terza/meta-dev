@@ -47,7 +47,7 @@ pub enum Failure {
 }
 
 impl Failure {
-    pub fn settled(
+    pub(crate) fn settled(
         outcome: Result<Outcome, Failure>,
         released: Result<Snapshot, ReleaseFailures>,
     ) -> Result<Outcome, Failure> {

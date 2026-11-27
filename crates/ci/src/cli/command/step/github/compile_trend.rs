@@ -25,7 +25,7 @@ enum Pace {
 
 #[derive(Debug, Record)]
 #[record(source = Arguments)]
-pub struct CompileTrend {
+pub(crate) struct CompileTrend {
     #[field(Location)]
     today: PathBuf,
     #[field(Location, via = Fortnight::downloading_to)]

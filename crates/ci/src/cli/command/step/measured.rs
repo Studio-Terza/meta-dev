@@ -11,13 +11,13 @@ use crate::cli::command::failure::Failure;
 use crate::cli::ports::Text;
 
 #[derive(Debug)]
-pub struct Measured(Journal);
+pub(crate) struct Measured(Journal);
 
 impl Measured {
     const ASSIGN: &'static str = " = ";
     const TAB: &'static str = "\t";
 
-    pub fn file(path: &Path) -> Measured {
+    pub(crate) fn file(path: &Path) -> Measured {
         Measured(Journal::file(path))
     }
 

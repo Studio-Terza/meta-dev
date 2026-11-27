@@ -4,7 +4,7 @@ use file_ports::Size;
 use newtype::{Arbitrary, Newtype, Wrapping};
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Kilobytes(u64);
+pub(crate) struct Kilobytes(u64);
 
 impl Kilobytes {
     const KIBIBYTE: u64 = 1024;

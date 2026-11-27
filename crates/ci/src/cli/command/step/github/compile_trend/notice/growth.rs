@@ -9,7 +9,7 @@ use crate::cli::ignored::Ignored;
 use invariants::Ignoring;
 
 #[derive(Debug)]
-pub struct Growth<'name> {
+pub(crate) struct Growth<'name> {
     name: &'name OneLine,
     today: Seconds,
     average: Seconds,

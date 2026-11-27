@@ -11,7 +11,7 @@ use crate::cli::ports::{Exit, Invocation, Ports};
 use grammar_output::Record;
 
 #[derive(Debug)]
-pub struct Timed {
+pub(crate) struct Timed {
     measured: Measured,
     stage: Stage,
     invocation: Invocation,

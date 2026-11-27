@@ -8,6 +8,6 @@ mod mutants_prior;
 use super::Step;
 
 pub(crate) use mutants_changed::Deferred;
-pub use mutants_changed::MutantsChanged;
-pub use mutants_plan::MutantsPlan;
-pub use mutants_prior::MutantsPrior;
+pub(crate) use mutants_changed::MutantsChanged;
+pub(crate) use mutants_plan::MutantsPlan;
+pub(crate) use mutants_prior::MutantsPrior;

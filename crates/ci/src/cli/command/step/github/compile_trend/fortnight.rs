@@ -32,7 +32,7 @@ impl fmt::Display for Stamp {
 }
 
 #[derive(Debug)]
-pub struct Fortnight {
+pub(crate) struct Fortnight {
     downloads: PathBuf,
 }
 

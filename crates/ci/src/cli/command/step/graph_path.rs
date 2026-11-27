@@ -33,7 +33,7 @@ use work::Work;
 
 #[derive(Debug, Record)]
 #[record(source = Arguments)]
-pub struct GraphPath {
+pub(crate) struct GraphPath {
     #[field(Journaled)]
     page: Journal,
     #[field(Recording)]

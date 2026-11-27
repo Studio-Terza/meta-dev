@@ -1,20 +1,20 @@
 mod arguments;
 mod changed;
-pub mod clippy_targets;
-pub mod cold_size;
+pub(crate) mod clippy_targets;
+pub(crate) mod cold_size;
 mod compile_times;
-pub mod github;
-pub mod graph_path;
+pub(crate) mod github;
+pub(crate) mod graph_path;
 mod install_tools;
 mod journal;
 mod libtest_seconds;
 mod logged;
 mod measured;
-pub mod mutation;
-pub mod ratchet;
+pub(crate) mod mutation;
+pub(crate) mod ratchet;
 mod revision;
 mod seconds;
-pub mod sqlite;
+pub(crate) mod sqlite;
 mod stage;
 mod timed;
 
@@ -25,13 +25,13 @@ use crate::cli::command::failure::Failure;
 use crate::cli::ports::Ports;
 pub(crate) use arguments::{Arguments, Ended, Flag, Journaled, Location, Parsing, Recording, Utf8, Word};
 
-pub use compile_times::CompileTimes;
-pub use install_tools::InstallTools;
-pub use libtest_seconds::LibtestSeconds;
-pub use logged::Logged;
-pub use timed::Timed;
+pub(crate) use compile_times::CompileTimes;
+pub(crate) use install_tools::InstallTools;
+pub(crate) use libtest_seconds::LibtestSeconds;
+pub(crate) use logged::Logged;
+pub(crate) use timed::Timed;
 
-pub trait Step: Sized {
+pub(crate) trait Step: Sized {
     fn from_arguments(arguments: Vec<OsString>) -> Result<Self, Failure<'static>>;
 
     fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>>;

@@ -7,14 +7,14 @@ use crate::cli::command::failure::Failure;
 use crate::cli::command::step::seconds::Seconds;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Finished(Seconds);
+pub(crate) struct Finished(Seconds);
 
 impl Finished {
-    pub fn seconds(self) -> Seconds {
+    pub(crate) fn seconds(self) -> Seconds {
         self.0
     }
 
-    pub fn read<'path>(path: &'path Path, line: &str) -> Option<Result<Finished, Failure<'path>>> {
+    pub(crate) fn read<'path>(path: &'path Path, line: &str) -> Option<Result<Finished, Failure<'path>>> {
         Summary::opened(line).map(|opened| {
             opened
                 .summary()

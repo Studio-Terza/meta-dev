@@ -25,7 +25,7 @@ use selected::Selected;
 use verdict::Verdict;
 
 #[derive(Debug)]
-pub struct MutantsChanged {
+pub(crate) struct MutantsChanged {
     diff: Journal,
     narrowed: Journal,
     chosen: Journal,

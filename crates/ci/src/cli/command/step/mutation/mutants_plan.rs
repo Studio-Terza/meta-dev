@@ -25,7 +25,7 @@ struct Planned {
 }
 
 #[derive(Debug)]
-pub struct MutantsPlan {
+pub(crate) struct MutantsPlan {
     diff: Journal,
     output: Journal,
     prior: Option<Prior>,

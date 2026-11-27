@@ -9,7 +9,7 @@ use crate::cli::ports::{Exit, Ports};
 use grammar_output::Record;
 
 #[derive(Debug)]
-pub struct RatchetLower {
+pub(crate) struct RatchetLower {
     record: gate_limits::Cli,
 }
 

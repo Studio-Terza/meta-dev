@@ -15,7 +15,7 @@ pub(crate) enum Told<'step> {
 }
 
 #[derive(Debug)]
-pub struct Telling<'step> {
+pub(crate) struct Telling<'step> {
     told: vec::IntoIter<Told<'step>>,
     deferred: Option<Deferred<'step>>,
     ended: Option<Answer>,

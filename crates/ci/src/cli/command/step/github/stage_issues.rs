@@ -10,7 +10,7 @@ use crate::cli::ports::{Invocation, Ports};
 use grammar_output::Record;
 
 #[derive(Debug)]
-pub struct StageIssues {
+pub(crate) struct StageIssues {
     limits: gate_limits::Cli,
 }
 

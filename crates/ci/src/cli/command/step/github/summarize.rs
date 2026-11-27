@@ -12,7 +12,7 @@ use grammar_output::Record;
 
 #[derive(Debug, Record)]
 #[record(source = Arguments)]
-pub struct Summarize {
+pub(crate) struct Summarize {
     #[field(Journaled)]
     report: Journal,
     #[field(Journaled)]

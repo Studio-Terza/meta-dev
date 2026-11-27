@@ -4,7 +4,7 @@ use strum::{Display, VariantArray};
 
 #[derive(Display, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
 #[strum(serialize_all = "snake_case")]
-pub enum Outcome {
+pub(crate) enum Outcome {
     Caught,
     Missed,
     Timeout,

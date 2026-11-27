@@ -14,7 +14,7 @@ use verdict::Verdict;
 
 #[derive(Debug, Record)]
 #[record(source = Arguments)]
-pub struct SpecLine {
+pub(crate) struct SpecLine {
     #[field(Utf8, via = PullNumber::new)]
     pull_request: PullNumber,
 }

@@ -9,7 +9,7 @@ use crate::cli::ports::{Invocation, Ports};
 use grammar_output::Record;
 
 #[derive(Debug)]
-pub struct Logged {
+pub(crate) struct Logged {
     log: PathBuf,
     invocation: Invocation,
 }

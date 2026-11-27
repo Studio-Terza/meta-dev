@@ -1,7 +1,7 @@
 use std::ffi::OsStr;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Tool(&'static str);
+pub(crate) struct Tool(&'static str);
 
 impl Tool {
     pub(crate) const LINT: Tool = Tool("lint");

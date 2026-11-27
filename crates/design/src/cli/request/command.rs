@@ -37,7 +37,7 @@ impl Command {
         }
     }
 
-    pub fn written<F: Files, S: Store, D: Dispatch, C: Clock, G: Shell>(
+    pub(crate) fn written<F: Files, S: Store, D: Dispatch, C: Clock, G: Shell>(
         self,
         environment: &impl Environment,
         ground: Ground<'_, F, S>,

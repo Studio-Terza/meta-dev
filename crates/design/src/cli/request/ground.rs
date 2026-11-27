@@ -36,11 +36,11 @@ impl<'run, F: Files, S: Store> Ground<'run, F, S> {
         Some(Queue::read(text.as_ref()))
     }
 
-    pub fn queued(&self, line: impl fmt::Display) -> Result<(), FileFailure> {
+    pub(crate) fn queued(&self, line: impl fmt::Display) -> Result<(), FileFailure> {
         self.files.append(self.located.queue(), &Bytes::new(format!("{line}\n").into_bytes()))
     }
 
-    pub fn transcripts(self) -> Port<'run, ClaudeCodeDir<F>> {
+    pub(crate) fn transcripts(self) -> Port<'run, ClaudeCodeDir<F>> {
         self.run.port(self.located.transcripts(self.files))
     }
 }

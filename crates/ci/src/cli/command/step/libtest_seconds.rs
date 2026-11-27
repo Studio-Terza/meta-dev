@@ -18,7 +18,7 @@ use grammar_output::Record;
 
 #[derive(Debug, Record)]
 #[record(source = Arguments)]
-pub struct LibtestSeconds {
+pub(crate) struct LibtestSeconds {
     #[field(Recording)]
     measured: Measured,
     #[field(Utf8, via = Stage::new)]

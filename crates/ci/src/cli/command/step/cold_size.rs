@@ -17,7 +17,7 @@ use grammar_output::Record;
 
 #[derive(Debug, Record)]
 #[record(source = Arguments)]
-pub struct ColdSize {
+pub(crate) struct ColdSize {
     #[field(Location)]
     directory: PathBuf,
     #[field(Journaled)]

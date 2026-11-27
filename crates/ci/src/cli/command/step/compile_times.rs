@@ -28,7 +28,7 @@ use unit::Unit;
 
 #[derive(Debug, Record)]
 #[record(source = Arguments)]
-pub struct CompileTimes {
+pub(crate) struct CompileTimes {
     #[field(Journaled)]
     page: Journal,
     #[field(Journaled)]
