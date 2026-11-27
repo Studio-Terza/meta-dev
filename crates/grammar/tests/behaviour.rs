@@ -1,17 +1,17 @@
 use std::fs;
 use std::path::Path;
 
-use grammar::{Bare, Fields, Ignoring, Inked, KeptLines, Letters, Lines, MigrationFile, Nested, Stamp, Unlexed};
+use grammar::{Bare, Cited, Edited, Fields, KeptLines, Letters, Lines, Nested, TaskFile, TaskNotice};
 use serde::Deserialize;
 use test_failure::Failed;
 
 #[derive(Debug, Deserialize)]
 struct Texts {
     lines: Vec<String>,
-    stamps: Vec<String>,
-    replies: Vec<String>,
+    notices: Vec<String>,
+    stems: Vec<String>,
+    cited: Vec<String>,
     slugs: Vec<String>,
-    migrations: Vec<String>,
     bare: Vec<String>,
     shell: Vec<String>,
 }
@@ -29,31 +29,35 @@ fn every_lexer_reads_its_fixture_texts_as_its_golden_says() -> Result<(), Failed
             .collect();
         format!("lines {text:?}: {lines:?} {kept:?} {fields:?}")
     };
-    let migrated = |text: &String| {
-        let file = text.parse::<MigrationFile>().ignoring(Unlexed::NotThisGrammar);
-        format!("migration {text:?}: {:?}", file.map(|read| (read.version(), read.description())))
-    };
     let shown: Vec<String> = texts
         .lines
         .iter()
         .map(split)
-        .chain(texts.stamps.iter().map(|text| {
-            format!(
-                "stamp {text:?}: {:?}",
-                Stamp::try_from(text.as_str()).map(|stamp| (stamp.words(), stamp.numbers()))
-            )
-        }))
         .chain(
             texts
-                .replies
+                .notices
                 .iter()
-                .map(|text| format!("reply {text:?}: {:?}", Inked::read(text).map(|inked| inked.as_ref().len()))),
+                .map(|text| format!("notice {text:?}: {:?}", TaskNotice::read(text).map(|notice| notice.task()))),
         )
+        .chain(
+            texts.stems.iter().map(|text| format!("stem {text:?}: {:?}", TaskFile::read(text).map(|file| file.ids()))),
+        )
+        .chain(texts.cited.iter().map(|text| {
+            let each: Vec<String> =
+                Cited::each(text).iter().map(|cited| format!("{} {}", cited.project(), cited.detail())).collect();
+            format!("cited {text:?}: {each:?}")
+        }))
         .chain(texts.slugs.iter().map(|text| format!("slug {text:?}: {:?}", Letters::slugged(text))))
-        .chain(texts.migrations.iter().map(migrated))
         .chain(texts.bare.iter().map(|text| format!("bare {text:?}: {:?}", Bare::word(text))))
         .chain(texts.shell.iter().map(|text| {
-            format!("shell {text:?}: {:?}", Nested::read(text).map(|nested| (nested.flagged(), nested.construct())))
+            let edited: Vec<String> = Edited::read(text)
+                .iter()
+                .map(|edited| format!("{:?} {:?} {:?}", edited.edit(), edited.construct(), edited.directory()))
+                .collect();
+            format!(
+                "shell {text:?}: {:?} {edited:?}",
+                Nested::read(text).map(|nested| (nested.flagged(), nested.construct()))
+            )
         }))
         .collect();
     let golden = directory.join("lexed.txt");

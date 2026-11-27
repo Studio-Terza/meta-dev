@@ -42,8 +42,3 @@ pub fn derive_serialize(input: TokenStream) -> TokenStream {
 pub fn derive_spelled(input: TokenStream) -> TokenStream {
     Marked::expanded(input.into(), Mark::Spelled).into()
 }
-
-#[proc_macro_derive(Listed)]
-pub fn derive_listed(input: TokenStream) -> TokenStream {
-    Marked::expanded(input.into(), Mark::Listed).into()
-}

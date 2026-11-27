@@ -1,0 +1,28 @@
+# Calls the system shell runs together; tests/ran.txt holds what each returns.
+pause = 0
+
+[[call]]
+program = "sh"
+arguments = ["-c", "cat"]
+fed = "a prompt handed on standard input"
+seconds = 3
+
+[[call]]
+program = "sh"
+arguments = ["-c", "printf 'printed'; exit 3"]
+seconds = 3
+
+[[call]]
+program = "sh"
+arguments = ["-c", "cat; printf 'read nothing'"]
+seconds = 3
+
+[[call]]
+program = "sleep"
+arguments = ["30"]
+seconds = 1
+
+[[call]]
+program = "a-program-that-is-not-installed"
+arguments = []
+seconds = 3

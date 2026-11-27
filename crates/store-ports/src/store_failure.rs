@@ -8,8 +8,8 @@ pub enum StoreFailure {
     Directory(#[source] io::Error),
     #[error("cannot open the store: {0}")]
     Open(#[source] Cause),
-    #[error("cannot bring the store's schema up to date: {0}")]
-    Migrate(#[source] Cause),
+    #[error("cannot build the store's schema: {0}")]
+    Rebuild(#[source] Cause),
     #[error("a store statement failed: {0}")]
     Statement(#[source] Cause),
     #[error("a store statement broke a foreign key: {0}")]

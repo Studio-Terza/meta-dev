@@ -2,13 +2,12 @@ use std::collections::BTreeSet;
 use std::fmt;
 use std::ops::Not;
 
-use design_messages::{Quote, Said, StopRow, Tally, Unabridged};
-use dispatch_ports::{Prompt, Reply};
+use design_messages::{Quote, Said, Unabridged};
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use transcript_ports::{Body, Uuid};
 
-use super::super::super::crew::Heard;
+use super::super::super::crew::{Prompt, Reply};
 use crate::cli::request::ignored::Ignored;
 use invariants::Ignoring;
 
@@ -39,14 +38,6 @@ struct Picked {
 pub struct Answers(Vec<Quote>);
 
 #[derive(Debug)]
-pub struct Search {
-    read: Tally,
-    quoted: Tally,
-    answers: Option<Answers>,
-    tokens: Tally,
-}
-
-#[derive(Debug)]
 pub struct Selecting<'asked> {
     question: &'asked Body,
     shown: Vec<String>,
@@ -54,21 +45,6 @@ pub struct Selecting<'asked> {
 
 #[derive(Clone, Copy, Debug)]
 pub struct Replied<'reply>(&'reply Reply);
-
-impl Search {
-    pub fn new(history: &[Said], quoted: &[Quote], answers: Option<Answers>, tokens: Tally) -> Search {
-        Search { read: Tally::from(history.len()), quoted: Tally::from(quoted.len()), answers, tokens }
-    }
-
-    pub fn answers(&self) -> Option<&Answers> {
-        self.answers.as_ref()
-    }
-
-    pub fn trailed(&self, row: StopRow) -> StopRow {
-        let kept = Tally::from(self.answers.as_ref().map_or(0, |answers| answers.0.len()));
-        row.searched([self.read, self.quoted, kept, self.tokens])
-    }
-}
 
 impl From<&Body> for Asked {
     fn from(said: &Body) -> Asked {
@@ -108,11 +84,11 @@ impl Reading<'_> {
         &self.prompts
     }
 
-    pub fn quoted(&self, heard: &[Heard]) -> Vec<Vec<Quote>> {
+    pub fn quoted(&self, heard: &[Option<Reply>]) -> Vec<Vec<Quote>> {
         self.chunks
             .iter()
             .zip(heard)
-            .map(|(chunk, read)| read.reply().map_or_default(|reply| Answers::quoted(reply, chunk)))
+            .map(|(chunk, read)| read.as_ref().map_or_default(|reply| Answers::quoted(reply, chunk)))
             .collect()
     }
 }
@@ -123,7 +99,7 @@ impl Replied<'_> {
     }
 
     fn braced(self, open: char, close: char) -> String {
-        let letters: Vec<char> = self.0.to_string().chars().collect();
+        let letters: Vec<char> = self.0.as_ref().chars().collect();
         let start = letters.iter().position(|letter| *letter == open).unwrap_or(letters.len());
         let end = letters.iter().rposition(|letter| *letter == close).map_or(start, |last| last + 1);
         letters.get(start..end).unwrap_or_default().iter().collect()

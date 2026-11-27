@@ -6,7 +6,7 @@ use file_ports::{Epoch, Files, Kind, Tail};
 use invariants::Ignoring;
 
 use crate::cli::request::ignored::Ignored;
-pub use boundary::Tasks;
+pub use boundary::{Halt, Stopped, Tasks};
 use boundary::{Output, Task};
 
 #[derive(Debug)]

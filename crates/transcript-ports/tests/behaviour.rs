@@ -58,6 +58,7 @@ impl Transcript {
         let edge = |skipped: &Skipped| skipped.parent().map(|above| format!("{} after {above}", skipped.uuid()));
         match line {
             Line::Said(record) => vec![Transcript::said(&record)],
+            Line::Ended(task) => vec![format!("ended {task}")],
             Line::Skipped(skipped) => edge(&skipped).into_iter().collect(),
             Line::Unrecognised(unrecognised) => {
                 let unknown: &Unrecognised = &unrecognised;
@@ -83,7 +84,7 @@ impl Transcript {
         read.into_iter()
             .filter_map(|line| match line {
                 Line::Said(record) => Some(record.uuid().to_string()),
-                Line::Skipped(_) | Line::Unrecognised(_) => None,
+                Line::Ended(_) | Line::Skipped(_) | Line::Unrecognised(_) => None,
             })
             .collect()
     }

@@ -5,7 +5,7 @@ use super::classified::Classified;
 use super::object::Object;
 use super::said::{Hears, Said};
 use super::stamp::Stamp;
-use crate::{Authorship, Body, Ignored, Line, Skipped, Unrecognised};
+use crate::{Authorship, Body, Ignored, Line, Skipped, TaskId, Unrecognised};
 
 #[derive(Clone, Copy, Debug)]
 struct Failed;
@@ -25,7 +25,22 @@ struct Model(Option<Synthetic>);
 enum Written {
     Text { text: Body },
     Thinking,
-    ToolUse,
+    ToolUse { stopped: Option<TaskId> },
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "name")]
+enum Used {
+    TaskStop {
+        input: Stopping,
+    },
+    #[serde(other)]
+    Other,
+}
+
+#[derive(Debug, Deserialize)]
+struct Stopping {
+    task_id: TaskId,
 }
 
 #[derive(strum::EnumString, Clone, Copy, Debug)]
@@ -60,6 +75,7 @@ struct Answer {
     stamp: Stamp,
     delivery: Delivery,
     model: Model,
+    stopped: Option<TaskId>,
 }
 
 impl Assistant {
@@ -97,7 +113,27 @@ impl Written {
         match tag {
             Tag::Text => block.field(Self::TEXT).ignoring(Ignored::NotKnown).map(|text| Written::Text { text }),
             Tag::Thinking => Some(Written::Thinking),
-            Tag::ToolUse => Some(Written::ToolUse),
+            Tag::ToolUse => {
+                Some(Written::ToolUse { stopped: block.whole().ignoring(Ignored::Unstopped).and_then(Used::stopped) })
+            }
+        }
+    }
+}
+
+impl Used {
+    fn stopped(self) -> Option<TaskId> {
+        match self {
+            Used::TaskStop { input } => Some(input.task_id),
+            Used::Other => None,
+        }
+    }
+}
+
+impl Block {
+    fn stopped(&self) -> Option<TaskId> {
+        match self {
+            Block::Known(Written::ToolUse { stopped }) => stopped.clone(),
+            Block::Known(Written::Text { .. } | Written::Thinking) | Block::Unknown(_) => None,
         }
     }
 }
@@ -138,7 +174,7 @@ impl From<Block> for Said {
     fn from(block: Block) -> Said {
         match block {
             Block::Known(Written::Text { text }) => Said::Text(text),
-            Block::Known(Written::Thinking | Written::ToolUse) => Said::Silent,
+            Block::Known(Written::Thinking | Written::ToolUse { .. }) => Said::Silent,
             Block::Unknown(unrecognised) => Said::Unrecognised(unrecognised),
         }
     }
@@ -150,7 +186,8 @@ impl Hears for Answer {
     }
 
     fn silence(self) -> Line {
-        Line::Skipped(Skipped::from(self.stamp))
+        let stamp = self.stamp;
+        self.stopped.map_or_else(|| Line::Skipped(Skipped::from(stamp)), Line::Ended)
     }
 
     fn unrecognised(self, unrecognised: Unrecognised) -> Line {
@@ -160,8 +197,9 @@ impl Hears for Answer {
 
 impl Message {
     fn heard(self, stamp: Stamp, delivery: Delivery) -> Line {
+        let stopped = self.content.iter().find_map(Block::stopped);
         let said: Said = self.content.into_iter().map(Said::from).collect();
-        said.heard(Answer { stamp, delivery, model: self.model })
+        said.heard(Answer { stamp, delivery, model: self.model, stopped })
     }
 }
 

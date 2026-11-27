@@ -1,13 +1,9 @@
-mod template;
-
 use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use super::migrations::Migrations;
-use super::opened::Opened;
-use template::Template;
+use super::opened::{Opened, Stamped};
 
 use store_ports::{Busy, Claim, StoreFailure, StoreLock};
 
@@ -23,11 +19,14 @@ impl Place {
     pub(super) fn opened(
         &self,
         prepare: impl FnOnce(&Path) -> io::Result<()>,
-        migrations: Migrations,
+        schema: Stamped,
     ) -> Result<Opened, StoreFailure> {
         match self {
-            Place::File(path) => Self::filed(path, prepare).and_then(|()| Opened::filed(path, migrations)),
-            Place::Memory => Template::shared(migrations).opened(migrations),
+            Place::File(path) => {
+                Self::filed(path, prepare)?;
+                Opened::filed(path, schema)
+            }
+            Place::Memory => Opened::fresh(schema),
         }
     }
 

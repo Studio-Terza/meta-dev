@@ -12,9 +12,6 @@ pub enum Validated {}
 pub enum Spelled {}
 
 #[derive(Debug)]
-pub enum Listed {}
-
-#[derive(Debug)]
 pub enum Optional {}
 
 impl<Value: Stored> Stored for Option<Value> {

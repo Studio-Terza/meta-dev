@@ -7,17 +7,8 @@ pub(in super::super) struct Unopened(rusqlite::Error);
 #[derive(Debug)]
 pub(in super::super) struct Unexecuted(rusqlite::Error);
 
-#[derive(Debug, thiserror::Error)]
-pub(in super::super) enum Unmigrated {
-    #[error("migration {0} was left partly applied")]
-    Dirty(i64),
-    #[error("migration {0} is applied but the code does not declare it")]
-    Missing(i64),
-    #[error("migration {0} was applied with different contents")]
-    Mismatched(i64),
-    #[error("{0}")]
-    Statement(rusqlite::Error),
-}
+#[derive(Debug)]
+pub(in super::super) struct Unbuilt(rusqlite::Error);
 
 impl Unexecuted {
     fn kinded(extended: Option<i32>, failed: &rusqlite::Error) -> StoreFailure {
@@ -40,9 +31,9 @@ impl From<rusqlite::Error> for Unexecuted {
     }
 }
 
-impl From<rusqlite::Error> for Unmigrated {
-    fn from(failed: rusqlite::Error) -> Unmigrated {
-        Unmigrated::Statement(failed)
+impl From<rusqlite::Error> for Unbuilt {
+    fn from(failed: rusqlite::Error) -> Unbuilt {
+        Unbuilt(failed)
     }
 }
 
@@ -59,8 +50,8 @@ impl From<Unexecuted> for StoreFailure {
     }
 }
 
-impl From<Unmigrated> for StoreFailure {
-    fn from(failed: Unmigrated) -> StoreFailure {
-        StoreFailure::Migrate(Cause::told(&failed))
+impl From<Unbuilt> for StoreFailure {
+    fn from(failed: Unbuilt) -> StoreFailure {
+        StoreFailure::Rebuild(Cause::told(&failed.0))
     }
 }

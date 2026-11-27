@@ -1,8 +1,10 @@
+use std::thread;
 use std::time::{Duration, SystemTime};
 
+use newtype::Wrapping;
 use port_core::Pass;
 
-use crate::{Bell, ClockFiller, Moment, Pause, Wall, clock_ops};
+use crate::{ClockFiller, Pause, Wall, clock_ops};
 
 #[derive(Debug)]
 pub struct SystemClock;
@@ -12,12 +14,8 @@ impl ClockFiller for SystemClock {
         Wall::from(SystemTime::now())
     }
 
-    fn moment(&self, _pass: Pass<'_, clock_ops::Moment>) -> Moment {
-        Moment::from(SystemTime::now())
-    }
-
-    fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause, bell: &Bell) -> Wall {
-        let _woke = bell.waited(Duration::from(pause));
+    fn paused(&self, _pass: Pass<'_, clock_ops::Paused>, pause: Pause) -> Wall {
+        thread::sleep(Duration::from_secs(u64::from(pause.into_inner())));
         Wall::from(SystemTime::now())
     }
 }

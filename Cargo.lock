@@ -162,14 +162,12 @@ dependencies = [
 name = "design-messages"
 version = "0.1.0"
 dependencies = [
- "console-ports",
  "file-ports",
  "grammar",
  "invariants",
  "newtype",
  "port-core",
  "store-ports",
- "strum",
  "thiserror",
  "transcript-ports",
 ]
@@ -188,16 +186,13 @@ dependencies = [
 name = "dispatch-ports"
 version = "0.1.0"
 dependencies = [
- "grammar",
  "invariants",
  "newtype",
  "port-core",
- "proptest",
  "serde",
- "serde_json",
- "strum",
  "test-failure",
  "thiserror",
+ "toml",
 ]
 
 [[package]]
@@ -752,7 +747,6 @@ dependencies = [
  "rusqlite",
  "sha2",
  "store-ports",
- "thiserror",
 ]
 
 [[package]]
@@ -760,7 +754,6 @@ name = "store-ports"
 version = "0.1.0"
 dependencies = [
  "design-messages",
- "dispatch-ports",
  "file-ports",
  "invariants",
  "newtype",
@@ -778,7 +771,6 @@ dependencies = [
 name = "store-ports-macros"
 version = "0.1.0"
 dependencies = [
- "grammar",
  "invariants",
  "proc-macro2",
  "query-cache",
