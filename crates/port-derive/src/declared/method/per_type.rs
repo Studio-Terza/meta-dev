@@ -1,5 +1,5 @@
-use syntax::TokenStream;
-use syntax::{Attribute, Meta, MetaList, TraitItemFn};
+use proc_macro2::TokenStream;
+use syn::{Attribute, Meta, MetaList, TraitItemFn};
 
 pub struct PerType;
 

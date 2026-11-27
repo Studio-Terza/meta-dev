@@ -1,7 +1,7 @@
 use grammar_ident::Words;
-use syntax::Span;
-use syntax::{Ident, LitStr};
-use syntax::{ToTokens, format_ident};
+use proc_macro2::{Ident, Span};
+use quote::{ToTokens, format_ident};
+use syn::LitStr;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Derivation {

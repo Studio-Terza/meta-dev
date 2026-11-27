@@ -6,7 +6,7 @@ use std::time::Instant;
 
 use file_ports::{Bytes, Memory, Text};
 use fuzz::ports::{Case, Crashes};
-use lint_runner::{Cli, Ports, Verdict};
+use lint::{Cli, Verdict};
 use proptest::prelude::{Strategy, prop_assert_eq};
 use proptest::test_runner::{Config, Reason, TestCaseError, TestError, TestRunner};
 use timer_ports::Monotonic;
@@ -49,7 +49,8 @@ impl Campaign {
     fn ran(files: &Memory) -> Run {
         let mut err = Vec::new();
         let verdict = Cli::from_args(iter::once(OsString::from(ROOT))).verdict(
-            Ports::new(files, Monotonic::default()),
+            files,
+            Monotonic::default(),
             &mut Vec::new(),
             &mut err,
         );

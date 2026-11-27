@@ -18,7 +18,9 @@ invariants = { path = "../invariants" }
 grammar-migration = { path = "../grammar-migration" }
 query-cache = { path = "../query-cache" }
 hex.workspace = true
-syntax = { path = "../syntax" }
+proc-macro2.workspace = true
+quote.workspace = true
+syn.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

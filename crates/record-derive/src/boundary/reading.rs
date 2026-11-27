@@ -1,7 +1,9 @@
+use proc_macro2::TokenStream;
+use quote::quote;
 use strum::{IntoStaticStr, VariantArray};
-use syntax::parse::ParseStream;
-use syntax::quote;
-use syntax::{Attribute, Error, Expr, Field, Ident, Meta, Punctuated, Token, TokenStream, Type};
+use syn::parse::ParseStream;
+use syn::punctuated::Punctuated;
+use syn::{Attribute, Error, Expr, Field, Ident, Meta, Token, Type};
 
 #[derive(IntoStaticStr, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
 #[strum(serialize_all = "snake_case")]
@@ -39,7 +41,7 @@ impl Keyword {
         Self::VARIANTS.iter().copied().find(|keyword| attribute.path().is_ident(<&str>::from(*keyword)))
     }
 
-    fn spec(self, attribute: &Attribute) -> syntax::Result<Spec> {
+    fn spec(self, attribute: &Attribute) -> syn::Result<Spec> {
         match self {
             Keyword::Field => attribute.parse_args_with(|input: ParseStream| Spec::typed(input, Taking::Field)),
             Keyword::Optional => attribute.parse_args_with(|input: ParseStream| Spec::typed(input, Taking::Optional)),
@@ -50,19 +52,19 @@ impl Keyword {
 }
 
 impl Spec {
-    fn typed(input: ParseStream, taking: fn(Type) -> Taking) -> syntax::Result<Spec> {
+    fn typed(input: ParseStream, taking: fn(Type) -> Taking) -> syn::Result<Spec> {
         let ty: Type = input.parse()?;
         Ok(Spec { taking: taking(ty), via: Self::via(input)? })
     }
 
-    fn nested(meta: &Meta) -> syntax::Result<Spec> {
+    fn nested(meta: &Meta) -> syn::Result<Spec> {
         match meta {
             Meta::Path(_) => Ok(Spec { taking: Taking::Record, via: None }),
             Meta::List(_) | Meta::NameValue(_) => Err(Error::new_spanned(meta, "a nested record is a bare #[record]")),
         }
     }
 
-    fn via(input: ParseStream) -> syntax::Result<Option<Expr>> {
+    fn via(input: ParseStream) -> syn::Result<Option<Expr>> {
         let comma = input.parse::<Option<Token![,]>>()?;
         let key = comma.map(|_| input.parse::<Ident>()).transpose()?;
         let keyed = key
@@ -74,7 +76,7 @@ impl Spec {
 }
 
 impl Reading {
-    pub fn declared(field: &Field) -> syntax::Result<Reading> {
+    pub fn declared(field: &Field) -> syn::Result<Reading> {
         let ident = field.ident.clone().ok_or_else(|| Error::new_spanned(field, "a record's fields are named"))?;
         let found =
             field.attrs.iter().find_map(|attribute| Keyword::named(attribute).map(|keyword| (keyword, attribute)));
@@ -85,7 +87,7 @@ impl Reading {
         let lists = field.attrs.iter().filter(|listed| listed.path().is_ident("past"));
         let past = lists
             .map(|listed| listed.parse_args_with(Punctuated::<Expr, Token![,]>::parse_terminated))
-            .collect::<syntax::Result<Vec<_>>>()?;
+            .collect::<syn::Result<Vec<_>>>()?;
         Ok(Reading { ident, ty: field.ty.clone(), spec, past: past.into_iter().flatten().collect() })
     }
 

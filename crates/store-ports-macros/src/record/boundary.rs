@@ -1,6 +1,6 @@
 use query_cache::{Origin, Table};
-use syntax::parse::{Parse, ParseStream};
-use syntax::{Attribute, Data, DataStruct, DeriveInput, Error, Field, Fields, Ident, LitStr, Token};
+use syn::parse::{Parse, ParseStream};
+use syn::{Attribute, Data, DataStruct, DeriveInput, Error, Field, Fields, Ident, LitStr, Token};
 
 use super::{Placed, Record};
 
@@ -20,7 +20,7 @@ impl Naming {
 }
 
 impl Parse for Naming {
-    fn parse(input: ParseStream<'_>) -> syntax::Result<Naming> {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Naming> {
         let word: Ident = input.parse()?;
         Some(&word).filter(|found| *found == Self::TABLE).ok_or_else(|| Error::new(word.span(), Self::UNNAMED))?;
         input.parse::<Token![=]>()?;
@@ -29,7 +29,7 @@ impl Parse for Naming {
 }
 
 impl Parse for Marked {
-    fn parse(input: ParseStream<'_>) -> syntax::Result<Marked> {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Marked> {
         let word: Ident = input.parse()?;
         let origin = word.to_string().parse::<Origin>().map_err(|failed| Error::new(word.span(), failed))?;
         Ok(Marked { origin })
@@ -67,7 +67,7 @@ impl Placed {
         LitStr::new(&Table::named(&table.value()).overwrite(&self.name.to_string()), table.span())
     }
 
-    fn from_field(field: &Field) -> syntax::Result<Placed> {
+    fn from_field(field: &Field) -> syn::Result<Placed> {
         let name = field.ident.clone().ok_or_else(|| Error::new_spanned(field, Record::UNNAMED))?;
         let marked = Record::marking(&field.attrs).map(Attribute::parse_args::<Marked>).transpose()?;
         Ok(Placed { name, column: field.ty.clone(), origin: marked.map_or(Origin::Given, |found| found.origin) })
@@ -75,12 +75,12 @@ impl Placed {
 }
 
 impl Parse for Record {
-    fn parse(input: ParseStream<'_>) -> syntax::Result<Record> {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Record> {
         let row: DeriveInput = input.parse()?;
         let fields = Self::named(&row.data).ok_or_else(|| Error::new_spanned(&row, Self::UNNAMED))?;
         let marking = Self::marking(&row.attrs).ok_or_else(|| Error::new_spanned(&row.ident, Naming::UNNAMED))?;
         let naming = marking.parse_args::<Naming>()?;
-        let placed = fields.iter().map(Placed::from_field).collect::<syntax::Result<Vec<Placed>>>()?;
+        let placed = fields.iter().map(Placed::from_field).collect::<syn::Result<Vec<Placed>>>()?;
         Ok(Record { visibility: row.vis, row: row.ident, table: naming.table, fields: placed })
     }
 }

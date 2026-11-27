@@ -1,0 +1,13 @@
+[package]
+name = "app"
+
+[features]
+mock-data = []
+fast = []
+
+[dependencies]
+linked = { path = "../linked" }
+
+[[bin]]
+name = "tool"
+path = "tools/run.rs"

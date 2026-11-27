@@ -1,5 +1,8 @@
-use syntax::parse::{Parse, ParseStream};
-use syntax::{Ident, IdentExt, Span, ToTokens, Token, TokenStream, Type, quote};
+use proc_macro2::{Ident, Span, TokenStream};
+use quote::{ToTokens, quote};
+use syn::ext::IdentExt;
+use syn::parse::{Parse, ParseStream};
+use syn::{Token, Type};
 
 use query_cache::Described;
 use serde::Deserialize;
@@ -36,10 +39,10 @@ pub struct Typed {
 struct Unmapped(Ident);
 
 impl Typed {
-    pub fn described(described: &Described<ColumnName>, span: Span) -> syntax::Result<Typed> {
+    pub fn described(described: &Described<ColumnName>, span: Span) -> syn::Result<Typed> {
         let ColumnName { ident, nullability, overridden } = described.as_ref();
-        let spelled = described.storage().spelled().map(syntax::parse::parse_str::<Type>).transpose()?;
-        let base = overridden.clone().or(spelled).ok_or_else(|| syntax::Error::new(span, Unmapped(ident.clone())))?;
+        let spelled = described.storage().spelled().map(syn::parse_str::<Type>).transpose()?;
+        let base = overridden.clone().or(spelled).ok_or_else(|| syn::Error::new(span, Unmapped(ident.clone())))?;
         let presence = nullability.presence(described);
         Ok(Typed { ident: ident.clone(), column: presence.wrapped(base) })
     }
@@ -54,7 +57,7 @@ impl Nullability {
         }
     }
 
-    fn parsed(input: ParseStream<'_>) -> syntax::Result<Nullability> {
+    fn parsed(input: ParseStream<'_>) -> syn::Result<Nullability> {
         let present = input.parse::<Option<Token![!]>>()?.map(|_bang| Nullability::Present);
         let nullable = input.parse::<Option<Token![?]>>()?.map(|_question| Nullability::Nullable);
         Ok(present.or(nullable).unwrap_or(Nullability::Described))
@@ -62,7 +65,7 @@ impl Nullability {
 }
 
 impl Parse for ColumnName {
-    fn parse(input: ParseStream<'_>) -> syntax::Result<ColumnName> {
+    fn parse(input: ParseStream<'_>) -> syn::Result<ColumnName> {
         let ident = Ident::parse_any(input)?;
         let nullability = Nullability::parsed(input)?;
         let overridden = input.parse::<Option<Token![:]>>()?.map(|_colon| input.parse::<Type>()).transpose()?;
@@ -71,10 +74,10 @@ impl Parse for ColumnName {
 }
 
 impl TryFrom<String> for ColumnName {
-    type Error = syntax::Error;
+    type Error = syn::Error;
 
-    fn try_from(name: String) -> syntax::Result<ColumnName> {
-        syntax::parse::parse_str(&name)
+    fn try_from(name: String) -> syn::Result<ColumnName> {
+        syn::parse_str(&name)
     }
 }
 
@@ -82,7 +85,7 @@ impl Presence {
     fn wrapped(self, base: Type) -> Type {
         match self {
             Presence::Always => base,
-            Presence::Maybe => syntax::parse::parse_quote!(::core::option::Option<#base>),
+            Presence::Maybe => syn::parse_quote!(::core::option::Option<#base>),
         }
     }
 }

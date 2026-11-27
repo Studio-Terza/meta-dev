@@ -1,5 +1,5 @@
 use strum::{IntoStaticStr, VariantArray};
-use syntax::{AngleBracketedGenericArguments, GenericArgument, PathArguments, PathSegment, Type, TypePath};
+use syn::{AngleBracketedGenericArguments, GenericArgument, PathArguments, PathSegment, Type, TypePath};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Spine {

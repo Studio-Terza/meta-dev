@@ -1,0 +1,9 @@
+Violations
+--- out
+--- err
+free functions are not allowed; make them associated functions or methods:
+provider/src/inner.rs:9: fn own; make it an associated function or a method
+a crate exports exactly what another crate uses:
+consumer/src/lib.rs:4: extras is exported but no other crate names it; export it when a user appears
+provider/src/lib.rs:5: Alias is exported but no other crate names it; export it when a user appears
+provider/src/lib.rs:5: Unnamed is exported but no other crate names it; export it when a user appears

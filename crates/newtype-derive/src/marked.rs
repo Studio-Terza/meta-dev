@@ -1,7 +1,6 @@
-use syntax::Compiled;
-use syntax::TokenStream;
-use syntax::{DeriveInput, Generics, Ident, Visibility};
-use syntax::{format_ident, quote};
+use proc_macro2::TokenStream;
+use quote::{format_ident, quote};
+use syn::{DeriveInput, Generics, Ident, Visibility};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mark {
@@ -20,9 +19,12 @@ impl<'item> Marked<'item> {
     }
 
     pub fn expanded(tokens: TokenStream, mark: Mark) -> TokenStream {
-        syntax::parse::parse2::<DeriveInput>(tokens)
-            .map(|input| Marked::new(&input.ident, &input.generics).marked(mark, &input.vis))
-            .compiled()
+        let expansion = syn::parse2::<DeriveInput>(tokens)
+            .map(|input| Marked::new(&input.ident, &input.generics).marked(mark, &input.vis));
+        match expansion {
+            Ok(expanded) => expanded,
+            Err(error) => error.to_compile_error(),
+        }
     }
 
     fn marked(&self, mark: Mark, visibility: &Visibility) -> TokenStream {

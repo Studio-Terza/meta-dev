@@ -22,7 +22,7 @@ invariants = { path = "../crates/invariants" }
 file-ports = { path = "../crates/file-ports" }
 
 [dev-dependencies]
-lint-runner = { path = "../crates/lint-runner" }
+lint = { path = "../crates/lint" }
 proptest.workspace = true
 strum.workspace = true
 timer-ports = { path = "../crates/timer-ports" }

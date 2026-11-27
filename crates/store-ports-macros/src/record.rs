@@ -1,6 +1,8 @@
 mod boundary;
 
-use syntax::{Error, Ident, LitStr, TokenStream, Type, Visibility, format_ident, quote};
+use proc_macro2::TokenStream;
+use quote::{format_ident, quote};
+use syn::{Error, Ident, LitStr, Type, Visibility};
 
 use crate::expanded::Expanding;
 use query_cache::Origin;
@@ -28,7 +30,7 @@ impl Placed {
 }
 
 impl Expanding for Record {
-    fn expansion(self) -> syntax::Result<TokenStream> {
+    fn expansion(self) -> syn::Result<TokenStream> {
         let Record { visibility, row, table, fields } = self;
         let key = fields
             .iter()

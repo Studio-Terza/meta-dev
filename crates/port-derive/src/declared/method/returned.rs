@@ -1,6 +1,5 @@
-use syntax::Ident;
-use syntax::format_ident;
-use syntax::{ReturnType, Type};
+use quote::format_ident;
+use syn::{Ident, ReturnType, Type};
 
 use named::{Named, Slot};
 

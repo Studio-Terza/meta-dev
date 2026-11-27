@@ -1,0 +1,11 @@
+Violations
+--- out
+--- err
+free functions are not allowed; make them associated functions or methods:
+src/free.rs:1: fn helper; make it an associated function or a method
+src/free.rs:3: fn nested; make it an associated function or a method
+src/nested.rs:4: fn helper; make it an associated function or a method
+src/nested.rs:9: fn hidden; make it an associated function or a method
+tests go through public APIs:
+src/allowed.rs:3: test code in src; move it to the package's tests directory and call the public API from there
+src/required.rs:4: test code in src; move it to the package's tests directory and call the public API from there

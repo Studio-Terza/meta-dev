@@ -1,4 +1,4 @@
-use lint_runner::Verdict;
+use lint::Verdict;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Explanation(Vec<u8>);

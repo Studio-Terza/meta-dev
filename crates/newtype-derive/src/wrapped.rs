@@ -1,13 +1,12 @@
 mod expansion;
 mod only_field;
 
-use syntax::TokenStream;
-use syntax::{DeriveInput, Generics, Ident};
+use proc_macro2::TokenStream;
+use syn::{DeriveInput, Generics, Ident};
 
 use crate::settings::Settings;
 pub use expansion::{CheckedDeserializing, Constructors, Deserializing, Expansion, Formatting, Serializing, Strategy};
 use only_field::OnlyField;
-use syntax::Compiled;
 
 pub struct Wrapped {
     ident: Ident,
@@ -18,14 +17,20 @@ pub struct Wrapped {
 
 impl Wrapped {
     pub fn expanded<Derived: Expansion>(tokens: TokenStream) -> TokenStream {
-        syntax::parse::parse2(tokens).map(Self::derived::<Derived>).compiled()
+        match syn::parse2(tokens).map(Self::derived::<Derived>) {
+            Ok(expansion) => expansion,
+            Err(error) => error.to_compile_error(),
+        }
     }
 
     pub fn derived<Derived: Expansion>(input: DeriveInput) -> TokenStream {
-        Self::split(input).map(Derived::of).compiled()
+        match Self::split(input).map(Derived::of) {
+            Ok(expansion) => expansion,
+            Err(error) => error.to_compile_error(),
+        }
     }
 
-    fn split(DeriveInput { attrs, vis, ident, generics, data }: DeriveInput) -> syntax::Result<Wrapped> {
+    fn split(DeriveInput { attrs, vis, ident, generics, data }: DeriveInput) -> syn::Result<Wrapped> {
         match OnlyField::taken(data) {
             Ok(field) => Settings::declared(&attrs).map(|settings| Wrapped { ident, generics, field, settings }),
             Err(refused) => Settings::declared(&attrs)

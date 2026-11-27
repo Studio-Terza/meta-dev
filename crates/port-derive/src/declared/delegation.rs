@@ -1,5 +1,5 @@
-use syntax::TokenStream;
-use syntax::quote;
+use proc_macro2::TokenStream;
+use quote::quote;
 
 use super::method::{Method, Parameter};
 use super::{Declared, Rendered};

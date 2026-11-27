@@ -1,0 +1,7 @@
+Refused
+--- out
+--- err
+cannot parse src/bad.rs:1: cannot parse string into token stream
+cannot read src/missing.rs: entity not found
+free functions are not allowed; make them associated functions or methods:
+src/lib.rs:3: fn kept; make it an associated function or a method
