@@ -20,7 +20,8 @@ impl Files for Disk {
 
     fn read_from(&self, path: &Path, offset: Offset) -> Result<Bytes, FileFailure> {
         let mut file = File::open(path)?;
-        file.seek(SeekFrom::Start(offset.position()))?;
+        let length = file.metadata()?.len();
+        file.seek(SeekFrom::Start(offset.position().min(length)))?;
         let mut bytes = Vec::new();
         io::copy(&mut file, &mut bytes)?;
         Ok(Bytes::new(bytes))
