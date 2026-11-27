@@ -89,19 +89,20 @@ jobs:
           shopt -s nullglob
           PLAN=$RUNNER_TEMP/plan PRIOR=$RUNNER_TEMP/prior
           git diff HEAD^1 HEAD > "$PLAN/changed.diff"
+          git diff --numstat --no-renames HEAD^1 HEAD > "$PLAN/changed"
           git rev-parse HEAD^1 HEAD^2 > "$PLAN/heads"
-          cargo mutants --list --json --in-diff "$PLAN/changed.diff" > "$PLAN/listed.json"
+          cargo mutants --list --json > "$PLAN/workspace.json"
+          cargo mutants --list --json --in-diff "$PLAN/changed.diff" > "$PLAN/diff.json"
           heads="$PRIOR/mutants-plan/heads"
           earlier=()
           if test -f "$heads" && { git diff --numstat --no-renames "$(sed -n 1p "$heads")" HEAD^1 && git diff --numstat --no-renames "$(sed -n 2p "$heads")" HEAD^2; } > "$PLAN/numstat"; then
             earlier=("$PLAN/numstat" "$PRIOR"/*/*.json)
           fi
-          cargo run --locked -q --bin ci -- mutants-plan "$PLAN/listed.json" "$PLAN/reused.json" "$PLAN/caught.txt" "$GITHUB_OUTPUT" "${earlier[@]}"
+          cargo run --locked -q --bin ci -- mutants-plan "$PLAN/workspace.json" "$PLAN/diff.json" "$PLAN/changed" "$PLAN/reused.json" "$PLAN/caught.txt" "$GITHUB_OUTPUT" "${earlier[@]}"
       - uses: actions/upload-artifact@v4
         with:
           name: mutants-plan
           path: |
-            ${{ runner.temp }}/plan/changed.diff
             ${{ runner.temp }}/plan/heads
             ${{ runner.temp }}/plan/reused.json
             ${{ runner.temp }}/plan/caught.txt
@@ -130,12 +131,12 @@ jobs:
         with:
           name: mutants-plan
           path: ${{ runner.temp }}/plan
-      - name: mutants in changed lines, skipping those the earlier run caught in unchanged files
+      - name: the planned mutants, skipping every one listed in caught.txt
         run: |
           PLAN=$RUNNER_TEMP/plan OUT=$RUNNER_TEMP/out
           mkdir -p "$OUT/mutants.out"
           cp "$PLAN/caught.txt" "$OUT/mutants.out/caught.txt"
-          cargo mutants --no-shuffle --iterate --in-diff "$PLAN/changed.diff" --output "$OUT" --shard "${{ matrix.shard }}/${{ strategy.job-total }}"
+          cargo mutants --no-shuffle --iterate --output "$OUT" --sharding round-robin --shard "${{ matrix.shard }}/${{ strategy.job-total }}"
       - uses: actions/upload-artifact@v4
         if: success() || failure()
         with:

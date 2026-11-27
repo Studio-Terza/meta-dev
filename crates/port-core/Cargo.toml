@@ -15,8 +15,5 @@ newtype = { path = "../newtype" }
 port-derive = { path = "../port-derive" }
 thiserror.workspace = true
 
-[dev-dependencies]
-strum.workspace = true
-
 [lints]
 workspace = true

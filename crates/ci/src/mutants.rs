@@ -13,7 +13,9 @@ use crate::ports::Disk;
 
 #[derive(Debug)]
 pub struct Plan {
-    listed: PathBuf,
+    workspace: PathBuf,
+    diff: PathBuf,
+    changed: PathBuf,
     reused: PathBuf,
     caught: PathBuf,
     output: PathBuf,
@@ -79,22 +81,25 @@ struct Row {
 struct Shards(usize);
 
 impl Plan {
-    const PER_SHARD: usize = 60;
+    const PER_SHARD: usize = 120;
 
-    pub(crate) fn new([listed, reused, caught, output]: [PathBuf; 4], prior: Option<Prior>) -> Plan {
-        Plan { listed, reused, caught, output, prior }
+    pub(crate) fn new([workspace, diff, changed, reused, caught, output]: [PathBuf; 6], prior: Option<Prior>) -> Plan {
+        Plan { workspace, diff, changed, reused, caught, output, prior }
     }
 
     pub(crate) fn run(&self, out: &mut impl Write) -> Result<Exit, Failure> {
-        let text = Disk::read(&self.listed)?;
-        let listed: Vec<Mutant> =
-            serde_json::Deserializer::from_str(&text).into_iter().next().unwrap_or_else(|| Ok(Vec::new()))?;
+        let workspace = Mutant::listed(&self.workspace)?;
+        let in_diff: BTreeSet<String> = Mutant::listed(&self.diff)?.into_iter().map(|mutant| mutant.name).collect();
+        let tested = Row::tested(Row::read(&Disk::read(&self.changed)?)?);
         let reusable = self.prior.as_ref().map_or(Ok(Reusable::Nothing(Reason::NoEarlierRun)), Prior::reusable)?;
-        let count = listed.len();
+        let count = workspace.len();
+        let (selected, skipped): (Vec<Mutant>, Vec<Mutant>) =
+            workspace.into_iter().partition(|mutant| mutant.selected(&in_diff, &tested).is_some());
+        let chosen = selected.len();
         let (reused, untested): (Vec<Mutant>, Vec<Mutant>) =
-            listed.into_iter().partition(|mutant| reusable.reuses(mutant).is_some());
+            selected.into_iter().partition(|mutant| reusable.reuses(mutant).is_some());
         let shards = Shards(untested.len().div_ceil(Plan::PER_SHARD).max(1));
-        let names: String = reused.iter().map(|mutant| [mutant.name.as_str(), "\n"].concat()).collect();
+        let names: String = skipped.iter().chain(&reused).map(|mutant| [mutant.name.as_str(), "\n"].concat()).collect();
         let outcomes = Outcomes {
             outcomes: reused
                 .into_iter()
@@ -104,15 +109,30 @@ impl Plan {
         Disk::write(&self.reused, &serde_json::to_string(&outcomes)?)?;
         Disk::write(&self.caught, &names)?;
         Disk::append(&self.output, &format!("shards={shards}\n"))?;
+        let crates: Vec<String> = tested.iter().map(|path| path.display().to_string()).collect();
         writeln!(out, "{reusable}")?;
+        writeln!(out, "mutants: every one in the crates whose tests changed: [{}]", crates.join(", "))?;
         writeln!(
             out,
-            "mutants: {count} in the diff, {} reused, {} to test in {} shards",
+            "mutants: {chosen} of {count} selected, {} in the diff; {} reused, {} to test in {} shards",
+            in_diff.len(),
             outcomes.outcomes.len(),
             untested.len(),
             shards.0
         )?;
         Ok(Exit::Passed)
+    }
+}
+
+impl Mutant {
+    fn listed(path: &Path) -> Result<Vec<Mutant>, Failure> {
+        let text = Disk::read(path)?;
+        Ok(serde_json::Deserializer::from_str(&text).into_iter().next().unwrap_or_else(|| Ok(Vec::new()))?)
+    }
+
+    fn selected(&self, in_diff: &BTreeSet<String>, tested: &BTreeSet<PathBuf>) -> Option<()> {
+        let file = Path::new(&self.file);
+        in_diff.get(&self.name).map(|_| ()).or(tested.iter().find(|root| file.starts_with(root)).map(|_| ()))
     }
 }
 
@@ -171,6 +191,14 @@ impl Reusable {
 }
 
 impl Row {
+    fn tested(rows: Vec<Row>) -> BTreeSet<PathBuf> {
+        let tests = Component::Normal(Prior::TESTS.as_ref());
+        rows.into_iter()
+            .filter(|row| row.path.components().any(|part| part == tests))
+            .map(|row| row.path.components().take_while(|part| *part != tests).collect())
+            .collect()
+    }
+
     fn read(numstat: &str) -> Result<Vec<Row>, Failure> {
         numstat
             .parse::<Lines>()

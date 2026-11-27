@@ -179,7 +179,6 @@ dependencies = [
  "invariants",
  "newtype",
  "port-core",
- "sqlite-ports",
  "store-ports",
  "strum",
  "transcript-ports",
@@ -283,7 +282,6 @@ dependencies = [
  "invariants",
  "lint",
  "proptest",
- "strum",
  "timer-ports",
 ]
 
@@ -569,7 +567,6 @@ dependencies = [
  "invariants",
  "newtype",
  "port-derive",
- "strum",
  "thiserror",
 ]
 
@@ -614,7 +611,6 @@ name = "query-cache"
 version = "0.1.0"
 dependencies = [
  "hex",
- "invariants",
  "serde",
  "serde_json",
  "sha2",
@@ -811,7 +807,6 @@ name = "sqlite-ports"
 version = "0.1.0"
 dependencies = [
  "invariants",
- "newtype",
  "port-core",
  "rusqlite",
  "sha2",
@@ -843,14 +838,11 @@ name = "store-ports-macros"
 version = "0.1.0"
 dependencies = [
  "grammar-migration",
- "hex",
  "invariants",
  "proc-macro2",
  "query-cache",
  "quote",
  "serde",
- "serde_json",
- "sha2",
  "syn 2.0.119",
  "thiserror",
 ]
@@ -918,12 +910,6 @@ version = "0.1.0"
 [[package]]
 name = "text-lines"
 version = "0.1.0"
-dependencies = [
- "grammar-lines",
- "newtype",
- "serde_json",
- "thiserror",
-]
 
 [[package]]
 name = "thiserror"

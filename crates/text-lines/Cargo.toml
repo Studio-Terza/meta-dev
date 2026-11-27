@@ -9,13 +9,5 @@ publish.workspace = true
 test = false
 doctest = false
 
-[dependencies]
-grammar-lines = { path = "../grammar-lines" }
-newtype = { path = "../newtype" }
-thiserror.workspace = true
-
-[dev-dependencies]
-serde_json.workspace = true
-
 [lints]
 workspace = true

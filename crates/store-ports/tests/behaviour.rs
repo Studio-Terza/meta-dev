@@ -276,64 +276,20 @@ impl Stored {
 proptest! {
     #![proptest_config(Config { failure_persistence: None, rng_seed: RngSeed::Fixed(0), ..Config::default() })]
     #[test]
-    fn a_uuid_column_reads_back(value in any::<Uuid>()) {
-        prop_assert_eq!(Stored::back::<Uuid>(&value.raw()), Some(value));
-    }
-
-    #[test]
-    fn a_session_column_reads_back(value in any::<SessionId>()) {
-        prop_assert_eq!(Stored::back::<SessionId>(&value.raw()), Some(value));
-    }
-
-    #[test]
-    fn an_instant_column_reads_back(value in any::<Instant>()) {
-        prop_assert_eq!(Stored::back::<Instant>(&value.raw()), Some(value));
-    }
-
-    #[test]
-    fn a_body_column_reads_back(value in any::<Body>()) {
-        prop_assert_eq!(Stored::back::<Body>(&value.raw()), Some(value));
-    }
-
-    #[test]
-    fn an_offset_column_reads_back(value in any::<Offset>()) {
-        prop_assert_eq!(Stored::back::<Offset>(&value.raw()), Some(value));
-    }
-
-    #[test]
-    fn an_optional_column_reads_back(value in option::of(any::<Body>())) {
-        prop_assert_eq!(Stored::back::<Option<Body>>(&value.raw()), Some(value));
-    }
-
-    #[test]
-    fn a_pid_column_reads_back(value in any::<Pid>()) {
-        prop_assert_eq!(Stored::back::<Pid>(&value.raw()), Some(value));
-    }
-
-    #[test]
-    fn a_token_count_column_reads_back(value in any::<Tokens>()) {
-        prop_assert_eq!(Stored::back::<Tokens>(&value.raw()), Some(value));
-    }
-
-    #[test]
-    fn a_wall_time_column_reads_back(value in any::<Wall>()) {
-        prop_assert_eq!(Stored::back::<Wall>(&value.raw()), Some(value));
-    }
-
-    #[test]
-    fn a_count_beyond_a_pid_is_refused_as_unfit(number in i64::from(u32::MAX) + 1..i64::MAX) {
-        prop_assert!(matches!(Pid::from_raw(number), Err(ColumnFailure::Unfit(_))));
-    }
-
-    #[test]
-    fn an_unknown_spelling_is_refused_as_misspelled(text in "[a-z]{0,3}[A-Z ]{1,3}") {
-        prop_assert!(matches!(Halt::from_raw(text.clone()), Err(ColumnFailure::Misspelled(_))));
-        prop_assert!(matches!(Authorship::from_raw(text), Err(ColumnFailure::Misspelled(_))));
-    }
-
-    #[test]
-    fn a_negative_offset_is_refused(number in i64::MIN..0) {
-        prop_assert!(matches!(Offset::from_raw(number), Err(ColumnFailure::Refused(_))));
+    fn every_column_reads_back_and_refuses_what_it_cannot_hold(uuid in any::<Uuid>(), session in any::<SessionId>(), instant in any::<Instant>(), body in any::<Body>(), offset in any::<Offset>(), optional in option::of(any::<Body>()), pid in any::<Pid>(), tokens in any::<Tokens>(), wall in any::<Wall>(), beyond in i64::from(u32::MAX) + 1..i64::MAX, misspelled in "[a-z]{0,3}[A-Z ]{1,3}", negative in i64::MIN..0) {
+        prop_assert_eq!(Stored::back::<Uuid>(&uuid.raw()), Some(uuid));
+        prop_assert_eq!(Stored::back::<SessionId>(&session.raw()), Some(session));
+        prop_assert_eq!(Stored::back::<Instant>(&instant.raw()), Some(instant));
+        prop_assert_eq!(Stored::back::<Body>(&body.raw()), Some(body));
+        prop_assert_eq!(Stored::back::<Offset>(&offset.raw()), Some(offset));
+        prop_assert_eq!(Stored::back::<Option<Body>>(&optional.raw()), Some(optional));
+        prop_assert_eq!(Stored::back::<Pid>(&pid.raw()), Some(pid));
+        prop_assert_eq!(Stored::back::<Tokens>(&tokens.raw()), Some(tokens));
+        prop_assert_eq!(Stored::back::<Wall>(&wall.raw()), Some(wall));
+        prop_assert!(matches!(Pid::from_raw(beyond), Err(ColumnFailure::Unfit(_))));
+        prop_assert!(matches!(Halt::from_raw(misspelled.clone()), Err(ColumnFailure::Misspelled(_))));
+        prop_assert!(matches!(Authorship::from_raw(misspelled), Err(ColumnFailure::Misspelled(_))));
+        prop_assert!(matches!(Offset::from_raw(negative), Err(ColumnFailure::Refused(_))));
     }
 }
 

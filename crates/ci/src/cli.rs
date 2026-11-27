@@ -33,8 +33,9 @@ impl Cli {
             [name, limits, stage, program, rest @ ..] if name == Cli::TIMED => {
                 Cli::Timed(Timed::new(PathBuf::from(limits), stage.to_string_lossy().into_owned(), program, rest))
             }
-            [name, listed, reused, caught, output, prior @ ..] if name == Cli::PLAN => {
-                Cli::Plan(Plan::new([listed, reused, caught, output].map(PathBuf::from), Prior::given(prior)))
+            [name, workspace, diff, changed, reused, caught, output, prior @ ..] if name == Cli::PLAN => {
+                let given = [workspace, diff, changed, reused, caught, output].map(PathBuf::from);
+                Cli::Plan(Plan::new(given, Prior::given(prior)))
             }
             _ => Cli::Usage,
         }

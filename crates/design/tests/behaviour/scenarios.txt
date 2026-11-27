@@ -1,0 +1,149 @@
+## ingest twice
+$ ingest < Nothing
+session s read to 387
+authorship owner 1
+authorship lead 1
+written 3
+Ok(Ingested) false
+$ ingest < Nothing
+written 0
+Ok(Ingested) false
+## a dry run, then a real one
+$ ingest --dry-run < Nothing
+session s read to 387
+authorship owner 1
+authorship lead 1
+written 3
+Ok(Ingested) false
+$ ingest < Nothing
+session s read to 387
+authorship owner 1
+authorship lead 1
+written 3
+Ok(Ingested) false
+## an unrecognised line
+$ ingest < Nothing
+session s read to 578
+authorship owner 1
+authorship lead 1
+unrecognised brand-new-kind 1
+written 3
+Ok(Ingested) false
+## hook settings
+$ hook --settings < Nothing
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "design --workspace \"$CLAUDE_PROJECT_DIR\" hook stop",
+            "timeout": 3600
+          }
+        ]
+      }
+    ]
+  }
+}
+Ok(Settings) false
+## a continuing stop
+$ hook stop < Text("{\"stop_hook_active\":true,\"session_id\":\"s\"}")
+Ok(Hooked(Stop)) true
+## nothing running
+$ hook stop < Stop
+{"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled."}
+Ok(Blocked) false
+prompt holds [false, true, true, true, false]
+## an agent quiet under twenty minutes
+$ hook stop < Stop
+Ok(Hooked(Stop)) true
+$ stops < Nothing
+session	shells	agents	halt	read	quoted	kept	fate	tokens	millis
+s	0	1	live	1	0	0	passed	7	5
+Ok(Trailed) false
+prompt holds [false, true, true, true, false]
+## a shell still running
+$ hook stop < Stop
+Ok(Hooked(Stop)) true
+$ stops < Nothing
+session	shells	agents	halt	read	quoted	kept	fate	tokens	millis
+s	1	0	live	1	0	0	passed	7	5
+Ok(Trailed) false
+prompt holds [false, true, true, true, false]
+## finished tasks and files that are not tasks
+$ hook stop < Stop
+{"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled."}
+Ok(Blocked) false
+prompt holds [false, true, true, true, false]
+## no transcript
+$ hook stop < Text("{\"stop_hook_active\":false}")
+Ok(Hooked(Stop)) true
+## an agent quiet for twenty minutes
+$ hook stop < Stop
+{"decision":"block","reason":"OVERRUN: these background tasks ran 20 minutes without finishing or writing output; check and stop them: agent-hung"}
+Ok(Blocked) false
+$ hook stop < Stop
+{"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled."}
+Ok(Blocked) false
+prompt holds [false, true, true, true, false]
+prompt holds [false, true, true, true, false]
+## quoted owner words
+$ hook stop < Asking
+{"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\nEarlier owner words bearing on this:\no1 2026-01-01T00:00:00Z: \"Merge only when CI is green.\"\n"}
+Ok(Blocked) false
+$ stops < Nothing
+session	shells	agents	halt	read	quoted	kept	fate	tokens	millis
+s	0	0	stalled	1	1	1	blocked	14	5
+Ok(Trailed) false
+prompt holds [true, true, false, true, false]
+prompt holds [true, true, false, false, true]
+## a quote the owner never wrote
+$ hook stop < Asking
+{"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled."}
+Ok(Blocked) false
+prompt holds [true, true, false, true, false]
+## a refused reading
+$ hook stop < Asking
+{"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled."}
+Ok(Blocked) false
+$ stops < Nothing
+session	shells	agents	halt	read	quoted	kept	fate	tokens	millis
+s	0	0	stalled	1	0	0	blocked	7	5
+Ok(Trailed) false
+prompt holds [true, true, false, true, false]
+## a stop without its last message
+$ hook stop < Stop
+{"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\nEarlier owner words bearing on this:\no1 2026-01-01T00:00:00Z: \"Merge only when CI is green.\"\n"}
+Ok(Blocked) false
+prompt holds [false, true, true, true, false]
+prompt holds [false, true, true, false, true]
+## a transcript that grows
+$ ingest < Nothing
+session s read to 387
+authorship owner 1
+authorship lead 1
+written 3
+Ok(Ingested) false
+$ ingest < Grown
+session s read to 560
+authorship owner 1
+written 2
+Ok(Ingested) false
+$ ingest < Nothing
+written 0
+Ok(Ingested) false
+## words the cli does not know
+$ frobnicate < Nothing
+Err(Refusal("usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | --settings))")) false
+$ hook < Nothing
+Err(Refusal("usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | --settings))")) false
+$ hook stop --settings < Nothing
+Err(Refusal("usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | --settings))")) false
+$ ingest --wet < Nothing
+Err(Refusal("usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | --settings))")) false
+$  < Nothing
+Err(Refusal("usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | --settings))")) false
+## an unreadable hook input
+$ hook stop < Text("not json")
+Err(Refusal("cannot read the hook input: expected ident at line 1 column 2")) false

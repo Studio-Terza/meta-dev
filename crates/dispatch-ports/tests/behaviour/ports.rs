@@ -5,8 +5,8 @@ use std::time::{Duration, Instant};
 use test_failure::Failed;
 
 use dispatch_ports::{
-    Agent, AgentRun, Clock, Deadline, Dispatch, Ended, Finished, HeadlessClaude, Job, Model, Pause, Pid, Prompt, Reply,
-    Stall, Started, SystemClock, Timeout, Tokens, Usage, Watch, Watched, Woke,
+    Agent, Clock, Deadline, Dispatch, Ended, Finished, HeadlessClaude, Job, Model, Pause, Pid, Prompt, Reply, Stall,
+    Started, SystemClock, Timeout, Tokens, Usage, Watch, Watched, Woke,
 };
 use invariants::Ignoring;
 use port_core::Run;
@@ -127,89 +127,30 @@ fn an_agent_that_leaves_a_large_prompt_unread_is_killed_and_reaped_at_its_deadli
 }
 
 #[test]
-fn a_wait_nobody_rings_lasts_its_full_pause() -> Result<(), Failed> {
-    let pause = Pause::new(1);
+fn a_bell_lapses_until_rung_spends_each_ring_once_and_rings_when_its_agent_finishes() -> Result<(), Failed> {
+    let (pause, quiet) = (Pause::new(1), Duration::from_millis(50));
     let waits = Waits::default();
     let run = Run::root();
-    let waited = {
-        let agent = run.port(HeadlessClaude::new(
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")),
-            Agent::new("sh", &["-c", "exec sleep 30"]),
-        ));
+    let woke = {
         let clock = run.port(FakeClock::new(Sleep::STILL, &waits));
-        let silent = agent.dispatch(
-            &Job::due_by(Deadline::after(clock.now(), Timeout::new(60)), Model::Haiku),
-            &Prompt::new("x".to_owned()),
-        )?;
+        let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let sleeping = run.port(HeadlessClaude::new(directory.clone(), Agent::new("sh", &["-c", "exec sleep 30"])));
+        let speaking = run.port(HeadlessClaude::new(directory, Agent::new("sh", &["-c", "echo spoken"])));
+        let job = Job::due_by(Deadline::after(clock.now(), Timeout::new(60)), Model::Haiku);
+        let silent = sleeping.dispatch(&job, &Prompt::new("x".to_owned()))?;
         let waited = clock.waited(pause, silent.bell());
+        let started = Instant::now();
+        let lapsed = (silent.bell().waited(quiet), started.elapsed() >= quiet);
+        silent.bell().ringer().ring();
+        let [rung, after] = [(); 2].map(|()| silent.bell().waited(Duration::ZERO));
         silent.end()?;
-        waited
-    };
-    run.finish().settled()?;
-    assert_eq!((waited, waits.recorded()), (Watching::START.after(pause), vec![Wait { pause, woke: Woke::Lapsed }]));
-    Ok(())
-}
-
-#[test]
-fn quiet_bell_waits_out_its_pause() -> Result<(), Failed> {
-    let pause = Duration::from_millis(50);
-    let run = Run::root();
-    let quiet = {
-        let clock = run.port(SystemClock);
-        AgentRun::new(Pid::new(1), Deadline::after(clock.now(), Timeout::new(5)))
-    };
-    run.finish().settled()?;
-    let started = Instant::now();
-    let woke = quiet.bell().waited(pause);
-    assert_eq!((woke, started.elapsed() >= pause), (Woke::Lapsed, true));
-    Ok(())
-}
-
-#[test]
-fn a_ring_wakes_one_wait_and_is_then_spent() -> Result<(), Failed> {
-    let waits = Waits::default();
-    let run = Run::root();
-    let woke = {
-        let agent = run.port(HeadlessClaude::new(
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")),
-            Agent::new("sh", &["-c", "exec sleep 30"]),
-        ));
-        let clock = run.port(FakeClock::new(Sleep::STILL, &waits));
-        let held = agent.dispatch(
-            &Job::due_by(Deadline::after(clock.now(), Timeout::new(60)), Model::Haiku),
-            &Prompt::new("x".to_owned()),
-        )?;
-        let before = held.bell().waited(Duration::ZERO);
-        held.bell().ringer().ring();
-        let rung = held.bell().waited(Duration::ZERO);
-        let after = held.bell().waited(Duration::ZERO);
-        held.end()?;
-        [before, rung, after]
-    };
-    run.finish().settled()?;
-    assert_eq!(woke, [Woke::Lapsed, Woke::Rung, Woke::Lapsed]);
-    Ok(())
-}
-
-#[test]
-fn a_dispatched_agent_rings_its_own_bell_when_it_finishes() -> Result<(), Failed> {
-    let waits = Waits::default();
-    let run = Run::root();
-    let woke = {
-        let agent = run.port(HeadlessClaude::new(
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")),
-            Agent::new("sh", &["-c", "echo spoken"]),
-        ));
-        let clock = run.port(FakeClock::new(Sleep::STILL, &waits));
-        let finished = agent.dispatch(
-            &Job::due_by(Deadline::after(clock.now(), Timeout::new(60)), Model::Haiku),
-            &Prompt::new("x".to_owned()),
-        )?;
-        let woke = finished.bell().waited(Duration::from_secs(20));
+        let finished = speaking.dispatch(&job, &Prompt::new("x".to_owned()))?;
+        let spoken = finished.bell().waited(Duration::from_secs(20));
         finished.end()?;
-        woke
+        (waited, lapsed, [rung, after, spoken])
     };
     run.finish().settled()?;
-    assert_eq!(woke, Woke::Rung);
+    assert_eq!(woke, (Watching::START.after(pause), (Woke::Lapsed, true), [Woke::Rung, Woke::Lapsed, Woke::Rung]));
+    assert_eq!(waits.recorded(), vec![Wait { pause, woke: Woke::Lapsed }]);
     Ok(())
 }

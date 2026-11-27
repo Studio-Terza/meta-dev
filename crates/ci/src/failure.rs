@@ -5,7 +5,7 @@ use std::time::TryFromFloatSecsError;
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum Failure {
     #[error(
-        "usage: ci timed <limits> <stage> <program> [<argument>...]\n       ci mutants-plan <listed> <reused> <caught> <output> [<numstat> <outcomes>...]"
+        "usage: ci timed <limits> <stage> <program> [<argument>...]\n       ci mutants-plan <workspace> <diff> <changed> <reused> <caught> <output> [<numstat> <outcomes>...]"
     )]
     Usage,
     #[error("cannot read {}: {source}", path.display())]

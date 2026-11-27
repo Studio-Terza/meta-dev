@@ -25,10 +25,7 @@ use tempfile::TempDir;
 
 const OWNER: &str = "Merge only when CI is green.";
 const QUESTION: &str = "Shall I merge the branch now?";
-const STALLED: &str = "Nothing is running: no background shell or agent will wake you, so the turn has stalled.";
-const OVERRUN: &str =
-    "OVERRUN: these background tasks ran 20 minutes without finishing or writing output; check and stop them:";
-const TRAIL_HEADER: &str = "session\tshells\tagents\thalt\tread\tquoted\tkept\tfate\ttokens\tmillis";
+const NONE: fn(&Home) -> Result<(), Failed> = |_| Ok(());
 const QUIET: Duration = Duration::from_mins(20);
 const BUSY: Duration = Duration::from_mins(19);
 const ASKED: &str = "{\"type\":\"user\"}\n";
@@ -126,13 +123,6 @@ struct Refusal(String);
 struct Said {
     shown: String,
     ended: Result<Outcome, Refusal>,
-}
-
-impl Said {
-    fn reason(&self) -> Result<Option<String>, Failed> {
-        let decision: Value = serde_json::from_str(&self.shown)?;
-        Ok(decision.get("reason").and_then(Value::as_str).map(str::to_owned))
-    }
 }
 
 #[derive(Debug)]
@@ -266,7 +256,7 @@ impl Home {
             Cli::new(&environment, files, SqliteOpener, Agents::new(|_kept: PathBuf| Agent { replies }, clock))
                 .rooted(words);
         let shown = AsRef::<Shown>::as_ref(&uttered).to_string();
-        Said { shown, ended: uttered.ended().map_err(|failure| Refusal(failure.to_string())) }
+        Said { shown, ended: uttered.ended().map_err(|failure: Failure| Refusal(failure.to_string())) }
     }
 
     fn stop(&self, extra: &str) -> String {
@@ -303,232 +293,135 @@ impl Home {
     }
 }
 
-#[test]
-fn ingest_reports_each_session_read_the_authors_and_the_rows_written_and_a_second_ingest_writes_none()
--> Result<(), Failed> {
-    let home = Home::answered()?;
-    let replies = Replies::default();
-    let first = home.said(&["ingest"], "", &replies);
-    let second = home.said(&["ingest"], "", &replies);
-    let read = Home::conversation().concat().len();
-    assert_eq!(
-        (first.shown.as_str(), first.ended),
-        (
-            format!("session s read to {read}\nauthorship owner 1\nauthorship lead 1\nwritten 3\n").as_str(),
-            Ok(Outcome::Ingested)
-        )
-    );
-    assert_eq!((second.shown.as_str(), second.ended), ("written 0\n", Ok(Outcome::Ingested)));
-    Ok(())
+#[derive(Clone, Copy, Debug)]
+enum Input {
+    Nothing,
+    Grown,
+    Stop,
+    Asking,
+    Text(&'static str),
 }
 
-#[test]
-fn a_dry_run_ingest_reports_the_same_rows_but_keeps_none() -> Result<(), Failed> {
-    let home = Home::answered()?;
-    let replies = Replies::default();
-    let dry = home.said(&["ingest", "--dry-run"], "", &replies);
-    let real = home.said(&["ingest"], "", &replies);
-    assert!(dry.shown.contains("written 3\n"), "{}", dry.shown);
-    assert_eq!(dry.shown, real.shown);
-    Ok(())
+struct Step(&'static [&'static str], Input);
+
+struct Scenario {
+    name: &'static str,
+    setup: fn(&Home) -> Result<(), Failed>,
+    replies: fn() -> Result<Replies, Failed>,
+    steps: &'static [Step],
 }
 
-#[test]
-fn an_unrecognised_line_is_counted_by_its_kind() -> Result<(), Failed> {
-    let home = Home::holding(&[Home::line("user", "o1", OWNER), Home::line("brand-new-kind", "x1", "odd")])?;
-    let said = home.said(&["ingest"], "", &Replies::default());
-    assert!(said.shown.contains("unrecognised brand-new-kind 1\n"), "{}", said.shown);
-    Ok(())
-}
+const STOP: Step = Step(&["hook", "stop"], Input::Stop);
+const ASK: Step = Step(&["hook", "stop"], Input::Asking);
+const INGEST: Step = Step(&["ingest"], Input::Nothing);
+const STOPS: Step = Step(&["stops"], Input::Nothing);
+const GOLDEN: &str = "tests/behaviour/scenarios.txt";
 
-#[test]
-fn the_hook_settings_name_a_command_running_each_hook_in_the_project() -> Result<(), Failed> {
-    let said = Home::new()?.said(&["hook", "--settings"], "", &Replies::default());
-    let settings: Value = serde_json::from_str(&said.shown)?;
-    let handler = settings.pointer("/hooks/Stop/0/hooks/0").cloned().unwrap_or_default();
-    assert_eq!(said.ended, Ok(Outcome::Settings));
-    assert_eq!(handler.get("type").and_then(Value::as_str), Some("command"));
-    assert_eq!(
-        handler.get("command").and_then(Value::as_str),
-        Some("design --workspace \"$CLAUDE_PROJECT_DIR\" hook stop")
-    );
-    assert_eq!(handler.get("timeout").and_then(Value::as_u64), Some(3600));
-    assert_eq!(settings.get("hooks").and_then(Value::as_object).map(serde_json::Map::len), Some(1));
-    Ok(())
-}
+impl Scenario {
+    const ALL: [Scenario; 18] = [
+        Scenario::of("ingest twice", NONE, &[INGEST, INGEST]),
+        Scenario::of("a dry run, then a real one", NONE, &[Step(&["ingest", "--dry-run"], Input::Nothing), INGEST]),
+        Scenario::of("an unrecognised line", |home| home.wrote(&Home::line("brand-new-kind", "x1", "odd")), &[INGEST]),
+        Scenario::of("hook settings", NONE, &[Step(&["hook", "--settings"], Input::Nothing)]),
+        Scenario::of(
+            "a continuing stop",
+            NONE,
+            &[Step(&["hook", "stop"], Input::Text("{\"stop_hook_active\":true,\"session_id\":\"s\"}"))],
+        ),
+        Scenario::of("nothing running", NONE, &[STOP]),
+        Scenario::of(
+            "an agent quiet under twenty minutes",
+            |home| home.agent_task("agent-busy.jsonl", ASKED, BUSY),
+            &[STOP, STOPS],
+        ),
+        Scenario::of("a shell still running", |home| home.shell_task("b1.output", "building\n"), &[STOP, STOPS]),
+        Scenario::of("finished tasks and files that are not tasks", Home::finished, &[STOP]),
+        Scenario::of("no transcript", NONE, &[Step(&["hook", "stop"], Input::Text("{\"stop_hook_active\":false}"))]),
+        Scenario::of(
+            "an agent quiet for twenty minutes",
+            |home| home.agent_task("agent-hung.jsonl", ASKED, QUIET),
+            &[STOP, STOP],
+        ),
+        Scenario { replies: KEPT, ..Scenario::of("quoted owner words", NONE, &[ASK, STOPS]) },
+        Scenario {
+            replies: || Ok(Replies::quoting("[{\"uuid\": \"o1\", \"quote\": \"Never said this.\"}]", "[1]")),
+            ..Scenario::of("a quote the owner never wrote", NONE, &[ASK])
+        },
+        Scenario { replies: Replies::refusing, ..Scenario::of("a refused reading", NONE, &[ASK, STOPS]) },
+        Scenario { replies: KEPT, ..Scenario::of("a stop without its last message", NONE, &[STOP]) },
+        Scenario::of("a transcript that grows", NONE, &[INGEST, Step(&["ingest"], Input::Grown), INGEST]),
+        Scenario::of(
+            "words the cli does not know",
+            NONE,
+            &[
+                Step(&["frobnicate"], Input::Nothing),
+                Step(&["hook"], Input::Nothing),
+                Step(&["hook", "stop", "--settings"], Input::Nothing),
+                Step(&["ingest", "--wet"], Input::Nothing),
+                Step(&[], Input::Nothing),
+            ],
+        ),
+        Scenario::of("an unreadable hook input", NONE, &[Step(&["hook", "stop"], Input::Text("not json"))]),
+    ];
 
-#[test]
-fn a_continuing_stop_passes_silently() -> Result<(), Failed> {
-    let home = Home::answered()?;
-    let replies = Replies::default();
-    let said = home.said(&["hook", "stop"], "{\"stop_hook_active\":true,\"session_id\":\"s\"}", &replies);
-    assert_eq!((said.shown.as_str(), said.ended), ("", Ok(Outcome::Hooked(HookEvent::Stop))));
-    assert_eq!(replies.prompts(), Vec::<String>::new());
-    Ok(())
-}
-
-#[test]
-fn a_stop_with_nothing_running_is_blocked_as_stalled() -> Result<(), Failed> {
-    let home = Home::answered()?;
-    let said = home.said(&["hook", "stop"], &home.stop(""), &Replies::default());
-    let decision: Value = serde_json::from_str(&said.shown)?;
-    assert_eq!(said.ended, Ok(Outcome::Blocked));
-    assert_eq!(decision.get("decision").and_then(Value::as_str), Some("block"));
-    assert_eq!(said.reason()?.as_deref(), Some(STALLED));
-    Ok(())
-}
-
-#[test]
-fn a_stop_with_an_agent_quiet_under_twenty_minutes_passes_and_trails_it_as_live() -> Result<(), Failed> {
-    let home = Home::answered()?;
-    home.agent_task("agent-busy.jsonl", ASKED, BUSY)?;
-    let replies = Replies::default();
-    let said = home.said(&["hook", "stop"], &home.stop(""), &replies);
-    let trail = home.said(&["stops"], "", &replies);
-    assert_eq!((said.shown.as_str(), said.ended), ("", Ok(Outcome::Hooked(HookEvent::Stop))));
-    assert!(trail.shown.contains("\ns\t0\t1\tlive\t"), "{}", trail.shown);
-    Ok(())
-}
-
-#[test]
-fn a_stop_with_a_shell_still_running_passes_and_trails_it_as_live() -> Result<(), Failed> {
-    let home = Home::answered()?;
-    home.shell_task("b1.output", "building\n")?;
-    let replies = Replies::default();
-    let said = home.said(&["hook", "stop"], &home.stop(""), &replies);
-    let trail = home.said(&["stops"], "", &replies);
-    assert_eq!((said.shown.as_str(), said.ended), ("", Ok(Outcome::Hooked(HookEvent::Stop))));
-    assert!(trail.shown.contains("\ns\t1\t0\tlive\t"), "{}", trail.shown);
-    Ok(())
-}
-
-#[test]
-fn finished_tasks_and_files_that_are_not_tasks_leave_the_stop_stalled() -> Result<(), Failed> {
-    let home = Home::answered()?;
-    let ended = "{\"type\":\"assistant\",\"message\":{\"stop_reason\":\"end_turn\"}}\n";
-    home.shell_task("b1.output", &["x".repeat(1024), "\n[exited with code 0]\n".to_owned()].concat())?;
-    home.shell_task("b2.log", "building\n")?;
-    home.agent_task("agent-done.jsonl", &[ASKED, ended].concat(), QUIET)?;
-    home.agent_task("agent-done.meta.json", "{}\n", QUIET)?;
-    let said = home.said(&["hook", "stop"], &home.stop(""), &Replies::default());
-    assert_eq!(said.reason()?.as_deref(), Some(STALLED));
-    Ok(())
-}
-
-#[test]
-fn a_stop_without_a_transcript_sees_no_tasks_and_passes() -> Result<(), Failed> {
-    let home = Home::answered()?;
-    let said = home.said(&["hook", "stop"], "{\"stop_hook_active\":false}", &Replies::default());
-    assert_eq!((said.shown.as_str(), said.ended), ("", Ok(Outcome::Hooked(HookEvent::Stop))));
-    Ok(())
-}
-
-#[test]
-fn an_agent_quiet_for_twenty_minutes_is_reported_once_as_an_overrun() -> Result<(), Failed> {
-    let home = Home::answered()?;
-    home.agent_task("agent-hung.jsonl", ASKED, QUIET)?;
-    let replies = Replies::default();
-    let first = home.said(&["hook", "stop"], &home.stop(""), &replies);
-    let second = home.said(&["hook", "stop"], &home.stop(""), &replies);
-    assert_eq!(first.reason()?, Some(format!("{OVERRUN} agent-hung")));
-    assert_eq!(second.reason()?.as_deref(), Some(STALLED));
-    Ok(())
-}
-
-#[test]
-fn a_stop_quotes_the_earlier_owner_words_the_reading_agents_keep() -> Result<(), Failed> {
-    let home = Home::answered()?;
-    let replies = Replies::quoting(&format!("[{{\"uuid\": \"o1\", \"quote\": \"{OWNER}\"}}]"), "[1]");
-    let said = home.said(&["hook", "stop"], &home.asking(), &replies);
-    let quoted = format!("Earlier owner words bearing on this:\no1 2026-01-01T00:00:00Z: \"{OWNER}\"\n");
-    assert_eq!(said.reason()?, Some([STALLED, "\n", &quoted].concat()));
-    let prompts = replies.prompts();
-    assert_eq!(prompts.len(), 2);
-    assert!(prompts.iter().all(|prompt| prompt.contains(QUESTION)));
-    assert!(prompts.first().is_some_and(|prompt| prompt.contains(OWNER) && prompt.contains("[o1 ")));
-    assert!(prompts.get(1).is_some_and(|prompt| prompt.contains(&format!("1. o1 2026-01-01T00:00:00Z: \"{OWNER}\""))));
-    Ok(())
-}
-
-#[test]
-fn a_quote_the_owner_never_wrote_is_dropped_and_no_trimming_is_asked() -> Result<(), Failed> {
-    let home = Home::answered()?;
-    let replies = Replies::quoting("[{\"uuid\": \"o1\", \"quote\": \"Never said this.\"}]", "[1]");
-    let said = home.said(&["hook", "stop"], &home.asking(), &replies);
-    assert_eq!(said.reason()?.as_deref(), Some(STALLED));
-    assert_eq!(replies.prompts().len(), 1);
-    Ok(())
-}
-
-#[test]
-fn the_stops_trail_lists_each_stop_with_its_reading() -> Result<(), Failed> {
-    let home = Home::answered()?;
-    let replies = Replies::quoting(&format!("[{{\"uuid\": \"o1\", \"quote\": \"{OWNER}\"}}]"), "[1]");
-    home.said(&["hook", "stop"], &home.asking(), &replies);
-    let trail = home.said(&["stops"], "", &replies);
-    assert_eq!(trail.ended, Ok(Outcome::Trailed));
-    assert!(
-        trail.shown.contains(&format!("{TRAIL_HEADER}\ns\t0\t0\tstalled\t1\t1\t1\tblocked\t14\t{STEP}\n")),
-        "{}",
-        trail.shown
-    );
-    assert_eq!(trail.shown.matches('\n').count(), 2);
-    Ok(())
-}
-
-#[test]
-fn a_refused_reading_still_counts_its_tokens_in_the_trail() -> Result<(), Failed> {
-    let home = Home::answered()?;
-    let replies = Replies::refusing()?;
-    let said = home.said(&["hook", "stop"], &home.asking(), &replies);
-    let trail = home.said(&["stops"], "", &replies);
-    assert_eq!(said.reason()?.as_deref(), Some(STALLED));
-    assert_eq!(trail.shown, format!("{TRAIL_HEADER}\ns\t0\t0\tstalled\t1\t0\t0\tblocked\t7\t{STEP}\n"));
-    Ok(())
-}
-
-#[test]
-fn a_stop_without_its_last_message_reads_with_the_leads_stored_words() -> Result<(), Failed> {
-    let home = Home::answered()?;
-    let replies = Replies::quoting(&format!("[{{\"uuid\": \"o1\", \"quote\": \"{OWNER}\"}}]"), "[1]");
-    home.said(&["hook", "stop"], &home.stop(""), &replies);
-    let prompts = replies.prompts();
-    assert_eq!(prompts.len(), 2);
-    assert!(prompts.iter().all(|prompt| prompt.contains("Understood.")), "{prompts:?}");
-    Ok(())
-}
-
-#[test]
-fn an_ingest_after_the_transcript_grows_moves_the_cursor_once() -> Result<(), Failed> {
-    let home = Home::answered()?;
-    let replies = Replies::default();
-    home.said(&["ingest"], "", &replies);
-    let added = Home::line("user", "o2", "Ship it.");
-    home.appended(&added)?;
-    let grown = home.said(&["ingest"], "", &replies);
-    let settled = home.said(&["ingest"], "", &replies);
-    let read = Home::conversation().concat().len() + added.len();
-    assert_eq!(grown.shown, format!("session s read to {read}\nauthorship owner 1\nwritten 2\n"));
-    assert_eq!(settled.shown, "written 0\n");
-    Ok(())
-}
-
-#[test]
-fn words_the_cli_does_not_know_are_refused_with_the_usage() -> Result<(), Failed> {
-    let home = Home::new()?;
-    let usage = Failure::Usage.to_string();
-    for words in
-        [&["frobnicate"][..], &["hook"][..], &["hook", "stop", "--settings"][..], &["ingest", "--wet"][..], &[][..]]
-    {
-        let said = home.said(words, "", &Replies::default());
-        assert_eq!((said.shown.as_str(), said.ended), ("", Err(Refusal(usage.clone()))), "{words:?}");
+    const fn of(name: &'static str, setup: fn(&Home) -> Result<(), Failed>, steps: &'static [Step]) -> Scenario {
+        Scenario { name, setup, replies: || Ok(Replies::default()), steps }
     }
-    Ok(())
+
+    fn shown(&self) -> Result<String, Failed> {
+        let home = Home::answered()?;
+        let replies = (self.replies)()?;
+        (self.setup)(&home)?;
+        let ran: Vec<String> = self
+            .steps
+            .iter()
+            .map(|Step(words, input)| {
+                let given = match input {
+                    Input::Nothing => String::new(),
+                    Input::Grown => home.appended(&Home::line("user", "o2", "Ship it.")).map(|()| String::new())?,
+                    Input::Stop => home.stop(""),
+                    Input::Asking => home.asking(),
+                    Input::Text(text) => (*text).to_owned(),
+                };
+                let said = home.said(words, &given, &replies);
+                let stopped = said.ended == Ok(Outcome::Hooked(HookEvent::Stop));
+                Ok(format!("$ {} < {input:?}\n{}{:?} {stopped}\n", words.join(" "), said.shown, said.ended))
+            })
+            .collect::<Result<_, Failed>>()?;
+        let prompts: Vec<String> = replies
+            .prompts()
+            .iter()
+            .map(|prompt| {
+                let held = [QUESTION, OWNER, "Understood.", "[o1 ", "1. o1 2026-01-01T00:00:00Z: \""];
+                format!("prompt holds {:?}\n", held.map(|part| prompt.contains(part)))
+            })
+            .collect();
+        Ok(format!("## {}\n{}{}", self.name, ran.concat(), prompts.concat()))
+    }
 }
 
+impl Home {
+    fn wrote(&self, line: &str) -> Result<(), Failed> {
+        self.appended(line)
+    }
+
+    fn finished(&self) -> Result<(), Failed> {
+        let ended = "{\"type\":\"assistant\",\"message\":{\"stop_reason\":\"end_turn\"}}\n";
+        self.shell_task("b1.output", &["x".repeat(1024), "\n[exited with code 0]\n".to_owned()].concat())?;
+        self.shell_task("b2.log", "building\n")?;
+        self.agent_task("agent-done.jsonl", &[ASKED, ended].concat(), QUIET)?;
+        self.agent_task("agent-done.meta.json", "{}\n", QUIET)
+    }
+}
+
+const KEPT: fn() -> Result<Replies, Failed> =
+    || Ok(Replies::quoting(&format!("[{{\"uuid\": \"o1\", \"quote\": \"{OWNER}\"}}]"), "[1]"));
+
 #[test]
-fn a_stop_hook_that_cannot_read_its_input_fails() -> Result<(), Failed> {
-    let said = Home::answered()?.said(&["hook", "stop"], "not json", &Replies::default());
-    assert!(said.ended.is_err_and(|failure| failure.0.contains("cannot read the hook input: ")));
+fn every_scenario_says_what_its_golden_says() -> Result<(), Failed> {
+    let shown: String = Scenario::ALL.iter().map(Scenario::shown).collect::<Result<_, Failed>>()?;
+    let golden = Path::new(env!("CARGO_MANIFEST_DIR")).join(GOLDEN);
+    std::env::var_os("RECORD_GOLDENS").map_or(Ok(()), |_| fs::write(&golden, &shown))?;
+    assert_eq!(shown, fs::read_to_string(golden)?);
     Ok(())
 }
