@@ -74,7 +74,7 @@ impl<'ports, D: Dispatch, C: Clock> Watch<'ports, D, C> {
             .map(|_now| self.polled(&mut run))
             .find_map(Result::transpose)
             .unwrap_or(Ok(Watched::Stalled(Stall::Overdue)))?;
-        run.end()?;
+        drop(run);
         Ok(watched)
     }
 

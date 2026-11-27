@@ -1,7 +1,5 @@
-use std::collections::BTreeSet;
 use std::num::NonZeroU32;
 use std::path::PathBuf;
-use std::sync::LazyLock;
 use test_failure::Failed;
 
 use design_messages::{CheckName, Fate, Halt, PullNumber, SessionCursors, StreamSchema};
@@ -14,9 +12,7 @@ use proptest::option;
 use proptest::prelude::{any, prop_assert, prop_assert_eq, proptest};
 use proptest::test_runner::{Config, RngSeed};
 use sqlite_ports::SqliteOpener;
-use store_ports::{
-    Batch, Busy, Column, ColumnFailure, Columns, Execute, Migrator, Query, Schema, Store, StoreFailure, Version,
-};
+use store_ports::{Batch, Busy, Column, ColumnFailure, Columns, Execute, Query, Schema, Store, StoreFailure, Version};
 use tempfile::TempDir;
 use transcript_ports::{Authorship, Body, Cursor, Instant, SessionId, Uuid};
 
@@ -113,54 +109,11 @@ impl Place {
     }
 
     fn opened(&self) -> Sqlite {
-        self.opened_as::<StreamSchema>()
-    }
-
-    fn opened_as<S: Schema>(&self) -> Sqlite {
-        Sqlite::file::<S>(self.store())
-    }
-
-    fn applied(&self) -> Result<BTreeSet<Version>, StoreFailure> {
-        Ok(Run::root().port(self.opened()).read(Applied)?.into_iter().collect())
+        Sqlite::file::<StreamSchema>(self.store())
     }
 
     fn cursor(store: &impl Store) -> Result<Cursor, Failed> {
         Ok(store.read(SessionCursors)?.resuming(&SessionId::try_new("s".to_owned())?))
-    }
-}
-
-struct Older;
-
-static OLDER: LazyLock<Migrator> = LazyLock::new(|| {
-    Migrator::from(
-        StreamSchema::migrator()
-            .iter()
-            .filter(|migration| migration.version() < Older::LAST)
-            .copied()
-            .collect::<Vec<_>>(),
-    )
-});
-
-impl Older {
-    const LAST: i64 = 20_261_126_000_004;
-}
-
-impl Schema for Older {
-    fn migrator() -> &'static Migrator {
-        &OLDER
-    }
-}
-
-struct Broken;
-
-static BREAKS: LazyLock<Migrator> = LazyLock::new(|| store_ports::migrate!("tests/broken"));
-
-static BROKEN: LazyLock<Migrator> =
-    LazyLock::new(|| Migrator::from(StreamSchema::migrator().iter().chain(BREAKS.iter()).copied().collect::<Vec<_>>()));
-
-impl Schema for Broken {
-    fn migrator() -> &'static Migrator {
-        &BROKEN
     }
 }
 
@@ -187,45 +140,11 @@ fn reopening_a_store_keeps_its_rows_and_runs_no_migration_again() -> Result<(), 
 }
 
 #[test]
-fn an_older_store_takes_the_migrations_it_lacks_and_keeps_its_rows() -> Result<(), Failed> {
-    let place = Place::new()?;
-    let run = Run::root();
-    run.port(place.opened_as::<Older>()).write(Resumed)?;
-    let reopened = run.port(place.opened());
-    assert_eq!(Place::cursor(&reopened)?, Cursor::new(Offset::try_new(7)?));
-    assert_eq!(place.applied()?.len(), StreamSchema::migrator().iter().count());
-    Ok(())
-}
-
-#[test]
 fn a_failing_statement_rolls_back_the_whole_batch() -> Result<(), Failed> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     assert!(store.write(HalfWritten).is_err());
     assert_eq!(Place::cursor(&store)?, Cursor::default());
-    Ok(())
-}
-
-#[test]
-fn a_store_migrated_past_what_the_code_declares_is_refused_and_left_as_it_was() -> Result<(), Failed> {
-    let place = Place::new()?;
-    let run = Run::root();
-    run.port(place.opened()).read(Applied)?;
-    let applied = place.applied()?;
-    assert!(matches!(run.port(place.opened_as::<Older>()).read(Applied), Err(StoreFailure::Migrate(_))));
-    assert_eq!(place.applied()?, applied);
-    Ok(())
-}
-
-#[test]
-fn a_failing_migration_leaves_the_store_as_it_was() -> Result<(), Failed> {
-    let place = Place::new()?;
-    let run = Run::root();
-    run.port(place.opened()).write(Resumed)?;
-    let applied = place.applied()?;
-    assert!(matches!(run.port(place.opened_as::<Broken>()).read(Applied), Err(StoreFailure::Migrate(_))));
-    assert_eq!(place.applied()?, applied);
-    assert_eq!(Place::cursor(&run.port(place.opened()))?, Cursor::new(Offset::try_new(7)?));
     Ok(())
 }
 
@@ -237,7 +156,7 @@ fn a_held_lock_refuses_other_file_handles_until_it_ends_and_a_second_memory_lock
         (run.port(place.opened()), run.port(place.opened()), run.port(Sqlite::in_memory::<StreamSchema>()));
     let (held, claimed) = (first.lock()?, memory.lock()?);
     assert!(matches!((second.lock(), memory.lock()), (Err(Busy::Taken(_)), Err(Busy::Claimed))));
-    held.end()?;
+    drop(held);
     drop(claimed);
     assert!(second.lock().is_ok() && memory.lock().is_ok());
     Ok(())

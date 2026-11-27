@@ -13,10 +13,10 @@ doctest = false
 invariants = { path = "../invariants" }
 newtype = { path = "../newtype" }
 port-derive = { path = "../port-derive" }
-thiserror.workspace = true
 
 [dev-dependencies]
 design-messages = { path = "../design-messages" }
+dispatch-doubles = { path = "../dispatch-doubles" }
 dispatch-ports = { path = "../dispatch-ports" }
 fixture = { path = "../fixture" }
 serde.workspace = true

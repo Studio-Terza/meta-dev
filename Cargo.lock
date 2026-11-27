@@ -187,9 +187,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "dispatch-doubles"
+version = "0.1.0"
+dependencies = [
+ "dispatch-ports",
+ "invariants",
+ "newtype",
+ "port-core",
+ "serde",
+]
+
+[[package]]
 name = "dispatch-ports"
 version = "0.1.0"
 dependencies = [
+ "dispatch-doubles",
  "fixture",
  "grammar",
  "invariants",
@@ -494,6 +506,7 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 name = "newtype"
 version = "0.1.0"
 dependencies = [
+ "dispatch-doubles",
  "dispatch-ports",
  "file-ports",
  "fixture",
@@ -543,6 +556,7 @@ name = "port-core"
 version = "0.1.0"
 dependencies = [
  "design-messages",
+ "dispatch-doubles",
  "dispatch-ports",
  "fixture",
  "invariants",
@@ -551,7 +565,6 @@ dependencies = [
  "serde",
  "sqlite-ports",
  "store-ports",
- "thiserror",
 ]
 
 [[package]]

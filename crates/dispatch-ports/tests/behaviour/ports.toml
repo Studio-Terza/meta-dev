@@ -42,11 +42,6 @@ paces = [
     { pid = 7, reply = "conversational(a.0)", finishing = 8, oversleep = { after = 9, by = 200 } },
 ]
 
-[Watched.rung]
-start = 1800000000
-timeouts = [1, 8, 15, 64, 197]
-paces = [{ pid = 7, reply = "conversational(a.0)", finishing = 200, ringing = "Early" }]
-
 [Living.living]
 program = "sleep"
 arguments = ["30"]

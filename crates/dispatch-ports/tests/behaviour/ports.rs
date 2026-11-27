@@ -2,10 +2,10 @@ use std::os::unix::process::CommandExt;
 use std::process::Command;
 use std::time::{Duration, Instant};
 
+use dispatch_doubles::{Count, Oversleep, Scripted, Stepped};
 use dispatch_ports::{
-    Agent, AgentRun, Call, Clock, Count, Deadline, Dispatch, HeadlessClaude, Job, Model, Output, Oversleep, Pause, Pid,
-    Prompt, Reply, Ringing, Scripted, Shell, Started, Stderr, Stepped, SystemClock, SystemShell, Timeout, Wall, Watch,
-    clock_ops, dispatch_ops, shell_ops,
+    Agent, AgentRun, Call, Clock, Deadline, Dispatch, HeadlessClaude, Job, Model, Output, Pause, Pid, Prompt, Reply,
+    Shell, Started, Stderr, SystemClock, SystemShell, Timeout, Wall, Watch, clock_ops, dispatch_ops, shell_ops,
 };
 use fixture::{Cases, Debugged, Failed, Fixture, Spelled};
 use invariants::Ignoring;
@@ -40,8 +40,6 @@ struct Paced {
     reply: Reply,
     #[serde(default)]
     finishing: Option<Count>,
-    #[serde(default)]
-    ringing: Ringing,
 }
 
 #[derive(Fixture, Deserialize, Debug)]
@@ -126,13 +124,13 @@ fn every_watch_over_the_stepped_clock_ends_as_its_golden_says() -> Result<(), Fa
                 let ports = Run::root();
                 let watched = {
                     let clock = ports.port(stepped.clone());
-                    let scripted = Scripted::replying(paced.pid, paced.reply.clone(), paced.finishing, paced.ringing);
+                    let scripted = Scripted::replying(paced.pid, paced.reply.clone(), paced.finishing);
                     let dispatch = ports.port(scripted);
                     let deadline = Deadline::after(start, timeout);
                     let held = dispatch.dispatch(&Job::due_by(deadline, Model::Haiku), &Prompt::from(&paced.reply))?;
                     Watch::over(&dispatch, &clock).watched(held)?
                 };
-                let snapshot = ports.finish().settled()?;
+                let snapshot = ports.finish();
                 let calls = [
                     snapshot.calls::<dispatch_ops::Output>(),
                     snapshot.calls::<clock_ops::Waited>(),
@@ -184,7 +182,7 @@ fn an_agent_is_watched_to_the_reply_and_usage_it_prints_for_the_model_its_job_na
                     let held = echo.dispatch(&Job::due_by(deadline, *model), &Prompt::from(&prompt))?;
                     Watch::over(&echo, &clock).watched(held)?
                 };
-                ports.finish().settled()?;
+                ports.finish();
                 Ok((model, watched))
             })
             .collect::<Result<Vec<_>, Failed>>()?;
@@ -214,7 +212,7 @@ fn an_agent_that_leaves_a_large_prompt_unread_is_killed_and_reaped_at_its_deadli
                     let watched = Watch::over(&running, &clock).watched(held)?;
                     (watched, running.started(pid)?)
                 };
-                ports.finish().settled()?;
+                ports.finish();
                 Ok(ended)
             })
             .collect::<Result<Vec<_>, Failed>>()?;
@@ -240,13 +238,13 @@ fn a_bell_lapses_until_its_agent_finishes_and_then_rings() -> Result<(), Failed>
             let waited = clock.waited(pause, silent.bell());
             let began = Instant::now();
             let lapsed = (silent.bell().waited(quiet), began.elapsed() >= quiet);
-            silent.end()?;
+            drop(silent);
             let finished = speaking_agent.dispatch(&job, &Prompt::from(&prompt))?;
             let spoken = finished.bell().waited(quiet.saturating_mul(u32::from(u8::MAX)));
-            finished.end()?;
+            drop(finished);
             (waited, lapsed, spoken)
         };
-        ports.finish().settled()?;
+        ports.finish();
         Ok(Debugged((woke, stepped.waits())).to_string())
     })?;
     assert_eq!(drifted, Vec::new());
@@ -271,7 +269,7 @@ fn a_shell_call_returns_its_printing_and_whether_it_succeeded_failed_or_ran_past
                 })
                 .collect::<Result<Vec<_>, _>>()?
         };
-        let counted = ports.finish().settled()?.calls::<shell_ops::Ran>();
+        let counted = ports.finish().calls::<shell_ops::Ran>();
         Ok(Debugged((ran, counted)).to_string())
     })?;
     assert_eq!(drifted, Vec::new());

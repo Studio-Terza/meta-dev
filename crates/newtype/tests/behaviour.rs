@@ -1,6 +1,7 @@
 use std::{iter, mem};
 
-use dispatch_ports::{Count, Tokens, Told, Wall};
+use dispatch_doubles::Count;
+use dispatch_ports::{Tokens, Told, Wall};
 use file_ports::Offset;
 use fixture::{Cases, Debugged, Failed, Fixture, Properties};
 use grammar_spec_line::Attachment;

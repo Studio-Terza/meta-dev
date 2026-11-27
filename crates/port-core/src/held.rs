@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
@@ -12,9 +11,7 @@ pub trait Resource: Sized {
 }
 
 pub trait Release: Resource {
-    type Failure: Error + Send + Sync + 'static;
-
-    fn release(&mut self, pass: Pass<'_, Released<Self>>) -> Result<ReleaseReceipt, Self::Failure>;
+    fn release(&mut self, pass: Pass<'_, Released<Self>>) -> ReleaseReceipt;
 }
 
 #[derive(Debug)]
@@ -34,30 +31,16 @@ impl<R: Resource> Pass<'_, Released<R>> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Holding {
-    Held,
-    Released,
-}
-
 #[must_use = "a held resource is released when dropped"]
 #[derive(Debug)]
 pub struct Held<'run, R: Release> {
     resource: R,
-    holding: Holding,
     run: &'run Run,
 }
 
 impl<'run, R: Release> Held<'run, R> {
     pub(crate) fn acquired(resource: R, run: &'run Run) -> Self {
-        Held { resource, holding: Holding::Held, run }
-    }
-
-    pub fn end(mut self) -> Result<(), R::Failure> {
-        match std::mem::replace(&mut self.holding, Holding::Released) {
-            Holding::Held => self.run.released(&mut self.resource),
-            Holding::Released => Ok(()),
-        }
+        Held { resource, run }
     }
 }
 
@@ -75,36 +58,9 @@ impl<R: Release> DerefMut for Held<'_, R> {
     }
 }
 
-impl Run {
-    fn released<R: Release>(&self, resource: &mut R) -> Result<(), R::Failure> {
-        resource
-            .release(Pass::minted())
-            .map(|receipt| self.receipted(receipt))
-            .map_err(|failure| self.unreleased::<R>(failure))
-    }
-
-    fn receipted(&self, ReleaseReceipt(released): ReleaseReceipt) {
-        self.count(released);
-    }
-
-    fn unreleased<R: Release>(&self, failure: R::Failure) -> R::Failure {
-        self.count(R::RELEASE);
-        failure
-    }
-
-    fn dropped<R: Release>(&self, resource: &mut R) {
-        match self.released(resource) {
-            Ok(()) => (),
-            Err(failure) => self.fail(R::NAME, &failure),
-        }
-    }
-}
-
 impl<R: Release> Drop for Held<'_, R> {
     fn drop(&mut self) {
-        match std::mem::replace(&mut self.holding, Holding::Released) {
-            Holding::Held => self.run.dropped(&mut self.resource),
-            Holding::Released => (),
-        }
+        let ReleaseReceipt(released) = self.resource.release(Pass::minted());
+        self.run.count(released);
     }
 }

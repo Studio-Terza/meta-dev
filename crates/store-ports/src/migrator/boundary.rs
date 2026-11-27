@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::slice;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -32,11 +31,6 @@ impl Migration {
 impl Migrator {
     pub fn iter(&self) -> slice::Iter<'_, Migration> {
         self.migrations.iter()
-    }
-
-    pub fn undeclared(&self, applied: impl IntoIterator<Item = i64>) -> Option<i64> {
-        let declared: BTreeSet<i64> = self.migrations.iter().map(Migration::version).collect();
-        applied.into_iter().collect::<BTreeSet<i64>>().difference(&declared).next().copied()
     }
 }
 

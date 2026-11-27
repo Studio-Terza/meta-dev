@@ -29,10 +29,6 @@ pub enum Claim {
     Taken,
 }
 
-#[derive(Debug, thiserror::Error)]
-#[error("cannot unlock the store lock file: {0}")]
-pub struct Unlock(#[from] io::Error);
-
 impl StoreLock {
     pub fn filed(lock: PathBuf, open: impl FnOnce(&Path) -> io::Result<File>) -> Result<StoreLock, Busy> {
         open(&lock)
@@ -63,12 +59,10 @@ impl Claim {
 }
 
 impl Release for StoreLock {
-    type Failure = Unlock;
-
-    fn release(&mut self, pass: Pass<'_, Released<StoreLock>>) -> Result<ReleaseReceipt, Unlock> {
+    fn release(&mut self, pass: Pass<'_, Released<StoreLock>>) -> ReleaseReceipt {
         match &self.hold {
-            Hold::File(file) => file.unlock().map(|()| pass.released()).map_err(Unlock::from),
-            Hold::Memory(claim) => Ok(Claim::freed(claim, pass)),
+            Hold::File(_closed_when_dropped) => pass.released(),
+            Hold::Memory(claim) => Claim::freed(claim, pass),
         }
     }
 }

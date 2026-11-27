@@ -48,18 +48,17 @@ fn every_transcript_case_reads_as_its_golden_says() -> Result<(), Failed> {
                     .map(|session| Transcripts::read_from(&port, session, Cursor::default()))
                     .collect::<Result<Vec<Read>, _>>()?;
                 drop(port);
-                let measured = run.finish();
-                let calls = [measured.snapshot().calls::<Sessions>(), measured.snapshot().calls::<ReadFrom>()];
-                let settled = measured.settled().map_err(|failure| failure.to_string());
+                let snapshot = run.finish();
+                let calls = [snapshot.calls::<Sessions>(), snapshot.calls::<ReadFrom>()];
                 let stems: Vec<&SessionId> = sessions.iter().map(Session::stem).collect();
-                Ok(Debugged((stems, calls, settled, read)).to_string())
+                Ok(Debugged((stems, calls, snapshot, read)).to_string())
             }
             Check::Resumed => {
                 let reading = Run::root();
                 let disk = reading.port(Disk);
                 let session = disk.entries(&directory)?.into_iter().next().unwrap_or_default();
                 let whole = disk.read_text(&session)?.as_ref().to_owned();
-                reading.finish().settled()?;
+                reading.finish();
                 let read = |text: String, cursor: Cursor| -> Result<Read, Failed> {
                     let files: Memory = [(session.clone(), Bytes::from(&text))].into_iter().collect();
                     let run = Run::root();
@@ -68,7 +67,7 @@ fn every_transcript_case_reads_as_its_golden_says() -> Result<(), Failed> {
                     let found = sessions.first().ok_or_else(|| Failed::from(session.display()))?;
                     let read = Transcripts::read_from(&port, found, cursor)?;
                     drop(port);
-                    run.finish().settled()?;
+                    run.finish();
                     Ok(read)
                 };
                 let resumed = (usize::MIN..=whole.len())

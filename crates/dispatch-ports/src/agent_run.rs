@@ -4,7 +4,9 @@ use std::process::{Child, Command, Stdio};
 
 use port_core::{Pass, Release, ReleaseReceipt, Released, Resource};
 
-use crate::{Bell, Deadline, DispatchFailure, Output, Pid};
+use invariants::Ignoring;
+
+use crate::{Bell, Deadline, DispatchFailure, Ignored, Output, Pid};
 use boundary::Process;
 
 pub(crate) use boundary::Exchange;
@@ -50,22 +52,17 @@ impl AsRef<Deadline> for AgentRun {
 }
 
 impl Release for AgentRun {
-    type Failure = DispatchFailure;
-
-    fn release(&mut self, pass: Pass<'_, Released<AgentRun>>) -> Result<ReleaseReceipt, DispatchFailure> {
+    fn release(&mut self, pass: Pass<'_, Released<AgentRun>>) -> ReleaseReceipt {
         let group = self.pid.group();
-        self.process
-            .take()
-            .map(|mut process| {
-                Command::new(Pid::KILL)
-                    .args(Pid::SIGNAL)
-                    .stderr(Stdio::null())
-                    .arg(&group)
-                    .status()
-                    .and_then(|_signalled| process.child().wait())
-            })
-            .transpose()
-            .map(|_reaped| pass.released())
-            .map_err(DispatchFailure::Kill)
+        let reaped = self.process.take().map(|mut process| {
+            Command::new(Pid::KILL)
+                .args(Pid::SIGNAL)
+                .stderr(Stdio::null())
+                .arg(&group)
+                .status()
+                .and_then(|_signalled| process.child().wait())
+        });
+        reaped.transpose().ignoring(Ignored::Reaped);
+        pass.released()
     }
 }

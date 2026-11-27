@@ -11,8 +11,6 @@ pub(in super::super) struct Unexecuted(rusqlite::Error);
 pub(in super::super) enum Unmigrated {
     #[error("migration {0} was left partly applied")]
     Dirty(i64),
-    #[error("migration {0} is applied but the code does not declare it")]
-    Missing(i64),
     #[error("migration {0} was applied with different contents")]
     Mismatched(i64),
     #[error("{0}")]

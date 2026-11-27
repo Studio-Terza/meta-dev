@@ -46,9 +46,6 @@ CREATE TABLE IF NOT EXISTS _sqlx_migrations (
         declared: &Migrator,
         connection: &Connection,
     ) -> Result<BTreeSet<Version>, Unmigrated> {
-        declared
-            .undeclared(self.applied.keys().copied())
-            .map_or(Ok(()), |version| Err(Unmigrated::Missing(version)))?;
         let mut ordered: Vec<&Migration> = declared.iter().collect();
         ordered.sort_by_key(|migration| migration.version());
         ordered.into_iter().filter_map(|migration| self.pending(migration, connection).transpose()).collect()

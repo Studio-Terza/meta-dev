@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use console_ports::Shown;
-use port_core::{ReleaseFailures, Snapshot};
+use port_core::Snapshot;
 
 use super::failure::Failure;
 use crate::Outcome;
@@ -28,8 +28,8 @@ impl Uttered<Said> {
         Uttered::new(Shown::default(), ended)
     }
 
-    pub(crate) fn settled(self, released: Result<Snapshot, ReleaseFailures>) -> Uttered<Settled> {
-        Uttered { shown: self.shown, ended: Failure::settled(self.ended, released), state: PhantomData }
+    pub(crate) fn settled(self, _finished: Snapshot) -> Uttered<Settled> {
+        Uttered { shown: self.shown, ended: self.ended, state: PhantomData }
     }
 }
 

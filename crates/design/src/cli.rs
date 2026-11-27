@@ -58,7 +58,7 @@ impl<'environment, E: Environment, F: FilesFiller, O, H, C: ClockFiller, G: Shel
     {
         let run = Run::root();
         let uttered = self.report(&run, arguments);
-        uttered.settled(run.finish().settled())
+        uttered.settled(run.finish())
     }
 
     pub(crate) fn report<D: DispatchFiller>(self, run: &Run, arguments: impl Iterator<Item = OsString>) -> Uttered

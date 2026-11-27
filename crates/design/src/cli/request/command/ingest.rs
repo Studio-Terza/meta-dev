@@ -52,7 +52,7 @@ impl<'ports, T: Transcripts, S: Store> Ingest<'ports, T, S> {
             })
             .map(|(session, cursor)| ingest.session(session, cursor))
             .collect::<Result<Vec<_>, Failure>>()?;
-        lock.end()?;
+        drop(lock);
         Ok(Tally::counted(ingested))
     }
 

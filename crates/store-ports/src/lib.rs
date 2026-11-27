@@ -28,7 +28,7 @@ pub use record::{Created, Record};
 pub use schema::Schema;
 pub use store::{Store, StoreFiller, store_ops};
 pub use store_failure::StoreFailure;
-pub use store_lock::{Claim, StoreLock, Unlock};
+pub use store_lock::{Claim, StoreLock};
 pub use store_ports_macros::{Columns, Record, migrate, query};
 pub use value::{Argument, Bind, FromValue, IntoArgument, Value};
 pub use written::{Done, Written};

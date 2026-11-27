@@ -84,7 +84,7 @@ impl Checks {
         assert_eq!(contract.not_text(), "failed");
         assert_eq!(contract.canonical_file()?.file_name(), Some(std::ffi::OsStr::new("here.txt")));
         Batches::on(&files, root)?;
-        run.finish().settled()?;
+        run.finish();
         Ok(())
     }
 }
@@ -107,7 +107,7 @@ fn memory_starts_from_its_entries() -> Result<(), Failed> {
     assert_eq!(memory.read_text(Path::new("/a/b.txt"))?, Text::new("b".to_owned()));
     memory.write(Path::new("top.txt"), Bytes::from("top"))?;
     assert_eq!(memory.kind(Path::new("top.txt")), Kind::File);
-    run.finish().settled()?;
+    run.finish();
     Ok(())
 }
 
@@ -121,7 +121,7 @@ fn disk_names_a_link() -> Result<(), Failed> {
     let link = scratch.path().join("link");
     std::os::unix::fs::symlink(&target, &link)?;
     assert_eq!(disk.kind(&link), Kind::Link);
-    run.finish().settled()?;
+    run.finish();
     Ok(())
 }
 
@@ -178,7 +178,7 @@ fn disk_stamps_each_file_with_the_time_it_was_written_and_misses_an_absent_one()
     let dated =
         |stamps: &Stamps| [Stamp::Born, Stamp::Touched].map(|stamp| stamps.dated(stamp).into_inner() > WRITTEN_AFTER);
     assert!(matches!(stamped.as_slice(), [Ok(stamps), Err(FileFailure::Missing(_))] if dated(stamps) == [true, true]));
-    run.finish().settled()?;
+    run.finish();
     Ok(())
 }
 
@@ -208,6 +208,6 @@ fn read_from_returns_the_bytes_after_the_offset_alike_on_disk_and_in_memory() ->
         .collect();
     assert_eq!(tails, wanted);
     drop(memory);
-    run.finish().settled()?;
+    run.finish();
     Ok(())
 }

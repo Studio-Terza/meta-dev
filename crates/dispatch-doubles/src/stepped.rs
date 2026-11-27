@@ -5,7 +5,9 @@ use invariants::Unpoisoned;
 use port_core::Pass;
 use serde::Deserialize;
 
-use crate::{Bell, ClockFiller, Count, Moment, Pause, Wall, Woke, clock_ops};
+use dispatch_ports::{Bell, ClockFiller, Moment, Pause, Wall, Woke, clock_ops};
+
+use crate::Count;
 
 #[derive(Clone, Debug)]
 pub struct Stepped {
