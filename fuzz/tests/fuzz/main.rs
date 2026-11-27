@@ -40,13 +40,10 @@ proptest! {
             .map(|directory| directory.join(&table))
             .find(|candidate| candidate.is_file())
             .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-        let rows: Vec<Vec<String>> = serde_json::from_slice(&std::fs::read(found)?)
+        let (manifest_at, manifest_from): (PathBuf, PathBuf) = serde_json::from_slice(&std::fs::read(found)?)
             .map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-        let Some([manifest_at, manifest_from]) = rows.first().map(Vec::as_slice) else {
-            return Err(TestCaseError::fail(io::Error::from(io::ErrorKind::InvalidData).to_string()));
-        };
         let files: Memory = [
-            (PathBuf::from(manifest_at), Bytes::new(std::fs::read(manifest_from)?)),
+            (manifest_at, Bytes::new(std::fs::read(manifest_from)?)),
             (PathBuf::from(place), Bytes::new(bytes)),
         ]
         .into_iter()

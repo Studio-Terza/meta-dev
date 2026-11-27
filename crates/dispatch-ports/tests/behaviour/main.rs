@@ -35,10 +35,10 @@ fn each_envelope_reads_as_its_reply_and_usage_or_its_stall() -> Result<(), Faile
     let bytes = fs::read(found)?;
     let mut rows = serde_json::Deserializer::from_slice(&bytes);
     let (fixture, golden) = <(PathBuf, PathBuf)>::deserialize(&mut rows)?;
-    let texts: Vec<String> = serde_json::from_slice(&fs::read(fixture)?)?;
-    let read: Vec<Result<(Reply, Vec<Tokens>), String>> = texts
-        .iter()
-        .map(|text| match Watched::from(Output::read(text, Stderr::Silent)) {
+    let outputs: Vec<Output> = serde_json::from_slice(&fs::read(fixture)?)?;
+    let read: Vec<Result<(Reply, Vec<Tokens>), String>> = outputs
+        .into_iter()
+        .map(|output| match Watched::from(output) {
             Watched::Finished(finished) => Ok((finished.reply().clone(), finished.usage().spent().to_vec())),
             Watched::Stalled(stall) => Err(stall.to_string()),
         })
