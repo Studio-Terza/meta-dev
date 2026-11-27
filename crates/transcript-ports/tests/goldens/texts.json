@@ -1,0 +1,12 @@
+[
+  [{"Err": "an identifier or timestamp is blank"}, {"Err": "an identifier or timestamp is blank"}, {"Err": "an identifier or timestamp is blank"}, {"Ok": ""}, {"Err": "\"\" names neither the owner nor the lead"}],
+  [{"Ok": "2026-01-01T00:00:01Z"}, {"Ok": "2026-01-01T00:00:01Z"}, {"Ok": "2026-01-01T00:00:01Z"}, {"Ok": "2026-01-01T00:00:01Z"}, {"Err": "\"2026-01-01T00:00:01Z\" names neither the owner nor the lead"}],
+  [{"Ok": "summary"}, {"Ok": "summary"}, {"Ok": "summary"}, {"Ok": "summary"}, {"Err": "\"summary\" names neither the owner nor the lead"}],
+  [{"Ok": "s1"}, {"Ok": "s1"}, {"Ok": "s1"}, {"Ok": "s1"}, {"Err": "\"s1\" names neither the owner nor the lead"}],
+  [{"Ok": "said plainly"}, {"Ok": "said plainly"}, {"Ok": "said plainly"}, {"Ok": "said plainly"}, {"Err": "\"said plainly\" names neither the owner nor the lead"}],
+  [{"Ok": "Owner"}, {"Ok": "Owner"}, {"Ok": "Owner"}, {"Ok": "Owner"}, {"Err": "\"Owner\" names neither the owner nor the lead"}],
+  [{"Ok": "Lead"}, {"Ok": "Lead"}, {"Ok": "Lead"}, {"Ok": "Lead"}, {"Err": "\"Lead\" names neither the owner nor the lead"}],
+  [{"Ok": "owner"}, {"Ok": "owner"}, {"Ok": "owner"}, {"Ok": "owner"}, {"Ok": "owner"}],
+  [{"Ok": "lead"}, {"Ok": "lead"}, {"Ok": "lead"}, {"Ok": "lead"}, {"Ok": "lead"}],
+  [{"Ok": "human"}, {"Ok": "human"}, {"Ok": "human"}, {"Ok": "human"}, {"Err": "\"human\" names neither the owner nor the lead"}]
+]

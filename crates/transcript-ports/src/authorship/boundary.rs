@@ -1,8 +1,10 @@
 use newtype::Spelled;
+use serde::Deserialize;
 use strum::{Display, EnumString};
 
-#[derive(Spelled, Display, EnumString, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Spelled, Display, EnumString, Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[strum(serialize_all = "snake_case", parse_err_ty = Unvoiced, parse_err_fn = Unvoiced::from)]
+#[serde(rename_all = "snake_case")]
 pub enum Authorship {
     Owner,
     Lead,

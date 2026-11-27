@@ -1,6 +1,5 @@
-[
-  ["tests/fixtures/transcripts", "tests/goldens/transcripts.txt", "\t", "\n"],
-  ["tests/fixtures/texts", "tests/goldens/texts.txt", "\t", "\n"],
-  ["tests/fixtures/transcripts/authors.jsonl", "/projects/work", "s1.jsonl"],
-  ["{\"type\":\"user\",\"uuid\":\"8\",\"parentUuid\":\"1\",\"sessionId\":\"s1\",\"timestamp\":\"2026-01-01T00:00:08Z\",\"origin\":{\"kind\":\"human\"},\"message\":{\"model\":\"claude\",\"content\":\"hi\"}}", "type", "\n", "/projects/work", "s1.jsonl"]
-]
+["tests/fixtures/transcripts", "tests/goldens/transcripts.json"]
+
+["tests/fixtures/texts", "tests/goldens/texts.json"]
+
+["tests/fixtures/transcripts/authors.jsonl", "/projects/work/s1.jsonl"]

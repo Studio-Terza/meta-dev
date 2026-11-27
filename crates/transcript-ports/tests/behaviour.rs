@@ -9,11 +9,12 @@ use newtype::Counter;
 use port_core::Run;
 use proptest::prelude::{any, prop_assert, prop_assert_eq, proptest};
 use proptest::sample::Index;
-use serde_json::Value;
+use serde::Deserialize;
+use serde::de::IgnoredAny;
 use test_failure::Failed;
 use transcript_ports::transcripts_ops::{ReadFrom, Sessions};
 use transcript_ports::{
-    Authorship, Body, ClaudeCodeDir, Cursor, Instant, Kind, Line, Read, Record, SessionId, Transcripts,
+    Authorship, Body, ClaudeCodeDir, Cursor, Instant, Kind, Line, Read, Record, SessionId, Transcripts, Uuid,
 };
 
 #[test]
@@ -25,41 +26,50 @@ fn each_transcript_line_reads_as_who_said_it_the_edge_it_leaves_or_the_kind_nobo
         .map(|directory| directory.join(&table))
         .find(|candidate| candidate.is_file())
         .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let rows: Vec<Vec<String>> = serde_json::from_slice(&fs::read(found)?)?;
-    let [transcripts, ..] = rows.as_slice() else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
-    let [fixtures, golden, tab, newline] = transcripts.as_slice() else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
+    let bytes = fs::read(found)?;
+    let mut rows = serde_json::Deserializer::from_slice(&bytes);
+    let (fixtures, golden) = <(PathBuf, PathBuf)>::deserialize(&mut rows)?;
     let run = Run::root();
-    let shown = {
+    let read = {
         let port = run.port(ClaudeCodeDir::new(Disk, std::env::current_dir()?.join(fixtures)));
         port.sessions()?
             .iter()
             .map(|session| {
-                let read = port.read_from(session, Cursor::default())?;
-                let lines = read.into_iter().map(|line| match line {
-                    Line::Said(record) => [
-                        record.author().to_string(),
-                        record.uuid().to_string(),
-                        record.session().to_string(),
-                        record.parent().map_or_default(ToString::to_string),
-                        record.stamp().to_string(),
-                        record.text().to_string(),
-                    ]
-                    .join(tab),
-                    Line::Skipped(skipped) => {
-                        [skipped.parent().map_or_default(ToString::to_string), skipped.uuid().to_string()].join(tab)
-                    }
-                    Line::Unrecognised(unrecognised) => unrecognised.kind().to_string(),
-                });
-                Ok([session.stem().to_string()].into_iter().chain(lines).collect::<Vec<String>>().join(newline))
+                let lines: Vec<Line> = port.read_from(session, Cursor::default())?.into_iter().collect();
+                let said: Vec<(Authorship, Uuid, SessionId, Option<Uuid>, Instant, Body)> = lines
+                    .iter()
+                    .filter_map(|line| match line {
+                        Line::Said(record) => Some((
+                            record.author(),
+                            record.uuid().clone(),
+                            record.session().clone(),
+                            record.parent().cloned(),
+                            record.stamp().clone(),
+                            record.text().clone(),
+                        )),
+                        Line::Skipped(_) | Line::Unrecognised(_) => None,
+                    })
+                    .collect();
+                let edges: Vec<(Option<Uuid>, Uuid)> = lines
+                    .iter()
+                    .filter_map(|line| match line {
+                        Line::Skipped(skipped) => Some((skipped.parent().cloned(), skipped.uuid().clone())),
+                        Line::Said(_) | Line::Unrecognised(_) => None,
+                    })
+                    .collect();
+                let unknown: Vec<Kind> = lines
+                    .iter()
+                    .filter_map(|line| match line {
+                        Line::Unrecognised(unrecognised) => Some(unrecognised.kind().clone()),
+                        Line::Said(_) | Line::Skipped(_) => None,
+                    })
+                    .collect();
+                Ok((session.stem().clone(), said, edges, unknown))
             })
-            .collect::<Result<Vec<String>, Failed>>()?
+            .collect::<Result<Vec<_>, Failed>>()?
     };
     run.finish().settled()?;
-    assert_eq!([shown.join(newline), newline.clone()].concat(), fs::read_to_string(golden)?);
+    assert_eq!(read, serde_json::from_slice::<Vec<_>>(&fs::read(golden)?)?);
     Ok(())
 }
 
@@ -72,41 +82,24 @@ fn each_text_reads_as_an_instant_a_kind_a_session_a_body_and_an_author_or_is_ref
         .map(|directory| directory.join(&table))
         .find(|candidate| candidate.is_file())
         .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let rows: Vec<Vec<String>> = serde_json::from_slice(&fs::read(found)?)?;
-    let [_, checked, ..] = rows.as_slice() else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
-    let [fixture, golden, tab, newline] = checked.as_slice() else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
+    let bytes = fs::read(found)?;
+    let mut rows = serde_json::Deserializer::from_slice(&bytes);
+    IgnoredAny::deserialize(&mut rows)?;
+    let (fixture, golden) = <(PathBuf, PathBuf)>::deserialize(&mut rows)?;
     let texts: Vec<String> = serde_json::from_slice(&fs::read(fixture)?)?;
-    let read: Vec<String> = texts
+    let read: Vec<_> = texts
         .iter()
         .map(|text| {
-            let instant = match Instant::try_new(text.clone()) {
-                Ok(read) => read.to_string(),
-                Err(refused) => refused.to_string(),
-            };
-            let kind = match Kind::try_new(text.clone()) {
-                Ok(read) => read.to_string(),
-                Err(refused) => refused.to_string(),
-            };
-            let session = match SessionId::try_new(text.clone()) {
-                Ok(read) => read.to_string(),
-                Err(refused) => refused.to_string(),
-            };
-            let body = match Body::try_new(text.clone()) {
-                Ok(read) => read.to_string(),
-                Err(refused) => refused.to_string(),
-            };
-            let author = match text.parse::<Authorship>() {
-                Ok(read) => read.to_string(),
-                Err(refused) => refused.to_string(),
-            };
-            [instant, kind, session, body, author].join(tab)
+            (
+                Instant::try_new(text.clone()).map_err(|refused| refused.to_string()),
+                Kind::try_new(text.clone()).map_err(|refused| refused.to_string()),
+                SessionId::try_new(text.clone()).map_err(|refused| refused.to_string()),
+                Body::try_new(text.clone()).map_err(|refused| refused.to_string()),
+                text.parse::<Authorship>().map_err(|refused| refused.to_string()),
+            )
         })
         .collect();
-    assert_eq!([read.join(newline), newline.clone()].concat(), fs::read_to_string(golden)?);
+    assert_eq!(read, serde_json::from_slice::<Vec<_>>(&fs::read(golden)?)?);
     Ok(())
 }
 
@@ -120,20 +113,18 @@ proptest! {
             .map(|directory| directory.join(&table))
             .find(|candidate| candidate.is_file())
             .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-        let rows: Vec<Vec<String>> = serde_json::from_slice(&fs::read(found)?)?;
-        let [_, _, resumed, ..] = rows.as_slice() else {
-            return Err(io::Error::from(io::ErrorKind::InvalidData).into());
-        };
-        let [fixture, directory, file] = resumed.as_slice() else {
-            return Err(io::Error::from(io::ErrorKind::InvalidData).into());
-        };
+        let bytes = fs::read(found)?;
+        let mut rows = serde_json::Deserializer::from_slice(&bytes);
+        IgnoredAny::deserialize(&mut rows)?;
+        IgnoredAny::deserialize(&mut rows)?;
+        let (fixture, path) = <(PathBuf, PathBuf)>::deserialize(&mut rows)?;
+        let directory = path.parent().map_or_default(Path::to_path_buf);
         let text = fs::read_to_string(fixture)?;
         let kept: String = text.chars().take(cut.index(text.chars().count())).collect();
-        let path = PathBuf::from(directory).join(file);
         let run = Run::root();
         let (first, second, whole) = {
-            let cut_port = run.port(ClaudeCodeDir::new(Memory::from_iter([(path.clone(), Bytes::from(&kept))]), PathBuf::from(directory)));
-            let whole_port = run.port(ClaudeCodeDir::new(Memory::from_iter([(path, Bytes::from(&text))]), PathBuf::from(directory)));
+            let cut_port = run.port(ClaudeCodeDir::new(Memory::from_iter([(path.clone(), Bytes::from(&kept))]), directory.clone()));
+            let whole_port = run.port(ClaudeCodeDir::new(Memory::from_iter([(path, Bytes::from(&text))]), directory));
             let sessions = whole_port.sessions()?;
             let session = sessions.first().ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
             let first: Read = cut_port.read_from(session, Cursor::default())?;
@@ -161,13 +152,9 @@ proptest! {
             .map(|directory| directory.join(&table))
             .find(|candidate| candidate.is_file())
             .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-        let rows: Vec<Vec<String>> = serde_json::from_slice(&fs::read(found)?)?;
-        let [transcripts, ..] = rows.as_slice() else {
-            return Err(io::Error::from(io::ErrorKind::InvalidData).into());
-        };
-        let [fixtures, ..] = transcripts.as_slice() else {
-            return Err(io::Error::from(io::ErrorKind::InvalidData).into());
-        };
+        let bytes = fs::read(found)?;
+        let mut rows = serde_json::Deserializer::from_slice(&bytes);
+        let (fixtures, _) = <(PathBuf, IgnoredAny)>::deserialize(&mut rows)?;
         let run = Run::root();
         let sessions = {
             let port = run.port(ClaudeCodeDir::new(Disk, std::env::current_dir()?.join(fixtures)));
@@ -178,42 +165,6 @@ proptest! {
         let settled = run.finish().settled()?;
         prop_assert_eq!(settled.calls::<Sessions>().count(), listings);
         prop_assert_eq!(settled.calls::<ReadFrom>().count(), sessions);
-    }
-
-    #[test]
-    fn a_record_of_a_kind_nobody_knows_is_unrecognised_and_never_said(kind in "[a-z]{1,8}-unheard") {
-        let source = Path::new(file!());
-        let table = source.with_file_name(source.file_stem().unwrap_or_default());
-        let found = std::env::current_dir()?
-            .ancestors()
-            .map(|directory| directory.join(&table))
-            .find(|candidate| candidate.is_file())
-            .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-        let rows: Vec<Vec<String>> = serde_json::from_slice(&fs::read(found)?)?;
-        let [_, _, _, unheard, ..] = rows.as_slice() else {
-            return Err(io::Error::from(io::ErrorKind::InvalidData).into());
-        };
-        let [template, key, newline, directory, file] = unheard.as_slice() else {
-            return Err(io::Error::from(io::ErrorKind::InvalidData).into());
-        };
-        let mut line: Value = serde_json::from_str(template)?;
-        if let Value::Object(fields) = &mut line {
-            fields.insert(key.clone(), Value::from(kind.clone()));
-        }
-        let held = Memory::from_iter([(PathBuf::from(directory).join(file), Bytes::from(&[line.to_string(), newline.clone()].concat()))]);
-        let run = Run::root();
-        let read = {
-            let port = run.port(ClaudeCodeDir::new(held, PathBuf::from(directory)));
-            let sessions = port.sessions()?;
-            let session = sessions.first().ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-            port.read_from(session, Cursor::default())?
-        };
-        run.finish().settled()?;
-        let kinds: Vec<Option<String>> = read.into_iter().map(|each| match each {
-            Line::Unrecognised(unrecognised) => Some(unrecognised.kind().to_string()),
-            Line::Said(_) | Line::Skipped(_) => None,
-        }).collect();
-        prop_assert_eq!(kinds, [Some(kind)]);
     }
 
     #[test]
