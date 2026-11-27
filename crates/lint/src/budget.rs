@@ -1,12 +1,12 @@
 use std::fmt;
 use std::ops::Add;
 
-use syn::ItemMod;
 use syn::spanned::Spanned;
-use syn::visit::{self, Visit};
+use syn::{ItemMod, Macro};
 
 use crate::gate::Gate;
 use crate::source::{Place, Source};
+use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Budget {
@@ -14,8 +14,8 @@ pub(crate) struct Budget {
     test_lines: usize,
 }
 
-#[derive(Debug, Default)]
-struct TestScan {
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct TestScan {
     test_lines: usize,
     gated: usize,
 }
@@ -27,9 +27,7 @@ impl Budget {
     const PERCENT_OF_LINES: usize = 18;
     const WHOLE: usize = 100;
 
-    pub(crate) fn of_file(source: &Source, file: &syn::File, gate: Gate) -> Budget {
-        let mut scan = TestScan::default();
-        scan.visit_file(file);
+    pub(crate) fn of_file(source: &Source, scan: TestScan, gate: Gate) -> Budget {
         let lines = source.text().bytes().filter(|byte| *byte == b'\n').count();
         let shipped = gate.entered().filter(|()| source.place() == Place::Shipped);
         Budget { lines, test_lines: shipped.map_or(lines, |()| scan.test_lines) }
@@ -40,19 +38,24 @@ impl Budget {
     }
 }
 
-impl<'ast> Visit<'ast> for TestScan {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        match Gate::of(&module.attrs) {
-            Gate::Entered => visit::visit_item_mod(self, module),
-            Gate::Skipped => {
-                let span = module.span();
-                let outermost = (self.gated == 0).then(|| span.end().line - span.start().line + 1);
-                self.test_lines += outermost.unwrap_or_default();
-                self.gated += 1;
-                visit::visit_item_mod(self, module);
-                self.gated -= 1;
-            }
-        }
+impl Hooks for TestScan {
+    fn item_mod(&mut self, module: &ItemMod) -> Descent {
+        let skipped = Gate::of(&module.attrs).entered().xor(Some(()));
+        skipped.map_or_default(|()| {
+            let span = module.span();
+            let outermost = (self.gated == 0).then(|| span.end().line - span.start().line + 1);
+            self.test_lines += outermost.unwrap_or_default();
+            self.gated += 1;
+        });
+        Descent::Into
+    }
+
+    fn left_item_mod(&mut self, module: &ItemMod) {
+        self.gated -= usize::from(Gate::of(&module.attrs) == Gate::Skipped);
+    }
+
+    fn macro_called(&mut self, _: &Macro) -> Expanded {
+        Expanded::Nothing
     }
 }
 

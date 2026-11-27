@@ -1,10 +1,10 @@
-use syn::visit::{self, Visit};
 use syn::{Attribute, ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, ReturnType, Signature, TraitItemFn, Type};
 
 use crate::finding::{Found, Rule};
 use crate::gate::Gate;
 use crate::source::Source;
 use crate::style::{Reads, Style};
+use crate::walk::{Descent, Hooks};
 
 #[derive(Debug, Default)]
 pub(crate) struct BoolMethods {
@@ -31,30 +31,29 @@ impl BoolMethods {
     }
 }
 
-impl<'ast> Visit<'ast> for BoolMethods {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Gate::of(&module.attrs).entered().map_or_default(|()| visit::visit_item_mod(self, module));
+impl Hooks for BoolMethods {
+    fn item_mod(&mut self, module: &ItemMod) -> Descent {
+        Descent::from(Gate::of(&module.attrs).entered())
     }
 
-    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        let walked = Gate::inherent(item).and(Gate::of(&item.attrs));
-        walked.entered().map_or_default(|()| visit::visit_item_impl(self, item));
+    fn item_impl(&mut self, item: &ItemImpl) -> Descent {
+        Descent::from(Gate::inherent(item).and(Gate::of(&item.attrs)).entered())
     }
 
-    fn visit_item_trait(&mut self, item: &'ast ItemTrait) {
-        Gate::of(&item.attrs).entered().map_or_default(|()| visit::visit_item_trait(self, item));
+    fn item_trait(&mut self, item: &ItemTrait) -> Descent {
+        Descent::from(Gate::of(&item.attrs).entered())
     }
 
-    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        self.opened(&function.attrs, &function.sig).map_or_default(|()| visit::visit_item_fn(self, function));
+    fn item_fn(&mut self, function: &ItemFn) -> Descent {
+        Descent::from(self.opened(&function.attrs, &function.sig))
     }
 
-    fn visit_impl_item_fn(&mut self, function: &'ast ImplItemFn) {
-        self.opened(&function.attrs, &function.sig).map_or_default(|()| visit::visit_impl_item_fn(self, function));
+    fn impl_item_fn(&mut self, function: &ImplItemFn) -> Descent {
+        Descent::from(self.opened(&function.attrs, &function.sig))
     }
 
-    fn visit_trait_item_fn(&mut self, function: &'ast TraitItemFn) {
-        self.opened(&function.attrs, &function.sig).map_or_default(|()| visit::visit_trait_item_fn(self, function));
+    fn trait_item_fn(&mut self, function: &TraitItemFn) -> Descent {
+        Descent::from(self.opened(&function.attrs, &function.sig))
     }
 }
 

@@ -136,9 +136,9 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
         let children: Vec<Result<Module, Failure>> =
             declared.iter().map(|declaration| self.child(module, declaration)).collect();
         let gate = module.gate;
-        let linted = gate.entered().map_or_default(|()| Lints::linted(source, file, self.timer, &mut spent));
-        let budget = spent.timed(self.timer, Stage::Budget, || Budget::of_file(source, file, gate));
-        let here = Read { failures: Vec::new(), findings: linted.found, facts: linted.facts, budget, spent };
+        let linted = spent.timed(self.timer, Stage::Visit, || Lints::linted(source, file, gate));
+        let here =
+            Read { failures: Vec::new(), findings: linted.found, facts: linted.facts, budget: linted.budget, spent };
         let below = children
             .into_par_iter()
             .map(|child| match child {

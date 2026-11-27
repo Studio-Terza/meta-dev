@@ -22,20 +22,17 @@ impl SystemShell {
     const POLL: Duration = Duration::from_millis(50);
 
     fn waited(child: &mut Child, deadline: Deadline) -> Result<Waited, DispatchFailure> {
-        iter::repeat_with(|| SystemShell::checked(child, deadline))
-            .find_map(Result::transpose)
+        iter::repeat_with(|| Wall::from(SystemTime::now()))
+            .take_while(|now| deadline.due(*now) == Due::Pending)
+            .find_map(|_| SystemShell::checked(child).transpose())
             .unwrap_or(Ok(Waited::Overdue))
     }
 
-    fn checked(child: &mut Child, deadline: Deadline) -> Result<Option<Waited>, DispatchFailure> {
+    fn checked(child: &mut Child) -> Result<Option<Waited>, DispatchFailure> {
         let exited = child.try_wait().map_err(DispatchFailure::Collect)?;
-        let due = deadline.due(Wall::from(SystemTime::now()));
-        Ok(exited.map(Waited::Exited).or_else(|| match due {
-            Due::Passed => Some(Waited::Overdue),
-            Due::Pending => {
-                thread::sleep(SystemShell::POLL);
-                None
-            }
+        Ok(exited.map(Waited::Exited).or_else(|| {
+            thread::sleep(SystemShell::POLL);
+            None
         }))
     }
 

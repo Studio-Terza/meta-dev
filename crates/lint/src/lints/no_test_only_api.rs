@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
 use proc_macro2::{TokenStream, TokenTree};
-use syn::visit::{self, Visit};
 use syn::{Attribute, Field, ImplItem, Item, ItemImpl, ItemMod, Lit, Macro, Meta, Visibility};
 
 use crate::finding::{Finding, Found, Rule};
 use crate::gate::Gate;
 use crate::graph::Graph;
 use crate::source::{Place, Source};
+use crate::walk::{Descent, Expanded, Hooks};
 use crate::workspace::Package;
 
 #[derive(Debug)]
@@ -108,8 +108,8 @@ impl NoTestOnlyApi<'_> {
     }
 }
 
-impl<'ast> Visit<'ast> for NoTestOnlyApi<'_> {
-    fn visit_item(&mut self, item: &'ast Item) {
+impl Hooks for NoTestOnlyApi<'_> {
+    fn item(&mut self, item: &Item) -> Descent {
         let head = match item {
             Item::Const(constant) => Some((&constant.attrs, &constant.vis)),
             Item::Enum(enumeration) => Some((&enumeration.attrs, &enumeration.vis)),
@@ -124,16 +124,19 @@ impl<'ast> Visit<'ast> for NoTestOnlyApi<'_> {
             _ => None,
         };
         head.map_or_default(|(attributes, visibility)| self.hidden(attributes, None, visibility));
-        visit::visit_item(self, item);
+        Descent::Into
     }
 
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
+    fn item_mod(&mut self, module: &ItemMod) -> Descent {
         self.gates.push(Gate::of(&module.attrs));
-        visit::visit_item_mod(self, module);
+        Descent::Into
+    }
+
+    fn left_item_mod(&mut self, _: &ItemMod) {
         self.gates.pop();
     }
 
-    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
+    fn item_impl(&mut self, item: &ItemImpl) -> Descent {
         let enclosing = Hidden::of(&item.attrs);
         item.items.iter().for_each(|member| {
             let head = match member {
@@ -144,34 +147,33 @@ impl<'ast> Visit<'ast> for NoTestOnlyApi<'_> {
             };
             head.map_or_default(|(attributes, visibility)| self.hidden(attributes, enclosing, visibility));
         });
-        visit::visit_item_impl(self, item);
+        Descent::Into
     }
 
-    fn visit_field(&mut self, field: &'ast Field) {
+    fn field(&mut self, field: &Field) -> Descent {
         self.hidden(&field.attrs, None, &field.vis);
-        visit::visit_field(self, field);
+        Descent::Into
     }
 
-    fn visit_attribute(&mut self, attribute: &'ast Attribute) {
+    fn attribute(&mut self, attribute: &Attribute) -> Descent {
         let condition = NoTestOnlyApi::CONDITIONS.iter().any(|name| attribute.path().is_ident(name));
         let found = match (&attribute.meta, condition) {
             (Meta::List(list), true) => NoTestOnlyApi::features(list.tokens.clone()),
             _ => Vec::new(),
         };
         self.found.extend(found);
-        visit::visit_attribute(self, attribute);
+        Descent::Into
     }
 
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
+    fn macro_called(&mut self, invocation: &Macro) -> Expanded {
         let condition = NoTestOnlyApi::CONDITIONS.iter().any(|name| invocation.path.is_ident(name));
         let found = if condition { NoTestOnlyApi::features(invocation.tokens.clone()) } else { Vec::new() };
         self.found.extend(found);
+        Expanded::Nothing
     }
 }
 
 impl<'file> Graph<'file> for NoTestOnlyApi<'file> {
-    const RULE: Rule = Rule::NoTestOnlyApi;
-
     type Fact = Finding;
 
     fn new(source: &'file Source) -> NoTestOnlyApi<'file> {

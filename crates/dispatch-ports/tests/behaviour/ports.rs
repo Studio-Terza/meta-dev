@@ -170,7 +170,7 @@ fn a_shell_call_returns_its_printing_and_whether_it_succeeded_failed_or_ran_past
         [
             shell.ran(&call("pwd", 5))?,
             shell.ran(&call("printf refused; exit 3", 5))?,
-            shell.ran(&call("exec sleep 30", 0))?,
+            shell.ran(&call("exec sleep 4", 0))?,
         ]
     };
     let calls = run.finish().settled()?.calls::<shell_ops::Ran>();

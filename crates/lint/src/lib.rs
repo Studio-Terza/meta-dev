@@ -12,6 +12,7 @@ mod source;
 mod spent;
 mod style;
 mod use_leaf;
+mod walk;
 mod workspace;
 
 pub use cli::{Cli, Verdict};

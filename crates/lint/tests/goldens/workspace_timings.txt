@@ -4,20 +4,7 @@ lint timings in milliseconds, each stage summed over files and threads:
 run: wall time of the whole run
 find: list the packages and their crate roots
 parse: read and parse each file once
-visit: NoComments
-visit: NoFreeFns
-visit: VecOutParams
-visit: NamedLifetimes
-visit: TypeShape
-visit: ExpressionFlow
-visit: ManualIteration
-visit: ProcessStarters
-visit: PublicSurface
-visit: PublicApiTests
-visit: NoTestOnlyApi
-visit: BoolMethods
-visit: NoDyn
-visit: test budget
+visit: walk each file's tree once through every lint and the test budget
 reduce: join the graph lints' facts
 --- err
 free functions are not allowed; make them associated functions or methods:

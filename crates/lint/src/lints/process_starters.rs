@@ -1,12 +1,12 @@
 use proc_macro2::{TokenStream, TokenTree};
 use syn::spanned::Spanned;
-use syn::visit::{self, Visit};
 use syn::{ItemMod, ItemUse, Macro, Path};
 
 use crate::finding::{Found, Rule};
 use crate::source::Source;
 use crate::style::{Reads, Style};
 use crate::use_leaf::UseLeaf;
+use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Debug)]
 pub(crate) struct ProcessStarters {
@@ -150,33 +150,38 @@ impl Run {
     }
 }
 
-impl<'ast> Visit<'ast> for ProcessStarters {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
+impl Hooks for ProcessStarters {
+    fn item_mod(&mut self, module: &ItemMod) -> Descent {
         let named = (module.ident == ProcessStarters::PORTS).then_some(());
         let ported = named.or(self.current().and_then(|enclosing| enclosing.ported));
         self.open.push(self.modules.len());
         self.modules.push(Module { ported, ..Module::default() });
-        visit::visit_item_mod(self, module);
+        Descent::Into
+    }
+
+    fn left_item_mod(&mut self, _: &ItemMod) {
         self.open.pop();
     }
 
-    fn visit_item_use(&mut self, item: &'ast ItemUse) {
+    fn item_use(&mut self, item: &ItemUse) -> Descent {
         let imports = UseLeaf::of_tree(&item.tree).iter().filter_map(Bound::of_leaf).collect::<Vec<Bound>>();
         self.current().map_or_default(|module| module.imports.extend(imports));
+        Descent::Over
     }
 
-    fn visit_path(&mut self, path: &'ast Path) {
+    fn path(&mut self, path: &Path) -> Descent {
         let spelled = Spelled {
             line: path.span().start().line,
             segments: path.segments.iter().map(|segment| segment.ident.to_string()).collect(),
         };
         self.admitted().map_or_default(|module| module.spelled.push(spelled));
-        visit::visit_path(self, path);
+        Descent::Into
     }
 
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
+    fn macro_called(&mut self, invocation: &Macro) -> Expanded {
         let spoken = Run::scanned(invocation.tokens.clone());
         self.admitted().map_or_default(|module| module.spelled.extend(spoken));
+        Expanded::Nothing
     }
 }
 

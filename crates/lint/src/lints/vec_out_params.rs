@@ -1,12 +1,11 @@
 use syn::spanned::Spanned;
-use syn::visit::{self, Visit};
 use syn::{FnArg, GenericArgument, ItemImpl, ItemMod, Macro, PathArguments, Signature, Type, TypePath};
 
-use crate::expansion::Expansion;
 use crate::finding::{Found, Rule};
 use crate::gate::Gate;
 use crate::source::Source;
 use crate::style::{Reads, Style};
+use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Debug, Default)]
 pub(crate) struct VecOutParams {
@@ -42,20 +41,20 @@ impl VecOutParams {
     }
 }
 
-impl<'ast> Visit<'ast> for VecOutParams {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Gate::of(&module.attrs).entered().map_or_default(|()| visit::visit_item_mod(self, module));
+impl Hooks for VecOutParams {
+    fn item_mod(&mut self, module: &ItemMod) -> Descent {
+        Descent::from(Gate::of(&module.attrs).entered())
     }
 
-    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        Gate::inherent(item).entered().map_or_default(|()| visit::visit_item_impl(self, item));
+    fn item_impl(&mut self, item: &ItemImpl) -> Descent {
+        Descent::from(Gate::inherent(item).entered())
     }
 
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Expansion::of(invocation).walk(self);
+    fn macro_called(&mut self, _: &Macro) -> Expanded {
+        Expanded::Statements
     }
 
-    fn visit_signature(&mut self, signature: &'ast Signature) {
+    fn signature(&mut self, signature: &Signature) -> Descent {
         let name = &signature.ident;
         let parameters = signature.inputs.iter().filter_map(|input| match input {
             FnArg::Typed(typed) => Some(typed),
@@ -66,6 +65,7 @@ impl<'ast> Visit<'ast> for VecOutParams {
             .map(|parameter| Found::spanned(parameter.pat.span(), format_args!("fn {name}"), VecOutParams::FIX))
             .collect();
         self.found.extend(found);
+        Descent::Over
     }
 }
 

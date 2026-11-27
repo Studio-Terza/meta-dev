@@ -3,14 +3,13 @@ use std::path::Path;
 use std::sync::Arc;
 
 use proc_macro2::Ident;
-use syn::visit::{self, Visit};
 use syn::{Item, ItemUse, Macro, Visibility};
 
-use crate::expansion::Expansion;
 use crate::finding::{Finding, Found, Rule};
 use crate::graph::Graph;
 use crate::source::{Place, Source};
 use crate::use_leaf::UseLeaf;
+use crate::walk::{Descent, Expanded, Hooks};
 use crate::workspace::Package;
 
 #[derive(Debug)]
@@ -97,13 +96,13 @@ impl PublicSurface<'_> {
     }
 }
 
-impl<'ast> Visit<'ast> for PublicSurface<'_> {
-    fn visit_file(&mut self, file: &'ast syn::File) {
+impl Hooks for PublicSurface<'_> {
+    fn file(&mut self, file: &syn::File) -> Descent {
         self.source.library_root().map_or_default(|()| self.exports(&file.items));
-        (self.reader != Reader::Neither).then_some(()).map_or_default(|()| visit::visit_file(self, file));
+        Descent::from((self.reader != Reader::Neither).then_some(()))
     }
 
-    fn visit_item_use(&mut self, item: &'ast ItemUse) {
+    fn item_use(&mut self, item: &ItemUse) -> Descent {
         let sightings: Vec<SurfaceFact> = UseLeaf::of_tree(&item.tree)
             .iter()
             .flat_map(|leaf| {
@@ -115,29 +114,23 @@ impl<'ast> Visit<'ast> for PublicSurface<'_> {
             })
             .collect();
         self.facts.extend(sightings);
+        Descent::Over
     }
 
-    fn visit_path(&mut self, path: &'ast syn::Path) {
+    fn path(&mut self, path: &syn::Path) -> Descent {
         let first = path.segments.first().map(|segment| &segment.ident);
         let second = path.segments.iter().nth(1);
         let sighting = second.and_then(|named| self.sighting(first, Reached::Named(named.ident.to_string())));
         self.facts.extend(sighting);
-        visit::visit_path(self, path);
+        Descent::Into
     }
 
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
-        let expansion = match Expansion::defining(invocation) {
-            Some(()) => Expansion::substituted(invocation),
-            None => Expansion::of(invocation),
-        };
-        expansion.walk(self);
-        visit::visit_macro(self, invocation);
+    fn macro_called(&mut self, _: &Macro) -> Expanded {
+        Expanded::Surface
     }
 }
 
 impl<'file> Graph<'file> for PublicSurface<'file> {
-    const RULE: Rule = Rule::PublicSurface;
-
     type Fact = SurfaceFact;
 
     fn new(source: &'file Source) -> PublicSurface<'file> {

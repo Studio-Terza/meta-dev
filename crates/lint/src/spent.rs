@@ -4,15 +4,12 @@ use std::io::{self, Write};
 
 use timer_ports::{Elapsed, Timer};
 
-use crate::finding::Rule;
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Stage {
     Run,
     Find,
     Parse,
-    Visit(Rule),
-    Budget,
+    Visit,
     Reduce,
 }
 
@@ -49,8 +46,7 @@ impl fmt::Display for Stage {
             Stage::Run => formatter.write_str("run: wall time of the whole run"),
             Stage::Find => formatter.write_str("find: list the packages and their crate roots"),
             Stage::Parse => formatter.write_str("parse: read and parse each file once"),
-            Stage::Visit(rule) => write!(formatter, "visit: {rule:?}"),
-            Stage::Budget => formatter.write_str("visit: test budget"),
+            Stage::Visit => formatter.write_str("visit: walk each file's tree once through every lint and the test budget"),
             Stage::Reduce => formatter.write_str("reduce: join the graph lints' facts"),
         }
     }
