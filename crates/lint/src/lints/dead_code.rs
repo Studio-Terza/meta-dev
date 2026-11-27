@@ -50,6 +50,7 @@ pub(crate) struct Reading {
 enum Reader {
     Library(Arc<Path>),
     Binary(Arc<Path>),
+    Tests(Arc<Path>),
 }
 
 #[derive(Debug)]
@@ -81,9 +82,10 @@ impl DeadCode<'_> {
 
     fn reader(&self) -> Reader {
         let directory = Arc::from(self.source.package().directory());
-        match self.source.own_crate() {
-            Some(_) => Reader::Library(directory),
-            None => Reader::Binary(directory),
+        match (self.source.place(), self.source.own_crate()) {
+            (Place::Shipped, Some(_)) => Reader::Library(directory),
+            (Place::Shipped, None) => Reader::Binary(directory),
+            (Place::Tests | Place::Elsewhere, _) => Reader::Tests(directory),
         }
     }
 
@@ -102,8 +104,18 @@ impl DeadCode<'_> {
 impl Read {
     fn named(&self, export: &Export) -> Option<()> {
         let crate_name = export.owner.crate_name();
-        let readers = self.0.iter().filter(|(reader, names)| **reader != export.home && names.contains(&crate_name));
+        let readers =
+            self.0.iter().filter(|(reader, names)| reader.reads(export).is_some() && names.contains(&crate_name));
         readers.into_iter().find(|(_, names)| names.contains(&export.exported.name)).map(|_| ())
+    }
+}
+
+impl Reader {
+    fn reads(&self, export: &Export) -> Option<()> {
+        match self {
+            Reader::Tests(directory) if **directory == *export.owner.directory() => None,
+            Reader::Library(_) | Reader::Binary(_) | Reader::Tests(_) => (*self != export.home).then_some(()),
+        }
     }
 }
 
@@ -175,18 +187,15 @@ impl<'file> Graph<'file> for DeadCode<'file> {
 
     fn facts(self) -> Vec<DeadFact> {
         let shipped = (self.source.place() == Place::Shipped).then_some(());
-        let reading = shipped.map(|()| {
-            let tokens =
-                TokenStream::from_str(self.source.text().as_ref()).ignoring(Ignored::Unparsed).unwrap_or_default();
-            DeadFact::Reading(Reading { reader: self.reader(), names: DeadCode::names(tokens) })
-        });
+        let tokens = TokenStream::from_str(self.source.text().as_ref()).ignoring(Ignored::Unparsed).unwrap_or_default();
+        let reading = DeadFact::Reading(Reading { reader: self.reader(), names: DeadCode::names(tokens) });
         let owner = self.source.package();
         let path = self.source.shown();
         let home = self.reader();
         let exports = shipped.map_or_default(|()| self.exported).into_iter().map(|exported| {
             DeadFact::Export(Export { owner: Arc::clone(owner), home: home.clone(), exported, path: Arc::clone(path) })
         });
-        reading.into_iter().chain(exports).collect()
+        [reading].into_iter().chain(exports).collect()
     }
 
     fn reduce(facts: Vec<DeadFact>, _: &[Arc<Package>]) -> Vec<Finding> {

@@ -9,7 +9,6 @@ tests/.fixtures/surface/provider/src/lib.rs:5: Alias is exported but no other cr
 tests/.fixtures/surface/provider/src/lib.rs:5: Unnamed is exported but no other crate names it; export it when a user appears
 every pub item is named by another workspace crate:
 tests/.fixtures/surface/consumer/src/extras.rs:1: pub Extra is named by no other crate; make it private or delete it
-tests/.fixtures/surface/consumer/src/lib.rs:4: pub extras is named by no other crate; make it private or delete it
 tests/.fixtures/surface/globbed/src/lib.rs:1: pub Anything is named by no other crate; make it private or delete it
 tests/.fixtures/surface/provider/src/inner.rs:4: pub Tested is named by no other crate; make it private or delete it
 tests/.fixtures/surface/provider/src/inner.rs:6: pub Unnamed is named by no other crate; make it private or delete it

@@ -21,7 +21,6 @@ tests/.fixtures/dead_code/library/src/inner.rs:2: pub Unnamed is named by no oth
 tests/.fixtures/dead_code/library/src/lib.rs:3: pub Unnamed is named by no other crate; make it private or delete it
 tests/.fixtures/dead_code/library/src/lib.rs:6: pub Forgotten is named by no other crate; make it private or delete it
 tests/.fixtures/dead_code/library/src/lib.rs:14: pub NAME is named by no other crate; make it private or delete it
-tests/.fixtures/dead_code/library/src/lib.rs:15: pub Alias is named by no other crate; make it private or delete it
 tests/.fixtures/dead_code/library/src/lib.rs:16: pub open is named by no other crate; make it private or delete it
 tests/.fixtures/dead_code/library/src/lib.rs:18: pub uncalled is named by no other crate; make it private or delete it
 tests/.fixtures/dead_code/library/src/lib.rs:21: pub idle is named by no other crate; make it private or delete it
