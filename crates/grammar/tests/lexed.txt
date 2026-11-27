@@ -23,6 +23,18 @@ slug "/Users/me/my_repo": "-Users-me-my-repo"
 slug "abc123": "abc123"
 slug "a.b é": "a-b--"
 slug "": ""
+migration "20261106000000_stream.sql": Some((20261106000000, "stream"))
+migration "20261106000005_applied_files.sql": Some((20261106000005, "applied files"))
+migration "20261107000002_unicode_trimmed_segments.sql": Some((20261107000002, "unicode trimmed segments"))
+migration "1_a2b.sql": Some((1, "a2b"))
+migration "20261106000000.sql": None
+migration "20261106000000_.sql": None
+migration "20261106000000_stream": None
+migration "20261106000000_stream.up.sql": None
+migration "stream_20261106000000.sql": None
+migration "20261106000000__stream.sql": None
+migration "99999999999999999999_stream.sql": None
+migration "": None
 bare "abc": Some("abc")
 bare "_a-9": Some("_a-9")
 bare "msg:1": None

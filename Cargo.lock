@@ -535,13 +535,10 @@ name = "query-cache"
 version = "0.1.0"
 dependencies = [
  "hex",
- "invariants",
- "logos",
  "serde",
  "serde_json",
  "sha2",
  "strum",
- "test-failure",
  "thiserror",
 ]
 
@@ -764,6 +761,7 @@ dependencies = [
 name = "store-ports-macros"
 version = "0.1.0"
 dependencies = [
+ "grammar",
  "invariants",
  "proc-macro2",
  "query-cache",

@@ -2,11 +2,12 @@ use std::collections::BTreeMap;
 use std::io;
 use std::path::PathBuf;
 
+use grammar::MigrationFile;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::LitStr;
 
-use query_cache::{Disk, MigrationFile};
+use query_cache::Disk;
 
 #[derive(Debug)]
 pub struct Directory(PathBuf);
