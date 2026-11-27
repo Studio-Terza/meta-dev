@@ -58,7 +58,7 @@ pub struct Stopped(BTreeSet<TaskId>);
 pub struct Tasks {
     shells: usize,
     agents: usize,
-    hung: Vec<Body>,
+    hung: BTreeSet<Body>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -332,7 +332,7 @@ impl Tasks {
     }
 
     #[must_use]
-    pub fn hung(&self) -> &[Body] {
+    pub fn hung(&self) -> &BTreeSet<Body> {
         &self.hung
     }
 }
