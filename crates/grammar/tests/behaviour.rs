@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use grammar::{Bare, Fields, Ignoring, Inked, KeptLines, Letters, Lines, MigrationFile, Stamp, Unlexed};
+use grammar::{Bare, Fields, Ignoring, Inked, KeptLines, Letters, Lines, MigrationFile, Nested, Stamp, Unlexed};
 use serde::Deserialize;
 use test_failure::Failed;
 
@@ -13,6 +13,7 @@ struct Texts {
     slugs: Vec<String>,
     migrations: Vec<String>,
     bare: Vec<String>,
+    shell: Vec<String>,
 }
 
 #[test]
@@ -51,6 +52,9 @@ fn every_lexer_reads_its_fixture_texts_as_its_golden_says() -> Result<(), Failed
         .chain(texts.slugs.iter().map(|text| format!("slug {text:?}: {:?}", Letters::slugged(text))))
         .chain(texts.migrations.iter().map(migrated))
         .chain(texts.bare.iter().map(|text| format!("bare {text:?}: {:?}", Bare::word(text))))
+        .chain(texts.shell.iter().map(|text| {
+            format!("shell {text:?}: {:?}", Nested::read(text).map(|nested| (nested.flagged(), nested.construct())))
+        }))
         .collect();
     let golden = directory.join("lexed.txt");
     let said = shown.join("\n");

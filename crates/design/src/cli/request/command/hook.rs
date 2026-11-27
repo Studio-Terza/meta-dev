@@ -2,6 +2,7 @@ mod answers;
 mod boundary;
 mod release;
 mod subagent;
+mod unroll;
 
 use console_ports::Environment;
 use dispatch_ports::{Clock, Dispatch, Shell};
@@ -18,6 +19,7 @@ use crate::cli::uttered::Uttered;
 use boundary::{Observed, Settings, Stopping};
 use release::Used;
 use subagent::Finishing;
+use unroll::Running;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Hook {
@@ -37,6 +39,7 @@ impl Hook {
             Hook::Settings => Settings::listed(HookEvent::VARIANTS).written(),
             Hook::On(HookEvent::Stop) => Hook::stopped(&Stopping::heard(heard()?)?, ground, crew),
             Hook::On(HookEvent::SubagentStop) => Finishing::heard(heard()?)?.answered(&ground, crew),
+            Hook::On(HookEvent::PreToolUse) => Running::heard(heard()?)?.answered(),
             Hook::On(HookEvent::PostToolUse) => Used::heard(heard()?)?.answered(&ground, crew),
         }
     }

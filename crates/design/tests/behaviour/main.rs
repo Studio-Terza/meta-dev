@@ -422,6 +422,17 @@ impl Home {
         self.heard(&["hook", "post-tool-use"], &input.to_string(), &Replies::default(), github)
     }
 
+    fn ran(&self, command: &str) -> Said {
+        let input = serde_json::json!({
+            "session_id": "s",
+            "hook_event_name": "PreToolUse",
+            "cwd": AGENT,
+            "tool_name": "Bash",
+            "tool_input": {"command": command, "description": "run it"},
+        });
+        self.heard(&["hook", "pre-tool-use"], &input.to_string(), &Replies::default(), &GitHub::default())
+    }
+
     fn heard(&self, arguments: &[&str], input: &str, replies: &Replies, github: &GitHub) -> Said {
         let environment: Variables = [
             (OsString::from("HOME"), self.path().as_os_str().to_owned()),
@@ -725,6 +736,7 @@ struct Finish {
 enum Hooked {
     #[default]
     SubagentStop,
+    PreToolUse,
     PostToolUse,
 }
 
@@ -810,6 +822,7 @@ impl Story {
                 let github = GitHub::answering(&finish.answers.iter().map(Scripted::answer).collect::<Vec<_>>());
                 let said = match finish.hook {
                     Hooked::SubagentStop => home.finished(&finish.said, finish.turn == Turn::Reminded, &github),
+                    Hooked::PreToolUse => home.ran(&finish.said),
                     Hooked::PostToolUse => home.used(&finish.said, &github),
                 };
                 let timeline = github.timeline(home.at);
@@ -882,6 +895,7 @@ fn the_hook_settings_are_printed_as_json_at_exit_zero() -> Result<(), Failed> {
     let settings: Value = serde_json::from_str(&exited.out)?;
     assert_eq!((exited.code, exited.err), (ExitCode::SUCCESS, String::new()));
     assert!(settings.pointer("/hooks/Stop/0/hooks/0/command").and_then(Value::as_str).is_some());
+    assert_eq!(settings.pointer("/hooks/PreToolUse/0/matcher").and_then(Value::as_str), Some("Bash"));
     Ok(())
 }
 
