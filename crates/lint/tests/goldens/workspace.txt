@@ -17,6 +17,7 @@ app/tests/flows.rs:7: fn cased; make it an associated function or a method
 app/tests/flows.rs:9: fn listed; make it an associated function or a method
 app/tests/suite/main.rs:2: fn suite; make it an associated function or a method
 app/tests/suite/ports.rs:1: fn spawn; make it an associated function or a method
+linked/src/lib.rs:1: fn linked; make it an associated function or a method
 scratch/target/kept/src/lib.rs:1: fn kept; make it an associated function or a method
 control flow is an expression; every branch yields the value the function returns:
 app/src/bin/multi/main.rs:2: loop; drive an iterator with combinators, const fns excepted

@@ -1,3 +1,5 @@
+mod manifest;
+
 use std::ffi::OsStr;
 use std::iter;
 use std::path::{Path, PathBuf};
@@ -9,6 +11,7 @@ use toml::de::{DeTable, DeValue};
 
 use crate::failure::Failure;
 use crate::ignored::Ignored;
+use manifest::Manifest;
 
 #[derive(Debug)]
 pub(crate) struct Tree {
@@ -122,6 +125,12 @@ impl CrateRoot {
 }
 
 #[derive(Debug)]
+struct Listed {
+    package: Option<Package>,
+    manifest: Manifest,
+}
+
+#[derive(Debug)]
 pub(crate) struct Workspace {
     packages: Vec<Arc<Package>>,
     roots: Vec<CrateRoot>,
@@ -155,9 +164,18 @@ impl Workspace {
             .map(|directory| directory.join(Workspace::MANIFEST))
             .filter(|manifest| files.kind(manifest) == Kind::File)
             .collect();
-        let read: Vec<Option<Package>> =
-            manifests.iter().map(|manifest| Workspace::package(files, tree, manifest)).collect::<Result<_, _>>()?;
-        let packages: Vec<Arc<Package>> = read.into_iter().flatten().map(Arc::new).collect();
+        let read: Vec<Listed> =
+            manifests.iter().map(|manifest| Workspace::listed(files, tree, manifest)).collect::<Result<_, _>>()?;
+        let above = tree.canonical.ancestors().skip(1).filter_map(|directory| {
+            let text = files.read_text(&directory.join(Workspace::MANIFEST)).ignoring(Ignored::Unlisted)?;
+            let table = DeTable::parse(text.as_ref()).ignoring(Ignored::Unparsed)?;
+            Some(Manifest::new(directory.to_path_buf(), table.get_ref()))
+        });
+        let (found, listed): (Vec<Option<Package>>, Vec<Manifest>) =
+            read.into_iter().map(|entry| (entry.package, entry.manifest)).unzip();
+        let admitted = Manifest::admitted(&listed.into_iter().chain(above).collect::<Vec<Manifest>>());
+        let packages: Vec<Arc<Package>> =
+            found.into_iter().flatten().filter(|package| admitted.contains(&package.directory)).map(Arc::new).collect();
         let roots: Vec<CrateRoot> = packages.iter().flat_map(|package| Workspace::roots(files, package)).collect();
         match roots.first() {
             Some(_) => Ok(Workspace { packages, roots }),
@@ -189,19 +207,21 @@ impl Workspace {
             .collect()
     }
 
-    fn package(files: &impl Files, tree: &Tree, manifest: &Path) -> Result<Option<Package>, Failure> {
+    fn listed(files: &impl Files, tree: &Tree, manifest: &Path) -> Result<Listed, Failure> {
         let text =
             files.read_text(manifest).map_err(|source| Failure::Read { path: manifest.to_path_buf(), source })?;
         let table = DeTable::parse(text.as_ref())
             .map_err(|source| Failure::Manifest { path: manifest.to_path_buf(), source })?
             .into_inner();
+        let directory = manifest.parent().map_or_default(Path::to_path_buf);
         let name = table.get("package").and_then(|package| Workspace::string(package.get_ref(), "name"));
-        Ok(name.map(|named| Package {
-            directory: manifest.parent().map_or_default(Path::to_path_buf),
+        let package = name.map(|named| Package {
+            directory: directory.clone(),
             name: named.to_owned(),
             manifest: tree.shown(manifest),
             features: Workspace::features(text.as_ref(), &table),
-        }))
+        });
+        Ok(Listed { package, manifest: Manifest::new(directory, &table) })
     }
 
     fn string<'value>(value: &'value DeValue<'_>, key: &str) -> Option<&'value str> {

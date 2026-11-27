@@ -43,7 +43,7 @@ impl Budgets {
             files: 1,
             lines,
             test_lines: shipped.map_or(lines, |()| scan.test_lines),
-            starts: ProcessStarters::everywhere(file),
+            starts: gate.entered().map_or(0, |()| ProcessStarters::everywhere(file)),
         };
         Budgets(BTreeMap::from([(source.package().crate_name(), budget)]))
     }
