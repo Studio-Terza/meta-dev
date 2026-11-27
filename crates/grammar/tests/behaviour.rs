@@ -1,9 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use grammar::{
-    Attachment, Bare, Fields, Ignoring, Inked, KeptLines, Letters, Line, Lines, MigrationFile, Stamp, Unlexed,
-};
+use grammar::{Attachment, Bare, Fields, Ignoring, Inked, KeptLines, Letters, Line, Lines, Stamp, Unlexed};
 use proptest::prelude::{Just, Strategy, any, prop_assert_eq, prop_oneof, proptest};
 use proptest::test_runner::{Config, RngSeed};
 use serde::Deserialize;
@@ -15,7 +13,6 @@ struct Texts {
     stamps: Vec<String>,
     replies: Vec<String>,
     slugs: Vec<String>,
-    migrations: Vec<String>,
     bare: Vec<String>,
 }
 
@@ -31,10 +28,6 @@ fn every_lexer_reads_its_fixture_texts_as_its_golden_says() -> Result<(), Failed
             .flat_map(|line| line.parse::<Fields>().into_iter().map(|cells| cells.as_ref().to_vec()))
             .collect();
         format!("lines {text:?}: {lines:?} {kept:?} {fields:?}")
-    };
-    let migrated = |text: &String| {
-        let file = text.parse::<MigrationFile>().ignoring(Unlexed::NotThisGrammar);
-        format!("migration {text:?}: {:?}", file.map(|read| (read.version(), read.description())))
     };
     let shown: Vec<String> = texts
         .lines
@@ -53,7 +46,6 @@ fn every_lexer_reads_its_fixture_texts_as_its_golden_says() -> Result<(), Failed
                 .map(|text| format!("reply {text:?}: {:?}", Inked::read(text).map(|inked| inked.as_ref().len()))),
         )
         .chain(texts.slugs.iter().map(|text| format!("slug {text:?}: {:?}", Letters::slugged(text))))
-        .chain(texts.migrations.iter().map(migrated))
         .chain(texts.bare.iter().map(|text| format!("bare {text:?}: {:?}", Bare::word(text))))
         .collect();
     let golden = directory.join("lexed.txt");

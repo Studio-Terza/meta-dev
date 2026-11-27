@@ -1,4 +1,8 @@
-use query_cache::{Entry, Origin, Table};
+use std::fs;
+use std::path::Path;
+
+use query_cache::{Entry, MigrationFile, Origin, Table};
+use test_failure::Failed;
 
 const COLUMNS: &str = r#"{"describe": {"columns": [{"name": "a", "type_info": "Text"}, {"name": "b", "type_info": "Integer"}, {"name": "c", "type_info": "Null"}], "parameters": {"Right": 0}, "nullable": [true, false]}}"#;
 const TWO_PARAMETERS: &str = r#"{"describe": {"columns": [], "parameters": {"Right": 2}, "nullable": []}}"#;
@@ -32,5 +36,23 @@ fn a_record_table_spells_its_statements_and_a_cached_query_binds_only_what_it_ta
             "UPDATE r SET body = ?1",
         ]
     );
+    Ok(())
+}
+
+#[test]
+fn every_migration_file_name_reads_as_its_golden_says() -> Result<(), Failed> {
+    let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
+    let names: Vec<String> = serde_json::from_str(&fs::read_to_string(directory.join("migrations.json"))?)?;
+    let shown: Vec<String> = names
+        .iter()
+        .map(|name| {
+            let file = name.parse::<MigrationFile>();
+            format!("migration {name:?}: {:?}", file.map(|read| (read.version(), read.description())))
+        })
+        .collect();
+    let said = shown.join("\n");
+    let golden = directory.join("migrations.txt");
+    std::env::var_os("RECORD_GOLDENS").map_or(Ok(()), |_| fs::write(&golden, &said))?;
+    assert_eq!(said, fs::read_to_string(golden)?);
     Ok(())
 }

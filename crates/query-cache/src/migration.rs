@@ -1,9 +1,19 @@
 use std::str::FromStr;
 
-use crate::{Ignoring, Unlexed};
+use invariants::{Ignoring, ignored};
 use logos::Logos;
 
-use crate::Unspelled;
+ignored! {
+    enum Unlexed {
+        NotThisGrammar => "a name that does not lex as a migration file is not one; the caller refuses it as unnamed",
+        OtherShape => "a lexing of another length or shape is not an underscore and a word",
+        OutOfRange => "digits past the i64 range do not read as a version",
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+#[error("the name is not spelled <version>_<words>.sql")]
+pub struct Unspelled;
 
 #[derive(Logos, Clone, Debug, PartialEq, Eq)]
 #[logos(crate = logos)]

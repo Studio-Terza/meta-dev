@@ -536,10 +536,13 @@ name = "query-cache"
 version = "0.1.0"
 dependencies = [
  "hex",
+ "invariants",
+ "logos",
  "serde",
  "serde_json",
  "sha2",
  "strum",
+ "test-failure",
  "thiserror",
 ]
 
@@ -731,7 +734,6 @@ checksum = "d0d5d4b1981b8bbbb7aed204cae5726d683d5d6ac7e74ec54122ea28f315e7c8"
 name = "store-ports-macros"
 version = "0.1.0"
 dependencies = [
- "grammar",
  "invariants",
  "proc-macro2",
  "query-cache",
