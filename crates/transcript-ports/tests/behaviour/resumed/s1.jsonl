@@ -1,0 +1,4 @@
+{"type":"user","uuid":"1","parentUuid":null,"sessionId":"s1","timestamp":"2026-01-01T00:00:01Z","origin":{"kind":"human"},"message":{"model":"claude","content":"typed words"}}
+{"type":"assistant","uuid":"2","parentUuid":null,"sessionId":"s1","timestamp":"2026-01-01T00:00:02Z","origin":null,"message":{"model":"claude","content":[{"type":"text","text":"first"},{"type":"tool_use"},{"type":"text","text":"second"}]}}
+{"type":"user","uuid":"3","parentUuid":null,"sessionId":"s1","timestamp":"2026-01-01T00:00:03Z","origin":null,"message":{"model":"claude","content":[{"type":"tool_result","content":"output"}]}}
+{"type":"user","uuid":"4","parentUuid":null,"sessionId":"s1","timestamp":"2026-01-01T00:00:04Z","origin":{"kind":"task-notification"},"message":{"model":"claude","content":"finished"}}

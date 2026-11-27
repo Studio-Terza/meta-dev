@@ -20,7 +20,7 @@ pub use read::Read;
 pub use read_failure::ReadFailure;
 pub use record::Record;
 pub use session::Session;
-pub use skipped::Skipped;
+use skipped::Skipped;
 pub use transcripts::{Transcripts, transcripts_ops};
 use unrecognised::Unrecognised;
 

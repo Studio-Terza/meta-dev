@@ -1,0 +1,1604 @@
+(
+    [
+        SessionId(
+            "s1",
+        ),
+    ],
+    [
+        Calls(
+            1,
+        ),
+        Calls(
+            1,
+        ),
+    ],
+    Ok(
+        Snapshot(
+            {
+                OpName(
+                    "transcript_ports::transcripts::transcripts_ops::Transcripts::read_from",
+                ): Calls(
+                    1,
+                ),
+                OpName(
+                    "transcript_ports::transcripts::transcripts_ops::Transcripts::sessions",
+                ): Calls(
+                    1,
+                ),
+            },
+        ),
+    ),
+    [
+        Read {
+            lines: [
+                Said(
+                    Record {
+                        uuid: Uuid(
+                            "1",
+                        ),
+                        parent: None,
+                        session: SessionId(
+                            "s1",
+                        ),
+                        at: Instant(
+                            "2026-01-01T00:00:01Z",
+                        ),
+                        author: Owner,
+                        text: Body(
+                            "typed words",
+                        ),
+                    },
+                ),
+                Said(
+                    Record {
+                        uuid: Uuid(
+                            "2",
+                        ),
+                        parent: None,
+                        session: SessionId(
+                            "s1",
+                        ),
+                        at: Instant(
+                            "2026-01-01T00:00:02Z",
+                        ),
+                        author: Lead,
+                        text: Body(
+                            "first second",
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "3",
+                        ),
+                        parent: None,
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "4",
+                        ),
+                        parent: None,
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "5",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "2",
+                            ),
+                        ),
+                    },
+                ),
+                Unrecognised(
+                    Unrecognised {
+                        kind: Kind(
+                            "unreadable",
+                        ),
+                        uuid: None,
+                        parent: None,
+                    },
+                ),
+                Unrecognised(
+                    Unrecognised {
+                        kind: Kind(
+                            "unreadable",
+                        ),
+                        uuid: None,
+                        parent: None,
+                    },
+                ),
+                Said(
+                    Record {
+                        uuid: Uuid(
+                            "abc",
+                        ),
+                        parent: None,
+                        session: SessionId(
+                            "s1",
+                        ),
+                        at: Instant(
+                            "2026-01-01T00:00:0abcZ",
+                        ),
+                        author: Owner,
+                        text: Body(
+                            "typed words",
+                        ),
+                    },
+                ),
+                Said(
+                    Record {
+                        uuid: Uuid(
+                            "_a-9",
+                        ),
+                        parent: None,
+                        session: SessionId(
+                            "s1",
+                        ),
+                        at: Instant(
+                            "2026-01-01T00:00:0_a-9Z",
+                        ),
+                        author: Owner,
+                        text: Body(
+                            "typed words",
+                        ),
+                    },
+                ),
+                Unrecognised(
+                    Unrecognised {
+                        kind: Kind(
+                            "unreadable",
+                        ),
+                        uuid: None,
+                        parent: None,
+                    },
+                ),
+                Unrecognised(
+                    Unrecognised {
+                        kind: Kind(
+                            "unreadable",
+                        ),
+                        uuid: None,
+                        parent: None,
+                    },
+                ),
+                Unrecognised(
+                    Unrecognised {
+                        kind: Kind(
+                            "unreadable",
+                        ),
+                        uuid: None,
+                        parent: None,
+                    },
+                ),
+                Unrecognised(
+                    Unrecognised {
+                        kind: Kind(
+                            "unreadable",
+                        ),
+                        uuid: None,
+                        parent: None,
+                    },
+                ),
+                Said(
+                    Record {
+                        uuid: Uuid(
+                            "1",
+                        ),
+                        parent: None,
+                        session: SessionId(
+                            "a b",
+                        ),
+                        at: Instant(
+                            "2026-01-01T00:00:01Z",
+                        ),
+                        author: Owner,
+                        text: Body(
+                            "typed words",
+                        ),
+                    },
+                ),
+                Unrecognised(
+                    Unrecognised {
+                        kind: Kind(
+                            "user",
+                        ),
+                        uuid: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                        parent: None,
+                    },
+                ),
+                Said(
+                    Record {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                        session: SessionId(
+                            "s1",
+                        ),
+                        at: Instant(
+                            "2026-01-01T00:00:08Z",
+                        ),
+                        author: Lead,
+                        text: Body(
+                            "a",
+                        ),
+                    },
+                ),
+                Unrecognised(
+                    Unrecognised {
+                        kind: Kind(
+                            "demo-unheard",
+                        ),
+                        uuid: Some(
+                            Uuid(
+                                "8",
+                            ),
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Unrecognised(
+                    Unrecognised {
+                        kind: Kind(
+                            "x_unheard",
+                        ),
+                        uuid: Some(
+                            Uuid(
+                                "8",
+                            ),
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Unrecognised(
+                    Unrecognised {
+                        kind: Kind(
+                            "brand-new-kind",
+                        ),
+                        uuid: Some(
+                            Uuid(
+                                "8",
+                            ),
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Said(
+                    Record {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                        session: SessionId(
+                            "s1",
+                        ),
+                        at: Instant(
+                            "2026-01-01T00:00:08Z",
+                        ),
+                        author: Owner,
+                        text: Body(
+                            "typed",
+                        ),
+                    },
+                ),
+                Said(
+                    Record {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                        session: SessionId(
+                            "s1",
+                        ),
+                        at: Instant(
+                            "2026-01-01T00:00:08Z",
+                        ),
+                        author: Owner,
+                        text: Body(
+                            "look",
+                        ),
+                    },
+                ),
+                Unrecognised(
+                    Unrecognised {
+                        kind: Kind(
+                            "brand-new-kind",
+                        ),
+                        uuid: Some(
+                            Uuid(
+                                "8",
+                            ),
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Unrecognised(
+                    Unrecognised {
+                        kind: Kind(
+                            "brand-new-kind",
+                        ),
+                        uuid: Some(
+                            Uuid(
+                                "8",
+                            ),
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Unrecognised(
+                    Unrecognised {
+                        kind: Kind(
+                            "document",
+                        ),
+                        uuid: Some(
+                            Uuid(
+                                "8",
+                            ),
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Said(
+                    Record {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                        session: SessionId(
+                            "s1",
+                        ),
+                        at: Instant(
+                            "2026-01-01T00:00:08Z",
+                        ),
+                        author: Lead,
+                        text: Body(
+                            "said",
+                        ),
+                    },
+                ),
+                Unrecognised(
+                    Unrecognised {
+                        kind: Kind(
+                            "server_tool_use",
+                        ),
+                        uuid: Some(
+                            Uuid(
+                                "8",
+                            ),
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Said(
+                    Record {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                        session: SessionId(
+                            "s1",
+                        ),
+                        at: Instant(
+                            "2026-01-01T00:00:08Z",
+                        ),
+                        author: Owner,
+                        text: Body(
+                            "typed while busy",
+                        ),
+                    },
+                ),
+                Said(
+                    Record {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                        session: SessionId(
+                            "s1",
+                        ),
+                        at: Instant(
+                            "2026-01-01T00:00:08Z",
+                        ),
+                        author: Owner,
+                        text: Body(
+                            "see",
+                        ),
+                    },
+                ),
+                Unrecognised(
+                    Unrecognised {
+                        kind: Kind(
+                            "brand-new-kind",
+                        ),
+                        uuid: Some(
+                            Uuid(
+                                "8",
+                            ),
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Unrecognised(
+                    Unrecognised {
+                        kind: Kind(
+                            "brand_new_attachment",
+                        ),
+                        uuid: Some(
+                            Uuid(
+                                "8",
+                            ),
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "8",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "1",
+                            ),
+                        ),
+                    },
+                ),
+            ],
+            cursor: Cursor(
+                Offset(
+                    19388,
+                ),
+            ),
+        },
+    ],
+)

@@ -1,0 +1,9 @@
+[Transcript.lines]
+check = "Classified"
+
+[Transcript.resumed]
+check = "Resumed"
+
+[Transcript.admitted]
+check = "Admitted"
+texts = ["", "s1", "said\u0000plainly", "owner", "lead"]
