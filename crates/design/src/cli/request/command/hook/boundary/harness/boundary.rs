@@ -31,6 +31,7 @@ enum Status {
     Live,
     Attended,
     Hung,
+    Gone,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -60,19 +61,25 @@ pub struct Tasks {
     hung: Vec<Body>,
 }
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-enum Turn {
-    Assistant,
-    #[default]
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type", rename_all = "lowercase")]
+enum Line {
+    Assistant {
+        #[serde(default)]
+        message: Closing,
+    },
+    Attachment {
+        attachment: Note,
+    },
     #[serde(other)]
     Other,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 enum Reason {
-    #[serde(rename = "end_turn")]
     EndTurn,
+    StopSequence,
     #[serde(other)]
     Other,
 }
@@ -84,11 +91,33 @@ struct Closing {
 }
 
 #[derive(Debug, Deserialize)]
-struct Last {
-    #[serde(rename = "type", default)]
-    turn: Turn,
-    #[serde(default)]
-    message: Closing,
+#[serde(tag = "type", rename_all = "snake_case")]
+enum Note {
+    PromptSnapshot,
+    HookSuccess {
+        #[serde(rename = "hookEvent")]
+        event: Event,
+    },
+    HookNonBlockingError {
+        #[serde(rename = "hookEvent")]
+        event: Event,
+    },
+    #[serde(other)]
+    Other,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+enum Event {
+    SubagentStop,
+    #[serde(other)]
+    Other,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Turn {
+    Ended,
+    Open,
+    Trailing,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -138,17 +167,18 @@ impl Runner {
     fn ending(self, text: &str) -> Option<Ended> {
         match self {
             Runner::Shell => Task::TRAILERS.iter().any(|trailer| text.contains(trailer)).then_some(Ended),
-            Runner::Agent => Last::parsed(text).and_then(Last::ending),
+            Runner::Agent => Line::last(text),
         }
     }
 
     fn status(self, ending: Option<Ended>, stamps: Stamps, now: Epoch) -> Status {
-        let fresh = |stamp: Stamp| now.into_inner() - stamps.dated(stamp).into_inner() < Task::QUIET;
+        let within = |stamp: Stamp, limit: i64| now.into_inner() - stamps.dated(stamp).into_inner() < limit;
         let open = || {
-            fresh(Stamp::from(self))
+            within(Stamp::from(self), Task::QUIET)
                 .then_some(Status::Live)
-                .or_else(|| fresh(Stamp::Touched).then_some(Status::Attended))
-                .unwrap_or(Status::Hung)
+                .or_else(|| within(Stamp::Touched, Task::QUIET).then_some(Status::Attended))
+                .or_else(|| within(Stamp::Touched, Task::GONE).then_some(Status::Hung))
+                .unwrap_or(Status::Gone)
         };
         ending.map_or_else(open, |Ended| Status::Finished)
     }
@@ -185,25 +215,44 @@ impl From<Runner> for Stamp {
     }
 }
 
-impl Last {
-    fn parsed(text: &str) -> Option<Last> {
-        let last = text.parse::<Lines>().ignoring(Ignored::Untasked)?.into_iter().last()?;
-        serde_json::from_str::<Last>(&last).ignoring(Ignored::Untasked)
+impl Line {
+    fn last(text: &str) -> Option<Ended> {
+        let lines = text.parse::<Lines>().ignoring(Ignored::Untasked)?;
+        let read = lines
+            .into_iter()
+            .rev()
+            .map(|line| serde_json::from_str::<Line>(&line).ignoring(Ignored::Untasked).map_or(Turn::Open, Line::read))
+            .find(|read| *read != Turn::Trailing)?;
+        (read == Turn::Ended).then_some(Ended)
     }
 
-    fn ending(self) -> Option<Ended> {
-        match self.turn {
-            Turn::Assistant => self.message.ending(),
-            Turn::Other => None,
+    fn read(self) -> Turn {
+        match self {
+            Line::Assistant { message } => message.read(),
+            Line::Attachment { attachment } => attachment.read(),
+            Line::Other => Turn::Open,
         }
     }
 }
 
 impl Closing {
-    fn ending(&self) -> Option<Ended> {
+    fn read(&self) -> Turn {
         match self.stop_reason {
-            Some(Reason::EndTurn) => Some(Ended),
-            Some(Reason::Other) | None => None,
+            Some(Reason::EndTurn | Reason::StopSequence) => Turn::Ended,
+            Some(Reason::Other) | None => Turn::Open,
+        }
+    }
+}
+
+impl Note {
+    fn read(self) -> Turn {
+        match self {
+            Note::PromptSnapshot
+            | Note::HookSuccess { event: Event::SubagentStop }
+            | Note::HookNonBlockingError { event: Event::SubagentStop } => Turn::Trailing,
+            Note::HookSuccess { event: Event::Other }
+            | Note::HookNonBlockingError { event: Event::Other }
+            | Note::Other => Turn::Open,
         }
     }
 }
@@ -211,6 +260,7 @@ impl Closing {
 impl Task {
     const TRAILERS: [&'static str; 2] = ["[exited with code", "[killed]"];
     const QUIET: i64 = 20 * 60;
+    const GONE: i64 = 60 * 60;
     const CONTINUATION: u8 = 0b1100_0000;
     const FOLLOWER: u8 = 0b1000_0000;
 
@@ -256,7 +306,7 @@ impl Tasks {
         match task.status {
             Status::Live => self.running_by(task.runner),
             Status::Hung => self.hung_on(task.name),
-            Status::Finished | Status::Attended => self,
+            Status::Finished | Status::Attended | Status::Gone => self,
         }
     }
 
