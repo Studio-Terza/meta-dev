@@ -48,7 +48,7 @@ jobs:
         with:
           path: target
           key: ${{ steps.target.outputs.key }}
-      - run: '"$TIMER" timed ci/limits.toml clippy --since ../clippy.start cargo clippy --locked --workspace --all-targets --all-features --profile clippy -- -D warnings'
+      - run: '"$TIMER" timed ci/limits.toml clippy --since ../clippy.start cargo clippy --locked --workspace --all-targets --all-features -- -D warnings'
       - uses: actions/cache/save@v4
         if: always()
         with:
