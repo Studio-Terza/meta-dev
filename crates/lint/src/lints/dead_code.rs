@@ -51,7 +51,7 @@ pub(crate) struct Attachment {
 
 #[derive(Debug)]
 pub(crate) struct Attached {
-    to: Name,
+    to: Vec<Name>,
     interface: Names,
 }
 
@@ -129,11 +129,13 @@ impl DeadCode<'_> {
             .collect()
     }
 
-    fn attached(item: &ItemImpl) -> Option<Attached> {
-        let to = match &*item.self_ty {
+    fn attached(item: &ItemImpl) -> Attached {
+        let own = match &*item.self_ty {
             Type::Path(path) => path.path.segments.last().map(|segment| Name::of(&segment.ident)),
             _ => None,
-        }?;
+        };
+        let implemented = item.trait_.as_ref().and_then(|(_, path, _)| path.segments.last());
+        let to = own.into_iter().chain(implemented.map(|segment| Name::of(&segment.ident))).collect();
         let trait_path = item.trait_.as_ref().map(|(_, path, _)| path.to_token_stream());
         let items = item.items.iter().map(|inner| match inner {
             ImplItem::Fn(function) => function.sig.to_token_stream(),
@@ -141,7 +143,8 @@ impl DeadCode<'_> {
             ImplItem::Const(constant) => constant.ty.to_token_stream(),
             _ => TokenStream::new(),
         });
-        Some(Attached { to, interface: Names::of(trait_path.into_iter().chain(items).collect()) })
+        let written = [item.generics.to_token_stream()].into_iter().chain(trait_path).chain(items).collect();
+        Attached { to, interface: Names::of(written) }
     }
 }
 
@@ -242,7 +245,7 @@ impl Graphed {
         let attached =
             self.attachments.iter().filter(|attachment| attachment.owner.directory() == directory).find(|attachment| {
                 attachment.attached.interface.0.contains(&export.exported.name)
-                    && living.iter().any(|user| user.exported.name == attachment.attached.to)
+                    && living.iter().any(|user| attachment.attached.to.contains(&user.exported.name))
             });
         interfaced.map(|_| ()).or(attached.map(|_| ()))
     }
@@ -318,7 +321,7 @@ impl<'ast> Visit<'ast> for DeadCode<'_> {
             _ => None,
         }));
         let traited = Gate::inherent(item).entered().xor(Some(())).and(gated);
-        self.attached.extend(traited.and_then(|()| DeadCode::attached(item)));
+        self.attached.extend(traited.map(|()| DeadCode::attached(item)));
     }
 }
 

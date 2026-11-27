@@ -36,6 +36,8 @@ impl Used {
     fn private(&self) {}
 }
 impl Shared for Used {}
+pub trait Bounded {}
+impl<Held: Bounded> Shared for Vec<Held> {}
 impl std::str::FromStr for Used {
     type Err = Refused;
     fn from_str(_: &str) -> Result<Used, Refused> {
