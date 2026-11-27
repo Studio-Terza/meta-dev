@@ -1,5 +1,13 @@
+"tests/goldens/spelled.json"
+
+{"describe": {"columns": [], "parameters": {"Right": 2}, "nullable": []}}
+
+[1, 2, 3]
+
 [
-  [["tests/goldens/statements.txt", "tests/goldens/refusals.txt", "\n", "{\"describe\": {\"columns\": [], \"parameters\": {\"Right\": 2}, \"nullable\": []}}", "1", "2", "3"]],
-  [["r", "body"], ["id", "generated_key"], ["body", "given"], ["at", "generated"]],
-  [["s", "id"], ["id", "generated_key"]]
+  [
+    {"name": "r", "fields": [{"name": "id", "origin": "generated_key"}, {"name": "body", "origin": "given"}, {"name": "at", "origin": "generated"}]},
+    "body"
+  ],
+  [{"name": "s", "fields": [{"name": "id", "origin": "generated_key"}]}, "id"]
 ]

@@ -1,1 +1,0 @@
-BLOCK: test-run took 6s, warn above 3s, block above 5s

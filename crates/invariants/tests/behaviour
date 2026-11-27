@@ -1,1 +1,1 @@
-[["tests/goldens/messages.txt", "300", "\n"]]
+["tests/goldens/messages.json", 300]

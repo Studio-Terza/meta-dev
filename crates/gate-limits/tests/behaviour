@@ -1,37 +1,38 @@
-[
-  [["--- out\n", "--- err\n", "--- written\n", "\n", "passed\n", "failed\n"]],
   [
-    ["tests/goldens/all-ok.txt", "tests/fixtures/limits/levels.toml", "tests/fixtures/measured/all-ok.toml"],
-    ["tests/goldens/warns.txt", "tests/fixtures/limits/levels.toml", "tests/fixtures/measured/warns.toml"],
-    ["tests/goldens/blocks.txt", "tests/fixtures/limits/levels.toml", "tests/fixtures/measured/blocks.toml"],
-    ["tests/goldens/on-level.txt", "tests/fixtures/limits/levels.toml", "tests/fixtures/measured/on-level.toml"],
-    ["tests/goldens/equal-levels.txt", "tests/fixtures/limits/equal.toml", "tests/fixtures/measured/two.toml"],
-    ["tests/goldens/unmeasured.txt", "tests/fixtures/limits/levels.toml", "tests/fixtures/measured/one.toml"],
-    ["tests/goldens/unlimited.txt", "tests/fixtures/limits/levels.toml", "tests/fixtures/measured/unlimited.toml"],
-    ["tests/goldens/not-a-number.txt", "tests/fixtures/limits/levels.toml", "tests/fixtures/measured/not-a-number.toml"],
-    ["tests/goldens/warn-above-block.txt", "tests/fixtures/limits/warn-above-block.toml", "tests/fixtures/measured/one.toml"],
-    ["tests/goldens/no-block.txt", "tests/fixtures/limits/no-block.toml", "tests/fixtures/measured/one.toml"],
-    ["tests/goldens/empty.txt", "tests/fixtures/limits/empty.toml", "tests/fixtures/measured/empty.toml"],
-    ["tests/goldens/within.txt", "tests/fixtures/limits/level.toml", "tests/fixtures/measured/within.toml"],
-    ["tests/goldens/blocked.txt", "tests/fixtures/limits/level.toml", "tests/fixtures/measured/three.toml"],
-    ["tests/goldens/unreadable.txt", "tests/fixtures/limits/level.toml", "tests/fixtures/measured/no-such-measured.toml"],
-    ["tests/goldens/named.txt", "tests/fixtures/limits/levels.toml", "tests/fixtures/measured/four.toml", "test-run"],
-    ["tests/goldens/report-only.txt", "tests/fixtures/limits/levels.toml", "tests/fixtures/measured/report-only.toml", "--report-only", "clippy", "absent"],
-    ["tests/goldens/report-only-other.txt", "tests/fixtures/limits/levels.toml", "tests/fixtures/measured/report-only-other.toml", "--report-only", "clippy", "absent"],
-    ["tests/goldens/named-unmeasured.txt", "tests/fixtures/limits/levels.toml", "tests/fixtures/measured/empty.toml", "test-run"],
-    ["tests/goldens/named-unknown.txt", "tests/fixtures/limits/levels.toml", "tests/fixtures/measured/one.toml", "test-run", "typo"],
-    ["tests/goldens/named-stray.txt", "tests/fixtures/limits/levels.toml", "tests/fixtures/measured/both-one.toml", "test-run"],
-    ["tests/goldens/record-within.txt", "tests/fixtures/limits/record.toml", "tests/fixtures/measured/cold-50.toml"],
-    ["tests/goldens/record-above.txt", "tests/fixtures/limits/record.toml", "tests/fixtures/measured/cold-above.toml"],
-    ["tests/goldens/record-missing.txt", "tests/fixtures/limits/record.toml", "tests/fixtures/measured/cold-unrecorded.toml"]
-  ],
-  [
-    ["tests/goldens/past-warn.txt", "tests/fixtures/limits/levels.toml", "tests/fixtures/measured/warns.toml"],
-    ["tests/goldens/past-block.txt", "tests/fixtures/limits/levels.toml", "tests/fixtures/measured/block.toml"],
-    ["tests/goldens/past-none.txt", "tests/fixtures/limits/levels.toml", "tests/fixtures/measured/clippy-only.toml"]
-  ],
-  [
-    ["tests/goldens/lowered.txt", "tests/fixtures/limits/record.toml", "tests/fixtures/measured/cold-40.toml"],
-    ["tests/goldens/lowered-levels.txt", "tests/fixtures/limits/level.toml", "tests/fixtures/measured/within.toml"]
-  ]
+    ["tests/fixtures/limits/levels.toml", "tests/fixtures/measured/all-ok.toml"],
+    ["tests/fixtures/limits/levels.toml", "tests/fixtures/measured/warns.toml"],
+    ["tests/fixtures/limits/levels.toml", "tests/fixtures/measured/blocks.toml"],
+    ["tests/fixtures/limits/levels.toml", "tests/fixtures/measured/on-level.toml"],
+    ["tests/fixtures/limits/equal.toml", "tests/fixtures/measured/two.toml"],
+    ["tests/fixtures/limits/levels.toml", "tests/fixtures/measured/one.toml"],
+    ["tests/fixtures/limits/levels.toml", "tests/fixtures/measured/unlimited.toml"],
+    ["tests/fixtures/limits/levels.toml", "tests/fixtures/measured/not-a-number.toml"],
+    ["tests/fixtures/limits/warn-above-block.toml", "tests/fixtures/measured/one.toml"],
+    ["tests/fixtures/limits/no-block.toml", "tests/fixtures/measured/one.toml"],
+    ["tests/fixtures/limits/empty.toml", "tests/fixtures/measured/empty.toml"],
+    ["tests/fixtures/limits/level.toml", "tests/fixtures/measured/within.toml"],
+    ["tests/fixtures/limits/level.toml", "tests/fixtures/measured/three.toml"],
+    ["tests/fixtures/limits/level.toml", "tests/fixtures/measured/no-such-measured.toml"],
+    ["tests/fixtures/limits/levels.toml", "tests/fixtures/measured/four.toml", "test-run"],
+    ["tests/fixtures/limits/levels.toml", "tests/fixtures/measured/report-only.toml", "--report-only", "clippy", "absent"],
+    ["tests/fixtures/limits/levels.toml", "tests/fixtures/measured/report-only-other.toml", "--report-only", "clippy", "absent"],
+    ["tests/fixtures/limits/levels.toml", "tests/fixtures/measured/empty.toml", "test-run"],
+    ["tests/fixtures/limits/levels.toml", "tests/fixtures/measured/one.toml", "test-run", "typo"],
+    ["tests/fixtures/limits/levels.toml", "tests/fixtures/measured/both-one.toml", "test-run"],
+    ["tests/fixtures/limits/record.toml", "tests/fixtures/measured/cold-50.toml"],
+    ["tests/fixtures/limits/record.toml", "tests/fixtures/measured/cold-above.toml"],
+    ["tests/fixtures/limits/record.toml", "tests/fixtures/measured/cold-unrecorded.toml"]
 ]
+
+[
+  ["tests/fixtures/limits/levels.toml", "tests/fixtures/measured/warns.toml"],
+  ["tests/fixtures/limits/levels.toml", "tests/fixtures/measured/block.toml"],
+  ["tests/fixtures/limits/levels.toml", "tests/fixtures/measured/clippy-only.toml"]
+]
+
+[
+  ["tests/fixtures/limits/record.toml", "tests/fixtures/measured/cold-40.toml"],
+  ["tests/fixtures/limits/level.toml", "tests/fixtures/measured/within.toml"]
+]
+
+"tests/goldens/runs.json"

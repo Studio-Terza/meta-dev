@@ -1,5 +1,0 @@
-stage test-run has warn and block levels, which only the owner changes; only a record is lowered
---- written
-[test-run]
-warn = 1
-block = 2

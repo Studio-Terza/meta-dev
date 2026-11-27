@@ -1,0 +1,36 @@
+[
+  [
+    [true, "ok: clippy took 10s, warn above 10.5s, block above 20s\nok: test-run took 2.9s, warn above 3s, block above 5s\n", ""],
+    [true, "ok: clippy took 10s, warn above 10.5s, block above 20s\nWARN: test-run took 4s, warn above 3s, block above 5s\n", ""],
+    [false, "ok: clippy took 1s, warn above 10.5s, block above 20s\nBLOCK: test-run took 5.1s, warn above 3s, block above 5s\n", ""],
+    [true, "ok: clippy took 10.5s, warn above 10.5s, block above 20s\nWARN: test-run took 5s, warn above 3s, block above 5s\n", ""],
+    [true, "ok: test-run took 2s, warn above 2s, block above 2s\n", ""],
+    [false, "", "stage clippy has a limit but was not measured\n"],
+    [false, "", "stage lint has no usable limit: it needs numeric warn and block with warn not above block\n"],
+    [false, "", "cannot parse measured: TOML parse error at line 1, column 12\n  |\n1 | test-run = \"fast\"\n  |            ^^^^^^\ninvalid type: string \"fast\", expected f64\n\n"],
+    [false, "", "stage test-run has no usable limit: it needs numeric warn and block with warn not above block\n"],
+    [false, "", "cannot parse limits: TOML parse error at line 1, column 1\n  |\n1 | [test-run]\n  | ^^^^^^^^^^\ndata did not match any variant of untagged enum Limit\n\n"],
+    [false, "", "no stage has a limit\n"],
+    [true, "ok: test-run took 0.5s, warn above 1s, block above 2s\n", ""],
+    [false, "BLOCK: test-run took 3s, warn above 1s, block above 2s\n", ""],
+    [false, "", "cannot read tests/fixtures/measured/no-such-measured.toml: No such file or directory (os error 2)\n"],
+    [true, "WARN: test-run took 4s, warn above 3s, block above 5s\n", ""],
+    [true, "BLOCK: clippy took 30s, warn above 10.5s, block above 20s\nWARN: test-run took 4s, warn above 3s, block above 5s\n", ""],
+    [false, "BLOCK: clippy took 30s, warn above 10.5s, block above 20s\nBLOCK: test-run took 6s, warn above 3s, block above 5s\n", ""],
+    [false, "", "stage test-run has a limit but was not measured\n"],
+    [false, "", "stage typo was asked for but has no limit\n"],
+    [false, "", "stage clippy has no usable limit: it needs numeric warn and block with warn not above block\n"],
+    [true, "ok: cold-clippy took 50s, record 50s, lowered only by ci ratchet-lower\n", ""],
+    [false, "BLOCK: cold-clippy took 50.1s, record 50s, lowered only by ci ratchet-lower\n", ""],
+    [false, "", "stage cold-test-compile has no usable limit: it needs numeric warn and block with warn not above block\n"]
+  ],
+  [
+    {"Ok": ["WARN: test-run took 4s, warn above 3s, block above 5s"]},
+    {"Ok": ["BLOCK: test-run took 6s, warn above 3s, block above 5s"]},
+    {"Err": "stage test-run has a limit but was not measured"}
+  ],
+  [
+    [{"Ok": "cold-clippy = 40\n"}, "cold-clippy = 40\n"],
+    [{"Err": "stage test-run has warn and block levels, which only the owner changes; only a record is lowered"}, "[test-run]\nwarn = 1\nblock = 2\n"]
+  ]
+]

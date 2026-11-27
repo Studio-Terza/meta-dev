@@ -1,4 +1,0 @@
-failed
---- out
---- err
-stage typo was asked for but has no limit

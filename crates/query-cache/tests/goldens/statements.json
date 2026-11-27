@@ -1,0 +1,14 @@
+[
+  "INSERT INTO r (body) VALUES (?1) RETURNING id AS \"id!\", body AS \"body!\", at AS \"at!\"",
+  "SELECT id AS \"id!\", body AS \"body!\", at AS \"at!\" FROM r WHERE id = ?1",
+  "UPDATE r SET body = ?1, at = ?2 WHERE id = ?3",
+  "DELETE FROM r WHERE id = ?1",
+  "SELECT id AS \"id!\", body AS \"body!\", at AS \"at!\" FROM r",
+  "UPDATE r SET body = ?1",
+  "INSERT INTO s DEFAULT VALUES RETURNING id AS \"id!\"",
+  "SELECT id AS \"id!\" FROM s WHERE id = ?1",
+  "UPDATE s SET id = id WHERE id = ?1",
+  "DELETE FROM s WHERE id = ?1",
+  "SELECT id AS \"id!\" FROM s",
+  "UPDATE s SET id = ?1"
+]

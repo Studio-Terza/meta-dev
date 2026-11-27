@@ -1,4 +1,0 @@
-passed
---- out
-ok: test-run took 0.5s, warn above 1s, block above 2s
---- err

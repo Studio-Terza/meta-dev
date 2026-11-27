@@ -1,3 +1,4 @@
+mod boundary;
 mod contents;
 mod document;
 mod failure;
@@ -19,7 +20,8 @@ use gate::Gate;
 use gate::Record;
 use newtype::Wrapping;
 
-#[derive(Debug)]
+#[derive(Debug, serde::Deserialize)]
+#[serde(from = "Vec<String>")]
 pub struct Cli {
     limits: PathBuf,
     measured: PathBuf,

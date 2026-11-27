@@ -1,6 +1,6 @@
 use std::io;
 use std::panic;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use invariants::{Ignoring, Unpoisoned, ignored, invariant, invariants};
@@ -53,11 +53,7 @@ fn each_broken_invariant_and_reason_says_its_text() -> Result<(), Failed> {
         .map(|directory| directory.join(&table))
         .find(|candidate| candidate.is_file())
         .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let rows: Vec<Vec<String>> = serde_json::from_slice(&std::fs::read(found)?)?;
-    let Some([messages, wide, newline]) = rows.first().map(Vec::as_slice) else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
-    let width: u16 = wide.parse()?;
+    let (messages, width): (PathBuf, u16) = serde_json::from_slice(&std::fs::read(found)?)?;
     let lock = Mutex::new(width);
     let poisoning = panic::catch_unwind(|| {
         let _held = lock.lock().unpoisoned();
@@ -79,6 +75,6 @@ fn each_broken_invariant_and_reason_says_its_text() -> Result<(), Failed> {
         .filter_map(|payload| payload.downcast::<String>().into_iter().next().map(|text| *text))
         .chain([Ignored::Wide.to_string()])
         .collect();
-    assert_eq!([said.join(newline), newline.clone()].concat(), std::fs::read_to_string(messages)?);
+    assert_eq!(said, serde_json::from_slice::<Vec<String>>(&std::fs::read(messages)?)?);
     Ok(())
 }

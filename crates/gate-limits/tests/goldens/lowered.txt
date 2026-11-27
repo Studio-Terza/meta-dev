@@ -1,3 +1,0 @@
-cold-clippy = 40
---- written
-cold-clippy = 40

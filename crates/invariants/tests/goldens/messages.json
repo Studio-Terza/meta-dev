@@ -1,0 +1,7 @@
+[
+  "broken invariant: the count fits a byte",
+  "broken invariant: the count fits a byte: number too large to fit in target type",
+  "broken invariant: the count is positive",
+  "broken invariant: no thread panics while it holds a lock, so no lock is poisoned; were one, its state may be half-written",
+  "a count too wide for a byte is not a byte count"
+]

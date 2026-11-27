@@ -1,4 +1,0 @@
-failed
---- out
---- err
-no stage has a limit

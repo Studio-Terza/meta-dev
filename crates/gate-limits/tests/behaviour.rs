@@ -1,14 +1,13 @@
 use std::ffi::OsString;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use console_ports::{Complaint, Shown};
 use file_ports::{Disk, Files, Memory};
 use gate_limits::Cli;
+use serde::Deserialize;
 use test_failure::Failed;
-
-const CODES: [ExitCode; 2] = [ExitCode::SUCCESS, ExitCode::FAILURE];
 
 #[test]
 fn every_run_prints_its_golden_output() -> Result<(), Failed> {
@@ -19,62 +18,44 @@ fn every_run_prints_its_golden_output() -> Result<(), Failed> {
         .map(|directory| directory.join(&table))
         .find(|candidate| candidate.is_file())
         .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let sections: Vec<Vec<Vec<String>>> = serde_json::from_slice(&std::fs::read(found)?)?;
-    let [header, reports, past, lowered, ..] = sections.as_slice() else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
-    let Some([out_marker, err_marker, written_marker, newline, words @ ..]) = header.first().map(Vec::as_slice) else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
-    let reported = reports.iter().map(|row| {
-        let [golden, arguments @ ..] = row.as_slice() else {
-            return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-        };
-        let answered = Cli::from_args(arguments.iter().map(OsString::from)).report_to(&Disk);
-        let code = answered.code();
-        let said = CODES.iter().zip(words).filter(|(known, _)| **known == code).map(|(_, word)| word.as_str());
-        let out: &Shown = answered.as_ref();
-        let err: &Complaint = answered.as_ref();
-        let shown: String = said
-            .chain([out_marker.as_str(), AsRef::<str>::as_ref(out), err_marker, AsRef::<str>::as_ref(err)])
-            .collect();
-        Ok((golden.clone(), shown))
-    });
-    let listed = past.iter().map(|row| {
-        let [golden, arguments @ ..] = row.as_slice() else {
-            return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-        };
-        let cli = Cli::from_args(arguments.iter().map(OsString::from));
-        let shown = match cli.past_warn(&Disk) {
-            Ok(findings) => findings.iter().map(|finding| [finding.to_string(), newline.clone()].concat()).collect(),
-            Err(failure) => [failure.to_string(), newline.clone()].concat(),
-        };
-        Ok((golden.clone(), shown))
-    });
-    let lowered_runs = lowered.iter().map(|row| {
-        let [golden, limits, measured] = row.as_slice() else {
-            return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-        };
-        let files: Memory = [limits, measured]
-            .into_iter()
-            .map(|path| Disk.read(Path::new(path)).map(|bytes| (Path::new(path).to_path_buf(), bytes)))
-            .collect::<Result<Memory, _>>()?;
-        let cli = Cli::from_args([limits, measured].into_iter().map(OsString::from));
-        let result = match cli.lower(&files) {
-            Ok(record) => record.to_string(),
-            Err(failure) => [failure.to_string(), newline.clone()].concat(),
-        };
-        let shown = [result, written_marker.clone(), files.read_text(Path::new(limits))?.to_string()].concat();
-        Ok((golden.clone(), shown))
-    });
-    let drifted: Vec<String> = reported
-        .chain(listed)
-        .chain(lowered_runs)
-        .map(|run| run.and_then(|(golden, shown)| Ok((std::fs::read_to_string(&golden)? != shown).then_some(golden))))
-        .collect::<Result<Vec<Option<String>>, Failed>>()?
-        .into_iter()
-        .flatten()
+    let bytes = std::fs::read(found)?;
+    let mut rows = serde_json::Deserializer::from_slice(&bytes);
+    let reports = Vec::<Cli>::deserialize(&mut rows)?;
+    let past = Vec::<Cli>::deserialize(&mut rows)?;
+    let lowered = Vec::<(PathBuf, PathBuf)>::deserialize(&mut rows)?;
+    let golden = PathBuf::deserialize(&mut rows)?;
+    rows.end()?;
+    let reported: Vec<(bool, String, String)> = reports
+        .iter()
+        .map(|cli| {
+            let answered = cli.report_to(&Disk);
+            let out: &Shown = answered.as_ref();
+            let err: &Complaint = answered.as_ref();
+            (answered.code() == ExitCode::SUCCESS, out.to_string(), AsRef::<str>::as_ref(err).to_owned())
+        })
         .collect();
-    assert_eq!(drifted, Vec::<String>::new());
+    let listed: Vec<Result<Vec<String>, String>> = past
+        .iter()
+        .map(|cli| match cli.past_warn(&Disk) {
+            Ok(findings) => Ok(findings.iter().map(ToString::to_string).collect()),
+            Err(failure) => Err(failure.to_string()),
+        })
+        .collect();
+    let written = lowered
+        .iter()
+        .map(|(limits, measured)| {
+            let files: Memory = [limits, measured]
+                .into_iter()
+                .map(|path| Disk.read(path).map(|held| (path.clone(), held)))
+                .collect::<Result<Memory, _>>()?;
+            let cli = Cli::from_args([limits, measured].into_iter().map(OsString::from));
+            let result = match cli.lower(&files) {
+                Ok(record) => Ok(record.to_string()),
+                Err(failure) => Err(failure.to_string()),
+            };
+            Ok((result, files.read_text(limits)?.to_string()))
+        })
+        .collect::<Result<Vec<(Result<String, String>, String)>, Failed>>()?;
+    assert_eq!((reported, listed, written), serde_json::from_slice(&std::fs::read(golden)?)?);
     Ok(())
 }

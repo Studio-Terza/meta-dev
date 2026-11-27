@@ -207,18 +207,14 @@ fn op_names_are_the_module_path_then_the_trait_and_method() -> Result<(), Failed
         .map(|directory| directory.join(&table))
         .find(|candidate| candidate.is_file())
         .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    let rows: Vec<Vec<String>> = serde_json::from_slice(&std::fs::read(found)?)?;
-    let Some([golden, newline]) = rows.first().map(Vec::as_slice) else {
-        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
-    };
+    let golden: PathBuf = serde_json::from_slice(&std::fs::read(found)?)?;
     let run = Run::root();
     let store = run.port(SqliteOpener.in_memory::<StreamSchema>());
     store.read(SessionCursors)?;
     store.lock()?.end()?;
     drop(store);
-    let named: Vec<String> =
-        run.finish().settled()?.iter().map(|counted| [counted.name().to_string(), newline.clone()].concat()).collect();
-    assert_eq!(named.concat(), std::fs::read_to_string(golden)?);
+    let named: Vec<String> = run.finish().settled()?.iter().map(|counted| counted.name().to_string()).collect();
+    assert_eq!(named, serde_json::from_slice::<Vec<String>>(&std::fs::read(golden)?)?);
     Ok(())
 }
 

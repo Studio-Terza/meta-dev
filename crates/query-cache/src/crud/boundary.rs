@@ -1,7 +1,9 @@
+use serde::Deserialize;
 use strum::EnumString;
 
-#[derive(EnumString, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(EnumString, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[strum(serialize_all = "snake_case", parse_err_ty = Unplaced, parse_err_fn = Unplaced::from)]
+#[serde(rename_all = "snake_case")]
 pub enum Origin {
     Key,
     GeneratedKey,
@@ -25,13 +27,13 @@ impl From<&str> for Unplaced {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
 struct Field {
     name: String,
     origin: Origin,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 pub struct Table {
     name: String,
     fields: Vec<Field>,
