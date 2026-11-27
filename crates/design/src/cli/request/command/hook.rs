@@ -1,5 +1,6 @@
 mod answers;
 mod boundary;
+mod release;
 mod subagent;
 
 use console_ports::Environment;
@@ -15,6 +16,7 @@ use crate::HookEvent;
 use crate::cli::failure::Failure;
 use crate::cli::uttered::Uttered;
 use boundary::{Observed, Settings, Stopping};
+use release::Used;
 use subagent::Finishing;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -35,6 +37,7 @@ impl Hook {
             Hook::Settings => Settings::listed(HookEvent::VARIANTS).written(),
             Hook::On(HookEvent::Stop) => Hook::stopped(&Stopping::heard(heard()?)?, ground, crew),
             Hook::On(HookEvent::SubagentStop) => Finishing::heard(heard()?)?.answered(&ground, crew),
+            Hook::On(HookEvent::PostToolUse) => Used::heard(heard()?)?.answered(&ground, crew),
         }
     }
 
@@ -46,7 +49,7 @@ impl Hook {
         let started = crew.moment();
         let store = ground.store();
         let tasks = stopping.tasks(&ground, crew.now());
-        let queue = ground.queue();
+        let queue = ground.local().queue().and_then(|file| ground.queue(file));
         Ingest::read(store, &ground.transcripts())?;
         stopping.decided(crew, &Observed::new(store, tasks, started, queue))
     }

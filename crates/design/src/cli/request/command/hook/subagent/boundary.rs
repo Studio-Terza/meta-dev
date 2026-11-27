@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use design_messages::PullNumber;
-use grammar::{AgentReport, BranchName, Ended, JobLink, RepositoryName, SpecTrailer, Target};
+use grammar::{AgentReport, BranchName, Ended, JobLink, SpecTrailer, Target};
 use grammar_spec_line::Attachment;
 use hex::FromHex;
 use invariants::Ignoring;
@@ -62,8 +62,13 @@ pub struct Branched {
     head: CommitSha,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(try_from = "String")]
 pub struct Branch(String);
+
+#[derive(Debug, thiserror::Error)]
+#[error("not a branch name of the form area/topic")]
+pub struct Unbranched;
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(from = "String")]
@@ -85,22 +90,6 @@ struct Committed {
 struct Message {
     message: First,
 }
-
-#[derive(Debug, Deserialize)]
-pub struct Local {
-    repository: Repository,
-}
-
-#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(try_from = "String")]
-pub struct Repository {
-    owner: String,
-    name: String,
-}
-
-#[derive(Debug, thiserror::Error)]
-#[error("not a repository of the form owner/name")]
-pub struct Unrepositoried;
 
 #[derive(Debug, Deserialize)]
 pub struct Opened {
@@ -201,37 +190,6 @@ impl Compared {
     }
 }
 
-impl Local {
-    pub fn repository(self) -> Repository {
-        self.repository
-    }
-}
-
-impl Repository {
-    pub fn owner(&self) -> &str {
-        &self.owner
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-}
-
-impl TryFrom<String> for Repository {
-    type Error = Unrepositoried;
-
-    fn try_from(text: String) -> Result<Repository, Unrepositoried> {
-        let read = RepositoryName::read(&text).ok_or(Unrepositoried)?;
-        Ok(Repository { owner: read.owner().to_owned(), name: read.name().to_owned() })
-    }
-}
-
-impl fmt::Display for Repository {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{}/{}", self.owner, self.name)
-    }
-}
-
 impl Opened {
     pub fn pull(&self) -> PullNumber {
         PullNumber::new(self.number)
@@ -241,6 +199,14 @@ impl Opened {
 impl From<BranchName<'_>> for Branch {
     fn from(lexed: BranchName<'_>) -> Branch {
         Branch(lexed.to_string())
+    }
+}
+
+impl TryFrom<String> for Branch {
+    type Error = Unbranched;
+
+    fn try_from(text: String) -> Result<Branch, Unbranched> {
+        BranchName::read(&text).map(Branch::from).ok_or(Unbranched)
     }
 }
 
