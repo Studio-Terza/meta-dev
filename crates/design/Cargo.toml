@@ -21,8 +21,6 @@ design-messages = { path = "../design-messages" }
 dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports" }
 grammar = { path = "../grammar" }
-grammar-git = { path = "../grammar-git" }
-grammar-spec-line = { path = "../grammar-spec-line" }
 hex.workspace = true
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }

@@ -5,14 +5,12 @@ use std::fmt;
 use std::iter;
 use std::str::FromStr;
 
-use grammar::logos::{Lexer, Logos};
-use grammar::{Ignoring, Unlexed};
+use logos::{Lexer, Logos};
 use newtype::{Arbitrary, Checked, Newtype};
 
+use crate::{Ignoring, Unlexed, Unspelled};
 use head::Head;
 use piece::Piece;
-
-use grammar::Unspelled;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Line {
