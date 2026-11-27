@@ -6,7 +6,7 @@ use newtype::{Arbitrary, Newtype, Wrapping};
 use crate::cli::failure::Failure;
 
 #[derive(Newtype, Arbitrary, Clone, Debug, PartialEq, Eq)]
-pub struct Slug(String);
+pub(crate) struct Slug(String);
 
 impl TryFrom<&Path> for Slug {
     type Error = Failure;

@@ -24,7 +24,7 @@ pub struct Finishing {
 
 #[derive(Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(from = "bool")]
-pub enum Reminder {
+pub(crate) enum Reminder {
     #[default]
     First,
     Repeated,
@@ -72,12 +72,12 @@ pub struct Unbranched;
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(from = "String")]
-pub struct First {
+pub(crate) struct First {
     spec: Option<Attachment>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Compared {
+pub(crate) struct Compared {
     commits: Vec<Committed>,
 }
 
@@ -92,7 +92,7 @@ struct Message {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Opened {
+pub(crate) struct Opened {
     number: NonZeroU32,
 }
 
@@ -112,7 +112,7 @@ impl Finishing {
         &self.said
     }
 
-    pub fn reminder(&self) -> Reminder {
+    pub(crate) fn reminder(&self) -> Reminder {
         self.reminder
     }
 
@@ -162,7 +162,7 @@ impl Pushed {
 }
 
 impl Branched {
-    pub fn branch(&self) -> &Branch {
+    pub(crate) fn branch(&self) -> &Branch {
         &self.branch
     }
 
@@ -172,7 +172,7 @@ impl Branched {
 }
 
 impl First {
-    pub fn spec(&self) -> Option<&Attachment> {
+    pub(crate) fn spec(&self) -> Option<&Attachment> {
         self.spec.as_ref()
     }
 }
@@ -185,7 +185,7 @@ impl From<String> for First {
 }
 
 impl Compared {
-    pub fn first(self) -> Option<First> {
+    pub(crate) fn first(self) -> Option<First> {
         self.commits.into_iter().next().map(|committed| committed.commit.message)
     }
 }
@@ -239,7 +239,7 @@ impl fmt::Display for CommitSha {
 }
 
 impl JobId {
-    pub fn linked(link: &str) -> Option<JobId> {
+    pub(crate) fn linked(link: &str) -> Option<JobId> {
         JobLink::read(link).map(|linked| JobId::new(linked.job()))
     }
 }

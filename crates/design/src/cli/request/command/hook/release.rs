@@ -64,7 +64,7 @@ impl Used {
         serde_json::from_str(&heard.into_inner()).map_err(Failure::Unheard)
     }
 
-    pub fn answered<F: Files, S: Store, D: Dispatch, C: Clock, G: Shell>(
+    pub(crate) fn answered<F: Files, S: Store, D: Dispatch, C: Clock, G: Shell>(
         &self,
         ground: &Ground<'_, F, S>,
         crew: &Crew<'_, D, C, G>,

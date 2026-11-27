@@ -34,7 +34,7 @@ pub struct QueueFile(PathBuf);
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(try_from = "PathBuf")]
-pub struct SpecsFolder(PathBuf);
+pub(crate) struct SpecsFolder(PathBuf);
 
 #[derive(Debug, thiserror::Error)]
 #[error("not a repository of the form owner/name")]
@@ -45,7 +45,7 @@ pub struct Unrepositoried;
 pub struct Unrooted;
 
 impl Local {
-    pub fn written(text: &str) -> Local {
+    pub(crate) fn written(text: &str) -> Local {
         toml::from_str(text).ignoring(Ignored::Unconfigured).unwrap_or_default()
     }
 
@@ -57,7 +57,7 @@ impl Local {
         self.queue.0.as_ref()
     }
 
-    pub fn specs(&self) -> Option<&SpecsFolder> {
+    pub(crate) fn specs(&self) -> Option<&SpecsFolder> {
         self.specs.0.as_ref()
     }
 }
@@ -76,7 +76,7 @@ impl<'de, T: DeserializeOwned> Deserialize<'de> for Keyed<T> {
 }
 
 impl Repository {
-    pub fn owner(&self) -> &str {
+    pub(crate) fn owner(&self) -> &str {
         &self.owner
     }
 
@@ -125,7 +125,7 @@ impl AsRef<Path> for QueueFile {
 impl SpecsFolder {
     const SPEC: &'static str = "md";
 
-    pub fn spec(&self, project: &str) -> PathBuf {
+    pub(crate) fn spec(&self, project: &str) -> PathBuf {
         self.0.join(project).with_extension(SpecsFolder::SPEC)
     }
 }

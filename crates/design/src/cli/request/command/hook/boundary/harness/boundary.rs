@@ -145,7 +145,7 @@ impl Runner {
 }
 
 impl Output {
-    pub fn listed(path: &Path) -> Option<Output> {
+    pub(crate) fn listed(path: &Path) -> Option<Output> {
         let runner = Runner::spawned(path)?;
         let name = path
             .file_stem()
@@ -154,7 +154,7 @@ impl Output {
         Some(Output { runner, path: path.to_path_buf(), name })
     }
 
-    pub fn tailed(&self, size: Size) -> Option<Tail> {
+    pub(crate) fn tailed(&self, size: Size) -> Option<Tail> {
         let from = i64::try_from(size.into_inner().saturating_sub(self.runner.tail())).ignoring(Ignored::Untasked)?;
         Some(Tail::new(self.path.clone(), Offset::try_new(from).ignoring(Ignored::Untasked)?))
     }
@@ -245,17 +245,17 @@ impl Tasks {
     }
 
     #[must_use]
-    pub fn live(&self) -> [Tally; 2] {
+    pub(crate) fn live(&self) -> [Tally; 2] {
         [Tally::from(self.shells), Tally::from(self.agents)]
     }
 
     #[must_use]
-    pub fn running(&self) -> usize {
+    pub(crate) fn running(&self) -> usize {
         self.shells + self.agents
     }
 
     #[must_use]
-    pub fn hung(&self) -> &[Body] {
+    pub(crate) fn hung(&self) -> &[Body] {
         &self.hung
     }
 }

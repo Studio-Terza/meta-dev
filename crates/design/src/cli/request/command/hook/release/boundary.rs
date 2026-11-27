@@ -26,7 +26,7 @@ struct Input {
 struct Merge(Option<PullNumber>);
 
 #[derive(Debug, Deserialize)]
-pub struct Landed {
+pub(crate) struct Landed {
     state: State,
     #[serde(rename = "headRefName")]
     branch: Branch,
@@ -45,14 +45,14 @@ pub enum State {
 }
 
 #[derive(Debug)]
-pub struct Checkout {
+pub(crate) struct Checkout {
     path: PathBuf,
     head: Option<CommitSha>,
     branch: Option<Branch>,
 }
 
 impl Used {
-    pub fn merged(&self) -> Option<PullNumber> {
+    pub(crate) fn merged(&self) -> Option<PullNumber> {
         self.tool_input.command.0
     }
 
@@ -68,15 +68,15 @@ impl From<Option<String>> for Merge {
 }
 
 impl Landed {
-    pub fn state(&self) -> State {
+    pub(crate) fn state(&self) -> State {
         self.state
     }
 
-    pub fn found(&self, checkouts: impl IntoIterator<Item = Checkout>) -> Option<Checkout> {
+    pub(crate) fn found(&self, checkouts: impl IntoIterator<Item = Checkout>) -> Option<Checkout> {
         checkouts.into_iter().find(|checkout| checkout.branch.as_ref() == Some(&self.branch))
     }
 
-    pub fn pushed<'checkout>(&self, checkout: &'checkout Checkout) -> Option<&'checkout Checkout> {
+    pub(crate) fn pushed<'checkout>(&self, checkout: &'checkout Checkout) -> Option<&'checkout Checkout> {
         (checkout.head == Some(self.head)).then_some(checkout)
     }
 }

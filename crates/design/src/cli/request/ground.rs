@@ -39,11 +39,11 @@ impl<'run, F: Files, S: Store> Ground<'run, F, S> {
         Some(Queue::read(text.as_ref()))
     }
 
-    pub fn queued(&self, file: &QueueFile, line: impl fmt::Display) -> Result<(), FileFailure> {
+    pub(crate) fn queued(&self, file: &QueueFile, line: impl fmt::Display) -> Result<(), FileFailure> {
         self.files.append(file.as_ref(), &Bytes::new(format!("{line}\n").into_bytes()))
     }
 
-    pub fn titled(&self, specs: &SpecsFolder, spec: &Attachment) -> Option<Heading> {
+    pub(crate) fn titled(&self, specs: &SpecsFolder, spec: &Attachment) -> Option<Heading> {
         let written = spec.to_string();
         let cited = Cited::read(&written)?;
         let text = self.files.read_text(&specs.spec(cited.project())).ignoring(Ignored::Untitled)?;
@@ -59,7 +59,7 @@ impl<'run, F: Files, S: Store> Ground<'run, F, S> {
         text.map_or_default(|read| Local::written(read.as_ref()))
     }
 
-    pub fn transcripts(self) -> Port<'run, ClaudeCodeDir<F>> {
+    pub(crate) fn transcripts(self) -> Port<'run, ClaudeCodeDir<F>> {
         self.run.port(self.located.transcripts(self.files))
     }
 }

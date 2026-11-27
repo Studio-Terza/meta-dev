@@ -36,27 +36,33 @@ impl<'ports, D: Dispatch, C: Clock, G: Shell> Crew<'ports, D, C, G> {
         self.clock.now()
     }
 
-    pub fn spoke(&self, program: &'static str, arguments: &[&str], directory: &Path, timeout: Timeout) -> Option<Ran> {
+    pub(crate) fn spoke(
+        &self,
+        program: &'static str,
+        arguments: &[&str],
+        directory: &Path,
+        timeout: Timeout,
+    ) -> Option<Ran> {
         let spoken = arguments.iter().map(|word| (*word).to_owned()).collect();
         let deadline = Deadline::after(self.clock.now(), timeout);
         let call = Call::new(program, spoken, directory.to_path_buf(), deadline);
         self.shell.ran(&call).ignoring(Ignored::Unrun)
     }
 
-    pub fn moment(&self) -> Moment {
+    pub(crate) fn moment(&self) -> Moment {
         self.clock.moment()
     }
 
-    pub fn paused(&self, pause: Pause) {
+    pub(crate) fn paused(&self, pause: Pause) {
         self.clock.waited(pause, &Bell::hung());
     }
 
-    pub fn replied(&self, prompt: &Prompt, timeout: Timeout, model: Model) -> Result<Heard, Failure> {
+    pub(crate) fn replied(&self, prompt: &Prompt, timeout: Timeout, model: Model) -> Result<Heard, Failure> {
         let held = self.dispatch.dispatch(&Job::due_by(Deadline::after(self.clock.now(), timeout), model), prompt)?;
         Ok(Watch::over(self.dispatch, self.clock).watched(held)?.visited(Replying))
     }
 
-    pub fn fanned(&self, prompts: &[Prompt], timeout: Timeout) -> Result<Vec<Heard>, Failure> {
+    pub(crate) fn fanned(&self, prompts: &[Prompt], timeout: Timeout) -> Result<Vec<Heard>, Failure> {
         let job = Job::due_by(Deadline::after(self.clock.now(), timeout), Model::Haiku);
         let watched = Watch::over(self.dispatch, self.clock).fanned(&job, prompts)?;
         Ok(watched.iter().map(|each| each.visited(Replying)).collect())

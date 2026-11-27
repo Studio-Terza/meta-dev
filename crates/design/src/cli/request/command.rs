@@ -36,7 +36,7 @@ impl Command {
     const HOOK: &'static str = "hook";
     const SETTINGS: &'static str = "--settings";
 
-    pub fn spoken(words: &[&str]) -> Result<Command, Failure> {
+    pub(crate) fn spoken(words: &[&str]) -> Result<Command, Failure> {
         match words {
             [Self::INGEST] => Ok(Command::Ingest(Persistence::File)),
             [Self::INGEST, Self::DRY_RUN] => Ok(Command::Ingest(Persistence::DryRun)),
@@ -54,7 +54,7 @@ impl Command {
         }
     }
 
-    pub fn written<F: Files, S: Store, D: Dispatch, C: Clock, G: Shell>(
+    pub(crate) fn written<F: Files, S: Store, D: Dispatch, C: Clock, G: Shell>(
         self,
         environment: &impl Environment,
         ground: Ground<'_, F, S>,

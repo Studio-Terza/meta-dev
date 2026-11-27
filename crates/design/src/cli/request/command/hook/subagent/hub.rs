@@ -27,7 +27,7 @@ pub struct Hub<'crew, D: Dispatch, C: Clock, G: Shell> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Verdict {
+pub(crate) enum Verdict {
     Green,
     Red(Vec<FailedJob>),
 }
@@ -44,7 +44,7 @@ struct Merging {
 }
 
 #[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Mergeability {
+pub(crate) enum Mergeability {
     #[serde(rename = "MERGEABLE")]
     Clean,
     #[serde(rename = "CONFLICTING")]
@@ -150,7 +150,7 @@ impl<'crew, D: Dispatch, C: Clock, G: Shell> Hub<'crew, D, C, G> {
         self.crew.spoke(Hub::<D, C, G>::PROGRAM, arguments, self.directory, timeout)
     }
 
-    pub fn viewed<T: DeserializeOwned>(&self, pull: PullNumber, fields: &str) -> Option<T> {
+    pub(crate) fn viewed<T: DeserializeOwned>(&self, pull: PullNumber, fields: &str) -> Option<T> {
         let ran = self.ran(&["pr", "view", &pull.to_string(), "--json", fields], Self::QUICK);
         let printed = ran.as_ref().and_then(Ran::succeeded)?;
         serde_json::from_str(printed.as_ref()).ignoring(Ignored::Unviewed)
@@ -203,11 +203,11 @@ impl<'crew, D: Dispatch, C: Clock, G: Shell> Hub<'crew, D, C, G> {
         self.viewed::<Head>(pull, "headRefOid").map(|read| read.head).ok_or(UnreadStep::Head)
     }
 
-    pub fn mergeable(&self, pull: PullNumber) -> Result<Mergeability, UnreadStep> {
+    pub(crate) fn mergeable(&self, pull: PullNumber) -> Result<Mergeability, UnreadStep> {
         self.viewed::<Merging>(pull, "mergeable").map(|read| read.mergeable).ok_or(UnreadStep::Mergeable)
     }
 
-    pub fn registered(&self, pull: PullNumber) -> Result<(), UnreadStep> {
+    pub(crate) fn registered(&self, pull: PullNumber) -> Result<(), UnreadStep> {
         let deadline = Deadline::after(self.crew.now(), Self::REGISTERING);
         iter::repeat_with(|| self.crew.now())
             .take_while(|now| deadline.due(*now) == Due::Pending)
@@ -227,7 +227,7 @@ impl<'crew, D: Dispatch, C: Clock, G: Shell> Hub<'crew, D, C, G> {
         listed.first().map(|_check| ())
     }
 
-    pub fn watched(&self, pull: PullNumber) -> Result<(), UnreadStep> {
+    pub(crate) fn watched(&self, pull: PullNumber) -> Result<(), UnreadStep> {
         match self.ran(&["pr", "checks", &pull.to_string(), "--watch", "--fail-fast"], Self::WATCH) {
             Some(Ran::Succeeded(_) | Ran::Failed(_)) => Ok(()),
             Some(Ran::Overdue) => Err(UnreadStep::Overdue),
@@ -235,14 +235,14 @@ impl<'crew, D: Dispatch, C: Clock, G: Shell> Hub<'crew, D, C, G> {
         }
     }
 
-    pub fn checks(&self, pull: PullNumber) -> Result<Verdict, UnreadStep> {
+    pub(crate) fn checks(&self, pull: PullNumber) -> Result<Verdict, UnreadStep> {
         let ran = self.ran(&["pr", "checks", &pull.to_string(), "--json", "name,bucket,link"], Self::QUICK);
         let printed = ran.as_ref().and_then(Ran::printed).ok_or(UnreadStep::Checks)?;
         let checks: Vec<Check> = serde_json::from_str(printed.as_ref()).map_err(|_unread| UnreadStep::Checks)?;
         Verdict::read(&checks).ok_or(UnreadStep::Checks)
     }
 
-    pub fn log(&self, job: JobId) -> String {
+    pub(crate) fn log(&self, job: JobId) -> String {
         let ran = self.ran(&["run", "view", "--job", &job.to_string(), "--log-failed"], Self::QUICK);
         ran.as_ref().and_then(Ran::succeeded).map_or_else(|| Hub::<D, C, G>::UNLOGGED.to_owned(), ToString::to_string)
     }
@@ -262,7 +262,7 @@ impl Verdict {
         }
     }
 
-    pub fn failed(self) -> Vec<FailedJob> {
+    pub(crate) fn failed(self) -> Vec<FailedJob> {
         match self {
             Verdict::Green => Vec::new(),
             Verdict::Red(jobs) => jobs,

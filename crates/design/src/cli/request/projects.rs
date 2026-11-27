@@ -11,10 +11,10 @@ use crate::cli::failure::Failure;
 use slug::Slug;
 
 #[derive(Debug)]
-pub struct Projects;
+pub(crate) struct Projects;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Kept {
+pub(crate) enum Kept {
     Store,
     Agents,
     Local,
@@ -32,11 +32,11 @@ impl Located {
     const AGENTS: &'static str = "agents";
     const LOCAL: &'static str = "local.toml";
 
-    pub fn transcripts<F: Files>(&self, files: F) -> ClaudeCodeDir<F> {
+    pub(crate) fn transcripts<F: Files>(&self, files: F) -> ClaudeCodeDir<F> {
         ClaudeCodeDir::new(files, self.transcripts.clone())
     }
 
-    pub fn kept(&self, kept: Kept) -> PathBuf {
+    pub(crate) fn kept(&self, kept: Kept) -> PathBuf {
         self.workspace.join(Self::META).join(kept.name())
     }
 }
