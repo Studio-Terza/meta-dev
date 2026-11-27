@@ -97,6 +97,7 @@ impl Unroll {
             Construct::Conditional => "an `if` or `case`",
             Construct::Function => "a function",
             Construct::Subshell => "a subshell",
+            Construct::Group => "a `{ ...; }` group",
             Construct::Substitution => "a command substitution",
             Construct::Xargs => "`xargs`",
             Construct::Find => "`find`",

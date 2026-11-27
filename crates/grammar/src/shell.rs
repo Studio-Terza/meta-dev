@@ -17,6 +17,7 @@ pub enum Construct {
     Conditional,
     Function,
     Subshell,
+    Group,
     Substitution,
     Xargs,
     Find,

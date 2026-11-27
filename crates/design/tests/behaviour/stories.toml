@@ -32,6 +32,10 @@ said = "bash <<'EOF'\nrm x\nEOF"
 
 [[story.finish]]
 hook = "PreToolUse"
+said = "test -d out && { rm -rf out; }"
+
+[[story.finish]]
+hook = "PreToolUse"
 said = "rm x"
 
 [[story.finish]]

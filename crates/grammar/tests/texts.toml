@@ -67,6 +67,7 @@ shell = [
     """find . -exec echo {} \\; -delete""",
     'echo "`rm x`"',
     "true && { rm x; }",
+    "{ echo a; echo b; } > log; rm x",
     "(( i++ )); echo \"$(( 1 + 2 ))\"; rm x",
     "cat a 2>&1 >/dev/null | tee log; rm x",
     "rm x",

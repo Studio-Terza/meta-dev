@@ -437,12 +437,7 @@ impl State {
                 self.opening(Construct::Conditional, Closer::Esac, argument(Head::Case))
             }
             (Some(Spelling::Lead), Quoting::Plain) | (Some(Spelling::Assignment), _) => self,
-            (Some(Spelling::Brace), Quoting::Plain) => self.positioned(argument(Head::Plain)).pushed(Frame::new(
-                None,
-                Closer::Brace,
-                Mode::Command,
-                Position::Command,
-            )),
+            (Some(Spelling::Brace), Quoting::Plain) => self.opening(Construct::Group, Closer::Brace, Position::Command),
             (Some(Spelling::Unbrace), Quoting::Plain) => self.ended_by(Closer::Brace),
             (Some(Spelling::Done), Quoting::Plain) => self.ended_by(Closer::Done),
             (Some(Spelling::Fi), Quoting::Plain) => self.ended_by(Closer::Fi),

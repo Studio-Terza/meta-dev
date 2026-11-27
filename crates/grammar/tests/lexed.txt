@@ -77,7 +77,8 @@ shell "for f in a; do bash -c \"rm $f\"; done": Some((Rm, Loop))
 shell "xargs sh -c 'rm \"$1\"' _": Some((Rm, Xargs))
 shell "find . -exec echo {} \\; -delete": Some((Delete, Find))
 shell "echo \"`rm x`\"": Some((Rm, Substitution))
-shell "true && { rm x; }": None
+shell "true && { rm x; }": Some((Rm, Group))
+shell "{ echo a; echo b; } > log; rm x": None
 shell "(( i++ )); echo \"$(( 1 + 2 ))\"; rm x": None
 shell "cat a 2>&1 >/dev/null | tee log; rm x": None
 shell "rm x": None

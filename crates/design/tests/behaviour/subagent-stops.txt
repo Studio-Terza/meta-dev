@@ -20,6 +20,9 @@ Ok(Blocked) {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecis
 > "bash <<'EOF'\nrm x\nEOF" First
 Ok(Blocked) {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `rm` inside a heredoc fed to a shell. The harness flags `rm` there and stalls the call. Unroll it into separate plain top-level commands: list the targets first, then run each `rm` as its own command with literal paths."}}
 
+> "test -d out && { rm -rf out; }" First
+Ok(Blocked) {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `rm` inside a `{ ...; }` group. The harness flags `rm` there and stalls the call. Unroll it into separate plain top-level commands: list the targets first, then run each `rm` as its own command with literal paths."}}
+
 > "rm x" First
 Ok(Hooked(PreToolUse)) 
 > "git rm x" First
