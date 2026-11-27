@@ -16,6 +16,21 @@
         Snapshot(
             {
                 OpName(
+                    "file_ports::files::files_ops::Files::entries",
+                ): Calls(
+                    1,
+                ),
+                OpName(
+                    "file_ports::files::files_ops::Files::read_from",
+                ): Calls(
+                    1,
+                ),
+                OpName(
+                    "file_ports::files::files_ops::Files::size",
+                ): Calls(
+                    1,
+                ),
+                OpName(
                     "transcript_ports::transcripts::transcripts_ops::Transcripts::read_from",
                 ): Calls(
                     1,

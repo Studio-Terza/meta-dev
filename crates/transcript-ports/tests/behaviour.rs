@@ -15,7 +15,6 @@ use transcript_ports::{
 
 ignored! {
     enum Ignored {
-        Unseeded => "seeding a fresh in-memory store does not fail; were it to, the read finds no session",
         Refused => "a text the check or parse refuses is the None the golden shows",
     }
 }
@@ -42,7 +41,7 @@ fn every_transcript_case_reads_as_its_golden_says() -> Result<(), Failed> {
         match transcript.check {
             Check::Classified => {
                 let run = Run::root();
-                let port = run.port(ClaudeCodeDir::new(Disk, directory));
+                let port = run.port(ClaudeCodeDir::new(run.port(Disk), directory));
                 let sessions = Transcripts::sessions(&port)?;
                 let read = sessions
                     .iter()
@@ -56,14 +55,15 @@ fn every_transcript_case_reads_as_its_golden_says() -> Result<(), Failed> {
                 Ok(Debugged((stems, calls, settled, read)).to_string())
             }
             Check::Resumed => {
-                let session = Disk.entries(&directory)?.into_iter().next().unwrap_or_default();
-                let whole = Disk.read_text(&session)?.as_ref().to_owned();
+                let reading = Run::root();
+                let disk = reading.port(Disk);
+                let session = disk.entries(&directory)?.into_iter().next().unwrap_or_default();
+                let whole = disk.read_text(&session)?.as_ref().to_owned();
+                reading.finish().settled()?;
                 let read = |text: String, cursor: Cursor| -> Result<Read, Failed> {
-                    let files = Memory::default();
-                    files.create_directories(&directory).ignoring(Ignored::Unseeded);
-                    files.append(&session, &Bytes::from(&text)).ignoring(Ignored::Unseeded);
+                    let files: Memory = [(session.clone(), Bytes::from(&text))].into_iter().collect();
                     let run = Run::root();
-                    let port = run.port(ClaudeCodeDir::new(files, directory.clone()));
+                    let port = run.port(ClaudeCodeDir::new(run.port(files), directory.clone()));
                     let sessions = Transcripts::sessions(&port)?;
                     let found = sessions.first().ok_or_else(|| Failed::from(session.display()))?;
                     let read = Transcripts::read_from(&port, found, cursor)?;

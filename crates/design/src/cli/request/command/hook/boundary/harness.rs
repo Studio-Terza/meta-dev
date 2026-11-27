@@ -2,7 +2,7 @@ mod boundary;
 
 use std::path::{Path, PathBuf};
 
-use file_ports::{Epoch, Files, Kind, Tail};
+use file_ports::{Batched, Epoch, Files, Kind, Tail};
 use invariants::Ignoring;
 
 use crate::cli::request::ignored::Ignored;

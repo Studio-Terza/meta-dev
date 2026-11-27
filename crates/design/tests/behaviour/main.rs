@@ -18,7 +18,7 @@ use dispatch_ports::{
     Moment, Output, Pause, Pid, Printed, Prompt, Ran, Reply, ShellFiller, Started, Tokens, Told, Usage, Wall,
     clock_ops, dispatch_ops, shell_ops,
 };
-use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Offset, Size, Stamps, Text};
+use file_ports::{Bytes, Disk, FileFailure, FilesFiller, Kind, Offset, Size, Stamps, Text, files_ops};
 use grammar::Letters;
 use invariants::{Unpoisoned, invariant, invariants};
 use newtype::Wrapping;
@@ -266,53 +266,50 @@ impl Rerooted {
     }
 }
 
-impl Files for Rerooted {
-    fn read(&self, path: &Path) -> Result<Bytes, FileFailure> {
-        Disk.read(&self.real(path))
+impl FilesFiller for Rerooted {
+    fn read(&self, pass: Pass<'_, files_ops::Read>, path: &Path) -> Result<Bytes, FileFailure> {
+        Disk.read(pass, &self.real(path))
     }
 
-    fn read_text(&self, path: &Path) -> Result<Text, FileFailure> {
-        Disk.read_text(&self.real(path))
+    fn read_text(&self, pass: Pass<'_, files_ops::ReadText>, path: &Path) -> Result<Text, FileFailure> {
+        Disk.read_text(pass, &self.real(path))
     }
 
-    fn read_from(&self, path: &Path, offset: Offset) -> Result<Bytes, FileFailure> {
-        Disk.read_from(&self.real(path), offset)
+    fn read_from(
+        &self,
+        pass: Pass<'_, files_ops::ReadFrom>,
+        path: &Path,
+        offset: Offset,
+    ) -> Result<Bytes, FileFailure> {
+        Disk.read_from(pass, &self.real(path), offset)
     }
 
-    fn write(&self, path: &Path, bytes: Bytes) -> Result<(), FileFailure> {
-        Disk.write(&self.real(path), bytes)
+    fn write(&self, pass: Pass<'_, files_ops::Write>, path: &Path, bytes: Bytes) -> Result<(), FileFailure> {
+        Disk.write(pass, &self.real(path), bytes)
     }
 
-    fn append(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure> {
-        Disk.append(&self.real(path), bytes)
+    fn append(&self, pass: Pass<'_, files_ops::Append>, path: &Path, bytes: &Bytes) -> Result<(), FileFailure> {
+        Disk.append(pass, &self.real(path), bytes)
     }
 
-    fn create_directories(&self, path: &Path) -> Result<(), FileFailure> {
-        Disk.create_directories(&self.real(path))
+    fn entries(&self, pass: Pass<'_, files_ops::Entries>, directory: &Path) -> Result<Vec<PathBuf>, FileFailure> {
+        Disk.entries(pass, &self.real(directory))
     }
 
-    fn copy(&self, from: &Path, to: &Path) -> Result<(), FileFailure> {
-        Disk.copy(&self.real(from), &self.real(to))
+    fn canonical(&self, pass: Pass<'_, files_ops::Canonical>, path: &Path) -> Result<PathBuf, FileFailure> {
+        Disk.canonical(pass, &self.real(path))
     }
 
-    fn entries(&self, directory: &Path) -> Result<Vec<PathBuf>, FileFailure> {
-        Disk.entries(&self.real(directory))
+    fn kind(&self, pass: Pass<'_, files_ops::Kind>, path: &Path) -> Kind {
+        Disk.kind(pass, &self.real(path))
     }
 
-    fn canonical(&self, path: &Path) -> Result<PathBuf, FileFailure> {
-        Disk.canonical(&self.real(path))
+    fn size(&self, pass: Pass<'_, files_ops::Size>, path: &Path) -> Result<Size, FileFailure> {
+        Disk.size(pass, &self.real(path))
     }
 
-    fn kind(&self, path: &Path) -> Kind {
-        Disk.kind(&self.real(path))
-    }
-
-    fn size(&self, path: &Path) -> Result<Size, FileFailure> {
-        Disk.size(&self.real(path))
-    }
-
-    fn stamps(&self, path: &Path) -> Result<Stamps, FileFailure> {
-        Disk.stamps(&self.real(path))
+    fn stamps(&self, pass: Pass<'_, files_ops::Stamps>, path: &Path) -> Result<Stamps, FileFailure> {
+        Disk.stamps(pass, &self.real(path))
     }
 }
 

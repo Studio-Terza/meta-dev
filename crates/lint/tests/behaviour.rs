@@ -25,18 +25,19 @@ enum Out {
 #[test]
 fn every_case_prints_its_golden_output_and_reaches_its_verdict() -> Result<(), Failed> {
     let drifted = Cases::<Lint>::drifted(|case| {
-        let lint = case.row();
-        let cli = Cli::from_args(lint.arguments.iter().map(|argument| argument.clone().into_os_string()));
+        let name = case.name().clone();
+        let Lint { arguments, verdict: expected, files, out } = case.into_row();
+        let cli = Cli::from_args(arguments.into_iter().map(PathBuf::into_os_string));
         let mut kept = Vec::new();
         let mut err = Vec::new();
-        let verdict = match lint.out {
-            Out::Kept => cli.verdict(&lint.files, Stopped::default(), &mut kept, &mut err),
+        let verdict = match out {
+            Out::Kept => cli.verdict(files, Stopped::default(), &mut kept, &mut err),
             Out::Full => {
                 let mut full: &mut [u8] = &mut [];
-                cli.verdict(&lint.files, Stopped::default(), &mut full, &mut err)
+                cli.verdict(files, Stopped::default(), &mut full, &mut err)
             }
         };
-        assert_eq!((case.name(), verdict), (case.name(), lint.verdict));
+        assert_eq!((&name, verdict), (&name, expected));
         Ok(String::from_utf8([kept, err].concat())?)
     })?;
     assert_eq!(drifted, Vec::new());

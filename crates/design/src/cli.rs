@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use console_ports::Environment;
 use dispatch_ports::{ClockFiller, DispatchFiller, ShellFiller};
-use file_ports::Files;
+use file_ports::FilesFiller;
 use port_core::Run;
 use store_ports::Opens;
 
@@ -26,7 +26,7 @@ pub struct Agents<H, C, G> {
 }
 
 #[derive(Debug)]
-pub struct Cli<'environment, E: Environment, F: Files, O, H, C, G> {
+pub struct Cli<'environment, E: Environment, F: FilesFiller, O, H, C, G> {
     environment: &'environment E,
     files: F,
     opened: O,
@@ -39,7 +39,9 @@ impl<H, C: ClockFiller, G: ShellFiller> Agents<H, C, G> {
     }
 }
 
-impl<'environment, E: Environment, F: Files, O, H, C: ClockFiller, G: ShellFiller> Cli<'environment, E, F, O, H, C, G> {
+impl<'environment, E: Environment, F: FilesFiller, O, H, C: ClockFiller, G: ShellFiller>
+    Cli<'environment, E, F, O, H, C, G>
+{
     pub fn new(
         environment: &'environment E,
         files: F,
@@ -87,7 +89,7 @@ impl<'environment, E: Environment, F: Files, O, H, C: ClockFiller, G: ShellFille
         let shell = run.port(self.agents.shell);
         request.command().written(
             self.environment,
-            Ground::new(run, self.files, located, &store),
+            Ground::new(run, run.port(self.files), located, &store),
             &Crew::new(&dispatch, &clock, &shell),
         )
     }

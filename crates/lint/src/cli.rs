@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use file_ports::Files;
+use file_ports::{Files, FilesFiller};
 use invariants::Ignoring;
 use port_core::Run;
 use rayon::ThreadPoolBuilder;
@@ -54,15 +54,16 @@ impl Cli {
 
     pub fn verdict(
         &self,
-        files: &(impl Files + Sync),
+        files: impl FilesFiller + Sync,
         timer: impl TimerFiller + Sync,
         out: &mut impl Write,
         err: &mut impl Write,
     ) -> Verdict {
         let run = Run::root();
         let clock = run.port(timer);
+        let disk = run.port(files);
         let read = match ThreadPoolBuilder::new().stack_size(Cli::STACK_BYTES).build() {
-            Ok(pool) => pool.install(|| self.read(files, &clock)),
+            Ok(pool) => pool.install(|| self.read(&disk, &clock)),
             Err(failure) => Read::failed(Failure::Threads(failure)),
         };
         let decided = Cli::decided(&read);

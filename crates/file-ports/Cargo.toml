@@ -12,6 +12,7 @@ doctest = false
 [dependencies]
 invariants = { path = "../invariants" }
 newtype = { path = "../newtype" }
+port-core = { path = "../port-core" }
 thiserror.workspace = true
 
 [dev-dependencies]
