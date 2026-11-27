@@ -18,6 +18,7 @@ file-ports = { path = "../file-ports" }
 grammar-lines = { path = "../grammar-lines" }
 grammar = { path = "../grammar" }
 grammar-slug = { path = "../grammar-slug" }
+hex.workspace = true
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 serde.workspace = true

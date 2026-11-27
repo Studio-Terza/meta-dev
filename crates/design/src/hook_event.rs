@@ -8,4 +8,5 @@ use strum::{Display, IntoStaticStr, VariantArray};
 #[strum(serialize_all = "kebab-case")]
 pub enum HookEvent {
     Stop,
+    SubagentStop,
 }

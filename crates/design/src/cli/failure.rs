@@ -12,7 +12,9 @@ use crate::Outcome;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
-    #[error("usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | --settings))")]
+    #[error(
+        "usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | subagent-stop | --settings))"
+    )]
     Usage,
     #[error("the environment does not name {0:?}")]
     Unset(OsString),
@@ -34,6 +36,8 @@ pub enum Failure {
     Deaf(#[source] io::Error),
     #[error("cannot read the hook input: {0}")]
     Unheard(#[source] serde_json::Error),
+    #[error("cannot add the escalation to the discussion queue: {0}")]
+    Unqueued(#[source] FileFailure),
     #[error("cannot render the hook settings: {0}")]
     Render(#[source] serde_json::Error),
     #[error("a resource was not released cleanly: {0}")]

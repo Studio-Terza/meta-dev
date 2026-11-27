@@ -153,6 +153,7 @@ dependencies = [
  "grammar",
  "grammar-lines",
  "grammar-slug",
+ "hex",
  "invariants",
  "newtype",
  "port-core",
@@ -195,6 +196,7 @@ dependencies = [
  "sqlite-ports",
  "store-ports",
  "strum",
+ "thiserror",
  "transcript-ports",
 ]
 
