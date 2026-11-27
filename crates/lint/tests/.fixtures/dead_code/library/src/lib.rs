@@ -25,6 +25,7 @@ pub struct Returned {
     hidden: Hidden,
 }
 pub struct Kept;
+pub fn spelled_late() {}
 pub struct Hidden;
 pub struct Stranded;
 pub struct Refused;

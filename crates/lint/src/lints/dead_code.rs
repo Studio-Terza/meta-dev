@@ -9,7 +9,7 @@ use quote::ToTokens;
 use syn::visit::{self, Visit};
 use syn::{
     Attribute, Fields, ImplItem, ItemConst, ItemEnum, ItemFn, ItemImpl, ItemMacro, ItemMod, ItemStatic, ItemStruct,
-    ItemTrait, ItemType, ItemUnion, ItemUse, Type, Visibility,
+    ItemTrait, ItemType, ItemUnion, ItemUse, Lit, Type, Visibility,
 };
 
 use crate::finding::{Finding, Fix, Found, Line, Rule};
@@ -146,17 +146,41 @@ impl DeadCode<'_> {
 }
 
 impl Names {
+    const FORMAT_IDENT: &'static str = "format_ident";
+    const BANG: char = '!';
+
     fn of(tokens: TokenStream) -> Names {
-        Names(
-            tokens
-                .into_iter()
-                .flat_map(|tree| match tree {
-                    TokenTree::Ident(ident) => BTreeSet::from([Name::of(&ident)]),
-                    TokenTree::Group(group) => Names::of(group.stream()).0,
-                    TokenTree::Punct(_) | TokenTree::Literal(_) => BTreeSet::new(),
-                })
-                .collect(),
-        )
+        let trees: Vec<TokenTree> = tokens.into_iter().collect();
+        let triples = trees.iter().zip(trees.iter().skip(1)).zip(trees.iter().skip(2));
+        let formatted: BTreeSet<Name> = triples
+            .filter_map(|triple| match triple {
+                ((TokenTree::Ident(called), TokenTree::Punct(bang)), TokenTree::Group(group))
+                    if *called == Names::FORMAT_IDENT && bang.as_char() == Names::BANG =>
+                {
+                    Names::spelled(group.stream())
+                }
+                _ => None,
+            })
+            .collect();
+        let written = trees.into_iter().flat_map(|tree| match tree {
+            TokenTree::Ident(ident) => BTreeSet::from([Name::of(&ident)]),
+            TokenTree::Group(group) => Names::of(group.stream()).0,
+            TokenTree::Punct(_) | TokenTree::Literal(_) => BTreeSet::new(),
+        });
+        Names(written.chain(formatted).collect())
+    }
+
+    fn spelled(arguments: TokenStream) -> Option<Name> {
+        let first = arguments.into_iter().next()?;
+        let literal = match first {
+            TokenTree::Literal(literal) => Some(literal),
+            TokenTree::Ident(_) | TokenTree::Punct(_) | TokenTree::Group(_) => None,
+        }?;
+        let spelled = match Lit::new(literal) {
+            Lit::Str(text) => Some(text.value()),
+            _ => None,
+        }?;
+        syn::parse_str::<Ident>(&spelled).ignoring(Ignored::Unparsed).map(|ident| Name::of(&ident))
     }
 }
 

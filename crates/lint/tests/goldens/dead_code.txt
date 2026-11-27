@@ -4,14 +4,15 @@ Violations
 free functions are not allowed; make them associated functions or methods:
 tests/.fixtures/dead_code/library/src/lib.rs:17: fn called; make it an associated function or a method
 tests/.fixtures/dead_code/library/src/lib.rs:20: fn uncalled; make it an associated function or a method
-tests/.fixtures/dead_code/library/src/lib.rs:45: fn gated; make it an associated function or a method
+tests/.fixtures/dead_code/library/src/lib.rs:28: fn spelled_late; make it an associated function or a method
+tests/.fixtures/dead_code/library/src/lib.rs:46: fn gated; make it an associated function or a method
 a crate exports exactly what another crate uses:
 tests/.fixtures/dead_code/library/src/lib.rs:3: Unnamed is exported but no other crate names it; export it when a user appears
 tests/.fixtures/dead_code/library/src/lib.rs:16: open is exported but no other crate names it; export it when a user appears
 tests go through public APIs:
-tests/.fixtures/dead_code/library/src/lib.rs:45: test code in src; move it to the package's tests directory and call the public API from there
+tests/.fixtures/dead_code/library/src/lib.rs:46: test code in src; move it to the package's tests directory and call the public API from there
 shipped code has no test-only API:
-tests/.fixtures/dead_code/library/src/lib.rs:45: visible item gated on test; remove the gate and test through the real public API
+tests/.fixtures/dead_code/library/src/lib.rs:46: visible item gated on test; remove the gate and test through the real public API
 primitives stay at the boundary: outside a module named boundary, signatures, fields and variants carry types with meaning:
 tests/.fixtures/dead_code/user/src/lib.rs:5: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 every pub item is named by another workspace crate:
@@ -23,7 +24,7 @@ tests/.fixtures/dead_code/library/src/lib.rs:6: pub Forgotten is named by no oth
 tests/.fixtures/dead_code/library/src/lib.rs:14: pub NAME is named by no other crate; make it private or delete it
 tests/.fixtures/dead_code/library/src/lib.rs:16: pub open is named by no other crate; make it private or delete it
 tests/.fixtures/dead_code/library/src/lib.rs:20: pub uncalled is named by no other crate; make it private or delete it
-tests/.fixtures/dead_code/library/src/lib.rs:28: pub Hidden is named by no other crate; make it private or delete it
-tests/.fixtures/dead_code/library/src/lib.rs:29: pub Stranded is named by no other crate; make it private or delete it
-tests/.fixtures/dead_code/library/src/lib.rs:33: pub idle is named by no other crate; make it private or delete it
+tests/.fixtures/dead_code/library/src/lib.rs:29: pub Hidden is named by no other crate; make it private or delete it
+tests/.fixtures/dead_code/library/src/lib.rs:30: pub Stranded is named by no other crate; make it private or delete it
+tests/.fixtures/dead_code/library/src/lib.rs:34: pub idle is named by no other crate; make it private or delete it
 tests/.fixtures/dead_code/user/src/lib.rs:3: pub Reader is named by no other crate; make it private or delete it
