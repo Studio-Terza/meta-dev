@@ -6,8 +6,8 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
-use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, SystemTime};
 use test_failure::Failed;
 
@@ -26,6 +26,7 @@ use port_core::Pass;
 use serde::Deserialize;
 use serde_json::Value;
 use sqlite_ports::SqliteOpener;
+use store_ports::{Opens, Schema};
 use tempfile::TempDir;
 
 use ports::Design;
@@ -56,15 +57,8 @@ const TRIMMING: u32 = 1;
 const READING: u32 = 2;
 const STEP: i64 = 5;
 const READS: i64 = 10_000;
-const STORE: &str = ".meta/design.sqlite";
 const PLACED: &str = "placed";
 const MERGEABLE: &str = "pr view 12 --json mergeable -R o/r";
-
-static MIGRATED: LazyLock<Result<Vec<u8>, Failed>> = LazyLock::new(|| {
-    let home = Home::new()?;
-    home.said(&["stops"], "", &Replies::default());
-    Ok(fs::read(home.workspace().join(STORE))?)
-});
 
 #[derive(Debug)]
 struct Stepping {
@@ -252,6 +246,25 @@ struct Said {
     answer: console_ports::Answer,
 }
 
+#[derive(Debug, Default)]
+struct InMemoryStoresByPath {
+    stores: Mutex<BTreeMap<PathBuf, Sqlite>>,
+}
+
+type Sqlite = <SqliteOpener as Opens>::Store;
+
+impl Opens for &InMemoryStoresByPath {
+    type Store = Sqlite;
+
+    fn file<S: Schema>(&self, path: PathBuf) -> Sqlite {
+        self.stores.lock().unpoisoned().entry(path).or_insert_with(|| SqliteOpener.in_memory::<S>()).clone()
+    }
+
+    fn in_memory<S: Schema>(&self) -> Sqlite {
+        SqliteOpener.in_memory::<S>()
+    }
+}
+
 #[derive(Debug)]
 struct Rerooted {
     temporary: PathBuf,
@@ -320,11 +333,12 @@ impl Files for Rerooted {
 struct Home {
     directory: TempDir,
     at: SystemTime,
+    stores: InMemoryStoresByPath,
 }
 
 impl Home {
     fn new() -> Result<Home, Failed> {
-        let home = Home { directory: TempDir::new()?, at: SystemTime::now() };
+        let home = Home { directory: TempDir::new()?, at: SystemTime::now(), stores: InMemoryStoresByPath::default() };
         fs::create_dir_all(home.workspace().join(".meta"))?;
         home.configured(LOCAL)?;
         Ok(home)
@@ -431,7 +445,7 @@ impl Home {
         let files = Rerooted { temporary: self.path().join("tmp") };
         let clock = Stepping::at(self.at);
         let agents = Agents::new(|_kept: PathBuf| Agent { replies }, clock, Gh { github });
-        let uttered = Cli::new(&environment, files, SqliteOpener, agents).rooted(words);
+        let uttered = Cli::new(&environment, files, &self.stores, agents).rooted(words);
         let shown = AsRef::<Shown>::as_ref(&uttered).clone();
         let ended = uttered.ended();
         let answer = console_ports::Answer::reported(ended.as_ref()).showing(&shown);
@@ -569,9 +583,6 @@ impl Scenario {
 
     fn shown(&self) -> Result<String, Failed> {
         let home = Home::answered()?;
-        let migrated = MIGRATED.as_ref().map_err(|failed| Failed::from(format!("{failed:?}")))?;
-        fs::create_dir_all(home.workspace().join(".meta"))?;
-        fs::write(home.workspace().join(STORE), migrated)?;
         let replies = (self.replies)()?;
         (self.setup)(&home)?;
         let ran: Vec<String> = self
