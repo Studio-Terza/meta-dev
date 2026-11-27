@@ -406,6 +406,7 @@ dependencies = [
  "invariants",
  "port-core",
  "proc-macro2",
+ "quote",
  "ra-ap-rustc_lexer",
  "rayon",
  "syn",

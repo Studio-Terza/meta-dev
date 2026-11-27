@@ -70,6 +70,11 @@ impl Location {
 
 impl Source {
     const PORTS: &'static str = "ports";
+    const BOUNDARY: &'static str = "boundary";
+
+    pub(crate) fn bounded(&self) -> Option<()> {
+        self.location.module.iter().any(|segment| segment == Source::BOUNDARY).then_some(())
+    }
 
     pub(crate) fn new(
         package: Arc<Package>,

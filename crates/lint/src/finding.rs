@@ -20,6 +20,9 @@ pub(crate) enum Rule {
     NoTestOnlyApi,
     BoolMethods,
     NoDyn,
+    PrimitiveBoundary,
+    TestShape,
+    DeadCode,
 }
 
 impl Rule {
@@ -44,11 +47,18 @@ impl Rule {
             Rule::NoDyn => {
                 "no dyn: every type is known at compile time, so code takes a generic, returns impl Trait or names an enum instead of a trait object"
             }
+            Rule::PrimitiveBoundary => {
+                "primitives stay at the boundary: outside a module named boundary, signatures, fields and variants carry types with meaning"
+            }
+            Rule::TestShape => {
+                "tests run production code paths: no literals in a test body and no test helpers beyond a test table"
+            }
+            Rule::DeadCode => "every pub item is named by another workspace crate",
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct Found {
     line: usize,
     problem: String,

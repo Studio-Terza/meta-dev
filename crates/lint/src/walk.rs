@@ -1,16 +1,16 @@
 use syn::visit::{self, Visit};
 use syn::{
     Attribute, Block, Expr, ExprAssign, ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprMethodCall, ExprWhile, Field,
-    ImplItemConst, ImplItemFn, Item, ItemConst, ItemEnum, ItemFn, ItemImpl, ItemMacro, ItemMod, ItemStruct, ItemTrait,
-    ItemType, ItemUse, LifetimeParam, Local, Macro, Path, Signature, TraitItemFn, Type, TypePath, TypeTraitObject,
-    TypeTuple,
+    ImplItemConst, ImplItemFn, ImplItemType, Item, ItemConst, ItemEnum, ItemFn, ItemImpl, ItemMacro, ItemMod,
+    ItemStatic, ItemStruct, ItemTrait, ItemType, ItemUnion, ItemUse, LifetimeParam, Lit, Local, Macro, Path, Signature,
+    TraitItemFn, TraitItemType, Type, TypePath, TypeTraitObject, TypeTuple,
 };
 
 use crate::budget::TestScan;
 use crate::expansion::Expansion;
 use crate::lints::{
-    BoolMethods, Emitters, ExpressionFlow, ManualIteration, NamedLifetimes, NoDyn, NoFreeFns, NoTestOnlyApi,
-    ProcessStarters, PublicApiTests, PublicSurface, TypeShape, VecOutParams,
+    BoolMethods, DeadCode, Emitters, ExpressionFlow, ManualIteration, NamedLifetimes, NoDyn, NoFreeFns, NoTestOnlyApi,
+    PrimitiveBoundary, ProcessStarters, PublicApiTests, PublicSurface, TestShape, TypeShape, VecOutParams,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -244,6 +244,9 @@ walker! {
         emitters: Emitters,
         no_test_only_api: NoTestOnlyApi<'file>,
         test_scan: TestScan,
+        primitive_boundary: PrimitiveBoundary,
+        test_shape: TestShape,
+        dead_code: DeadCode<'file>,
     ]
     nodes [
         visit_file(syn::File) file left_file,
@@ -257,6 +260,11 @@ walker! {
         visit_item_const(ItemConst) item_const left_item_const,
         visit_impl_item_const(ImplItemConst) impl_item_const left_impl_item_const,
         visit_item_struct(ItemStruct) item_struct left_item_struct,
+        visit_item_union(ItemUnion) item_union left_item_union,
+        visit_item_static(ItemStatic) item_static left_item_static,
+        visit_impl_item_type(ImplItemType) impl_item_type left_impl_item_type,
+        visit_trait_item_type(TraitItemType) trait_item_type left_trait_item_type,
+        visit_lit(Lit) lit left_lit,
         visit_item_enum(ItemEnum) item_enum left_item_enum,
         visit_item_type(ItemType) item_type left_item_type,
         visit_item_use(ItemUse) item_use left_item_use,

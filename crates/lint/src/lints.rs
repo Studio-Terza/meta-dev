@@ -1,4 +1,5 @@
 mod bool_methods;
+mod dead_code;
 mod expression_flow;
 mod manual_iteration;
 mod named_lifetimes;
@@ -6,9 +7,11 @@ mod no_comments;
 mod no_dyn;
 mod no_free_fns;
 mod no_test_only_api;
+mod primitive_boundary;
 mod process_starters;
 mod public_api_tests;
 mod public_surface;
+mod test_shape;
 mod type_shape;
 mod vec_out_params;
 
@@ -23,6 +26,7 @@ use crate::style::Style;
 use crate::walk::{Lineup, Pausable, Walker};
 use crate::workspace::Package;
 pub(crate) use bool_methods::BoolMethods;
+pub(crate) use dead_code::{DeadCode, DeadFact};
 pub(crate) use expression_flow::ExpressionFlow;
 pub(crate) use manual_iteration::ManualIteration;
 pub(crate) use named_lifetimes::NamedLifetimes;
@@ -30,9 +34,11 @@ use no_comments::NoComments;
 pub(crate) use no_dyn::NoDyn;
 pub(crate) use no_free_fns::NoFreeFns;
 pub(crate) use no_test_only_api::NoTestOnlyApi;
+pub(crate) use primitive_boundary::PrimitiveBoundary;
 pub(crate) use process_starters::ProcessStarters;
 pub(crate) use public_api_tests::{ApiFact, Emitters, PublicApiTests};
 pub(crate) use public_surface::{PublicSurface, SurfaceFact};
+pub(crate) use test_shape::TestShape;
 pub(crate) use type_shape::TypeShape;
 pub(crate) use vec_out_params::VecOutParams;
 
@@ -41,6 +47,7 @@ pub(crate) struct Facts {
     surface: Vec<SurfaceFact>,
     api: Vec<ApiFact>,
     test_only: Vec<Finding>,
+    dead: Vec<DeadFact>,
 }
 
 #[derive(Debug, Default)]
@@ -74,6 +81,9 @@ impl<'run> Lints<'run> {
             emitters: Pausable::admitted(Emitters::default(), lints.entered),
             no_test_only_api: lints.graph(),
             test_scan: Pausable::admitted(TestScan::default(), Some(())),
+            primitive_boundary: lints.style(),
+            test_shape: lints.style(),
+            dead_code: lints.graph(),
         };
         let Lineup {
             no_free_fns,
@@ -90,6 +100,9 @@ impl<'run> Lints<'run> {
             emitters,
             no_test_only_api,
             test_scan,
+            primitive_boundary,
+            test_shape,
+            dead_code,
         } = Walker::walked(lineup, file);
         let found = [
             lints.found(lints.style::<NoComments>()),
@@ -102,12 +115,15 @@ impl<'run> Lints<'run> {
             lints.found(process_starters),
             lints.found(bool_methods),
             lints.found(no_dyn),
+            lints.found(primitive_boundary),
+            lints.found(test_shape),
         ];
         let api = Lints::facts(public_api_tests).into_iter().chain(emitters.woken().map_or_default(Emitters::facts));
         let facts = Facts {
             surface: Lints::facts(public_surface),
             api: api.collect(),
             test_only: Lints::facts(no_test_only_api),
+            dead: Lints::facts(dead_code),
         };
         let budget = Budget::of_file(source, test_scan.woken().unwrap_or_default(), gate);
         Linted { found: found.into_iter().flatten().collect(), facts, budget }
@@ -139,6 +155,7 @@ impl Facts {
             surface: self.surface.into_iter().chain(later.surface).collect(),
             api: self.api.into_iter().chain(later.api).collect(),
             test_only: self.test_only.into_iter().chain(later.test_only).collect(),
+            dead: self.dead.into_iter().chain(later.dead).collect(),
         }
     }
 
@@ -146,6 +163,7 @@ impl Facts {
         let surface = PublicSurface::reduce(self.surface, packages);
         let api = PublicApiTests::reduce(self.api, packages);
         let test_only = NoTestOnlyApi::reduce(self.test_only, packages);
-        surface.into_iter().chain(api).chain(test_only).collect()
+        let dead = DeadCode::reduce(self.dead, packages);
+        surface.into_iter().chain(api).chain(test_only).chain(dead).collect()
     }
 }
