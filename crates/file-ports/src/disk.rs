@@ -41,6 +41,14 @@ impl FilesFiller for Disk {
         Ok(OpenOptions::new().append(true).create(true).open(path)?.write_all(bytes.as_ref())?)
     }
 
+    fn create_directories(
+        &self,
+        _pass: Pass<'_, files_ops::CreateDirectories>,
+        path: &Path,
+    ) -> Result<(), FileFailure> {
+        Ok(fs::create_dir_all(path)?)
+    }
+
     fn entries(&self, _pass: Pass<'_, files_ops::Entries>, directory: &Path) -> Result<Vec<PathBuf>, FileFailure> {
         let listed: BTreeSet<PathBuf> =
             fs::read_dir(directory)?.map(|entry| entry.map(|found| found.path())).collect::<Result<_, _>>()?;

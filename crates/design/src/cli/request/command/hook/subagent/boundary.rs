@@ -1,5 +1,3 @@
-mod hub;
-
 use std::fmt;
 use std::num::{NonZeroU32, NonZeroU64};
 use std::path::{Path, PathBuf};
@@ -14,30 +12,6 @@ use newtype::{Display, Newtype};
 use serde::Deserialize;
 
 use crate::cli::request::ignored::Ignored;
-pub use hub::Hub;
-pub(super) use hub::{Mergeability, Unopened, Verdict};
-
-#[derive(Debug)]
-pub(crate) struct Tail(Vec<String>);
-
-impl Tail {
-    const LINES: usize = 40;
-
-    fn of(log: &str) -> Tail {
-        let whole: Vec<String> = match log.parse::<grammar::Lines>() {
-            Ok(lines) => lines.into_iter().collect(),
-            Err(unsplit) => match unsplit {},
-        };
-        let skipped = whole.len().saturating_sub(Tail::LINES);
-        Tail(whole.into_iter().skip(skipped).collect())
-    }
-}
-
-impl fmt::Display for Tail {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.iter().try_for_each(|line| writeln!(formatter, "{line}"))
-    }
-}
 
 #[derive(Debug, Deserialize)]
 pub struct Finishing {
@@ -50,7 +24,7 @@ pub struct Finishing {
 
 #[derive(Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(from = "bool")]
-pub(crate) enum Reminder {
+pub enum Reminder {
     #[default]
     First,
     Repeated,
@@ -98,12 +72,12 @@ pub struct Unbranched;
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(from = "String")]
-pub(crate) struct First {
+pub struct First {
     spec: Option<Attachment>,
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct Compared {
+pub struct Compared {
     commits: Vec<Committed>,
 }
 
@@ -118,7 +92,7 @@ struct Message {
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct Opened {
+pub struct Opened {
     number: NonZeroU32,
 }
 
@@ -138,7 +112,7 @@ impl Finishing {
         &self.said
     }
 
-    pub(crate) fn reminder(&self) -> Reminder {
+    pub fn reminder(&self) -> Reminder {
         self.reminder
     }
 
@@ -188,7 +162,7 @@ impl Pushed {
 }
 
 impl Branched {
-    pub(crate) fn branch(&self) -> &Branch {
+    pub fn branch(&self) -> &Branch {
         &self.branch
     }
 
@@ -198,7 +172,7 @@ impl Branched {
 }
 
 impl First {
-    pub(crate) fn spec(&self) -> Option<&Attachment> {
+    pub fn spec(&self) -> Option<&Attachment> {
         self.spec.as_ref()
     }
 }
@@ -211,7 +185,7 @@ impl From<String> for First {
 }
 
 impl Compared {
-    pub(crate) fn first(self) -> Option<First> {
+    pub fn first(self) -> Option<First> {
         self.commits.into_iter().next().map(|committed| committed.commit.message)
     }
 }
@@ -265,7 +239,7 @@ impl fmt::Display for CommitSha {
 }
 
 impl JobId {
-    pub(crate) fn linked(link: &str) -> Option<JobId> {
+    pub fn linked(link: &str) -> Option<JobId> {
         JobLink::read(link).map(|linked| JobId::new(linked.job()))
     }
 }

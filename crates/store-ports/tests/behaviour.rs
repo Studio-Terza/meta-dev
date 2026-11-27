@@ -1,12 +1,11 @@
 use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 
-use design_messages::{CheckName, Fate, Halt, PullNumber, SessionCursors, SessionRecords, StreamSchema};
-use dispatch_ports::{Pid, Tokens, Wall};
+use design_messages::{CheckName, PullNumber, SessionCursors, SessionRecords, StreamSchema};
 use file_ports::Offset;
 use fixture::{Failed, Properties};
 use invariants::{Ignoring, ignored};
-use newtype::{Counter, Enumerated};
+use newtype::Counter;
 use port_core::Run;
 use proptest::collection::vec;
 use proptest::option;
@@ -17,7 +16,7 @@ use proptest::test_runner::TestRunner;
 use sqlite_ports::SqliteOpener;
 use store_ports::{Busy, Column, Counted, Opens, Store, Written};
 use tempfile::TempDir;
-use transcript_ports::{Authorship, Body, Cursor, Instant, SessionId, Uuid};
+use transcript_ports::{Authorship, Body, Cursor, Instant, SessionId, TaskId, Uuid};
 
 ignored! {
     enum Ignored {
@@ -67,28 +66,24 @@ proptest! {
     #![proptest_config(Properties::settled())]
 
     #[test]
-    fn every_column_reads_back_what_it_wrote(uuid in any::<Uuid>(), session in any::<SessionId>(), instant in any::<Instant>(), body in any::<Body>(), offset in any::<Offset>(), optional in option::of(any::<Body>()), pid in any::<Pid>(), tokens in any::<Tokens>(), wall in any::<Wall>(), pull in any::<NonZeroU32>()) {
+    fn every_column_reads_back_what_it_wrote(uuid in any::<Uuid>(), session in any::<SessionId>(), instant in any::<Instant>(), body in any::<Body>(), offset in any::<Offset>(), optional in option::of(any::<Body>()), task in any::<TaskId>(), pull in any::<NonZeroU32>()) {
         prop_assert_eq!(Uuid::from_raw(uuid.raw()).ignoring(Ignored::Unread), Some(uuid));
         prop_assert_eq!(SessionId::from_raw(session.raw()).ignoring(Ignored::Unread), Some(session));
         prop_assert_eq!(Instant::from_raw(instant.raw()).ignoring(Ignored::Unread), Some(instant));
         prop_assert_eq!(Body::from_raw(body.raw()).ignoring(Ignored::Unread), Some(body));
         prop_assert_eq!(Offset::from_raw(offset.raw()).ignoring(Ignored::Unread), Some(offset));
         prop_assert_eq!(<Option<Body>>::from_raw(optional.raw()).ignoring(Ignored::Unread), Some(optional));
-        prop_assert_eq!(Pid::from_raw(pid.raw()).ignoring(Ignored::Unread), Some(pid));
-        prop_assert_eq!(Tokens::from_raw(tokens.raw()).ignoring(Ignored::Unread), Some(tokens));
-        prop_assert_eq!(Wall::from_raw(wall.raw()).ignoring(Ignored::Unread), Some(wall));
+        prop_assert_eq!(TaskId::from_raw(task.raw()).ignoring(Ignored::Unread), Some(task));
         prop_assert_eq!(PullNumber::from_raw(PullNumber::new(pull).raw()).ignoring(Ignored::Unread), Some(PullNumber::new(pull)));
     }
 
     #[test]
     fn a_column_refuses_exactly_what_its_type_cannot_hold(number in any::<i64>(), text in any::<String>()) {
-        prop_assert_eq!(Pid::from_raw(number).is_ok(), u32::try_from(number).is_ok());
         prop_assert_eq!(Offset::from_raw(number).is_ok(), u64::try_from(number).is_ok());
         prop_assert_eq!(PullNumber::from_raw(number).is_ok(), u32::try_from(number).is_ok_and(|pull| NonZeroU32::new(pull).is_some()));
         prop_assert_eq!(CheckName::from_raw(text.clone()).is_ok(), CheckName::try_new(text.clone()).is_ok());
         prop_assert_eq!(Authorship::from_raw(text.clone()).is_ok(), text.parse::<Authorship>().is_ok());
-        prop_assert_eq!(Halt::from_raw(text.clone()).is_ok(), Halt::VARIANTS.iter().any(|halt| halt.raw() == text));
-        prop_assert_eq!(Fate::from_raw(text.clone()).is_ok(), Fate::VARIANTS.iter().any(|fate| fate.raw() == text));
+        prop_assert_eq!(TaskId::from_raw(text.clone()).is_ok(), TaskId::try_new(text.clone()).is_ok());
         let checked = CheckName::try_new(text).ignoring(Ignored::Unread);
         prop_assert_eq!(checked.clone().and_then(|name| CheckName::from_raw(name.raw()).ignoring(Ignored::Unread)), checked);
     }
@@ -96,14 +91,10 @@ proptest! {
 
 #[test]
 fn every_named_column_reads_back_as_its_variant() {
-    let halts =
-        Halt::VARIANTS.iter().filter(|halt| Halt::from_raw(halt.raw()).ignoring(Ignored::Unread) != Some(**halt));
-    let fates =
-        Fate::VARIANTS.iter().filter(|fate| Fate::from_raw(fate.raw()).ignoring(Ignored::Unread) != Some(**fate));
     let authors = [Authorship::Owner, Authorship::Lead];
     let unread =
         authors.iter().filter(|author| Authorship::from_raw(author.raw()).ignoring(Ignored::Unread) != Some(**author));
-    assert_eq!((halts.count(), fates.count(), unread.count()), (usize::MIN, usize::MIN, usize::MIN));
+    assert_eq!(unread.count(), usize::MIN);
 }
 
 #[test]

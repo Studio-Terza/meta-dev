@@ -1,8 +1,8 @@
-use std::fmt;
+use std::path::Path;
 
-use file_ports::{Bytes, FileFailure, Files};
+use file_ports::{Bytes, Files, Kind};
 use grammar::Lines;
-use grammar::{Cited, Heading, Queue};
+use grammar::{Cited, Heading};
 use grammar_spec_line::Attachment;
 use invariants::Ignoring;
 use port_core::{Port, Run};
@@ -10,8 +10,10 @@ use store_ports::Store;
 use transcript_ports::ClaudeCodeDir;
 
 use super::ignored::Ignored;
-use super::local::{Local, QueueFile, SpecsFolder};
+use super::local::{Local, Rooted};
 use super::projects::{Kept, Located};
+use super::queue::Queue;
+use crate::cli::failure::Failure;
 
 #[derive(Debug)]
 pub struct Ground<'run, F: Files, S: Store> {
@@ -34,16 +36,27 @@ impl<'run, F: Files, S: Store> Ground<'run, F, S> {
         &self.files
     }
 
-    pub fn queue(&self, file: &QueueFile) -> Option<Queue> {
-        let text = self.files.read_text(file.as_ref()).ignoring(Ignored::Unqueued)?;
-        Some(Queue::read(text.as_ref()))
+    pub fn prepared(&self, directory: &Path) -> Result<(), Failure> {
+        self.files.create_directories(directory).map_err(Failure::Files)
     }
 
-    pub(crate) fn queued(&self, file: &QueueFile, line: impl fmt::Display) -> Result<(), FileFailure> {
-        self.files.append(file.as_ref(), &Bytes::new(format!("{line}\n").into_bytes()))
+    pub fn kind(&self, path: &Path) -> Kind {
+        self.files.kind(path)
     }
 
-    pub(crate) fn titled(&self, specs: &SpecsFolder, spec: &Attachment) -> Option<Heading> {
+    pub fn queue(&self, file: &Rooted) -> Result<Queue, Failure> {
+        self.files
+            .read_text(file.as_ref())
+            .ignoring(Ignored::Unqueued)
+            .map_or(Ok(Queue::default()), |text| toml::from_str(text.as_ref()).map_err(Failure::Unparsed))
+    }
+
+    pub fn queued(&self, file: &Rooted, queue: &Queue) -> Result<(), Failure> {
+        let text = toml::to_string(queue).map_err(Failure::Unwritten)?;
+        self.files.write(file.as_ref(), Bytes::new(text.into_bytes())).map_err(Failure::Unqueued)
+    }
+
+    pub fn titled(&self, specs: &Rooted, spec: &Attachment) -> Option<Heading> {
         let written = spec.to_string();
         let cited = Cited::read(&written)?;
         let text = self.files.read_text(&specs.spec(cited.project())).ignoring(Ignored::Untitled)?;
@@ -59,7 +72,10 @@ impl<'run, F: Files, S: Store> Ground<'run, F, S> {
         text.map_or_default(|read| Local::written(read.as_ref()))
     }
 
-    pub(crate) fn transcripts(self) -> Port<'run, ClaudeCodeDir<F>> {
-        self.run.port(self.located.transcripts(self.files))
+    pub fn transcripts(&self) -> Port<'run, ClaudeCodeDir<F>>
+    where
+        F: Clone,
+    {
+        self.run.port(self.located.transcripts(self.files.clone()))
     }
 }

@@ -2,29 +2,28 @@ use std::collections::BTreeSet;
 use std::fmt;
 use std::ops::Not;
 
-use design_messages::{Quote, Said, StopRow, Tally, Unabridged};
-use dispatch_ports::{Prompt, Reply};
+use design_messages::{Quote, Said, Unabridged};
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use transcript_ports::{Body, Uuid};
 
-use super::super::super::crew::Heard;
+use super::super::super::crew::{Prompt, Reply};
 use crate::cli::request::ignored::Ignored;
 use invariants::Ignoring;
 
 #[derive(Debug)]
-pub(crate) struct Asked {
+pub struct Asked {
     question: Body,
 }
 
 #[derive(Debug)]
-pub(crate) struct Reading<'history> {
+pub struct Reading<'history> {
     chunks: Vec<&'history [Said]>,
     prompts: Vec<Prompt>,
 }
 
 #[derive(Debug)]
-pub(crate) struct Trimming<'asked> {
+pub struct Trimming<'asked> {
     question: &'asked Body,
     quotes: Vec<String>,
 }
@@ -39,36 +38,13 @@ struct Picked {
 pub struct Answers(Vec<Quote>);
 
 #[derive(Debug)]
-pub struct Search {
-    read: Tally,
-    quoted: Tally,
-    answers: Option<Answers>,
-    tokens: Tally,
-}
-
-#[derive(Debug)]
-pub(crate) struct Selecting<'asked> {
+pub struct Selecting<'asked> {
     question: &'asked Body,
     shown: Vec<String>,
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct Replied<'reply>(&'reply Reply);
-
-impl Search {
-    pub fn new(history: &[Said], quoted: &[Quote], answers: Option<Answers>, tokens: Tally) -> Search {
-        Search { read: Tally::from(history.len()), quoted: Tally::from(quoted.len()), answers, tokens }
-    }
-
-    pub fn answers(&self) -> Option<&Answers> {
-        self.answers.as_ref()
-    }
-
-    pub(crate) fn trailed(&self, row: StopRow) -> StopRow {
-        let kept = Tally::from(self.answers.as_ref().map_or(0, |answers| answers.0.len()));
-        row.searched([self.read, self.quoted, kept, self.tokens])
-    }
-}
+pub struct Replied<'reply>(&'reply Reply);
 
 impl From<&Body> for Asked {
     fn from(said: &Body) -> Asked {
@@ -81,7 +57,7 @@ impl Asked {
         Selecting { question: &self.question, shown: shown.iter().map(ToString::to_string).collect() }
     }
 
-    pub(crate) fn reading<'history>(&self, history: &'history [Said]) -> Reading<'history> {
+    pub fn reading<'history>(&self, history: &'history [Said]) -> Reading<'history> {
         let chunks: Vec<&[Said]> = history.chunks(Reading::CHUNK).collect();
         let prompts = chunks
             .iter()
@@ -93,7 +69,7 @@ impl Asked {
         Reading { chunks, prompts }
     }
 
-    pub(crate) fn trimming(&self, quotes: &[Quote]) -> Trimming<'_> {
+    pub fn trimming(&self, quotes: &[Quote]) -> Trimming<'_> {
         Trimming {
             question: &self.question,
             quotes: quotes.iter().zip(1..).map(|(quote, number)| format!("{number}. {quote}")).collect(),
@@ -104,26 +80,26 @@ impl Asked {
 impl Reading<'_> {
     const CHUNK: usize = 300;
 
-    pub(crate) fn prompts(&self) -> &[Prompt] {
+    pub fn prompts(&self) -> &[Prompt] {
         &self.prompts
     }
 
-    pub fn quoted(&self, heard: &[Heard]) -> Vec<Vec<Quote>> {
+    pub fn quoted(&self, heard: &[Option<Reply>]) -> Vec<Vec<Quote>> {
         self.chunks
             .iter()
             .zip(heard)
-            .map(|(chunk, read)| read.reply().map_or_default(|reply| Answers::quoted(reply, chunk)))
+            .map(|(chunk, read)| read.as_ref().map_or_default(|reply| Answers::quoted(reply, chunk)))
             .collect()
     }
 }
 
 impl Replied<'_> {
-    pub(crate) fn listed<T: DeserializeOwned>(self) -> Vec<T> {
+    pub fn listed<T: DeserializeOwned>(self) -> Vec<T> {
         serde_json::from_str(&self.braced('[', ']')).ignoring(Ignored::Unpicked).unwrap_or_default()
     }
 
     fn braced(self, open: char, close: char) -> String {
-        let letters: Vec<char> = self.0.to_string().chars().collect();
+        let letters: Vec<char> = self.0.as_ref().chars().collect();
         let start = letters.iter().position(|letter| *letter == open).unwrap_or(letters.len());
         let end = letters.iter().rposition(|letter| *letter == close).map_or(start, |last| last + 1);
         letters.get(start..end).unwrap_or_default().iter().collect()
@@ -133,7 +109,7 @@ impl Replied<'_> {
 impl Answers {
     const KEPT: usize = 8;
 
-    pub(crate) fn kept(reply: &Reply, quotes: &[Quote]) -> Option<Answers> {
+    pub fn kept(reply: &Reply, quotes: &[Quote]) -> Option<Answers> {
         let named: BTreeSet<usize> = Replied(reply).listed::<usize>().into_iter().collect();
         let kept: Vec<Quote> = quotes
             .iter()

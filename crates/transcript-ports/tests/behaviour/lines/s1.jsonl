@@ -121,3 +121,9 @@
 {"type":"attachment","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","attachment":{"type":"thinking_drop","content":"ok"}}
 {"type":"attachment","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","attachment":{"type":"total_tokens_reminder","content":"ok"}}
 {"type":"attachment","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","attachment":{"type":"ultrathink_effort","content":"ok"}}
+{"type":"user","uuid":"9","parentUuid":"8","sessionId":"s1","timestamp":"2026-01-01T00:00:09Z","origin":{"kind":"task-notification"},"message":{"content":"<task-notification>\n<task-id>bkilled1</task-id>\n<status>killed</status>\n</task-notification>"}}
+{"type":"attachment","uuid":"9","parentUuid":"8","sessionId":"s1","timestamp":"2026-01-01T00:00:09Z","attachment":{"type":"queued_command","prompt":"<task-notification><task-id>a26ca09f4c3ef4cfd</task-id><status>stopped</status></task-notification>","origin":{"kind":"task-notification"}}}
+{"type":"assistant","uuid":"9","parentUuid":"8","sessionId":"s1","timestamp":"2026-01-01T00:00:09Z","message":{"model":"claude","content":[{"type":"tool_use","id":"toolu_1","name":"TaskStop","input":{"task_id":"noskip"}}]}}
+{"type":"assistant","uuid":"9","parentUuid":"8","sessionId":"s1","timestamp":"2026-01-01T00:00:09Z","message":{"model":"claude","content":[{"type":"text","text":"stopping it"},{"type":"tool_use","id":"toolu_2","name":"TaskStop","input":{"task_id":"unroll"}}]}}
+{"type":"assistant","uuid":"9","parentUuid":"8","sessionId":"s1","timestamp":"2026-01-01T00:00:09Z","message":{"model":"claude","content":[{"type":"tool_use","id":"toolu_3","name":"TaskStop","input":{}}]}}
+{"type":"assistant","uuid":"9","parentUuid":"8","sessionId":"s1","timestamp":"2026-01-01T00:00:09Z","message":{"model":"claude","content":[{"type":"tool_use","id":"toolu_4","name":"TaskStop","input":{"task_id":""}}]}}

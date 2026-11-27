@@ -41,148 +41,134 @@
     ],
     [
         (
-            "Fri Nov  6 01:16:00 2026    \n",
-            Ok(
-                (
-                    [
-                        "Fri",
-                        "Nov",
-                    ],
-                    [
-                        6,
-                        1,
-                        16,
-                        0,
-                        2026,
-                    ],
-                ),
+            "<task-notification>\n<task-id>bhyzfnpyp</task-id>\n<status>killed</status>\n</task-notification>",
+            Some(
+                "bhyzfnpyp",
             ),
         ),
         (
-            "Wed Sep 30 22:11:39 2026",
-            Ok(
-                (
-                    [
-                        "Wed",
-                        "Sep",
-                    ],
-                    [
-                        30,
-                        22,
-                        11,
-                        39,
-                        2026,
-                    ],
-                ),
+            "<task-id>a26ca09f4c3ef4cfd</task-id><task-id>second</task-id>",
+            Some(
+                "a26ca09f4c3ef4cfd",
             ),
         ),
         (
-            "Fri Nov  6 01:16 2026",
-            Err(
-                Unshaped(
-                    "Fri Nov  6 01:16 2026",
-                ),
-            ),
+            "<task-id></task-id>",
+            None,
         ),
         (
-            "Fri Nov  6 01:16:00",
-            Err(
-                Unshaped(
-                    "Fri Nov  6 01:16:00",
-                ),
-            ),
+            "<task-id>open",
+            None,
         ),
         (
-            "Fri Nov  6 01:16:00 2026 2027",
-            Err(
-                Unshaped(
-                    "Fri Nov  6 01:16:00 2026 2027",
-                ),
-            ),
-        ),
-        (
-            "Fri Nov  6 01:16 00:2026",
-            Err(
-                Unshaped(
-                    "Fri Nov  6 01:16 00:2026",
-                ),
-            ),
-        ),
-        (
-            "Fri Nov  6 01:16:00 Sat",
-            Err(
-                Misplaced(
-                    "Fri Nov  6 01:16:00 Sat",
-                ),
-            ),
-        ),
-        (
-            "Fri 11  6 01:16:00 2026",
-            Err(
-                Misplaced(
-                    "Fri 11  6 01:16:00 2026",
-                ),
-            ),
-        ),
-        (
-            "fri Nov  6 01:16:00 2026",
-            Err(
-                Unshaped(
-                    "fri Nov  6 01:16:00 2026",
-                ),
-            ),
-        ),
-        (
-            "Fri Nov  6 01:16:00 99999",
-            Err(
-                Unshaped(
-                    "Fri Nov  6 01:16:00 99999",
-                ),
-            ),
+            "no notice here",
+            None,
         ),
         (
             "",
-            Err(
-                Unshaped(
-                    "",
-                ),
-            ),
+            None,
         ),
     ],
     [
         (
-            "place(a.0, n1, about)",
+            "bjjcy92fd",
             Some(
-                21,
+                [
+                    Some(
+                        "bjjcy92fd",
+                    ),
+                    None,
+                ],
             ),
         ),
         (
-            "  x  ",
+            "a26ca09f4c3ef4cfd",
             Some(
-                5,
+                [
+                    Some(
+                        "a26ca09f4c3ef4cfd",
+                    ),
+                    None,
+                ],
             ),
         ),
         (
-            "x\ny",
+            "agent-a26ca09f4c3ef4cfd",
             Some(
-                3,
+                [
+                    Some(
+                        "a26ca09f4c3ef4cfd",
+                    ),
+                    None,
+                ],
             ),
+        ),
+        (
+            "agent-anoskip-0bb9aacb9e503d6c",
+            Some(
+                [
+                    Some(
+                        "anoskip-0bb9aacb9e503d6c",
+                    ),
+                    Some(
+                        "noskip",
+                    ),
+                ],
+            ),
+        ),
+        (
+            "agent-ab0-sample-83f6552a698d193e",
+            Some(
+                [
+                    Some(
+                        "ab0-sample-83f6552a698d193e",
+                    ),
+                    Some(
+                        "b0-sample",
+                    ),
+                ],
+            ),
+        ),
+        (
+            "agent-abusy",
+            Some(
+                [
+                    Some(
+                        "agent-abusy",
+                    ),
+                    None,
+                ],
+            ),
+        ),
+        (
+            "a/b",
+            None,
         ),
         (
             "",
             None,
         ),
+    ],
+    [
         (
-            " \n\t",
-            None,
+            "process-rebuild#D1",
+            "[(\"process-rebuild\", 1)]",
         ),
         (
-            "x\0y",
-            None,
+            "process-rebuild#D1, process-rebuild#D2",
+            "[(\"process-rebuild\", 1), (\"process-rebuild\", 2)]",
         ),
         (
-            "\0",
-            None,
+            "a#D1,b#D2 c",
+            "[(\"a\", 1), (\"b\", 2)]",
+        ),
+        (
+            "none",
+            "[]",
+        ),
+        (
+            "",
+            "[]",
         ),
     ],
     [
@@ -201,76 +187,6 @@
         (
             "",
             "",
-        ),
-    ],
-    [
-        (
-            "20261106000000_stream.sql",
-            Some(
-                (
-                    20261106000000,
-                    "stream",
-                ),
-            ),
-        ),
-        (
-            "20261106000005_applied_files.sql",
-            Some(
-                (
-                    20261106000005,
-                    "applied files",
-                ),
-            ),
-        ),
-        (
-            "20261107000002_unicode_trimmed_segments.sql",
-            Some(
-                (
-                    20261107000002,
-                    "unicode trimmed segments",
-                ),
-            ),
-        ),
-        (
-            "1_a2b.sql",
-            Some(
-                (
-                    1,
-                    "a2b",
-                ),
-            ),
-        ),
-        (
-            "20261106000000.sql",
-            None,
-        ),
-        (
-            "20261106000000_.sql",
-            None,
-        ),
-        (
-            "20261106000000_stream",
-            None,
-        ),
-        (
-            "20261106000000_stream.up.sql",
-            None,
-        ),
-        (
-            "stream_20261106000000.sql",
-            None,
-        ),
-        (
-            "20261106000000__stream.sql",
-            None,
-        ),
-        (
-            "99999999999999999999_stream.sql",
-            None,
-        ),
-        (
-            "",
-            None,
         ),
     ],
     [
@@ -316,6 +232,7 @@
                     Loop,
                 ),
             ),
+            [],
         ),
         (
             "bash -c 'rm x'",
@@ -325,6 +242,7 @@
                     ShellScript,
                 ),
             ),
+            [],
         ),
         (
             "sh -c \"rm -rf /tmp/x\"",
@@ -334,6 +252,7 @@
                     ShellScript,
                 ),
             ),
+            [],
         ),
         (
             "zsh -ec 'cd a && rm b'",
@@ -343,6 +262,7 @@
                     ShellScript,
                 ),
             ),
+            [],
         ),
         (
             "find . -name x -delete",
@@ -352,6 +272,7 @@
                     Find,
                 ),
             ),
+            [],
         ),
         (
             "find . -name '*.o' -exec rm {} \\;",
@@ -361,6 +282,7 @@
                     Find,
                 ),
             ),
+            [],
         ),
         (
             "find . -type d -empty -exec rmdir {} +",
@@ -370,6 +292,7 @@
                     Find,
                 ),
             ),
+            [],
         ),
         (
             "ls | xargs rm",
@@ -379,6 +302,7 @@
                     Xargs,
                 ),
             ),
+            [],
         ),
         (
             "ls | xargs -I {} rm {}",
@@ -388,6 +312,7 @@
                     Xargs,
                 ),
             ),
+            [],
         ),
         (
             "printf a | xargs -0 -n1 rm -f",
@@ -397,6 +322,7 @@
                     Xargs,
                 ),
             ),
+            [],
         ),
         (
             "echo $(rm x)",
@@ -406,6 +332,7 @@
                     Substitution,
                 ),
             ),
+            [],
         ),
         (
             "x=\"$(rm y)\"",
@@ -415,6 +342,7 @@
                     Substitution,
                 ),
             ),
+            [],
         ),
         (
             "echo `rm x`",
@@ -424,6 +352,7 @@
                     Substitution,
                 ),
             ),
+            [],
         ),
         (
             "(cd a && rm b)",
@@ -433,6 +362,7 @@
                     Subshell,
                 ),
             ),
+            [],
         ),
         (
             "cleanup() { rm -rf build; }; cleanup",
@@ -442,6 +372,7 @@
                     Function,
                 ),
             ),
+            [],
         ),
         (
             "function tidy { rmdir out; }",
@@ -451,6 +382,7 @@
                     Function,
                 ),
             ),
+            [],
         ),
         (
             "if [ -e x ]; then rm x; fi",
@@ -460,6 +392,7 @@
                     Conditional,
                 ),
             ),
+            [],
         ),
         (
             "while read f; do rm \"$f\"; done < list",
@@ -469,6 +402,7 @@
                     Loop,
                 ),
             ),
+            [],
         ),
         (
             "case \"$x\" in a) rm a;; esac",
@@ -478,6 +412,7 @@
                     Conditional,
                 ),
             ),
+            [],
         ),
         (
             "bash <<'EOF'\nrm x\nEOF",
@@ -487,6 +422,7 @@
                     Heredoc,
                 ),
             ),
+            [],
         ),
         (
             "sh <<-EOF\n\trm x\n\tEOF",
@@ -496,6 +432,7 @@
                     Heredoc,
                 ),
             ),
+            [],
         ),
         (
             "cat <<A; bash <<B\nrm x\nA\nrm y\nB",
@@ -505,6 +442,7 @@
                     Heredoc,
                 ),
             ),
+            [],
         ),
         (
             "bash <<A\nrm x",
@@ -514,18 +452,22 @@
                     Heredoc,
                 ),
             ),
+            [],
         ),
         (
             "cat <<A\nrm x\nA\nrm y",
             None,
+            [],
         ),
         (
             "cat <<-A\n\trm x\n\tA\nrm y",
             None,
+            [],
         ),
         (
             "cat <<A\n\tA\nrm y\nA",
             None,
+            [],
         ),
         (
             "bash <<A\n\tA\nrm y\nA",
@@ -535,6 +477,7 @@
                     Heredoc,
                 ),
             ),
+            [],
         ),
         (
             "bash <<A\necho a\nrm x\nA\necho done",
@@ -544,6 +487,7 @@
                     Heredoc,
                 ),
             ),
+            [],
         ),
         (
             ">log bash -c 'rm x'",
@@ -553,6 +497,9 @@
                     ShellScript,
                 ),
             ),
+            [
+                "Wrote(\"log\") None Started",
+            ],
         ),
         (
             "cd /w && for f in *.tmp; do /bin/rm \"$f\"; done",
@@ -562,6 +509,7 @@
                     Loop,
                 ),
             ),
+            [],
         ),
         (
             "bash -c 'for f in a; do rm $f; done'",
@@ -571,6 +519,7 @@
                     ShellScript,
                 ),
             ),
+            [],
         ),
         (
             "for f in a; do bash -c \"rm $f\"; done",
@@ -580,6 +529,7 @@
                     Loop,
                 ),
             ),
+            [],
         ),
         (
             "xargs sh -c 'rm \"$1\"' _",
@@ -589,6 +539,7 @@
                     Xargs,
                 ),
             ),
+            [],
         ),
         (
             "find . -exec echo {} \\; -delete",
@@ -598,6 +549,7 @@
                     Find,
                 ),
             ),
+            [],
         ),
         (
             "echo \"`rm x`\"",
@@ -607,6 +559,7 @@
                     Substitution,
                 ),
             ),
+            [],
         ),
         (
             "true && { rm x; }",
@@ -616,98 +569,301 @@
                     Group,
                 ),
             ),
+            [],
         ),
         (
             "{ echo a; echo b; } > log; rm x",
             None,
+            [
+                "Wrote(\"log\") None Started",
+            ],
         ),
         (
             "(( i++ )); echo \"$(( 1 + 2 ))\"; rm x",
             None,
+            [],
         ),
         (
             "cat a 2>&1 >/dev/null | tee log; rm x",
             None,
+            [
+                "Wrote(\"/dev/null\") None Started",
+                "Wrote(\"log\") None Started",
+            ],
         ),
         (
             "rm x",
             None,
+            [],
         ),
         (
             "rm -rf /tmp/build && rmdir /tmp/empty",
             None,
+            [],
         ),
         (
             "git rm x",
             None,
+            [],
         ),
         (
             "echo rm",
             None,
+            [],
         ),
         (
             "cd /w; rm a; rm b",
             None,
+            [],
         ),
         (
             "\\rm x",
             None,
+            [],
         ),
         (
             "git commit -m \"$(cat <<'EOF'\nfor x; do rm y; done\nEOF\n)\"",
             None,
+            [],
         ),
         (
             "grep -rn 'rm -rf' . | xargs echo",
             None,
+            [],
         ),
         (
             "find . -name '*.rs' -exec grep -l rm {} \\; -print",
             None,
+            [],
         ),
         (
             "echo \"for x in a; do rm; done\"",
             None,
+            [],
         ),
         (
             "for f in rm rmdir; do echo $f; done",
             None,
+            [],
         ),
         (
             "cat <<EOF\nrm x\nEOF",
             None,
+            [],
         ),
         (
             "ls # rm x",
             None,
+            [],
         ),
         (
             "printf 'rm x' > script.sh",
             None,
+            [
+                "Wrote(\"script.sh\") None Started",
+            ],
         ),
         (
             "for d in a b; do echo \"$d\"; done; rm -rf a",
             None,
+            [],
         ),
         (
             "case x in rm) echo;; esac",
             None,
+            [],
         ),
         (
             "RM=rm make clean",
             None,
+            [],
         ),
         (
             "rm -rf \"$(git rev-parse --show-toplevel)/target\"",
             None,
+            [],
         ),
         (
             "'unterminated rm",
             None,
+            [],
         ),
         (
             "",
             None,
+            [],
+        ),
+        (
+            "sed -i 's/a/b/' src/lib.rs",
+            None,
+            [
+                "InPlace(Sed) None Started",
+            ],
+        ),
+        (
+            "sed -i '' -e 's/a/b/' x.rs",
+            None,
+            [
+                "InPlace(Sed) None Started",
+            ],
+        ),
+        (
+            "gsed --in-place=.bak 's/a/b/' x.rs",
+            None,
+            [
+                "InPlace(Sed) None Started",
+            ],
+        ),
+        (
+            "sed -ni 's/a/b/p' x.rs",
+            None,
+            [
+                "InPlace(Sed) None Started",
+            ],
+        ),
+        (
+            "sed -n 's/i/b/p' x.rs",
+            None,
+            [],
+        ),
+        (
+            "perl -pi -e 's/a/b/' x.rs",
+            None,
+            [
+                "InPlace(Perl) None Started",
+            ],
+        ),
+        (
+            "perl -i.bak -pe 's/a/b/' x.rs",
+            None,
+            [
+                "InPlace(Perl) None Started",
+            ],
+        ),
+        (
+            "perl -Mstrict -ne 'print' x.rs",
+            None,
+            [],
+        ),
+        (
+            "for f in *.rs; do sed -i 's/a/b/' \"$f\"; done",
+            None,
+            [
+                "InPlace(Sed) Some(Loop) Started",
+            ],
+        ),
+        (
+            "echo a > src/x.rs",
+            None,
+            [
+                "Wrote(\"src/x.rs\") None Started",
+            ],
+        ),
+        (
+            "cargo test 2>/dev/null >> log.txt",
+            None,
+            [
+                "Wrote(\"/dev/null\") None Started",
+                "Wrote(\"log.txt\") None Started",
+            ],
+        ),
+        (
+            "cat <<'EOF' > notes.md\nhello\nEOF",
+            None,
+            [
+                "Wrote(\"notes.md\") None Started",
+            ],
+        ),
+        (
+            "grep x < input.txt",
+            None,
+            [],
+        ),
+        (
+            "echo a | tee -a out.txt other.txt",
+            None,
+            [
+                "Wrote(\"out.txt\") None Started",
+                "Wrote(\"other.txt\") None Started",
+            ],
+        ),
+        (
+            "(cd a && echo b > c)",
+            None,
+            [
+                "Wrote(\"c\") Some(Subshell) Changed([\"a\"])",
+            ],
+        ),
+        (
+            "mv src/a.rs /tmp/a.rs",
+            None,
+            [
+                "Moved { sources: [\"src/a.rs\"], destination: \"/tmp/a.rs\" } None Started",
+            ],
+        ),
+        (
+            "mv -f a b c dest/",
+            None,
+            [
+                "Moved { sources: [\"a\", \"b\", \"c\"], destination: \"dest/\" } None Started",
+            ],
+        ),
+        (
+            "mv only",
+            None,
+            [],
+        ),
+        (
+            "git mv a b",
+            None,
+            [],
+        ),
+        (
+            "echo '> not a redirect' 'sed -i'",
+            None,
+            [],
+        ),
+        (
+            "cd src && echo a > x.rs",
+            None,
+            [
+                "Wrote(\"x.rs\") None Changed([\"src\"])",
+            ],
+        ),
+        (
+            "cd /a; cd b; echo a > x",
+            None,
+            [
+                "Wrote(\"x\") None Changed([\"/a\", \"b\"])",
+            ],
+        ),
+        (
+            "cd $HOME/repo && echo a > x",
+            None,
+            [
+                "Wrote(\"x\") None Unknown",
+            ],
+        ),
+        (
+            "cd - && echo a > x",
+            None,
+            [
+                "Wrote(\"x\") None Unknown",
+            ],
+        ),
+        (
+            "cd && echo a > x",
+            None,
+            [
+                "Wrote(\"x\") None Unknown",
+            ],
+        ),
+        (
+            "cd ~/r; cd /abs && echo a > x",
+            None,
+            [
+                "Wrote(\"x\") None Changed([\"/abs\"])",
+            ],
         ),
     ],
 )

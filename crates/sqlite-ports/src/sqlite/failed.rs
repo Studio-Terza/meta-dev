@@ -1,3 +1,3 @@
 mod boundary;
 
-pub(super) use boundary::{Unexecuted, Unmigrated, Unopened};
+pub(super) use boundary::{Unbuilt, Unexecuted, Unopened};

@@ -15,9 +15,17 @@
             (),
         ),
     ),
-    OpName(
-        "design_messages::session_cursors::SessionCursors",
-    ),
+    [
+        OpName(
+            "design_messages::session_cursors::SessionCursors",
+        ),
+        OpName(
+            "store_ports::store_lock::StoreLock",
+        ),
+        OpName(
+            "store_ports::store_lock::StoreLock::release",
+        ),
+    ],
     [
         Counted {
             name: OpName(

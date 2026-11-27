@@ -1,14 +1,14 @@
 use fixture::{Cases, Debugged, Failed, Fixture, Spelled};
-use grammar::{Bare, Fields, Ignoring, Inked, Letters, Lines, MigrationFile, Nested, Stamp, Unlexed};
+use grammar::{Bare, Cited, Edited, Fields, Letters, Lines, Nested, TaskFile, TaskNotice};
 use serde::Deserialize;
 
 #[derive(Fixture, Deserialize, Debug)]
 struct Texts {
     lines: Vec<Spelled>,
-    stamps: Vec<Spelled>,
-    replies: Vec<Spelled>,
+    notices: Vec<Spelled>,
+    stems: Vec<Spelled>,
+    cited: Vec<Spelled>,
     slugs: Vec<Spelled>,
-    migrations: Vec<Spelled>,
     bare: Vec<Spelled>,
     shell: Vec<Spelled>,
 }
@@ -29,32 +29,36 @@ fn every_lexer_reads_its_fixture_texts_as_its_golden_says() -> Result<(), Failed
                 (text, lines, fields)
             })
             .collect();
-        let stamps: Vec<_> = texts
-            .stamps
+        let notices: Vec<_> = texts
+            .notices
             .iter()
-            .map(|text| (text, Stamp::try_from(text.as_str()).map(|stamp| (stamp.words(), stamp.numbers()))))
+            .map(|text| (text, TaskNotice::read(text.as_str()).map(|notice| notice.task())))
             .collect();
-        let replies: Vec<_> = texts
-            .replies
-            .iter()
-            .map(|text| (text, Inked::read(text.as_str()).map(|inked| inked.as_ref().len())))
-            .collect();
-        let slugs: Vec<_> = texts.slugs.iter().map(|text| (text, Letters::slugged(text.as_str()))).collect();
-        let migrations: Vec<_> = texts
-            .migrations
+        let stems: Vec<_> =
+            texts.stems.iter().map(|text| (text, TaskFile::read(text.as_str()).map(|file| file.ids()))).collect();
+        let cited: Vec<_> = texts
+            .cited
             .iter()
             .map(|text| {
-                let file = text.as_str().parse::<MigrationFile>().ignoring(Unlexed::NotThisGrammar);
-                (text, file.map(|read| (read.version(), read.description())))
+                let each: Vec<_> =
+                    Cited::each(text.as_str()).iter().map(|cited| (cited.project(), cited.detail())).collect();
+                (text, format!("{each:?}"))
             })
             .collect();
+        let slugs: Vec<_> = texts.slugs.iter().map(|text| (text, Letters::slugged(text.as_str()))).collect();
         let bare: Vec<_> = texts.bare.iter().map(|text| (text, Bare::word(text.as_str()))).collect();
         let shell: Vec<_> = texts
             .shell
             .iter()
-            .map(|text| (text, Nested::read(text.as_str()).map(|nested| (nested.flagged(), nested.construct()))))
+            .map(|text| {
+                let edited: Vec<String> = Edited::read(text.as_str())
+                    .iter()
+                    .map(|edited| format!("{:?} {:?} {:?}", edited.edit(), edited.construct(), edited.directory()))
+                    .collect();
+                (text, Nested::read(text.as_str()).map(|nested| (nested.flagged(), nested.construct())), edited)
+            })
             .collect();
-        Ok(Debugged((lines, stamps, replies, slugs, migrations, bare, shell)).to_string())
+        Ok(Debugged((lines, notices, stems, cited, slugs, bare, shell)).to_string())
     })?;
     assert_eq!(drifted, Vec::new());
     Ok(())

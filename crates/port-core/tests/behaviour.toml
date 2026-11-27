@@ -8,12 +8,6 @@ start = 1800000000
 pauses = [1, 5, 20]
 threads = 4
 
-[Dispatched.dropped_twice]
-start = 1800000000
-timeout = 30
-pid = 7
-reply = "conversational(a.0)"
-
 [Stored.unread]
 reads = 0
 

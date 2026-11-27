@@ -18,23 +18,15 @@
     [
         Counted {
             name: OpName(
-                "dispatch_ports::clock::clock_ops::Clock::moment",
-            ),
-            calls: Calls(
-                4,
-            ),
-        },
-        Counted {
-            name: OpName(
                 "dispatch_ports::clock::clock_ops::Clock::now",
             ),
             calls: Calls(
-                1,
+                5,
             ),
         },
         Counted {
             name: OpName(
-                "dispatch_ports::clock::clock_ops::Clock::waited",
+                "dispatch_ports::clock::clock_ops::Clock::paused",
             ),
             calls: Calls(
                 3,

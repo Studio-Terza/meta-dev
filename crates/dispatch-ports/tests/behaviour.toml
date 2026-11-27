@@ -1,0 +1,9 @@
+[Shells.calls]
+pause = 0
+calls = [
+    { program = "sh", arguments = ["-c", "cat"], fed = "a prompt handed on standard input", timeout = 3 },
+    { program = "sh", arguments = ["-c", "printf 'printed'; exit 3"], timeout = 3 },
+    { program = "sh", arguments = ["-c", "cat; printf 'read nothing'"], timeout = 3 },
+    { program = "sleep", arguments = ["30"], timeout = 1 },
+    { program = "a-program-that-is-not-installed", arguments = [], timeout = 3 },
+]

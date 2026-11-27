@@ -1,16 +1,23 @@
+use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 
-use design_messages::{Halt, Tally};
 use file_ports::{Bytes, Epoch, Offset, Size, Stamp, Stamps, Tail};
-use grammar::Lines;
+use grammar::{Lines, TaskFile};
 use invariants::Ignoring;
 use newtype::Wrapping;
 use serde::Deserialize;
-use transcript_ports::Body;
+use transcript_ports::{Body, TaskId};
 
 use crate::cli::request::ignored::Ignored;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Halt {
+    Live,
+    Stalled,
+    Overrun,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Runner {
@@ -42,6 +49,9 @@ pub struct Task {
     status: Status,
     name: Body,
 }
+
+#[derive(Debug, Default)]
+pub struct Stopped(BTreeSet<TaskId>);
 
 #[derive(Debug, Default)]
 pub struct Tasks {
@@ -145,7 +155,7 @@ impl Runner {
 }
 
 impl Output {
-    pub(crate) fn listed(path: &Path) -> Option<Output> {
+    pub fn listed(path: &Path) -> Option<Output> {
         let runner = Runner::spawned(path)?;
         let name = path
             .file_stem()
@@ -154,7 +164,7 @@ impl Output {
         Some(Output { runner, path: path.to_path_buf(), name })
     }
 
-    pub(crate) fn tailed(&self, size: Size) -> Option<Tail> {
+    pub fn tailed(&self, size: Size) -> Option<Tail> {
         let from = i64::try_from(size.into_inner().saturating_sub(self.runner.tail())).ignoring(Ignored::Untasked)?;
         Some(Tail::new(self.path.clone(), Offset::try_new(from).ignoring(Ignored::Untasked)?))
     }
@@ -212,6 +222,23 @@ impl Task {
     }
 }
 
+impl Stopped {
+    fn holding(&self, name: &Body) -> Option<Ended> {
+        let file = TaskFile::read(name.as_ref())?;
+        file.ids()
+            .into_iter()
+            .flatten()
+            .find_map(|id| self.0.iter().find(|task| AsRef::<str>::as_ref(*task) == id))
+            .map(|_stopped| Ended)
+    }
+}
+
+impl From<Vec<TaskId>> for Stopped {
+    fn from(tasks: Vec<TaskId>) -> Stopped {
+        Stopped(tasks.into_iter().collect())
+    }
+}
+
 impl From<&Tasks> for Halt {
     fn from(tasks: &Tasks) -> Halt {
         NonZeroUsize::new(tasks.running()).map_or(Halt::Stalled, |_running| Halt::Live)
@@ -245,17 +272,17 @@ impl Tasks {
     }
 
     #[must_use]
-    pub(crate) fn live(&self) -> [Tally; 2] {
-        [Tally::from(self.shells), Tally::from(self.agents)]
+    pub fn unstopped(self, stopped: &Stopped) -> Tasks {
+        Tasks { hung: self.hung.into_iter().filter(|name| stopped.holding(name).is_none()).collect(), ..self }
     }
 
     #[must_use]
-    pub(crate) fn running(&self) -> usize {
+    pub fn running(&self) -> usize {
         self.shells + self.agents
     }
 
     #[must_use]
-    pub(crate) fn hung(&self) -> &[Body] {
+    pub fn hung(&self) -> &[Body] {
         &self.hung
     }
 }

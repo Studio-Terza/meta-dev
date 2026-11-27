@@ -6,7 +6,7 @@ mod wrapped;
 use generated::Generated;
 use marked::{Mark, Marked};
 use proc_macro::TokenStream;
-use wrapped::{CheckedDeserializing, Constructors, Deserializing, Formatting, Wrapped};
+use wrapped::{CheckedDeserializing, Constructors, Deserializing, Formatting, Serializing, Wrapped};
 
 #[proc_macro_derive(Newtype, attributes(newtype))]
 pub fn derive_newtype(input: TokenStream) -> TokenStream {
@@ -23,6 +23,11 @@ pub fn derive_display(input: TokenStream) -> TokenStream {
     Wrapped::expanded::<Formatting>(input.into()).into()
 }
 
+#[proc_macro_derive(Serialize, attributes(newtype))]
+pub fn derive_serialize(input: TokenStream) -> TokenStream {
+    Wrapped::expanded::<Serializing>(input.into()).into()
+}
+
 #[proc_macro_derive(Deserialize, attributes(newtype))]
 pub fn derive_deserialize(input: TokenStream) -> TokenStream {
     Wrapped::expanded::<Deserializing>(input.into()).into()
@@ -36,9 +41,4 @@ pub fn derive_checked_deserialize(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(Spelled)]
 pub fn derive_spelled(input: TokenStream) -> TokenStream {
     Marked::expanded(input.into(), Mark::Spelled).into()
-}
-
-#[proc_macro_derive(Listed)]
-pub fn derive_listed(input: TokenStream) -> TokenStream {
-    Marked::expanded(input.into(), Mark::Listed).into()
 }

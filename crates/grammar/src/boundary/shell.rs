@@ -1,6 +1,8 @@
 mod lexeme;
 mod reading;
 
+use std::path::Path;
+
 use reading::Reading;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -24,9 +26,43 @@ pub enum Construct {
     Heredoc,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Editor {
+    Sed,
+    Perl,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Edit {
+    InPlace(Editor),
+    Wrote(String),
+    Moved { sources: Vec<String>, destination: String },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Spotted {
+    Flagged(Flagged),
+    Edit(Edit),
+    Changed(Changed),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Changed {
+    To(String),
+    Unknown,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum Directory {
+    #[default]
+    Started,
+    Changed(Vec<String>),
+    Unknown,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Occurrence {
-    flagged: Flagged,
+    spotted: Spotted,
     within: Vec<Construct>,
 }
 
@@ -34,6 +70,13 @@ struct Occurrence {
 pub struct Nested {
     flagged: Flagged,
     construct: Construct,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Edited {
+    edit: Edit,
+    construct: Option<Construct>,
+    directory: Directory,
 }
 
 impl Nested {
@@ -53,12 +96,71 @@ impl Nested {
     }
 }
 
+impl Edited {
+    #[must_use]
+    pub fn read(command: &str) -> Vec<Edited> {
+        let walked = Reading::occurrences(command).into_iter().fold(Walk::default(), Walk::stepped);
+        walked.edited
+    }
+
+    #[must_use]
+    pub fn directory(&self) -> &Directory {
+        &self.directory
+    }
+
+    #[must_use]
+    pub fn edit(&self) -> &Edit {
+        &self.edit
+    }
+
+    #[must_use]
+    pub fn construct(&self) -> Option<Construct> {
+        self.construct
+    }
+}
+
+#[derive(Debug, Default)]
+struct Walk {
+    directory: Directory,
+    edited: Vec<Edited>,
+}
+
+impl Walk {
+    fn stepped(self, occurrence: Occurrence) -> Walk {
+        let construct = occurrence.within.first().copied();
+        match occurrence.spotted {
+            Spotted::Edit(edit) => {
+                let edited = Edited { edit, construct, directory: self.directory.clone() };
+                Walk { edited: self.edited.into_iter().chain([edited]).collect(), ..self }
+            }
+            Spotted::Changed(changed) => Walk { directory: self.directory.changed(changed), ..self },
+            Spotted::Flagged(_) => self,
+        }
+    }
+}
+
+impl Directory {
+    fn changed(self, changed: Changed) -> Directory {
+        match (self, changed) {
+            (_, Changed::To(step)) if Path::new(&step).is_absolute() => Directory::Changed(vec![step]),
+            (Directory::Started, Changed::To(step)) => Directory::Changed(vec![step]),
+            (Directory::Changed(steps), Changed::To(step)) => {
+                Directory::Changed(steps.into_iter().chain([step]).collect())
+            }
+            (Directory::Unknown, Changed::To(_)) | (_, Changed::Unknown) => Directory::Unknown,
+        }
+    }
+}
+
 impl Occurrence {
     fn nested(&self) -> Option<Nested> {
-        self.within.first().map(|construct| Nested { flagged: self.flagged, construct: *construct })
+        match self.spotted {
+            Spotted::Flagged(flagged) => self.within.first().map(|construct| Nested { flagged, construct: *construct }),
+            Spotted::Edit(_) | Spotted::Changed(_) => None,
+        }
     }
 
     fn inside(self, outer: &[Construct]) -> Occurrence {
-        Occurrence { within: outer.iter().copied().chain(self.within).collect(), flagged: self.flagged }
+        Occurrence { within: outer.iter().copied().chain(self.within).collect(), spotted: self.spotted }
     }
 }

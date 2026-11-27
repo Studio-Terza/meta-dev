@@ -1,14 +1,13 @@
-use newtype::{Arbitrary, Deserialize, Newtype};
+use dispatch_ports::{Pause, Wall};
+use newtype::{Arbitrary, Deserialize, Newtype, Wrapping};
+
+use crate::Stepped;
 
 #[derive(Newtype, Arbitrary, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Count(u32);
+pub struct Count(usize);
 
-impl Count {
-    pub(crate) fn reached(self, seen: usize) -> Option<()> {
-        (usize::try_from(self.0).is_ok_and(|wanted| wanted == seen)).then_some(())
-    }
-
-    pub(crate) fn counted(self) -> Count {
-        Count(self.0.saturating_add(1))
+impl Stepped {
+    pub(crate) fn after(now: Wall, pause: Pause) -> Wall {
+        Wall::new(now.into_inner().saturating_add(i64::from(pause.into_inner())))
     }
 }

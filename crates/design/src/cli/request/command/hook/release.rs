@@ -1,11 +1,10 @@
 mod boundary;
 
-use std::fmt;
 use std::path::{Path, PathBuf};
 
 use console_ports::Heard;
 use design_messages::PullNumber;
-use dispatch_ports::{Clock, Dispatch, Ran, Shell};
+use dispatch_ports::{Clock, Ran, Shell, Timeout};
 use file_ports::Files;
 use grammar_git::Worktrees;
 use newtype::Wrapping;
@@ -15,15 +14,15 @@ use super::super::Ground;
 use super::super::crew::Crew;
 use super::subagent::Hub;
 use crate::cli::failure::Failure;
-use crate::cli::request::Local;
+use crate::cli::request::{Held, Item, Local};
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
 pub use boundary::Used;
 use boundary::{Checkout, Landed, State};
 
 #[derive(Debug)]
-struct Releasing<'used, 'crew, D: Dispatch, C: Clock, G: Shell> {
-    crew: &'crew Crew<'crew, D, C, G>,
+struct Releasing<'used, 'crew, C: Clock, G: Shell> {
+    crew: &'crew Crew<'crew, C, G>,
     directory: &'used Path,
     pull: PullNumber,
 }
@@ -34,29 +33,10 @@ enum Released {
     Untouched,
 }
 
-#[derive(strum::Display, Clone, Copy, Debug, PartialEq, Eq)]
-#[strum(serialize_all = "kebab-case")]
-enum Held {
-    NoRepository,
-    Unviewed,
-    Unlisted,
-    Unstatused,
-    Dirty,
-    Unpushed,
-    Unremoved,
-}
-
 #[derive(Debug)]
 struct Holding {
     held: Held,
     worktree: Option<PathBuf>,
-}
-
-#[derive(Debug)]
-struct Kept<'used> {
-    holding: Holding,
-    pull: PullNumber,
-    directory: &'used Path,
 }
 
 impl Used {
@@ -64,35 +44,40 @@ impl Used {
         serde_json::from_str(&heard.into_inner()).map_err(Failure::Unheard)
     }
 
-    pub(crate) fn answered<F: Files, S: Store, D: Dispatch, C: Clock, G: Shell>(
+    pub fn answered<F: Files, S: Store, C: Clock, G: Shell>(
         &self,
         ground: &Ground<'_, F, S>,
-        crew: &Crew<'_, D, C, G>,
+        crew: &Crew<'_, C, G>,
     ) -> Result<Uttered, Failure> {
         let untouched = || Ok(Uttered::silent(Ok(Outcome::Hooked(HookEvent::PostToolUse))));
         self.merged().map_or_else(untouched, |pull| self.released(pull, ground, crew))
     }
 
-    fn released<F: Files, S: Store, D: Dispatch, C: Clock, G: Shell>(
+    fn released<F: Files, S: Store, C: Clock, G: Shell>(
         &self,
         pull: PullNumber,
         ground: &Ground<'_, F, S>,
-        crew: &Crew<'_, D, C, G>,
+        crew: &Crew<'_, C, G>,
     ) -> Result<Uttered, Failure> {
         let local = ground.local();
         match (Releasing { crew, directory: self.directory(), pull }).released(&local) {
             Ok(Released::Removed) => Ok(Uttered::silent(Ok(Outcome::Released))),
             Ok(Released::Untouched) => Ok(Uttered::silent(Ok(Outcome::Hooked(HookEvent::PostToolUse)))),
             Err(holding) => {
-                let queue = local.queue().ok_or(Failure::Unplaced)?;
-                ground.queued(queue, Kept { holding, pull, directory: self.directory() }).map_err(Failure::Unqueued)?;
+                let file = local.queue().ok_or(Failure::Unplaced)?;
+                let worktree = holding.worktree.unwrap_or_else(|| self.directory().to_path_buf());
+                let item = Item::kept(worktree, holding.held, pull.into_inner());
+                ground.queued(file, &ground.queue(file)?.with(item))?;
                 Ok(Uttered::silent(Ok(Outcome::Escalated)))
             }
         }
     }
 }
 
-impl<D: Dispatch, C: Clock, G: Shell> Releasing<'_, '_, D, C, G> {
+impl<C: Clock, G: Shell> Releasing<'_, '_, C, G> {
+    const PROGRAM: &'static str = "git";
+    const QUICK: Timeout = Timeout::new(60);
+
     fn released(&self, local: &Local) -> Result<Released, Holding> {
         let repository = local.repository().ok_or(Holding::from(Held::NoRepository))?;
         let hub = Hub::new(self.crew, self.directory, repository);
@@ -122,18 +107,14 @@ impl<D: Dispatch, C: Clock, G: Shell> Releasing<'_, '_, D, C, G> {
         let removed = self.git(&["worktree", "remove", &path], self.directory);
         removed.as_ref().and_then(Ran::succeeded).map(|_removed| Released::Removed).ok_or_else(|| held(Held::Unremoved))
     }
+
+    fn git(&self, arguments: &[&str], directory: &Path) -> Option<Ran> {
+        self.crew.spoke(Self::PROGRAM, arguments, directory, Self::QUICK)
+    }
 }
 
 impl From<Held> for Holding {
     fn from(held: Held) -> Holding {
         Holding { held, worktree: None }
-    }
-}
-
-impl fmt::Display for Kept<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "- [worktree kept] {} after merging #{}", self.holding.held, self.pull)?;
-        self.holding.worktree.iter().try_for_each(|path| write!(formatter, " at {}", path.display()))?;
-        write!(formatter, ", from {}", self.directory.display())
     }
 }

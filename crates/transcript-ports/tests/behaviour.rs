@@ -80,7 +80,7 @@ fn every_transcript_case_reads_as_its_golden_says() -> Result<(), Failed> {
                             .chain(second)
                             .filter_map(|line| match line {
                                 Line::Said(record) => Some(record.uuid().to_string()),
-                                Line::Skipped(_) | Line::Unrecognised(_) => None,
+                                Line::Ended(_) | Line::Skipped(_) | Line::Unrecognised(_) => None,
                             })
                             .collect();
                         Ok(uuids)

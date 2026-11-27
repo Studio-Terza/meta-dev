@@ -8,5 +8,4 @@ pub enum Outcome {
     Blocked,
     Escalated,
     Released,
-    Trailed,
 }

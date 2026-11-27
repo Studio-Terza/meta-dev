@@ -1606,10 +1606,71 @@
                         ),
                     },
                 ),
+                Ended(
+                    TaskId(
+                        "bkilled1",
+                    ),
+                ),
+                Ended(
+                    TaskId(
+                        "a26ca09f4c3ef4cfd",
+                    ),
+                ),
+                Ended(
+                    TaskId(
+                        "noskip",
+                    ),
+                ),
+                Said(
+                    Record {
+                        uuid: Uuid(
+                            "9",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "8",
+                            ),
+                        ),
+                        session: SessionId(
+                            "s1",
+                        ),
+                        at: Instant(
+                            "2026-01-01T00:00:09Z",
+                        ),
+                        author: Lead,
+                        text: Body(
+                            "stopping it",
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "9",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "8",
+                            ),
+                        ),
+                    },
+                ),
+                Skipped(
+                    Skipped {
+                        uuid: Uuid(
+                            "9",
+                        ),
+                        parent: Some(
+                            Uuid(
+                                "8",
+                            ),
+                        ),
+                    },
+                ),
             ],
             cursor: Cursor(
                 Offset(
-                    19388,
+                    20841,
                 ),
             ),
         },

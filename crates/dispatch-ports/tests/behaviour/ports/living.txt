@@ -1,6 +1,0 @@
-(
-    true,
-    Killed,
-    None,
-    Absent,
-)

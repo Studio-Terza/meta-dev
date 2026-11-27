@@ -1,23 +1,12 @@
 use std::path::{Path, PathBuf};
 
 use design_messages::PullNumber;
-use dispatch_ports::{Clock, Dispatch, Ran, Shell, Timeout};
 use grammar_git::{MergeCommand, Worktree};
 use invariants::Ignoring;
 use serde::Deserialize;
 
 use super::super::subagent::{Branch, CommitSha};
-use super::Releasing;
 use crate::cli::request::ignored::Ignored;
-
-impl<D: Dispatch, C: Clock, G: Shell> Releasing<'_, '_, D, C, G> {
-    const PROGRAM: &'static str = "git";
-    const QUICK: Timeout = Timeout::new(60);
-
-    pub(super) fn git(&self, arguments: &[&str], directory: &Path) -> Option<Ran> {
-        self.crew.spoke(Self::PROGRAM, arguments, directory, Self::QUICK)
-    }
-}
 
 #[derive(Debug, Deserialize)]
 pub struct Used {
@@ -37,7 +26,7 @@ struct Input {
 struct Merge(Option<PullNumber>);
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct Landed {
+pub struct Landed {
     state: State,
     #[serde(rename = "headRefName")]
     branch: Branch,
@@ -56,14 +45,14 @@ pub enum State {
 }
 
 #[derive(Debug)]
-pub(crate) struct Checkout {
+pub struct Checkout {
     path: PathBuf,
     head: Option<CommitSha>,
     branch: Option<Branch>,
 }
 
 impl Used {
-    pub(crate) fn merged(&self) -> Option<PullNumber> {
+    pub fn merged(&self) -> Option<PullNumber> {
         self.tool_input.command.0
     }
 
@@ -79,15 +68,15 @@ impl From<Option<String>> for Merge {
 }
 
 impl Landed {
-    pub(crate) fn state(&self) -> State {
+    pub fn state(&self) -> State {
         self.state
     }
 
-    pub(crate) fn found(&self, checkouts: impl IntoIterator<Item = Checkout>) -> Option<Checkout> {
+    pub fn found(&self, checkouts: impl IntoIterator<Item = Checkout>) -> Option<Checkout> {
         checkouts.into_iter().find(|checkout| checkout.branch.as_ref() == Some(&self.branch))
     }
 
-    pub(crate) fn pushed<'checkout>(&self, checkout: &'checkout Checkout) -> Option<&'checkout Checkout> {
+    pub fn pushed<'checkout>(&self, checkout: &'checkout Checkout) -> Option<&'checkout Checkout> {
         (checkout.head == Some(self.head)).then_some(checkout)
     }
 }

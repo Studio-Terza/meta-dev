@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT\n  OR IGNORE INTO ended (task)\nVALUES\n  (?1)\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "1984af6f1686e2148034b97a472d3f15544130f5c06752b306c8b1439038a3ee"
+}

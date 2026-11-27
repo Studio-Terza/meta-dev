@@ -11,18 +11,13 @@ doctest = false
 
 [dependencies]
 invariants = { path = "../invariants" }
-grammar = { path = "../grammar" }
 newtype = { path = "../newtype" }
-strum.workspace = true
 port-core = { path = "../port-core" }
-serde.workspace = true
-serde_json.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-dispatch-doubles = { path = "../dispatch-doubles" }
 fixture = { path = "../fixture" }
-proptest.workspace = true
+serde.workspace = true
 
 [lints]
 workspace = true

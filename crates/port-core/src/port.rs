@@ -8,7 +8,7 @@ mod sealed {
 
 pub trait Metered: sealed::Sealed {}
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Port<'run, F> {
     filler: F,
     run: &'run Run,

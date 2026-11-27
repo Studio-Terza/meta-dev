@@ -1,0 +1,57 @@
+(
+    (
+        [
+            Ok(
+                Succeeded(
+                    Printed(
+                        "a prompt handed on standard input",
+                    ),
+                ),
+            ),
+            Ok(
+                Failed(
+                    Printed(
+                        "printed",
+                    ),
+                ),
+            ),
+            Ok(
+                Succeeded(
+                    Printed(
+                        "read nothing",
+                    ),
+                ),
+            ),
+            Ok(
+                Overdue,
+            ),
+            Err(
+                "cannot start the program: No such file or directory (os error 2)",
+            ),
+        ],
+        [
+            Ok(
+                Succeeded(
+                    Printed(
+                        "a prompt handed on standard input",
+                    ),
+                ),
+            ),
+        ],
+        true,
+    ),
+    [
+        Calls(
+            1,
+        ),
+        Calls(
+            1,
+        ),
+        Calls(
+            1,
+        ),
+        Calls(
+            1,
+        ),
+    ],
+)

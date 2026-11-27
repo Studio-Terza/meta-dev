@@ -60,7 +60,7 @@ impl Asked {
     fn answered(lead: Option<&Body>, reply: &Body) -> Option<Asked> {
         let replied: &str = reply.as_ref();
         lead.filter(|_said| Prose::read(replied).words() < Asked::SHORT)
-            .and_then(|said| Prose::read(said.as_ref()).last_sentence().map(str::to_owned))
+            .and_then(|said| Prose::read(said.as_ref()).answered().map(str::to_owned))
             .and_then(|sentence| Body::try_new(sentence).ignoring(Ignored::Unasked))
             .map(Asked)
     }
@@ -115,7 +115,9 @@ impl AsRef<Uuid> for Quote {
 
 impl fmt::Display for Unabridged<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "[{} {}] {}", self.0.uuid, self.0.at, self.0.body)
+        write!(formatter, "[{} {}] ", self.0.uuid, self.0.at)?;
+        self.0.asked.iter().try_for_each(|Asked(asked)| write!(formatter, "(replying to the lead's \"{asked}\") "))?;
+        write!(formatter, "{}", self.0.body)
     }
 }
 

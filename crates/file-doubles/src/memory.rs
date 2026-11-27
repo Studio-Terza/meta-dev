@@ -20,6 +20,7 @@ use resolved::Resolved;
 #[derive(Debug, Default)]
 pub struct Memory {
     files: Locked<BTreeMap<PathBuf, Bytes>>,
+    directories: Locked<BTreeSet<PathBuf>>,
 }
 
 impl Memory {
@@ -51,8 +52,14 @@ impl Memory {
 
     fn found(&self, path: &Path) -> Kind {
         let files = self.files.held();
+        let directories = self.directories.held();
         let file = files.contains_key(path).then_some(Kind::File);
-        let below = || files.keys().filter(|held| *held != path).find(|held| held.starts_with(path));
+        let below = || {
+            files
+                .keys()
+                .chain(directories.iter())
+                .find(|held| held.starts_with(path) && (*held != path || directories.contains(path)))
+        };
         file.or_else(|| below().map(|_| Kind::Directory)).unwrap_or(Kind::Missing)
     }
 }
@@ -66,7 +73,7 @@ impl<'de> Deserialize<'de> for Memory {
 
 impl FromIterator<(PathBuf, Bytes)> for Memory {
     fn from_iter<Entries: IntoIterator<Item = (PathBuf, Bytes)>>(entries: Entries) -> Memory {
-        Memory { files: Locked::new(entries.into_iter().collect()) }
+        Memory { files: Locked::new(entries.into_iter().collect()), directories: Locked::default() }
     }
 }
 
@@ -99,13 +106,32 @@ impl FilesFiller for Memory {
         self.put(path, Bytes::new(joined))
     }
 
+    fn create_directories(
+        &self,
+        _pass: Pass<'_, files_ops::CreateDirectories>,
+        path: &Path,
+    ) -> Result<(), FileFailure> {
+        let blocked = path.ancestors().any(|ancestor| self.files.held().contains_key(ancestor));
+        Some(())
+            .filter(|()| !blocked)
+            .ok_or_else(|| FileFailure::Failed(io::Error::from(io::ErrorKind::NotADirectory)))?;
+        self.directories.held().insert(path.to_path_buf());
+        Ok(())
+    }
+
     fn entries(&self, _pass: Pass<'_, files_ops::Entries>, directory: &Path) -> Result<Vec<PathBuf>, FileFailure> {
         Some(self.found(directory)).filter(|kind| *kind == Kind::Directory).ok_or_else(Self::missing).map(|_| {
             let files = self.files.held();
+            let directories = self.directories.held();
             let children: BTreeSet<PathBuf> = files
                 .range::<Path, _>((Bound::Included(directory), Bound::Unbounded))
                 .map(|(held, _bytes)| held)
                 .take_while(|held| held.starts_with(directory))
+                .chain(
+                    directories
+                        .range::<Path, _>((Bound::Included(directory), Bound::Unbounded))
+                        .take_while(|held| held.starts_with(directory)),
+                )
                 .filter_map(|held| held.strip_prefix(directory).ignoring(Ignored::Outside))
                 .filter_map(|inside| inside.components().next())
                 .map(|first| directory.join(first))

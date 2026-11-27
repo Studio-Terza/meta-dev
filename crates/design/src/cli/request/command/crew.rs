@@ -1,83 +1,111 @@
-mod boundary;
+use std::fmt;
+use std::path::{Path, PathBuf};
+use std::slice;
 
-use design_messages::Tally;
-use dispatch_ports::{
-    Bell, Clock, Deadline, Dispatch, Finished, Job, Model, Moment, Pause, Prompt, Reply, Shell, Stall, Timeout, Usage,
-    Wall, Watch, Watching,
-};
-use newtype::Wrapping;
+use dispatch_ports::{Call, Clock, Deadline, Pause, Ran, Shell, Timeout, Wall};
+use invariants::Ignoring;
+use serde::Deserialize;
 
-use crate::cli::failure::Failure;
+use crate::cli::request::ignored::Ignored;
 
 #[derive(Debug)]
-pub struct Crew<'ports, D: Dispatch, C: Clock, G: Shell> {
-    dispatch: &'ports D,
+pub struct Crew<'ports, C: Clock, G: Shell> {
     clock: &'ports C,
     shell: &'ports G,
+    scratch: PathBuf,
 }
 
-#[derive(Clone, Copy, Debug)]
-struct Replying;
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Prompt(String);
 
-#[derive(Clone, Debug, Default)]
-pub struct Heard {
-    reply: Option<Reply>,
-    tokens: Tally,
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Reply(String);
+
+#[derive(Debug, Deserialize)]
+struct Envelope {
+    subtype: Subtype,
+    result: Option<String>,
 }
 
-impl<'ports, D: Dispatch, C: Clock, G: Shell> Crew<'ports, D, C, G> {
-    pub fn new(dispatch: &'ports D, clock: &'ports C, shell: &'ports G) -> Crew<'ports, D, C, G> {
-        Crew { dispatch, clock, shell }
+#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+enum Subtype {
+    #[serde(rename = "success")]
+    Success,
+    #[serde(other)]
+    Other,
+}
+
+impl<'ports, C: Clock, G: Shell> Crew<'ports, C, G> {
+    const MODEL: &'static str = "claude";
+    const ASKED: [&'static str; 10] = [
+        "-p",
+        "--output-format",
+        "json",
+        "--setting-sources",
+        "user",
+        "--strict-mcp-config",
+        "--tools",
+        "",
+        "--model",
+        "haiku",
+    ];
+
+    pub fn new(clock: &'ports C, shell: &'ports G, scratch: PathBuf) -> Crew<'ports, C, G> {
+        Crew { clock, shell, scratch }
     }
 
     pub fn now(&self) -> Wall {
         self.clock.now()
     }
 
-    pub(crate) fn moment(&self) -> Moment {
-        self.clock.moment()
+    pub fn scratch(&self) -> &Path {
+        &self.scratch
     }
 
-    pub(crate) fn paused(&self, pause: Pause) {
-        self.clock.waited(pause, &Bell::hung());
+    pub fn spoke(&self, program: &'static str, arguments: &[&str], directory: &Path, timeout: Timeout) -> Option<Ran> {
+        let spoken = arguments.iter().map(|word| (*word).to_owned()).collect();
+        let call = Call::new(program, spoken, directory.to_path_buf(), Deadline::after(self.clock.now(), timeout));
+        self.shell.ran(&call).ignoring(Ignored::Unrun)
     }
 
-    pub(crate) fn replied(&self, prompt: &Prompt, timeout: Timeout, model: Model) -> Result<Heard, Failure> {
-        let held = self.dispatch.dispatch(&Job::due_by(Deadline::after(self.clock.now(), timeout), model), prompt)?;
-        Ok(Watch::over(self.dispatch, self.clock).watched(held)?.visited(Replying))
+    pub fn paused(&self, pause: Pause) {
+        self.clock.paused(pause);
     }
 
-    pub(crate) fn fanned(&self, prompts: &[Prompt], timeout: Timeout) -> Result<Vec<Heard>, Failure> {
-        let job = Job::due_by(Deadline::after(self.clock.now(), timeout), Model::Haiku);
-        let watched = Watch::over(self.dispatch, self.clock).fanned(&job, prompts)?;
-        Ok(watched.iter().map(|each| each.visited(Replying)).collect())
-    }
-}
-
-impl Heard {
-    fn spent(usage: Option<Usage>) -> Tally {
-        usage.map_or_default(|used| {
-            used.spent().iter().flat_map(|tokens| usize::try_from(tokens.into_inner())).map(Tally::from).sum()
-        })
+    pub fn replied(&self, prompt: &Prompt, timeout: Timeout) -> Option<Reply> {
+        self.fanned(slice::from_ref(prompt), timeout).into_iter().next().flatten()
     }
 
-    pub fn reply(&self) -> Option<&Reply> {
-        self.reply.as_ref()
-    }
-
-    pub fn tokens(&self) -> Tally {
-        self.tokens
+    pub fn fanned(&self, prompts: &[Prompt], timeout: Timeout) -> Vec<Option<Reply>> {
+        let deadline = Deadline::after(self.clock.now(), timeout);
+        let asked: Vec<String> = Self::ASKED.map(str::to_owned).to_vec();
+        let calls: Vec<Call> = prompts
+            .iter()
+            .map(|prompt| Call::new(Self::MODEL, asked.clone(), self.scratch.clone(), deadline).fed(prompt.0.clone()))
+            .collect();
+        self.shell
+            .fanned(&calls)
+            .into_iter()
+            .map(|ran| ran.ignoring(Ignored::Unrun).as_ref().and_then(Ran::succeeded).and_then(Reply::read))
+            .collect()
     }
 }
 
-impl Watching for Replying {
-    type Output = Heard;
-
-    fn finished(self, finished: &Finished) -> Heard {
-        Heard { reply: Some(finished.reply().clone()), tokens: Heard::spent(Some(finished.usage())) }
+impl<Shown: fmt::Display> From<&Shown> for Prompt {
+    fn from(shown: &Shown) -> Prompt {
+        Prompt(shown.to_string())
     }
+}
 
-    fn stalled(self, stall: &Stall) -> Heard {
-        Heard { reply: None, tokens: Heard::spent(stall.usage()) }
+impl Reply {
+    fn read(printed: &dispatch_ports::Printed) -> Option<Reply> {
+        let envelope: Envelope = serde_json::from_str(printed.as_ref()).ignoring(Ignored::Unreplied)?;
+        (envelope.subtype == Subtype::Success).then_some(envelope.result).flatten().map(Reply)
+    }
+}
+
+impl AsRef<str> for Reply {
+    fn as_ref(&self) -> &str {
+        &self.0
     }
 }

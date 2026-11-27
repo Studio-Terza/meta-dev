@@ -4,6 +4,7 @@ mod ignored;
 mod local;
 mod persistence;
 mod projects;
+mod queue;
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -15,12 +16,13 @@ use super::failure::Failure;
 use command::Command;
 pub use command::Crew;
 pub use ground::Ground;
-pub use local::{Local, Repository};
+pub use local::{Local, Repository, Rooted};
 use projects::Projects;
-pub(crate) use projects::{Kept, Located};
+pub use projects::{Kept, Located};
+pub use queue::{Cause, Held, Item, Landed, Named, Queue, Target, UnreadStep};
 
 #[derive(Debug)]
-pub(crate) struct Request {
+pub struct Request {
     command: Command,
     workspace: Option<PathBuf>,
 }
@@ -32,7 +34,7 @@ struct Words {
 }
 
 impl Request {
-    pub(crate) fn parsed(arguments: impl Iterator<Item = OsString>) -> Result<Request, Failure> {
+    pub fn parsed(arguments: impl Iterator<Item = OsString>) -> Result<Request, Failure> {
         let words = Words::heard(&arguments.collect::<Vec<OsString>>())?;
         let spoken = words.spoken.iter().map(|word| word.to_str()).collect::<Option<Vec<&str>>>();
         let command = spoken.ok_or(Failure::Usage).and_then(|said| Command::spoken(&said))?;

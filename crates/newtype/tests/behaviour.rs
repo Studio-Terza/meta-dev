@@ -1,8 +1,7 @@
 use std::{iter, mem};
 
-use dispatch_doubles::Count;
-use dispatch_ports::{Tokens, Told, Wall};
-use file_ports::Offset;
+use design_messages::CheckName;
+use file_ports::{Offset, Text};
 use fixture::{Cases, Debugged, Failed, Fixture, Properties};
 use grammar_spec_line::Attachment;
 use invariants::{Ignoring, ignored};
@@ -14,6 +13,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use shapes::Input;
 use store_ports::Written;
+use transcript_ports::Body;
 
 ignored! {
     enum Ignored {
@@ -22,9 +22,7 @@ ignored! {
 }
 
 #[derive(Fixture, Deserialize, Debug)]
-struct Sampled {
-    cases: Count,
-}
+struct Sampled {}
 
 proptest! {
     #![proptest_config(Properties::settled())]
@@ -41,19 +39,21 @@ proptest! {
     }
 
     #[test]
-    fn a_checked_newtype_builds_and_reads_only_what_its_check_accepts(text in any::<String>()) {
-        let built = Told::try_new(text.clone()).ignoring(Ignored::Refused);
-        prop_assert_eq!(built.is_some(), Told::checked(&text).is_ok());
-        let read = serde_json::from_value::<Told>(Value::String(text.clone())).ignoring(Ignored::Refused);
+    fn a_checked_newtype_builds_reads_and_writes_only_what_its_check_accepts(text in any::<String>()) {
+        let built = Body::try_new(text.clone()).ignoring(Ignored::Refused);
+        prop_assert_eq!(built.is_some(), Body::checked(&text).is_ok());
+        let read = serde_json::from_value::<Body>(Value::String(text.clone())).ignoring(Ignored::Refused);
         prop_assert_eq!(&read, &built);
-        prop_assert_eq!(built.map(|made| made.to_string()), Told::checked(&text).ignoring(Ignored::Refused).cloned());
+        prop_assert_eq!(built.map(|made| made.to_string()), Body::checked(&text).ignoring(Ignored::Refused).cloned());
+        let named = CheckName::try_new(text.clone()).ignoring(Ignored::Refused);
+        let written = named.as_ref().map(serde_json::to_value).transpose()?;
+        prop_assert_eq!(written, named.map(|_| Value::String(text)));
     }
 
     #[test]
-    fn a_plain_newtype_reads_and_shows_what_it_holds(tokens in any::<u32>(), wall in any::<i64>(), offset in any::<Offset>()) {
-        prop_assert_eq!(serde_json::from_value::<Tokens>(Value::from(tokens))?, Tokens::new(tokens));
-        prop_assert_eq!(serde_json::from_value::<Wall>(Value::from(wall))?, Wall::new(wall));
-        prop_assert_eq!(Tokens::new(tokens).to_string(), tokens.to_string());
+    fn a_plain_newtype_reads_and_shows_what_it_holds(text in any::<String>(), offset in any::<Offset>()) {
+        prop_assert_eq!(serde_json::from_value::<Text>(Value::String(text.clone()))?, Text::new(text.clone()));
+        prop_assert_eq!(Text::new(text.clone()).to_string(), text);
         prop_assert_eq!(offset.to_string(), offset.into_inner().to_string());
     }
 }
@@ -62,9 +62,9 @@ proptest! {
 fn checked_generators_draw_only_accepted_values_within_the_rejection_bound() {
     let settled = Properties::settled();
     let mut bounded = TestRunner::new(Config { max_local_rejects: settled.cases, ..settled });
-    let drawn = (any::<Told>(), any::<Offset>(), any::<Attachment>());
-    let accepted = bounded.run(&drawn, |(told, offset, attachment)| {
-        prop_assert!(Told::checked(&told.into_inner()).is_ok());
+    let drawn = (any::<Body>(), any::<Offset>(), any::<Attachment>());
+    let accepted = bounded.run(&drawn, |(body, offset, attachment)| {
+        prop_assert!(Body::checked(&body.into_inner()).is_ok());
         prop_assert!(Offset::checked(&offset.into_inner()).is_ok());
         prop_assert!(Attachment::checked(&attachment.into_inner()).is_ok());
         Ok(())
@@ -74,11 +74,13 @@ fn checked_generators_draw_only_accepted_values_within_the_rejection_bound() {
 
 #[test]
 fn an_enum_generator_draws_the_values_its_golden_lists() -> Result<(), Failed> {
-    let drifted = Cases::<Sampled>::drifted(|case| {
-        let mut runner = TestRunner::new(Properties::settled());
+    let drifted = Cases::<Sampled>::drifted(|_case| {
+        let settled = Properties::settled();
+        let cases = usize::try_from(settled.cases)?;
+        let mut runner = TestRunner::new(settled);
         let drawn =
             iter::repeat_with(|| any::<Input>().new_tree(&mut runner).map(|tree| mem::discriminant(&tree.current())))
-                .take(usize::try_from(case.row().cases.into_inner())?)
+                .take(cases)
                 .collect::<Result<Vec<_>, _>>()?;
         Ok(Debugged(drawn).to_string())
     })?;
