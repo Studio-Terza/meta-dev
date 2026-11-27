@@ -175,6 +175,7 @@ version = "0.1.0"
 dependencies = [
  "console-ports",
  "file-ports",
+ "grammar",
  "invariants",
  "newtype",
  "port-core",

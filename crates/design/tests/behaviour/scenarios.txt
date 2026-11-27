@@ -54,7 +54,7 @@ Ok(Hooked(Stop)) true
 $ hook stop < Stop
 {"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled."}
 Ok(Blocked) false
-prompt holds [false, true, true, true, false]
+prompt holds [false, true, true, true, false, false]
 ## an agent quiet under twenty minutes
 $ hook stop < Stop
 Ok(Hooked(Stop)) true
@@ -62,7 +62,7 @@ $ stops < Nothing
 session	shells	agents	halt	read	quoted	kept	fate	tokens	millis
 s	0	1	live	1	0	0	passed	7	5
 Ok(Trailed) false
-prompt holds [false, true, true, true, false]
+prompt holds [false, true, true, true, false, false]
 ## a shell still running
 $ hook stop < Stop
 Ok(Hooked(Stop)) true
@@ -70,12 +70,12 @@ $ stops < Nothing
 session	shells	agents	halt	read	quoted	kept	fate	tokens	millis
 s	1	0	live	1	0	0	passed	7	5
 Ok(Trailed) false
-prompt holds [false, true, true, true, false]
+prompt holds [false, true, true, true, false, false]
 ## finished tasks and files that are not tasks
 $ hook stop < Stop
 {"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled."}
 Ok(Blocked) false
-prompt holds [false, true, true, true, false]
+prompt holds [false, true, true, true, false, false]
 ## no transcript
 $ hook stop < Text("{\"stop_hook_active\":false}")
 Ok(Hooked(Stop)) true
@@ -86,8 +86,8 @@ Ok(Blocked) false
 $ hook stop < Stop
 {"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled."}
 Ok(Blocked) false
-prompt holds [false, true, true, true, false]
-prompt holds [false, true, true, true, false]
+prompt holds [false, true, true, true, false, false]
+prompt holds [false, true, true, true, false, false]
 ## quoted owner words
 $ hook stop < Asking
 {"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\nEarlier owner words bearing on this:\no1 2026-01-01T00:00:00Z: \"Merge only when CI is green.\"\n"}
@@ -96,13 +96,13 @@ $ stops < Nothing
 session	shells	agents	halt	read	quoted	kept	fate	tokens	millis
 s	0	0	stalled	1	1	1	blocked	14	5
 Ok(Trailed) false
-prompt holds [true, true, false, true, false]
-prompt holds [true, true, false, false, true]
+prompt holds [true, true, false, true, false, false]
+prompt holds [true, true, false, false, true, false]
 ## a quote the owner never wrote
 $ hook stop < Asking
 {"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled."}
 Ok(Blocked) false
-prompt holds [true, true, false, true, false]
+prompt holds [true, true, false, true, false, false]
 ## a refused reading
 $ hook stop < Asking
 {"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled."}
@@ -111,13 +111,13 @@ $ stops < Nothing
 session	shells	agents	halt	read	quoted	kept	fate	tokens	millis
 s	0	0	stalled	1	0	0	blocked	7	5
 Ok(Trailed) false
-prompt holds [true, true, false, true, false]
+prompt holds [true, true, false, true, false, false]
 ## a stop without its last message
 $ hook stop < Stop
 {"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\nEarlier owner words bearing on this:\no1 2026-01-01T00:00:00Z: \"Merge only when CI is green.\"\n"}
 Ok(Blocked) false
-prompt holds [false, true, true, true, false]
-prompt holds [false, true, true, false, true]
+prompt holds [false, true, true, true, false, false]
+prompt holds [false, true, true, false, true, false]
 ## a transcript that grows
 $ ingest < Nothing
 session s read to 387
@@ -147,3 +147,17 @@ Err(Refusal("usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hoo
 ## an unreadable hook input
 $ hook stop < Text("not json")
 Err(Refusal("cannot read the hook input: expected ident at line 1 column 2")) false
+## the open queue, stalled and then live
+$ hook stop < Stop
+{"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\nOpen items in transcripts/queue.md:\n- Merge #12 once CI is green (owner, decided)\n- Basho maps - with its dash kept\n"}
+Ok(Blocked) false
+$ hook stop < Live
+Ok(Hooked(Stop)) true
+prompt holds [false, true, true, true, false, false]
+prompt holds [false, true, true, true, false, false]
+## short owner replies with the lead sentences they answered
+$ hook stop < Asking
+{"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\nEarlier owner words bearing on this:\na2 2026-01-01T00:00:00Z: the lead said \"Shall I merge #12 now?\" and the owner replied \"yes\"\na4 2026-01-01T00:00:00Z: \"Next, port the hook\"\na6 2026-01-01T00:00:00Z: the lead said \"Ship it?\" and the owner replied \"sure\"\na8 2026-01-01T00:00:00Z: \"yes, merge it and then port the hook\"\n"}
+Ok(Blocked) false
+prompt holds [true, false, false, false, false, true]
+prompt holds [true, false, false, false, false, false]

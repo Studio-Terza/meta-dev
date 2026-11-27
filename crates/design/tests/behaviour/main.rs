@@ -29,6 +29,18 @@ const NONE: fn(&Home) -> Result<(), Failed> = |_| Ok(());
 const QUIET: Duration = Duration::from_mins(20);
 const BUSY: Duration = Duration::from_mins(19);
 const ASKED: &str = "{\"type\":\"user\"}\n";
+const STOPPED: &str = "{\"type\":\"user\"}\n{\"type\":\"api-request\"}\n";
+const QUEUE: &str = "tests/goldens/queue.md";
+const SHORT_REPLY: [[&str; 3]; 8] = [
+    ["assistant", "a1", "I checked CI\\nShall I merge #12 now?"],
+    ["user", "a2", "yes"],
+    ["assistant", "a3", "Merged."],
+    ["user", "a4", "Next, port the hook and keep every quote it reads exactly as it is today."],
+    ["assistant", "a5", "Done. Ship it?"],
+    ["user", "a6", "sure"],
+    ["assistant", "a7", "Anything else?"],
+    ["user", "a8", "yes, merge it and then port the hook"],
+];
 const TEMPORARY: &str = "/private/tmp";
 const TRIMMING: u32 = 1;
 const READING: u32 = 2;
@@ -250,7 +262,7 @@ impl Home {
     }
 
     fn conversation() -> [String; 2] {
-        [Home::line("user", "o1", OWNER), Home::line("assistant", "l1", "Understood.")]
+        [Home::line("user", "o1", OWNER), Home::line("assistant", "p1", "Understood.")]
     }
 
     fn answered() -> Result<Home, Failed> {
@@ -313,6 +325,7 @@ impl Home {
 enum Input {
     Nothing,
     Grown,
+    Live,
     Stop,
     Asking,
     Text(&'static str),
@@ -334,7 +347,7 @@ const STOPS: Step = Step(&["stops"], Input::Nothing);
 const GOLDEN: &str = "tests/behaviour/scenarios.txt";
 
 impl Scenario {
-    const ALL: [Scenario; 18] = [
+    const ALL: [Scenario; 20] = [
         Scenario::of("ingest twice", NONE, &[INGEST, INGEST]),
         Scenario::of("a dry run, then a real one", NONE, &[Step(&["ingest", "--dry-run"], Input::Nothing), INGEST]),
         Scenario::of("an unrecognised line", |home| home.wrote(&Home::line("brand-new-kind", "x1", "odd")), &[INGEST]),
@@ -355,7 +368,7 @@ impl Scenario {
         Scenario::of("no transcript", NONE, &[Step(&["hook", "stop"], Input::Text("{\"stop_hook_active\":false}"))]),
         Scenario::of(
             "an agent quiet for twenty minutes",
-            |home| home.agent_task("agent-hung.jsonl", ASKED, QUIET),
+            |home| home.agent_task("agent-hung.jsonl", STOPPED, QUIET),
             &[STOP, STOP],
         ),
         Scenario { replies: KEPT, ..Scenario::of("quoted owner words", NONE, &[ASK, STOPS]) },
@@ -378,6 +391,25 @@ impl Scenario {
             ],
         ),
         Scenario::of("an unreadable hook input", NONE, &[Step(&["hook", "stop"], Input::Text("not json"))]),
+        Scenario::of(
+            "the open queue, stalled and then live",
+            Home::queued,
+            &[STOP, Step(&["hook", "stop"], Input::Live)],
+        ),
+        Scenario {
+            replies: || {
+                let picked = [
+                    ["a2", "yes"],
+                    ["a4", "Next, port the hook"],
+                    ["a6", "sure"],
+                    ["a8", "yes, merge it and then port the hook"],
+                ]
+                .map(|[uuid, quote]| format!("{{\"uuid\": \"{uuid}\", \"quote\": \"{quote}\"}}"))
+                .join(", ");
+                Ok(Replies::quoting(&format!("[{picked}]"), "[1, 2, 3, 4]"))
+            },
+            ..Scenario::of("short owner replies with the lead sentences they answered", Home::short_replies, &[ASK])
+        },
     ];
 
     const fn of(name: &'static str, setup: fn(&Home) -> Result<(), Failed>, steps: &'static [Step]) -> Scenario {
@@ -398,6 +430,7 @@ impl Scenario {
                 let given = match input {
                     Input::Nothing => String::new(),
                     Input::Grown => home.appended(&Home::line("user", "o2", "Ship it.")).map(|()| String::new())?,
+                    Input::Live => home.shell_task("b1.output", "building\n").map(|()| home.stop(""))?,
                     Input::Stop => home.stop(""),
                     Input::Asking => home.asking(),
                     Input::Text(text) => (*text).to_owned(),
@@ -411,7 +444,14 @@ impl Scenario {
             .prompts()
             .iter()
             .map(|prompt| {
-                let held = [QUESTION, OWNER, "Understood.", "[o1 ", "1. o1 2026-01-01T00:00:00Z: \""];
+                let held = [
+                    QUESTION,
+                    OWNER,
+                    "Understood.",
+                    "[o1 ",
+                    "1. o1 2026-01-01T00:00:00Z: \"",
+                    "[a2 2026-01-01T00:00:00Z] yes\n",
+                ];
                 format!("prompt holds {:?}\n", held.map(|part| prompt.contains(part)))
             })
             .collect();
@@ -428,8 +468,22 @@ impl Home {
         let ended = "{\"type\":\"assistant\",\"message\":{\"stop_reason\":\"end_turn\"}}\n";
         self.shell_task("b1.output", &["x".repeat(1024), "\n[exited with code 0]\n".to_owned()].concat())?;
         self.shell_task("b2.log", "building\n")?;
+        self.shell_task("b3.output", "building\n\n[killed]")?;
         self.agent_task("agent-done.jsonl", &[ASKED, ended].concat(), QUIET)?;
         self.agent_task("agent-done.meta.json", "{}\n", QUIET)
+    }
+
+    fn queued(&self) -> Result<(), Failed> {
+        let folder = self.path().join("studio-meta-dev/transcripts");
+        fs::create_dir_all(&folder)?;
+        fs::write(folder.join("queue.md"), fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(QUEUE))?)?;
+        Ok(())
+    }
+
+    fn short_replies(&self) -> Result<(), Failed> {
+        let lines: String = SHORT_REPLY.iter().map(|[kind, uuid, text]| Home::line(kind, uuid, text)).collect();
+        fs::write(self.transcript(), lines)?;
+        Ok(())
     }
 }
 

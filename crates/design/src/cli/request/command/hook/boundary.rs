@@ -1,6 +1,7 @@
 mod harness;
 
 use std::collections::BTreeMap;
+use std::fmt;
 
 use std::ops::Not;
 use std::path::PathBuf;
@@ -9,6 +10,7 @@ use console_ports::{Heard, Shown};
 use design_messages::{Fate, Halt, LastSaid, Overran, Overruns, StopRow, Stopped, Tally};
 use dispatch_ports::{Clock, Dispatch, Moment, Wall};
 use file_ports::{Epoch, Files};
+use grammar::Queue;
 use newtype::Wrapping;
 use serde::{Deserialize, Serialize};
 use store_ports::Store;
@@ -59,7 +61,11 @@ pub struct Observed<'store, S: Store> {
     store: &'store S,
     tasks: Option<Tasks>,
     started: Moment,
+    queue: Option<Queue>,
 }
+
+#[derive(Clone, Copy, Debug)]
+struct Queued<'queue>(&'queue Queue);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Continuing;
@@ -149,8 +155,13 @@ impl Stopping {
 }
 
 impl<'store, S: Store> Observed<'store, S> {
-    pub fn new(store: &'store S, tasks: Option<Tasks>, started: Moment) -> Observed<'store, S> {
-        Observed { store, tasks, started }
+    pub fn new(store: &'store S, tasks: Option<Tasks>, started: Moment, queue: Option<Queue>) -> Observed<'store, S> {
+        Observed { store, tasks, started, queue }
+    }
+
+    fn queued(&self) -> Option<Queued<'_>> {
+        let idle = self.tasks.as_ref().map(Halt::from).filter(|halt| *halt == Halt::Stalled);
+        idle.and(self.queue.as_ref()).filter(|queue| queue.items().is_empty().not()).map(Queued)
     }
 
     fn blocking<D: Dispatch, C: Clock>(&self, crew: &Crew<'_, D, C>, stopping: &Stopping) -> Vec<String> {
@@ -167,6 +178,7 @@ impl<'store, S: Store> Observed<'store, S> {
         let stopped: Vec<String> = Stopping::lead(halt, &fresh)
             .into_iter()
             .chain(search.as_ref().and_then(Search::answers).map(Answers::to_string))
+            .chain(self.queued().map(|queued| queued.to_string()))
             .collect();
         let fate = stopped.first().map_or(Fate::Passed, |_first| Fate::Blocked);
         let ran = stopping.session.clone().map(|session| StopRow::ran(session, live, halt));
@@ -176,6 +188,17 @@ impl<'store, S: Store> Observed<'store, S> {
         store.write(Overran::from(fresh)).ignoring(Ignored::Unanswered);
         trailed.map(|row| store.write(Stopped::from(row))).and_then(|written| written.ignoring(Ignored::Unanswered));
         stopped
+    }
+}
+
+impl Queued<'_> {
+    const HEADER: &'static str = "Open items in transcripts/queue.md:";
+}
+
+impl fmt::Display for Queued<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(formatter, "{}", Queued::HEADER)?;
+        self.0.items().iter().try_for_each(|item| writeln!(formatter, "{item}"))
     }
 }
 
