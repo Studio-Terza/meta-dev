@@ -1,10 +1,9 @@
 mod boundary;
 
-use newtype::{Arbitrary, Display, Listed, Newtype};
+use newtype::Listed;
 use strum::{IntoStaticStr, VariantArray};
 
-#[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Pid(u32);
+pub use boundary::Pid;
 
 #[derive(strum::Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
 #[strum(serialize_all = "snake_case")]

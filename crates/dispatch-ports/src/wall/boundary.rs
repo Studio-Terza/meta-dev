@@ -1,9 +1,22 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use invariants::Ignoring;
+use newtype::{Arbitrary, Newtype};
 
-use super::{Deadline, Moment, Pause, Timeout, Wall};
+use super::Deadline;
 use crate::Ignored;
+
+#[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Wall(i64);
+
+#[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Moment(i64);
+
+#[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Timeout(u32);
+
+#[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Pause(u32);
 
 impl Deadline {
     #[must_use]
