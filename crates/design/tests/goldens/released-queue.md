@@ -1,0 +1,6 @@
+- [worktree kept] unviewed after merging #12, from /work/agent
+- [worktree kept] unlisted after merging #12, from /work/agent
+- [worktree kept] unstatused after merging #12 at /work/wt-open-pr, from /work/agent
+- [worktree kept] dirty after merging #12 at /work/wt-open-pr, from /work/agent
+- [worktree kept] unpushed after merging #12 at /work/wt-open-pr, from /work/agent
+- [worktree kept] unremoved after merging #12 at /work/wt-open-pr, from /work/agent

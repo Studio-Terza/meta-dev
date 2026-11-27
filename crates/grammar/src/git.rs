@@ -105,20 +105,17 @@ impl<'text> Worktrees<'text> {
 
     fn heard(self, line: Porcelain<'text>) -> Worktrees<'text> {
         let Worktrees(mut listed) = self;
-        match (line, listed.pop()) {
-            (Porcelain::Path(path), last) => {
-                listed.extend(last);
-                listed.push(Worktree { path, head: None, branch: None });
+        let kept: Vec<Worktree<'text>> = match (line, listed.pop()) {
+            (Porcelain::Path(path), open) => {
+                open.into_iter().chain([Worktree { path, head: None, branch: None }]).collect()
             }
-            (Porcelain::Head(head), Some(last)) => listed.push(Worktree { head: Some(head), ..last }),
-            (Porcelain::Branch(branch), Some(last)) => {
-                listed.push(Worktree { branch: BranchName::read(branch), ..last });
+            (Porcelain::Head(head), Some(open)) => vec![Worktree { head: Some(head), ..open }],
+            (Porcelain::Branch(branch), Some(open)) => vec![Worktree { branch: BranchName::read(branch), ..open }],
+            (Porcelain::Head(_) | Porcelain::Branch(_) | Porcelain::Other | Porcelain::Break, open) => {
+                open.into_iter().collect()
             }
-            (Porcelain::Head(_) | Porcelain::Branch(_) | Porcelain::Other | Porcelain::Break, last) => {
-                listed.extend(last);
-            }
-        }
-        Worktrees(listed)
+        };
+        Worktrees(listed.into_iter().chain(kept).collect())
     }
 
     #[must_use]

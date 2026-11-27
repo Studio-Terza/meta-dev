@@ -72,12 +72,12 @@ impl Landed {
         self.state
     }
 
-    pub fn holds(&self, checkout: &Checkout) -> bool {
-        checkout.branch.as_ref() == Some(&self.branch)
+    pub fn found(&self, checkouts: impl IntoIterator<Item = Checkout>) -> Option<Checkout> {
+        checkouts.into_iter().find(|checkout| checkout.branch.as_ref() == Some(&self.branch))
     }
 
-    pub fn pushed(&self, checkout: &Checkout) -> bool {
-        checkout.head == Some(self.head)
+    pub fn pushed<'checkout>(&self, checkout: &'checkout Checkout) -> Option<&'checkout Checkout> {
+        (checkout.head == Some(self.head)).then_some(checkout)
     }
 }
 

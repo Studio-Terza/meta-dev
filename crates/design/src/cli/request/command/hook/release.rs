@@ -112,7 +112,7 @@ impl<D: Dispatch, C: Clock, G: Shell> Releasing<'_, '_, D, C, G> {
         let ran = self.git(&["worktree", "list", "--porcelain"], self.directory);
         let printed = ran.as_ref().and_then(Ran::succeeded).ok_or(Held::Unlisted)?;
         let listed = Worktrees::read(printed.as_ref());
-        Ok(listed.listed().iter().map(Checkout::from).find(|checkout| landed.holds(checkout)))
+        Ok(landed.found(listed.listed().iter().map(Checkout::from)))
     }
 
     fn freed(&self, landed: &Landed, checkout: &Checkout) -> Result<Released, Holding> {
@@ -120,8 +120,8 @@ impl<D: Dispatch, C: Clock, G: Shell> Releasing<'_, '_, D, C, G> {
         let status = self.git(&["status", "--short"], checkout.as_ref());
         let printed = status.as_ref().and_then(Ran::succeeded).ok_or_else(|| held(Held::Unstatused))?;
         printed.as_ref().is_empty().then_some(()).ok_or_else(|| held(Held::Dirty))?;
-        landed.pushed(checkout).then_some(()).ok_or_else(|| held(Held::Unpushed))?;
-        let path = checkout.as_ref().to_string_lossy();
+        let pushed = landed.pushed(checkout).ok_or_else(|| held(Held::Unpushed))?;
+        let path = pushed.as_ref().to_string_lossy();
         let removed = self.git(&["worktree", "remove", &path], self.directory);
         removed.as_ref().and_then(Ran::succeeded).map(|_removed| Released::Removed).ok_or_else(|| held(Held::Unremoved))
     }
