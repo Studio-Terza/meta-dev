@@ -7,13 +7,13 @@ use crate::seconds::Seconds;
 use crate::stage::Stage;
 
 #[derive(Debug, Default)]
-pub struct Pairing {
+pub(crate) struct Pairing {
     limit: Option<Limit>,
     measured: Option<Seconds>,
 }
 
 impl Pairing {
-    pub fn joined(limits: BTreeMap<Stage, Limit>, measured: BTreeMap<Stage, Seconds>) -> BTreeMap<Stage, Pairing> {
+    pub(crate) fn joined(limits: BTreeMap<Stage, Limit>, measured: BTreeMap<Stage, Seconds>) -> BTreeMap<Stage, Pairing> {
         measured.into_iter().fold(
             limits.into_iter().map(|(stage, limit)| (stage, Pairing { limit: Some(limit), measured: None })).collect(),
             |mut joined, (stage, seconds)| {
@@ -23,7 +23,7 @@ impl Pairing {
         )
     }
 
-    pub fn finding(self, stage: Stage) -> Result<Finding, Failure<'static>> {
+    pub(crate) fn finding(self, stage: Stage) -> Result<Finding, Failure<'static>> {
         match self.limit.and_then(Limit::ordered) {
             None => Err(Failure::Unlimited { stage }),
             Some(limit) => self.measured_against(stage, limit),

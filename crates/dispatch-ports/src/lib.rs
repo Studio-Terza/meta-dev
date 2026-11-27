@@ -35,7 +35,8 @@ pub use started::Started;
 pub use stderr::Stderr;
 pub use system_clock::SystemClock;
 pub use system_shell::SystemShell;
-pub use wall::{Deadline, Due, Moment, Pause, Timeout, Wall};
+pub(crate) use wall::Due;
+pub use wall::{Deadline, Moment, Pause, Timeout, Wall};
 pub use watch::{Stall, Stalled, Watch, Watched, Watching};
 
 invariants::ignored! {

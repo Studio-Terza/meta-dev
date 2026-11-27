@@ -17,12 +17,12 @@ pub struct Finding {
 
 impl Finding {
     #[must_use]
-    pub fn new(stage: Stage, measured: Seconds, limit: Limit) -> Finding {
+    pub(crate) fn new(stage: Stage, measured: Seconds, limit: Limit) -> Finding {
         Finding { stage, measured, limit, verdict: limit.judge(measured) }
     }
 
     #[must_use]
-    pub fn blocks(&self) -> Option<&Finding> {
+    pub(crate) fn blocks(&self) -> Option<&Finding> {
         (self.verdict == Verdict::Block).then_some(self)
     }
 
@@ -31,7 +31,7 @@ impl Finding {
         &self.stage
     }
 
-    pub fn lowered(self) -> Result<Entry, Failure<'static>> {
+    pub(crate) fn lowered(self) -> Result<Entry, Failure<'static>> {
         match self.limit.lowered(self.measured) {
             Ok(seconds) => Ok(Entry::new(self.stage, seconds)),
             Err(refusal) => Err(refusal.refusing(self.stage, self.measured)),

@@ -18,16 +18,16 @@ pub use finding::Finding;
 use limit::Limit;
 use newtype::Wrapping;
 use pairing::Pairing;
-pub use record::Record;
+pub(crate) use record::Record;
 use verdict::Verdict;
 
 #[derive(Debug)]
-pub struct Gate {
+pub(crate) struct Gate {
     findings: Vec<Finding>,
 }
 
 impl Gate {
-    pub fn judge(
+    pub(crate) fn judge(
         limits_contents: Contents,
         measured_contents: Contents,
         only: &[OsString],
@@ -48,7 +48,7 @@ impl Gate {
         findings.first().map(|_| ()).ok_or(Failure::Empty).map(|()| Gate { findings })
     }
 
-    pub fn lowered(self) -> Result<Record, Failure<'static>> {
+    pub(crate) fn lowered(self) -> Result<Record, Failure<'static>> {
         self.findings.into_iter().map(Finding::lowered).collect()
     }
 
@@ -68,7 +68,7 @@ impl Gate {
     }
 
     #[must_use]
-    pub fn blocking(&self, report_only: &[OsString]) -> Option<&Finding> {
+    pub(crate) fn blocking(&self, report_only: &[OsString]) -> Option<&Finding> {
         self.findings
             .iter()
             .filter_map(Finding::blocks)
@@ -76,7 +76,7 @@ impl Gate {
     }
 
     #[must_use]
-    pub fn past_warn(self) -> Vec<Finding> {
+    pub(crate) fn past_warn(self) -> Vec<Finding> {
         self.findings.into_iter().filter(|finding| *AsRef::<Verdict>::as_ref(finding) != Verdict::Within).collect()
     }
 }

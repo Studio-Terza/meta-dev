@@ -9,27 +9,27 @@ use crate::stage::Stage;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
 #[serde(untagged)]
-pub enum Limit {
+pub(crate) enum Limit {
     Levels { warn: Seconds, block: Seconds },
     Record(Seconds),
 }
 
 impl Limit {
-    pub fn ordered(self) -> Option<Limit> {
+    pub(crate) fn ordered(self) -> Option<Limit> {
         match self {
             Limit::Levels { warn, block } => Self::exceeded(warn, block).map_or(Some(self), |_| None),
             Limit::Record(_) => Some(self),
         }
     }
 
-    pub fn judge(&self, measured: Seconds) -> Verdict {
+    pub(crate) fn judge(&self, measured: Seconds) -> Verdict {
         match self {
             Limit::Levels { warn, block } => Self::leveled(measured, *warn, *block),
             Limit::Record(record) => Self::exceeded(measured, *record).map_or(Verdict::Within, |_| Verdict::Block),
         }
     }
 
-    pub fn lowered(self, measured: Seconds) -> Result<Seconds, Refusal> {
+    pub(crate) fn lowered(self, measured: Seconds) -> Result<Seconds, Refusal> {
         match self {
             Limit::Levels { .. } => Err(Refusal::Levels),
             Limit::Record(record) => {
@@ -60,13 +60,13 @@ impl From<Exceeded> for Refusal {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Refusal {
+pub(crate) enum Refusal {
     Levels,
     Above { record: Seconds },
 }
 
 impl Refusal {
-    pub fn refusing(self, stage: Stage, measured: Seconds) -> Failure<'static> {
+    pub(crate) fn refusing(self, stage: Stage, measured: Seconds) -> Failure<'static> {
         match self {
             Refusal::Levels => Failure::Levels { stage },
             Refusal::Above { record } => Failure::Above { stage, measured, record },

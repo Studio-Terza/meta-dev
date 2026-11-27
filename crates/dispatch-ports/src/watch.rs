@@ -80,7 +80,7 @@ impl Stall {
 }
 
 impl<'ports, D: Dispatch, C: Clock> Watch<'ports, D, C> {
-    pub const PAUSE: Pause = Pause::new(2);
+    pub(crate) const PAUSE: Pause = Pause::new(2);
 
     pub fn over(dispatch: &'ports D, clock: &'ports C) -> Watch<'ports, D, C> {
         Watch { dispatch, clock }
