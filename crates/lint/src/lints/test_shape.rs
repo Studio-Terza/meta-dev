@@ -62,7 +62,7 @@ enum Helper {
 
 impl TestShape {
     const LITERAL_FIX: Fix =
-        Fix("read expected values from a golden file and inputs from a fixture or a proptest strategy");
+        Fix("read expected values from a golden file and inputs from a fixture or a derived Arbitrary");
     const HELPER_FIX: Fix = Fix("test through the production code path; a test file holds tests and their table");
     const DECLARING: &'static str = "fn";
     const DERIVE: &'static str = "derive";

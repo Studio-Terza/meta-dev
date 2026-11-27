@@ -2,9 +2,9 @@ free functions are not allowed; make them associated functions or methods:
 tests/story.rs:14: fn helper; make it an associated function or a method
 tests run production code paths: no literals in a test body and no test helpers beyond a test table:
 tests/story.rs:10: test helper type Helper; test through the production code path; a test file holds tests and their table
-tests/story.rs:12: literal in test constant LIMIT; read expected values from a golden file and inputs from a fixture or a proptest strategy
+tests/story.rs:12: literal in test constant LIMIT; read expected values from a golden file and inputs from a fixture or a derived Arbitrary
 tests/story.rs:14: test helper fn helper; test through the production code path; a test file holds tests and their table
-tests/story.rs:25: literal in test spelled_out; read expected values from a golden file and inputs from a fixture or a proptest strategy
+tests/story.rs:25: literal in test spelled_out; read expected values from a golden file and inputs from a fixture or a derived Arbitrary
 every pub item is named by another workspace crate:
 src/lib.rs:1: pub Shown is named by no other crate; make it private or delete it
 test budget: 28 of 29 lines are tests, at most 18% may be; cut test lines or test through fewer, table-driven cases
