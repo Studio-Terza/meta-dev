@@ -1,11 +1,10 @@
 use std::num::NonZeroU32;
 
-use logos::Logos;
-
-use crate::{BranchName, Ignoring, Unlexed};
+use grammar::logos::Logos;
+use grammar::{BranchName, Ignoring, Unlexed};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-#[logos(crate = logos)]
+#[logos(crate = grammar::logos)]
 #[logos(skip r"[ \t\r\n]+")]
 enum Word {
     #[token("gh")]
@@ -30,7 +29,7 @@ enum Heard {
 }
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-#[logos(crate = logos)]
+#[logos(crate = grammar::logos)]
 enum Porcelain<'text> {
     #[regex("worktree [^\n]+", |lexer| lexer.slice().get(9..), priority = 8, allow_greedy = true)]
     Path(&'text str),
