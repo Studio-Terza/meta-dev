@@ -140,6 +140,7 @@ dependencies = [
  "dispatch-ports",
  "file-ports",
  "grammar",
+ "grammar-git",
  "grammar-spec-line",
  "hex",
  "invariants",
@@ -320,6 +321,13 @@ dependencies = [
  "test-failure",
  "thiserror",
  "toml",
+]
+
+[[package]]
+name = "grammar-git"
+version = "0.1.0"
+dependencies = [
+ "grammar",
 ]
 
 [[package]]

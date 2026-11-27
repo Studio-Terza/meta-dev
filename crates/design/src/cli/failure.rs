@@ -13,7 +13,7 @@ use crate::Outcome;
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
     #[error(
-        "usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | subagent-stop | --settings))"
+        "usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | subagent-stop | post-tool-use | --settings))"
     )]
     Usage,
     #[error("the environment does not name {0:?}")]
@@ -38,6 +38,8 @@ pub enum Failure {
     Unheard(#[source] serde_json::Error),
     #[error("cannot add the escalation to the discussion queue: {0}")]
     Unqueued(#[source] FileFailure),
+    #[error("cannot add the escalation to the discussion queue: the workspace local.toml names no absolute queue path")]
+    Unplaced,
     #[error("cannot render the hook settings: {0}")]
     Render(#[source] serde_json::Error),
     #[error("a resource was not released cleanly: {0}")]

@@ -70,6 +70,17 @@ impl<'text> Piece<'text> {
     }
 }
 
+impl<'text> BranchName<'text> {
+    #[must_use]
+    pub fn read(text: &'text str) -> Option<BranchName<'text>> {
+        let pieces = Piece::lexer(text).collect::<Result<Vec<Piece<'text>>, ()>>().ignoring(Unlexed::NotThisGrammar)?;
+        match <[Piece<'text>; 1]>::try_from(pieces).ignoring(Unlexed::OtherShape)? {
+            [Piece::Branch(branch)] => Some(BranchName(branch)),
+            [Piece::Ended(_) | Piece::Pull(_) | Piece::Head(_)] => None,
+        }
+    }
+}
+
 impl fmt::Display for BranchName<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(self.0)

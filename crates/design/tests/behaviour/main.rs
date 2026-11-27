@@ -54,6 +54,8 @@ const READING: u32 = 2;
 const STEP: i64 = 5;
 const READS: i64 = 10_000;
 const STORE: &str = ".meta/design.sqlite";
+const PLACED: &str = "placed";
+const MERGEABLE: &str = "pr view 12 --json mergeable -R o/r";
 
 static MIGRATED: LazyLock<Result<Vec<u8>, Failed>> = LazyLock::new(|| {
     let home = Home::new()?;
@@ -179,6 +181,7 @@ struct Answer {
 struct Asked {
     spoken: String,
     deadline: Deadline,
+    directory: PathBuf,
 }
 
 impl Answer {
@@ -189,10 +192,12 @@ impl Answer {
 
 impl GitHub {
     fn answering(given: &[Answer]) -> GitHub {
-        let answers = given.iter().fold(BTreeMap::<String, Vec<Ran>>::new(), |mut answers, answer| {
+        let clean = Answer::new(MERGEABLE, Ran::Succeeded(Printed::new("{\"mergeable\":\"MERGEABLE\"}".to_owned())));
+        let mut answers = given.iter().fold(BTreeMap::<String, Vec<Ran>>::new(), |mut answers, answer| {
             answers.entry(answer.asked.clone()).or_default().push(answer.ran.clone());
             answers
         });
+        answers.entry(clean.asked).or_insert(vec![clean.ran]);
         GitHub { answers, asked: Mutex::default() }
     }
 }
@@ -206,7 +211,8 @@ impl ShellFiller for Gh<'_> {
     fn ran(&self, _pass: Pass<'_, shell_ops::Ran>, call: &Call) -> Result<Ran, DispatchFailure> {
         let spoken =
             [call.program().to_owned()].into_iter().chain(call.arguments().iter().cloned()).collect::<Vec<_>>();
-        let asked = Asked { spoken: spoken.join(" "), deadline: call.deadline() };
+        let asked =
+            Asked { spoken: spoken.join(" "), deadline: call.deadline(), directory: call.directory().to_path_buf() };
         let mut log = self.github.asked.lock().unpoisoned();
         let earlier = log.iter().filter(|before| before.spoken == asked.spoken).count();
         let answers = self.github.answers.get(&asked.spoken);
@@ -223,7 +229,11 @@ impl GitHub {
         let log = self.asked.lock().unpoisoned();
         let lines: Vec<String> = log
             .iter()
-            .map(|asked| format!("+{} {}\n", asked.deadline.into_inner().into_inner() - start, asked.spoken))
+            .map(|asked| {
+                let elsewhere = Some(&asked.directory).filter(|directory| *directory != Path::new(AGENT));
+                let place = elsewhere.map_or_else(String::new, |directory| format!(" in {}", directory.display()));
+                format!("+{} {}{place}\n", asked.deadline.into_inner().into_inner() - start, asked.spoken)
+            })
             .collect();
         lines.concat()
     }
@@ -312,17 +322,20 @@ impl Home {
     fn new() -> Result<Home, Failed> {
         let home = Home { directory: TempDir::new()?, at: SystemTime::now() };
         fs::create_dir_all(home.workspace().join(".meta"))?;
-        home.configured(Some(LOCAL))?;
+        home.configured(LOCAL)?;
         Ok(home)
     }
 
-    fn configured(&self, local: Option<&str>) -> Result<(), Failed> {
-        let path = self.workspace().join(".meta/local.toml");
-        match local {
-            Some(text) => fs::write(path, text)?,
-            None => fs::remove_file(path)?,
-        }
-        Ok(())
+    fn configured(&self, local: &str) -> Result<(), Failed> {
+        self.unplaced(&format!("queue = {}\nspecs = {}\n{local}", self.placed("queue.md"), self.placed("specs")))
+    }
+
+    fn placed(&self, kept: &str) -> Value {
+        Value::from(self.path().join(PLACED).join(kept).to_string_lossy())
+    }
+
+    fn unplaced(&self, local: &str) -> Result<(), Failed> {
+        Ok(fs::write(self.workspace().join(".meta/local.toml"), local)?)
     }
 
     fn holding(lines: &[String]) -> Result<Home, Failed> {
@@ -377,6 +390,18 @@ impl Home {
             "last_assistant_message": said,
         });
         self.heard(&["hook", "subagent-stop"], &input.to_string(), &Replies::default(), github)
+    }
+
+    fn used(&self, command: &str, github: &GitHub) -> Said {
+        let input = serde_json::json!({
+            "session_id": "s",
+            "hook_event_name": "PostToolUse",
+            "cwd": AGENT,
+            "tool_name": "Bash",
+            "tool_input": {"command": command},
+            "tool_response": {"stdout": ""},
+        });
+        self.heard(&["hook", "post-tool-use"], &input.to_string(), &Replies::default(), github)
     }
 
     fn heard(&self, arguments: &[&str], input: &str, replies: &Replies, github: &GitHub) -> Said {
@@ -583,18 +608,18 @@ impl Home {
     }
 
     fn queued(&self, text: &str) -> Result<(), Failed> {
-        let folder = self.path().join("studio-meta-dev/transcripts");
+        let folder = self.path().join(PLACED);
         fs::create_dir_all(&folder)?;
         fs::write(folder.join("queue.md"), text)?;
         Ok(())
     }
 
     fn queue(&self) -> Result<String, Failed> {
-        Ok(fs::read_to_string(self.path().join("studio-meta-dev/transcripts/queue.md"))?)
+        Ok(fs::read_to_string(self.path().join(PLACED).join("queue.md"))?)
     }
 
     fn specified(&self, text: &str) -> Result<(), Failed> {
-        let folder = self.path().join("studio-meta-dev/transcripts/specs");
+        let folder = self.path().join(PLACED).join("specs");
         fs::create_dir_all(&folder)?;
         fs::write(folder.join("tools-retirement.md"), text)?;
         Ok(())
@@ -659,15 +684,38 @@ struct Story {
 enum Local {
     Written(String),
     Removed,
+    Unplaced { queue: Option<Placing>, specs: Option<Placing>, rest: String },
+}
+
+#[derive(Debug, Deserialize)]
+enum Placing {
+    Placed,
+    Relative(String),
 }
 
 #[derive(Debug, Deserialize)]
 struct Finish {
     said: String,
     #[serde(default)]
+    hook: Hooked,
+    #[serde(default)]
     turn: Turn,
     #[serde(default)]
     answers: Vec<Scripted>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize)]
+enum Hooked {
+    #[default]
+    SubagentStop,
+    PostToolUse,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize)]
+enum Tool {
+    #[default]
+    Gh,
+    Git,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
@@ -679,6 +727,8 @@ enum Turn {
 
 #[derive(Debug, Deserialize)]
 struct Scripted {
+    #[serde(default)]
+    tool: Tool,
     asked: String,
     ran: Answered,
     printed: String,
@@ -699,7 +749,20 @@ impl Scripted {
             Answered::Failed => Ran::Failed(printed),
             Answered::Overdue => Ran::Overdue,
         };
-        Answer::new(&self.asked, ran)
+        match self.tool {
+            Tool::Gh => Answer::new(&self.asked, ran),
+            Tool::Git => Answer { asked: format!("git {}", self.asked), ran },
+        }
+    }
+}
+
+impl Placing {
+    fn line(&self, key: &str, home: &Home, kept: &str) -> String {
+        let value = match self {
+            Placing::Placed => home.placed(kept),
+            Placing::Relative(path) => Value::from(path.as_str()),
+        };
+        format!("{key} = {value}\n")
     }
 }
 
@@ -715,15 +778,23 @@ impl Story {
         self.queue.as_deref().map_or(Ok(()), |queued| home.queued(queued))?;
         self.spec.as_deref().map_or(Ok(()), |spec| home.specified(spec))?;
         self.local.as_ref().map_or(Ok(()), |local| match local {
-            Local::Written(text) => home.configured(Some(text)),
-            Local::Removed => home.configured(None),
+            Local::Written(text) => home.configured(text),
+            Local::Removed => home.configured(""),
+            Local::Unplaced { queue, specs, rest } => {
+                let queued = queue.as_ref().map(|placing| placing.line("queue", &home, "queue.md"));
+                let specified = specs.as_ref().map(|placing| placing.line("specs", &home, "specs"));
+                home.unplaced(&[queued.unwrap_or_default(), specified.unwrap_or_default(), rest.clone()].concat())
+            }
         })?;
         let finished: Vec<String> = self
             .finish
             .iter()
             .map(|finish| {
                 let github = GitHub::answering(&finish.answers.iter().map(Scripted::answer).collect::<Vec<_>>());
-                let said = home.finished(&finish.said, finish.turn == Turn::Reminded, &github);
+                let said = match finish.hook {
+                    Hooked::SubagentStop => home.finished(&finish.said, finish.turn == Turn::Reminded, &github),
+                    Hooked::PostToolUse => home.used(&finish.said, &github),
+                };
                 let timeline = github.timeline(home.at);
                 format!("> {:?} {:?}\n{:?} {}\n{timeline}", finish.said, finish.turn, said.ended, said.shown)
             })

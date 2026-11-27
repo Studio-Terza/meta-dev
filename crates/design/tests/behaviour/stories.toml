@@ -51,6 +51,17 @@ answers = [
 ]
 
 [[story]]
+name = "a done on a conflicting pull request is sent back to merge main without waiting on ci"
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+turn = "Reminded"
+answers = [
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"CONFLICTING"}' },
+]
+
+[[story]]
 name = "a done on green checks waits on ci and lets the agent stop"
 
 [[story.finish]]
@@ -373,6 +384,13 @@ answers = [
 [[story.finish]]
 said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
 answers = [
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"DIVERGED"}' },
+]
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+answers = [
   { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = '[{"name":"test","state":"IN_PROGRESS"}]' },
   { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
 ]
@@ -627,6 +645,162 @@ said = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
 answers = [
   { asked = "api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}", ran = "Succeeded", printed = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
   { asked = "api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567", ran = "Succeeded", printed = '{"commits":[{"commit":{"message":"Open it\n\nSpec: none here\n\nWhy.\n\nSpec: owner 3c84f560\nCo-Authored-By: A"}},{"commit":{"message":"Spec: other#D9"}}]}' },
+]
+
+[[story]]
+name = "a queue placed but no specs is escalated as unread"
+queue = ""
+spec = "# Tools retirement\n\nD2 Typed agent outcomes (owner de7a042f): the hook refuses other endings.\n"
+local = { Unplaced = { queue = "Placed", rest = "repository = \"o/r\"\n" } }
+
+[[story.finish]]
+said = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}", ran = "Succeeded", printed = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
+  { asked = "api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567", ran = "Succeeded", printed = '{"commits":[{"commit":{"message":"Open it\n\nSpec: tools-retirement#D2\nCo-Authored-By: A"}}]}' },
+]
+
+[[story]]
+name = "specs at a relative path are never guessed"
+queue = ""
+spec = "# Tools retirement\n\nD2 Typed agent outcomes (owner de7a042f): the hook refuses other endings.\n"
+local = { Unplaced = { queue = "Placed", specs = { Relative = "x" }, rest = "repository = \"o/r\"\n" } }
+
+[[story.finish]]
+said = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}", ran = "Succeeded", printed = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
+  { asked = "api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567", ran = "Succeeded", printed = '{"commits":[{"commit":{"message":"Open it\n\nSpec: tools-retirement#D2\nCo-Authored-By: A"}}]}' },
+]
+
+[[story]]
+name = "a workspace placing no queue refuses"
+queue = ""
+local = { Unplaced = { rest = "repository = \"o/r\"\n" } }
+
+[[story.finish]]
+said = "BLOCKED #12 0123456789abcdef0123456789abcdef01234567"
+
+[[story]]
+name = "a queue at a relative path refuses"
+queue = ""
+local = { Unplaced = { queue = { Relative = "queue.md" }, rest = "" } }
+
+[[story.finish]]
+said = "BLOCKED #12 0123456789abcdef0123456789abcdef01234567"
+
+[[story]]
+name = "a merged pull request's clean pushed worktree is removed and any other is kept and queued"
+queue = ""
+
+[[story.finish]]
+hook = "PostToolUse"
+said = "cd /work && gh pr merge 12 --merge -R o/r"
+answers = [
+  { asked = "pr view 12 --json state,headRefName,headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"MERGED"}' },
+  { tool = "Git", asked = "worktree list --porcelain", ran = "Succeeded", printed = """
+worktree /work/main
+HEAD fedcba9876543210fedcba9876543210fedcba98
+branch refs/heads/main
+
+worktree /work/wt-open-pr
+HEAD 0123456789abcdef0123456789abcdef01234567
+branch refs/heads/design/open-pr
+
+worktree /work/detached
+HEAD 0123456789abcdef0123456789abcdef01234567
+detached
+""" },
+  { tool = "Git", asked = "status --short", ran = "Succeeded", printed = "" },
+  { tool = "Git", asked = "worktree remove /work/wt-open-pr", ran = "Succeeded", printed = "" },
+]
+
+[[story.finish]]
+hook = "PostToolUse"
+said = "gh pr view 12 && echo merge 12"
+
+[[story.finish]]
+hook = "PostToolUse"
+said = "cd /work && gh pr merge 12 --merge -R o/r"
+answers = [
+  { asked = "pr view 12 --json state,headRefName,headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"OPEN"}' },
+]
+
+[[story.finish]]
+hook = "PostToolUse"
+said = "cd /work && gh pr merge 12 --merge -R o/r"
+answers = [
+  { asked = "pr view 12 --json state,headRefName,headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefName":"design/other","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"MERGED"}' },
+  { tool = "Git", asked = "worktree list --porcelain", ran = "Succeeded", printed = """
+worktree /work/wt-open-pr
+HEAD 0123456789abcdef0123456789abcdef01234567
+branch refs/heads/design/open-pr
+""" },
+]
+
+[[story.finish]]
+hook = "PostToolUse"
+said = "cd /work && gh pr merge 12 --merge -R o/r"
+
+[[story.finish]]
+hook = "PostToolUse"
+said = "cd /work && gh pr merge 12 --merge -R o/r"
+answers = [
+  { asked = "pr view 12 --json state,headRefName,headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"MERGED"}' },
+]
+
+[[story.finish]]
+hook = "PostToolUse"
+said = "cd /work && gh pr merge 12 --merge -R o/r"
+answers = [
+  { asked = "pr view 12 --json state,headRefName,headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"MERGED"}' },
+  { tool = "Git", asked = "worktree list --porcelain", ran = "Succeeded", printed = """
+worktree /work/wt-open-pr
+HEAD 0123456789abcdef0123456789abcdef01234567
+branch refs/heads/design/open-pr
+""" },
+]
+
+[[story.finish]]
+hook = "PostToolUse"
+said = "cd /work && gh pr merge 12 --merge -R o/r"
+answers = [
+  { asked = "pr view 12 --json state,headRefName,headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"MERGED"}' },
+  { tool = "Git", asked = "worktree list --porcelain", ran = "Succeeded", printed = """
+worktree /work/wt-open-pr
+HEAD 0123456789abcdef0123456789abcdef01234567
+branch refs/heads/design/open-pr
+""" },
+  { tool = "Git", asked = "status --short", ran = "Succeeded", printed = """
+ M src/lib.rs
+""" },
+]
+
+[[story.finish]]
+hook = "PostToolUse"
+said = "cd /work && gh pr merge 12 --merge -R o/r"
+answers = [
+  { asked = "pr view 12 --json state,headRefName,headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefName":"design/open-pr","headRefOid":"fedcba9876543210fedcba9876543210fedcba98","state":"MERGED"}' },
+  { tool = "Git", asked = "worktree list --porcelain", ran = "Succeeded", printed = """
+worktree /work/wt-open-pr
+HEAD 0123456789abcdef0123456789abcdef01234567
+branch refs/heads/design/open-pr
+""" },
+  { tool = "Git", asked = "status --short", ran = "Succeeded", printed = "" },
+]
+
+[[story.finish]]
+hook = "PostToolUse"
+said = "cd /work && gh pr merge 12 --merge -R o/r"
+answers = [
+  { asked = "pr view 12 --json state,headRefName,headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"MERGED"}' },
+  { tool = "Git", asked = "worktree list --porcelain", ran = "Succeeded", printed = """
+worktree /work/wt-open-pr
+HEAD 0123456789abcdef0123456789abcdef01234567
+branch refs/heads/design/open-pr
+""" },
+  { tool = "Git", asked = "status --short", ran = "Succeeded", printed = "" },
+  { tool = "Git", asked = "worktree remove /work/wt-open-pr", ran = "Failed", printed = "" },
 ]
 
 [[story]]

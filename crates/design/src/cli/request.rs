@@ -1,6 +1,7 @@
 mod command;
 mod ground;
 mod ignored;
+mod local;
 mod persistence;
 mod projects;
 
@@ -14,6 +15,7 @@ use super::failure::Failure;
 use command::Command;
 pub use command::Crew;
 pub use ground::Ground;
+pub use local::{Local, Repository};
 use projects::Projects;
 pub use projects::{Kept, Located};
 

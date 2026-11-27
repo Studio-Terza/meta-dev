@@ -6,11 +6,11 @@ use grammar::{Cited, Heading, Queue};
 use grammar_spec_line::Attachment;
 use invariants::Ignoring;
 use port_core::{Port, Run};
-use serde::de::DeserializeOwned;
 use store_ports::Store;
 use transcript_ports::ClaudeCodeDir;
 
 use super::ignored::Ignored;
+use super::local::{Local, QueueFile, SpecsFolder};
 use super::projects::{Kept, Located};
 
 #[derive(Debug)]
@@ -34,19 +34,19 @@ impl<'run, F: Files, S: Store> Ground<'run, F, S> {
         &self.files
     }
 
-    pub fn queue(&self) -> Option<Queue> {
-        let text = self.files.read_text(self.located.queue()).ignoring(Ignored::Unqueued)?;
+    pub fn queue(&self, file: &QueueFile) -> Option<Queue> {
+        let text = self.files.read_text(file.as_ref()).ignoring(Ignored::Unqueued)?;
         Some(Queue::read(text.as_ref()))
     }
 
-    pub fn queued(&self, line: impl fmt::Display) -> Result<(), FileFailure> {
-        self.files.append(self.located.queue(), &Bytes::new(format!("{line}\n").into_bytes()))
+    pub fn queued(&self, file: &QueueFile, line: impl fmt::Display) -> Result<(), FileFailure> {
+        self.files.append(file.as_ref(), &Bytes::new(format!("{line}\n").into_bytes()))
     }
 
-    pub fn titled(&self, spec: &Attachment) -> Option<Heading> {
+    pub fn titled(&self, specs: &SpecsFolder, spec: &Attachment) -> Option<Heading> {
         let written = spec.to_string();
         let cited = Cited::read(&written)?;
-        let text = self.files.read_text(&self.located.spec(cited.project())).ignoring(Ignored::Untitled)?;
+        let text = self.files.read_text(&specs.spec(cited.project())).ignoring(Ignored::Untitled)?;
         let lines = match text.as_ref().parse::<Lines>() {
             Ok(lines) => lines,
             Err(unsplit) => match unsplit {},
@@ -54,9 +54,9 @@ impl<'run, F: Files, S: Store> Ground<'run, F, S> {
         lines.into_iter().filter_map(|line| Heading::read(&line)).find(|heading| heading.detail() == cited.detail())
     }
 
-    pub fn configured<T: DeserializeOwned>(&self) -> Option<T> {
-        let text = self.files.read_text(&self.located.kept(Kept::Local)).ignoring(Ignored::Unconfigured)?;
-        toml::from_str(text.as_ref()).ignoring(Ignored::Unconfigured)
+    pub fn local(&self) -> Local {
+        let text = self.files.read_text(&self.located.kept(Kept::Local)).ignoring(Ignored::Unconfigured);
+        text.and_then(|read| toml::from_str(read.as_ref()).ignoring(Ignored::Unconfigured)).unwrap_or_default()
     }
 
     pub fn transcripts(self) -> Port<'run, ClaudeCodeDir<F>> {

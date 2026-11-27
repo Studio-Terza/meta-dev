@@ -33,7 +33,14 @@ pub struct Settings {
 
 #[derive(Debug, Serialize)]
 struct Matcher {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    matcher: Option<Tool>,
     hooks: [Handler; 1],
+}
+
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+enum Tool {
+    Bash,
 }
 
 #[derive(Debug, Serialize)]
@@ -91,7 +98,19 @@ impl Settings {
 
     pub fn listed(events: &[HookEvent]) -> Settings {
         Settings {
-            hooks: events.iter().map(|event| (*event, [Matcher { hooks: [Settings::handler(*event)] }])).collect(),
+            hooks: events
+                .iter()
+                .map(|event| {
+                    (*event, [Matcher { matcher: Settings::matcher(*event), hooks: [Settings::handler(*event)] }])
+                })
+                .collect(),
+        }
+    }
+
+    const fn matcher(event: HookEvent) -> Option<Tool> {
+        match event {
+            HookEvent::Stop | HookEvent::SubagentStop => None,
+            HookEvent::PostToolUse => Some(Tool::Bash),
         }
     }
 
@@ -107,6 +126,7 @@ impl Settings {
         match event {
             HookEvent::Stop => 3600,
             HookEvent::SubagentStop => 1500,
+            HookEvent::PostToolUse => 300,
         }
     }
 

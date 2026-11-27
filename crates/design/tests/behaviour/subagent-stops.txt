@@ -41,10 +41,17 @@ queue:
 Ok(Blocked) {"decision":"block","reason":"Pull request #12 has head fedcba9876543210fedcba9876543210fedcba98, not 0123456789abcdef0123456789abcdef01234567. Push the commit, then end with DONE #12 <full sha of the pushed head>."}
 
 +60 gh pr view 12 --json headRefOid -R o/r
+## a done on a conflicting pull request is sent back to merge main without waiting on ci
+> "DONE #12 0123456789abcdef0123456789abcdef01234567" Reminded
+Ok(Blocked) {"decision":"block","reason":"Pull request #12 at 0123456789abcdef0123456789abcdef01234567 conflicts with main. Merge origin/main, resolve the conflicts, push, then end with DONE #12 <full sha of the pushed head>."}
+
++60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable -R o/r
 ## a done on green checks waits on ci and lets the agent stop
 > "\nDONE #12 0123456789ABCDEF0123456789ABCDEF01234567\n" First
 Ok(Hooked(SubagentStop)) 
 +60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable -R o/r
 +60 gh pr checks 12 --json name,state -R o/r
 +1200 gh pr checks 12 --watch --fail-fast -R o/r
 +60 gh pr checks 12 --json name,bucket,link -R o/r
@@ -53,6 +60,7 @@ Ok(Hooked(SubagentStop))
 Ok(Blocked) {"decision":"block","reason":"CI failed on #12 at 0123456789abcdef0123456789abcdef01234567. Fix these jobs, push, then end with DONE #12 <full sha>.\n\ntest (job 456):\ntest step line 3\ntest step line 4\ntest step line 5\ntest step line 6\ntest step line 7\ntest step line 8\ntest step line 9\ntest step line 10\ntest step line 11\ntest step line 12\ntest step line 13\ntest step line 14\ntest step line 15\ntest step line 16\ntest step line 17\ntest step line 18\ntest step line 19\ntest step line 20\ntest step line 21\ntest step line 22\ntest step line 23\ntest step line 24\ntest step line 25\ntest step line 26\ntest step line 27\ntest step line 28\ntest step line 29\ntest step line 30\ntest step line 31\ntest step line 32\ntest step line 33\ntest step line 34\ntest step line 35\ntest step line 36\ntest step line 37\ntest step line 38\ntest step line 39\ntest step line 40\ntest step line 41\ntest step line 42\n\nbuild (job 458):\n(the log could not be read)\n"}
 
 +60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable -R o/r
 +60 gh pr checks 12 --json name,state -R o/r
 +1200 gh pr checks 12 --watch --fail-fast -R o/r
 +60 gh pr checks 12 --json name,bucket,link -R o/r
@@ -63,6 +71,7 @@ Ok(Blocked) {"decision":"block","reason":"CI failed on #12 at 0123456789abcdef01
 Ok(Blocked) {"decision":"block","reason":"CI failed on #12 at 0123456789abcdef0123456789abcdef01234567. Fix these jobs, push, then end with DONE #12 <full sha>.\n\ntest (job 456):\ntest step line 3\ntest step line 4\ntest step line 5\ntest step line 6\ntest step line 7\ntest step line 8\ntest step line 9\ntest step line 10\ntest step line 11\ntest step line 12\ntest step line 13\ntest step line 14\ntest step line 15\ntest step line 16\ntest step line 17\ntest step line 18\ntest step line 19\ntest step line 20\ntest step line 21\ntest step line 22\ntest step line 23\ntest step line 24\ntest step line 25\ntest step line 26\ntest step line 27\ntest step line 28\ntest step line 29\ntest step line 30\ntest step line 31\ntest step line 32\ntest step line 33\ntest step line 34\ntest step line 35\ntest step line 36\ntest step line 37\ntest step line 38\ntest step line 39\ntest step line 40\ntest step line 41\ntest step line 42\n\nbuild (job 458):\n(the log could not be read)\n"}
 
 +60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable -R o/r
 +60 gh pr checks 12 --json name,state -R o/r
 +1200 gh pr checks 12 --watch --fail-fast -R o/r
 +60 gh pr checks 12 --json name,bucket,link -R o/r
@@ -71,6 +80,7 @@ Ok(Blocked) {"decision":"block","reason":"CI failed on #12 at 0123456789abcdef01
 > "DONE #12 0123456789abcdef0123456789abcdef01234567" Reminded
 Ok(Escalated) 
 +60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable -R o/r
 +60 gh pr checks 12 --json name,state -R o/r
 +1200 gh pr checks 12 --watch --fail-fast -R o/r
 +60 gh pr checks 12 --json name,bucket,link -R o/r
@@ -81,6 +91,7 @@ queue:
 Ok(Blocked) {"decision":"block","reason":"CI failed on #12 at 0123456789abcdef0123456789abcdef01234567. Fix these jobs, push, then end with DONE #12 <full sha>.\n\ntest (job 456):\ntest step line 3\ntest step line 4\ntest step line 5\ntest step line 6\ntest step line 7\ntest step line 8\ntest step line 9\ntest step line 10\ntest step line 11\ntest step line 12\ntest step line 13\ntest step line 14\ntest step line 15\ntest step line 16\ntest step line 17\ntest step line 18\ntest step line 19\ntest step line 20\ntest step line 21\ntest step line 22\ntest step line 23\ntest step line 24\ntest step line 25\ntest step line 26\ntest step line 27\ntest step line 28\ntest step line 29\ntest step line 30\ntest step line 31\ntest step line 32\ntest step line 33\ntest step line 34\ntest step line 35\ntest step line 36\ntest step line 37\ntest step line 38\ntest step line 39\ntest step line 40\ntest step line 41\ntest step line 42\n\nbuild (job 458):\n(the log could not be read)\n"}
 
 +60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable -R o/r
 +60 gh pr checks 12 --json name,state -R o/r
 +1200 gh pr checks 12 --watch --fail-fast -R o/r
 +60 gh pr checks 12 --json name,bucket,link -R o/r
@@ -89,6 +100,7 @@ Ok(Blocked) {"decision":"block","reason":"CI failed on #12 at 0123456789abcdef01
 > "DONE #12 0123456789abcdef0123456789abcdef01234567" Reminded
 Ok(Hooked(SubagentStop)) 
 +60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable -R o/r
 +60 gh pr checks 12 --json name,state -R o/r
 +1200 gh pr checks 12 --watch --fail-fast -R o/r
 +60 gh pr checks 12 --json name,bucket,link -R o/r
@@ -96,6 +108,7 @@ Ok(Hooked(SubagentStop))
 Ok(Blocked) {"decision":"block","reason":"CI failed on #12 at 0123456789abcdef0123456789abcdef01234567. Fix these jobs, push, then end with DONE #12 <full sha>.\n\ntest (job 456):\ntest step line 3\ntest step line 4\ntest step line 5\ntest step line 6\ntest step line 7\ntest step line 8\ntest step line 9\ntest step line 10\ntest step line 11\ntest step line 12\ntest step line 13\ntest step line 14\ntest step line 15\ntest step line 16\ntest step line 17\ntest step line 18\ntest step line 19\ntest step line 20\ntest step line 21\ntest step line 22\ntest step line 23\ntest step line 24\ntest step line 25\ntest step line 26\ntest step line 27\ntest step line 28\ntest step line 29\ntest step line 30\ntest step line 31\ntest step line 32\ntest step line 33\ntest step line 34\ntest step line 35\ntest step line 36\ntest step line 37\ntest step line 38\ntest step line 39\ntest step line 40\ntest step line 41\ntest step line 42\n\nbuild (job 458):\n(the log could not be read)\n"}
 
 +60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable -R o/r
 +60 gh pr checks 12 --json name,state -R o/r
 +1200 gh pr checks 12 --watch --fail-fast -R o/r
 +60 gh pr checks 12 --json name,bucket,link -R o/r
@@ -116,46 +129,58 @@ Ok(Escalated)
 > "DONE #12 0123456789abcdef0123456789abcdef01234567" First
 Ok(Escalated) 
 +60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable -R o/r
+> "DONE #12 0123456789abcdef0123456789abcdef01234567" First
+Ok(Escalated) 
++60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable -R o/r
 +60 gh pr checks 12 --json name,state -R o/r
 +1200 gh pr checks 12 --watch --fail-fast -R o/r
 > "DONE #12 0123456789abcdef0123456789abcdef01234567" First
 Ok(Escalated) 
 +60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable -R o/r
 +60 gh pr checks 12 --json name,state -R o/r
 +1200 gh pr checks 12 --watch --fail-fast -R o/r
 > "DONE #12 0123456789abcdef0123456789abcdef01234567" First
 Ok(Escalated) 
 +60 gh pr view 12 --json headRefOid -R o/r
-+60 gh pr checks 12 --json name,state -R o/r
-+1200 gh pr checks 12 --watch --fail-fast -R o/r
-+60 gh pr checks 12 --json name,bucket,link -R o/r
-> "DONE #12 0123456789abcdef0123456789abcdef01234567" First
-Ok(Escalated) 
-+60 gh pr view 12 --json headRefOid -R o/r
-+60 gh pr checks 12 --json name,state -R o/r
-+1200 gh pr checks 12 --watch --fail-fast -R o/r
-+60 gh pr checks 12 --json name,bucket,link -R o/r
-> "DONE #12 0123456789abcdef0123456789abcdef01234567" First
-Ok(Escalated) 
-+60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable -R o/r
 +60 gh pr checks 12 --json name,state -R o/r
 +1200 gh pr checks 12 --watch --fail-fast -R o/r
 +60 gh pr checks 12 --json name,bucket,link -R o/r
 > "DONE #12 0123456789abcdef0123456789abcdef01234567" First
 Ok(Escalated) 
 +60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable -R o/r
 +60 gh pr checks 12 --json name,state -R o/r
 +1200 gh pr checks 12 --watch --fail-fast -R o/r
 +60 gh pr checks 12 --json name,bucket,link -R o/r
 > "DONE #12 0123456789abcdef0123456789abcdef01234567" First
 Ok(Escalated) 
 +60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable -R o/r
 +60 gh pr checks 12 --json name,state -R o/r
 +1200 gh pr checks 12 --watch --fail-fast -R o/r
 +60 gh pr checks 12 --json name,bucket,link -R o/r
 > "DONE #12 0123456789abcdef0123456789abcdef01234567" First
 Ok(Escalated) 
 +60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable -R o/r
++60 gh pr checks 12 --json name,state -R o/r
++1200 gh pr checks 12 --watch --fail-fast -R o/r
++60 gh pr checks 12 --json name,bucket,link -R o/r
+> "DONE #12 0123456789abcdef0123456789abcdef01234567" First
+Ok(Escalated) 
++60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable -R o/r
++60 gh pr checks 12 --json name,state -R o/r
++1200 gh pr checks 12 --watch --fail-fast -R o/r
++60 gh pr checks 12 --json name,bucket,link -R o/r
+> "DONE #12 0123456789abcdef0123456789abcdef01234567" First
+Ok(Escalated) 
++60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable -R o/r
 +60 gh pr checks 12 --json name,state -R o/r
 +1200 gh pr checks 12 --watch --fail-fast -R o/r
 +60 gh pr checks 12 --json name,bucket,link -R o/r
@@ -164,6 +189,7 @@ queue:
 - [agent outcome] unread head on #12 0123456789abcdef0123456789abcdef01234567, from /work/agent
 - [agent outcome] unread head on #12 0123456789abcdef0123456789abcdef01234567, from /work/agent
 - [agent outcome] unread head on #12 0123456789abcdef0123456789abcdef01234567, from /work/agent
+- [agent outcome] unread mergeable on #12 0123456789abcdef0123456789abcdef01234567, from /work/agent
 - [agent outcome] unread watch on #12 0123456789abcdef0123456789abcdef01234567, from /work/agent
 - [agent outcome] unread overdue on #12 0123456789abcdef0123456789abcdef01234567, from /work/agent
 - [agent outcome] unread checks on #12 0123456789abcdef0123456789abcdef01234567, from /work/agent
@@ -176,6 +202,7 @@ queue:
 > "DONE #12 0123456789abcdef0123456789abcdef01234567" First
 Ok(Hooked(SubagentStop)) 
 +60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable -R o/r
 +60 gh pr checks 12 --json name,state -R o/r
 +70 gh pr checks 12 --json name,state -R o/r
 +80 gh pr checks 12 --json name,state -R o/r
@@ -185,6 +212,7 @@ Ok(Hooked(SubagentStop))
 > "DONE #12 0123456789abcdef0123456789abcdef01234567" First
 Ok(Escalated) 
 +60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable -R o/r
 +60 gh pr checks 12 --json name,state -R o/r
 +70 gh pr checks 12 --json name,state -R o/r
 +80 gh pr checks 12 --json name,state -R o/r
@@ -227,6 +255,7 @@ Ok(Hooked(SubagentStop))
 🤖 Generated with [Claude Code](https://claude.com/claude-code) -R o/r
 +60 gh pr view design/open-pr --json number -R o/r
 +60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable -R o/r
 +60 gh pr checks 12 --json name,state -R o/r
 +1200 gh pr checks 12 --watch --fail-fast -R o/r
 +60 gh pr checks 12 --json name,bucket,link -R o/r
@@ -317,6 +346,79 @@ queue:
 - [agent outcome] unread detail on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent
 - [agent outcome] unread detail on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent
 - [agent outcome] unread detail on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent
+## a queue placed but no specs is escalated as unread
+> "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567" First
+Ok(Escalated) 
++60 gh api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}
++60 gh api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567
+queue:
+- [agent outcome] unread no-specs on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent
+## specs at a relative path are never guessed
+> "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567" First
+Ok(Escalated) 
++60 gh api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}
++60 gh api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567
+queue:
+- [agent outcome] unread no-specs on design/open-pr 0123456789abcdef0123456789abcdef01234567, from /work/agent
+## a workspace placing no queue refuses
+> "BLOCKED #12 0123456789abcdef0123456789abcdef01234567" First
+Err(Refusal("cannot add the escalation to the discussion queue: the workspace local.toml names no absolute queue path")) 
+queue:
+## a queue at a relative path refuses
+> "BLOCKED #12 0123456789abcdef0123456789abcdef01234567" First
+Err(Refusal("cannot add the escalation to the discussion queue: the workspace local.toml names no absolute queue path")) 
+queue:
+## a merged pull request's clean pushed worktree is removed and any other is kept and queued
+> "cd /work && gh pr merge 12 --merge -R o/r" First
+Ok(Released) 
++60 gh pr view 12 --json state,headRefName,headRefOid -R o/r
++60 git worktree list --porcelain
++60 git status --short in /work/wt-open-pr
++60 git worktree remove /work/wt-open-pr
+> "gh pr view 12 && echo merge 12" First
+Ok(Hooked(PostToolUse)) 
+> "cd /work && gh pr merge 12 --merge -R o/r" First
+Ok(Hooked(PostToolUse)) 
++60 gh pr view 12 --json state,headRefName,headRefOid -R o/r
+> "cd /work && gh pr merge 12 --merge -R o/r" First
+Ok(Hooked(PostToolUse)) 
++60 gh pr view 12 --json state,headRefName,headRefOid -R o/r
++60 git worktree list --porcelain
+> "cd /work && gh pr merge 12 --merge -R o/r" First
+Ok(Escalated) 
++60 gh pr view 12 --json state,headRefName,headRefOid -R o/r
+> "cd /work && gh pr merge 12 --merge -R o/r" First
+Ok(Escalated) 
++60 gh pr view 12 --json state,headRefName,headRefOid -R o/r
++60 git worktree list --porcelain
+> "cd /work && gh pr merge 12 --merge -R o/r" First
+Ok(Escalated) 
++60 gh pr view 12 --json state,headRefName,headRefOid -R o/r
++60 git worktree list --porcelain
++60 git status --short in /work/wt-open-pr
+> "cd /work && gh pr merge 12 --merge -R o/r" First
+Ok(Escalated) 
++60 gh pr view 12 --json state,headRefName,headRefOid -R o/r
++60 git worktree list --porcelain
++60 git status --short in /work/wt-open-pr
+> "cd /work && gh pr merge 12 --merge -R o/r" First
+Ok(Escalated) 
++60 gh pr view 12 --json state,headRefName,headRefOid -R o/r
++60 git worktree list --porcelain
++60 git status --short in /work/wt-open-pr
+> "cd /work && gh pr merge 12 --merge -R o/r" First
+Ok(Escalated) 
++60 gh pr view 12 --json state,headRefName,headRefOid -R o/r
++60 git worktree list --porcelain
++60 git status --short in /work/wt-open-pr
++60 git worktree remove /work/wt-open-pr
+queue:
+- [worktree kept] unviewed after merging #12, from /work/agent
+- [worktree kept] unlisted after merging #12, from /work/agent
+- [worktree kept] unstatused after merging #12 at /work/wt-open-pr, from /work/agent
+- [worktree kept] dirty after merging #12 at /work/wt-open-pr, from /work/agent
+- [worktree kept] unpushed after merging #12 at /work/wt-open-pr, from /work/agent
+- [worktree kept] unremoved after merging #12 at /work/wt-open-pr, from /work/agent
 ## a workspace naming a project but no repository is escalated without gh
 > "DONE #12 0123456789abcdef0123456789abcdef01234567" First
 Ok(Escalated) 
