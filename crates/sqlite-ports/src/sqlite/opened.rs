@@ -30,7 +30,7 @@ impl Stamped {
 }
 
 impl Opened {
-    const SETTINGS: &'static str = "PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = OFF;";
+    const SETTINGS: &'static str = "PRAGMA foreign_keys = ON; PRAGMA synchronous = OFF; PRAGMA journal_mode = WAL;";
     const STAMP: &'static str = "user_version";
     const EMPTIED: &'static str = "VACUUM;";
     const BUSY: std::time::Duration = std::time::Duration::from_secs(5);

@@ -6,6 +6,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
+use std::thread;
 use std::time::{Duration, SystemTime};
 use test_failure::Failed;
 
@@ -501,6 +502,16 @@ impl Step {
 }
 
 impl Story {
+    fn joined(running: Vec<thread::ScopedJoinHandle<'_, Result<String, String>>>) -> Vec<Result<String, String>> {
+        running
+            .into_iter()
+            .map(|handle| match handle.join() {
+                Ok(told) => told,
+                Err(_panicked) => Err("a story panicked".to_owned()),
+            })
+            .collect()
+    }
+
     fn all() -> Result<Vec<Story>, Failed> {
         let written = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(STORIES))?;
         Ok(toml::from_str::<Stories>(&written)?.story)
@@ -535,7 +546,17 @@ impl Story {
 
 #[test]
 fn every_story_says_what_its_golden_says() -> Result<(), Failed> {
-    let shown: String = Story::all()?.iter().map(Story::shown).collect::<Result<_, Failed>>()?;
+    let stories = Story::all()?;
+    let told: Vec<Result<String, String>> = thread::scope(|scope| {
+        let running: Vec<thread::ScopedJoinHandle<'_, Result<String, String>>> = stories
+            .iter()
+            .map(|story| {
+                scope.spawn(move || story.shown().map_err(|failed| format!("{} failed: {failed:?}", story.name)))
+            })
+            .collect();
+        Story::joined(running)
+    });
+    let shown: String = told.into_iter().collect::<Result<_, String>>()?;
     let golden = Path::new(env!("CARGO_MANIFEST_DIR")).join(GOLDEN);
     std::env::var_os("RECORD_GOLDENS").map_or(Ok(()), |_| fs::write(&golden, &shown))?;
     assert_eq!(shown, fs::read_to_string(golden)?);
