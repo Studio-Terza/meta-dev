@@ -2,6 +2,7 @@ use std::ffi::OsString;
 use std::io::Write;
 use std::path::PathBuf;
 
+use crate::boundary::Stage;
 use crate::cli::Exit;
 use crate::failure::Failure;
 use crate::limits::{Limit, Tenths, Verdict};
@@ -10,7 +11,7 @@ use crate::ports::{Mark, Ran};
 #[derive(Debug)]
 pub struct Timed {
     limits: PathBuf,
-    stage: String,
+    stage: Stage,
     since: Option<PathBuf>,
     program: OsString,
     arguments: Vec<OsString>,
@@ -25,7 +26,7 @@ impl Timed {
     ) -> Timed {
         Timed {
             limits: PathBuf::from(limits),
-            stage: stage.to_string_lossy().into_owned(),
+            stage: Stage::named(stage),
             since: since.map(PathBuf::from),
             program: program.clone(),
             arguments: arguments.to_vec(),

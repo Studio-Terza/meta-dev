@@ -1,3 +1,4 @@
+mod boundary;
 mod cli;
 mod failure;
 mod ignored;

@@ -1,7 +1,7 @@
+mod boundary;
+
 use std::ffi::{OsStr, OsString};
-use std::fs::{self, OpenOptions};
-use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -37,7 +37,7 @@ impl Ran {
         let status = Command::new(program)
             .args(arguments)
             .status()
-            .map_err(|source| Failure::Unstarted { program: program.to_string_lossy().into_owned(), source })?;
+            .map_err(|source| Failure::Unstarted { program: PathBuf::from(program), source })?;
         Ok(Ran { status, spent: start.elapsed() })
     }
 
@@ -47,24 +47,5 @@ impl Ran {
 
     pub(crate) fn spent(&self) -> Duration {
         self.spent
-    }
-}
-
-impl Disk {
-    pub(crate) fn read(path: &Path) -> Result<String, Failure> {
-        fs::read_to_string(path).map_err(|source| Failure::Unreadable { path: path.to_path_buf(), source })
-    }
-
-    pub(crate) fn write(path: &Path, text: &str) -> Result<(), Failure> {
-        fs::write(path, text).map_err(|source| Failure::Unwritable { path: path.to_path_buf(), source })
-    }
-
-    pub(crate) fn append(path: &Path, text: &str) -> Result<(), Failure> {
-        OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)
-            .and_then(|mut file| file.write_all(text.as_bytes()))
-            .map_err(|source| Failure::Unwritable { path: path.to_path_buf(), source })
     }
 }
