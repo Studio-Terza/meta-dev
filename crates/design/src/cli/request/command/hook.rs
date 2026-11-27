@@ -44,7 +44,8 @@ impl Hook {
         let started = crew.moment();
         let store = ground.store();
         let tasks = stopping.tasks(&ground, crew.now());
+        let queue = ground.queue();
         Ingest::read(store, &ground.transcripts())?;
-        stopping.decided(crew, &Observed::new(store, tasks, started))
+        stopping.decided(crew, &Observed::new(store, tasks, started, queue))
     }
 }

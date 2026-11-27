@@ -32,6 +32,8 @@ const TRAIL_HEADER: &str = "session\tshells\tagents\thalt\tread\tquoted\tkept\tf
 const QUIET: Duration = Duration::from_mins(20);
 const BUSY: Duration = Duration::from_mins(19);
 const ASKED: &str = "{\"type\":\"user\"}\n";
+const STOPPED: &str = "{\"type\":\"user\"}\n{\"type\":\"api-request\"}\n";
+const GOLDENS: &str = "tests/goldens";
 const TEMPORARY: &str = "/private/tmp";
 const TRIMMING: u32 = 1;
 const READING: u32 = 2;
@@ -244,7 +246,7 @@ impl Home {
     }
 
     fn conversation() -> [String; 2] {
-        [Home::line("user", "o1", OWNER), Home::line("assistant", "l1", "Understood.")]
+        [Home::line("user", "o1", OWNER), Home::line("assistant", "p1", "Understood.")]
     }
 
     fn answered() -> Result<Home, Failed> {
@@ -292,6 +294,17 @@ impl Home {
         fs::write(&task, text)?;
         File::options().write(true).open(&task)?.set_modified(self.at - quiet)?;
         Ok(())
+    }
+
+    fn queued(&self, text: &str) -> Result<(), Failed> {
+        let folder = self.path().join("studio-meta-dev/transcripts");
+        fs::create_dir_all(&folder)?;
+        fs::write(folder.join("queue.md"), text)?;
+        Ok(())
+    }
+
+    fn golden(name: &str) -> Result<String, Failed> {
+        Ok(fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(GOLDENS).join(name))?)
     }
 
     fn shell_task(&self, file: &str, text: &str) -> Result<(), Failed> {
@@ -408,6 +421,7 @@ fn finished_tasks_and_files_that_are_not_tasks_leave_the_stop_stalled() -> Resul
     let ended = "{\"type\":\"assistant\",\"message\":{\"stop_reason\":\"end_turn\"}}\n";
     home.shell_task("b1.output", &["x".repeat(1024), "\n[exited with code 0]\n".to_owned()].concat())?;
     home.shell_task("b2.log", "building\n")?;
+    home.shell_task("b3.output", "building\n\n[killed]")?;
     home.agent_task("agent-done.jsonl", &[ASKED, ended].concat(), QUIET)?;
     home.agent_task("agent-done.meta.json", "{}\n", QUIET)?;
     let said = home.said(&["hook", "stop"], &home.stop(""), &Replies::default());
@@ -424,9 +438,9 @@ fn a_stop_without_a_transcript_sees_no_tasks_and_passes() -> Result<(), Failed> 
 }
 
 #[test]
-fn an_agent_quiet_for_twenty_minutes_is_reported_once_as_an_overrun() -> Result<(), Failed> {
+fn an_agent_stopped_mid_request_and_quiet_for_twenty_minutes_is_reported_once_as_an_overrun() -> Result<(), Failed> {
     let home = Home::answered()?;
-    home.agent_task("agent-hung.jsonl", ASKED, QUIET)?;
+    home.agent_task("agent-hung.jsonl", STOPPED, QUIET)?;
     let replies = Replies::default();
     let first = home.said(&["hook", "stop"], &home.stop(""), &replies);
     let second = home.said(&["hook", "stop"], &home.stop(""), &replies);
@@ -495,6 +509,43 @@ fn a_stop_without_its_last_message_reads_with_the_leads_stored_words() -> Result
     let prompts = replies.prompts();
     assert_eq!(prompts.len(), 2);
     assert!(prompts.iter().all(|prompt| prompt.contains("Understood.")), "{prompts:?}");
+    Ok(())
+}
+
+#[test]
+fn a_stalled_stop_lists_the_open_queue_items_and_a_live_one_does_not() -> Result<(), Failed> {
+    let home = Home::answered()?;
+    home.queued(&Home::golden("queue.md")?)?;
+    let replies = Replies::default();
+    let stalled = home.said(&["hook", "stop"], &home.stop(""), &replies);
+    home.shell_task("b1.output", "building\n")?;
+    let live = home.said(&["hook", "stop"], &home.stop(""), &replies);
+    assert_eq!(stalled.reason()?, Some(Home::golden("stalled-with-queue.txt")?));
+    assert_eq!((live.shown.as_str(), live.ended), ("", Ok(Outcome::Hooked(HookEvent::Stop))));
+    Ok(())
+}
+
+#[test]
+fn a_short_owner_reply_is_quoted_with_the_lead_sentence_it_answered() -> Result<(), Failed> {
+    let home = Home::holding(&[
+        Home::line("assistant", "a1", "I checked CI\\nShall I merge #12 now?"),
+        Home::line("user", "a2", "yes"),
+        Home::line("assistant", "a3", "Merged."),
+        Home::line("user", "a4", "Next, port the hook and keep every quote it reads exactly as it is today."),
+        Home::line("assistant", "a5", "Done. Ship it?"),
+        Home::line("user", "a6", "sure"),
+        Home::line("assistant", "a7", "Anything else?"),
+        Home::line("user", "a8", "yes, merge it and then port the hook"),
+    ])?;
+    let picked =
+        [("a2", "yes"), ("a4", "Next, port the hook"), ("a6", "sure"), ("a8", "yes, merge it and then port the hook")]
+            .map(|(uuid, quote)| format!("{{\"uuid\": \"{uuid}\", \"quote\": \"{quote}\"}}"))
+            .join(", ");
+    let replies = Replies::quoting(&format!("[{picked}]"), "[1, 2, 3, 4]");
+    let said = home.said(&["hook", "stop"], &home.asking(), &replies);
+    let prompts = replies.prompts();
+    assert_eq!(said.reason()?, Some(Home::golden("short-reply.txt")?));
+    assert!(prompts.first().is_some_and(|prompt| prompt.contains("[a2 2026-01-01T00:00:00Z] yes\n")), "{prompts:?}");
     Ok(())
 }
 

@@ -49,9 +49,29 @@ impl From<&Record> for MessageRow {
     }
 }
 
+#[derive(Debug, Default)]
+struct Exchanges {
+    lead: Option<Body>,
+    owned: Vec<Said>,
+}
+
 impl From<SaidRow> for Said {
     fn from(row: SaidRow) -> Said {
-        Said::new(row.uuid, row.at, row.body)
+        Said::new(row.uuid, row.at, row.body, None)
+    }
+}
+
+impl Exchanges {
+    fn heard(self, row: SaidRow) -> Exchanges {
+        match row.author {
+            Authorship::Lead => Exchanges { lead: Some(row.body), ..self },
+            Authorship::Owner => {
+                let said = Said::new(row.uuid, row.at, row.body, self.lead.as_ref());
+                let mut owned = self.owned;
+                owned.push(said);
+                Exchanges { owned, ..self }
+            }
+        }
     }
 }
 
@@ -85,12 +105,9 @@ LIMIT
     }
 
     pub(crate) fn owned(statements: &mut impl Execute) -> Result<Vec<Said>, StoreFailure> {
-        let owned: BTreeMap<(Instant, Uuid), SaidRow> = SaidRow::all(statements)?
-            .into_iter()
-            .filter(|row| row.author == Authorship::Owner)
-            .map(|row| ((row.at.clone(), row.uuid.clone()), row))
-            .collect();
-        Ok(owned.into_values().map(Said::from).collect())
+        let ordered: BTreeMap<(Instant, Uuid), SaidRow> =
+            SaidRow::all(statements)?.into_iter().map(|row| ((row.at.clone(), row.uuid.clone()), row)).collect();
+        Ok(ordered.into_values().fold(Exchanges::default(), Exchanges::heard).owned)
     }
 
     fn all(statements: &mut impl Execute) -> Result<Vec<SaidRow>, StoreFailure> {

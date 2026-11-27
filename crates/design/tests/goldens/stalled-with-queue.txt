@@ -1,0 +1,4 @@
+Nothing is running: no background shell or agent will wake you, so the turn has stalled.
+Open items in transcripts/queue.md:
+- Merge #12 once CI is green (owner, decided)
+- Basho maps - with its dash kept

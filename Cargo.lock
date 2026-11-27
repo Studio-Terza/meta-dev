@@ -150,6 +150,7 @@ dependencies = [
  "design-messages",
  "dispatch-ports",
  "file-ports",
+ "grammar",
  "grammar-lines",
  "grammar-slug",
  "invariants",
@@ -187,6 +188,7 @@ version = "0.1.0"
 dependencies = [
  "console-ports",
  "file-ports",
+ "grammar",
  "invariants",
  "newtype",
  "port-core",
