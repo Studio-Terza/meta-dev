@@ -26,12 +26,16 @@ pub(crate) enum Exit {
 impl Cli {
     const TIMED: &'static str = "timed";
     const PLAN: &'static str = "mutants-plan";
+    const SINCE: &'static str = "--since";
 
     #[must_use]
     pub fn from_args(arguments: &[OsString]) -> Cli {
         match arguments {
+            [name, limits, stage, flag, mark, program, rest @ ..] if name == Cli::TIMED && flag == Cli::SINCE => {
+                Cli::Timed(Timed::new([limits, stage], Some(mark), program, rest))
+            }
             [name, limits, stage, program, rest @ ..] if name == Cli::TIMED => {
-                Cli::Timed(Timed::new(PathBuf::from(limits), stage.to_string_lossy().into_owned(), program, rest))
+                Cli::Timed(Timed::new([limits, stage], None, program, rest))
             }
             [name, workspace, diff, changed, reused, caught, output, prior @ ..] if name == Cli::PLAN => {
                 let given = [workspace, diff, changed, reused, caught, output].map(PathBuf::from);

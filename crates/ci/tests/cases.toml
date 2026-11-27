@@ -55,6 +55,30 @@ code = 1
 err = "cannot read limits.toml: "
 
 [[case]]
+arguments = ["timed", "limits.toml", "lint", "sh", "-c", "exit 0"]
+files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 0\n" }
+code = 0
+out = "lint: within warn 0 s and block 0 s, took 0.0 s\n"
+
+[[case]]
+arguments = ["timed", "limits.toml", "lint", "--since", "mark", "true"]
+files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 1000\n", "mark" = "0\n" }
+code = 1
+out = "::error::lint: above block 1000 s, took 1"
+
+[[case]]
+arguments = ["timed", "limits.toml", "lint", "--since", "mark", "true"]
+files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 0\n", "mark" = "99999999999\n" }
+code = 1
+err = "mark does not hold a start time in seconds since 1970, before now\n"
+
+[[case]]
+arguments = ["timed", "limits.toml", "lint", "--since", "mark", "true"]
+files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 0\n", "mark" = "soon" }
+code = 1
+err = "mark does not hold a start time in seconds since 1970, before now\n"
+
+[[case]]
 arguments = ["timed"]
 code = 1
 err = "usage: ci timed "

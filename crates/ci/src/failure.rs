@@ -5,7 +5,7 @@ use std::time::TryFromFloatSecsError;
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum Failure {
     #[error(
-        "usage: ci timed <limits> <stage> <program> [<argument>...]\n       ci mutants-plan <workspace> <diff> <changed> <reused> <caught> <output> [<numstat> <outcomes>...]"
+        "usage: ci timed <limits> <stage> [--since <mark>] <program> [<argument>...]\n       ci mutants-plan <workspace> <diff> <changed> <reused> <caught> <output> [<numstat> <outcomes>...]"
     )]
     Usage,
     #[error("cannot read {}: {source}", path.display())]
@@ -18,6 +18,8 @@ pub(crate) enum Failure {
     Unlimited(String),
     #[error("a limit is not a number of seconds: {0}")]
     Seconds(#[from] TryFromFloatSecsError),
+    #[error("{} does not hold a start time in seconds since 1970, before now", .0.display())]
+    Unmarked(PathBuf),
     #[error("cannot start {program}: {source}")]
     Unstarted { program: String, source: io::Error },
     #[error("cannot read the mutants: {0}")]

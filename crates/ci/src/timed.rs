@@ -5,25 +5,37 @@ use std::path::PathBuf;
 use crate::cli::Exit;
 use crate::failure::Failure;
 use crate::limits::{Limit, Tenths, Verdict};
-use crate::ports::Ran;
+use crate::ports::{Mark, Ran};
 
 #[derive(Debug)]
 pub struct Timed {
     limits: PathBuf,
     stage: String,
+    since: Option<PathBuf>,
     program: OsString,
     arguments: Vec<OsString>,
 }
 
 impl Timed {
-    pub(crate) fn new(limits: PathBuf, stage: String, program: &OsString, arguments: &[OsString]) -> Timed {
-        Timed { limits, stage, program: program.clone(), arguments: arguments.to_vec() }
+    pub(crate) fn new(
+        [limits, stage]: [&OsString; 2],
+        since: Option<&OsString>,
+        program: &OsString,
+        arguments: &[OsString],
+    ) -> Timed {
+        Timed {
+            limits: PathBuf::from(limits),
+            stage: stage.to_string_lossy().into_owned(),
+            since: since.map(PathBuf::from),
+            program: program.clone(),
+            arguments: arguments.to_vec(),
+        }
     }
 
     pub(crate) fn run(&self, out: &mut impl Write) -> Result<Exit, Failure> {
         let limit = Limit::read(&self.limits, &self.stage)?;
         let ran = Ran::started(&self.program, &self.arguments)?;
-        let spent = Tenths::from(ran.spent());
+        let spent = Tenths::from(self.since.as_deref().map_or(Ok(ran.spent()), Mark::elapsed)?);
         let verdict = limit.judged(spent)?;
         let stage = &self.stage;
         let (warn, block) = (limit.warn(), limit.block());
