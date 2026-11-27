@@ -1,3 +1,33 @@
+## a flagged command hidden in a script is refused and told to unroll; a plain one passes to the harness
+> "for d in a b; do rm -rf \"$d\"; done" First
+Ok(Blocked) {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `rm` inside a loop. The harness flags `rm` there and stalls the call. Unroll it into separate plain top-level commands: list the targets first, then run each `rm` as its own command with literal paths."}}
+
+> "bash -c 'rm -rf /tmp/x'" First
+Ok(Blocked) {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `rm` inside a `sh -c` script. The harness flags `rm` there and stalls the call. Unroll it into separate plain top-level commands: list the targets first, then run each `rm` as its own command with literal paths."}}
+
+> "find . -name x -delete" First
+Ok(Blocked) {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `-delete` inside `find`. The harness flags `-delete` there and stalls the call. Unroll it into separate plain top-level commands: list the targets first, then run each `rm` as its own command with literal paths."}}
+
+> "ls | xargs rm" First
+Ok(Blocked) {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `rm` inside `xargs`. The harness flags `rm` there and stalls the call. Unroll it into separate plain top-level commands: list the targets first, then run each `rm` as its own command with literal paths."}}
+
+> "echo $(rm x)" First
+Ok(Blocked) {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `rm` inside a command substitution. The harness flags `rm` there and stalls the call. Unroll it into separate plain top-level commands: list the targets first, then run each `rm` as its own command with literal paths."}}
+
+> "find . -type d -empty -exec rmdir {} +" First
+Ok(Blocked) {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `rmdir` inside `find`. The harness flags `rmdir` there and stalls the call. Unroll it into separate plain top-level commands: list the targets first, then run each `rm` as its own command with literal paths."}}
+
+> "bash <<'EOF'\nrm x\nEOF" First
+Ok(Blocked) {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `rm` inside a heredoc fed to a shell. The harness flags `rm` there and stalls the call. Unroll it into separate plain top-level commands: list the targets first, then run each `rm` as its own command with literal paths."}}
+
+> "rm x" First
+Ok(Hooked(PreToolUse)) 
+> "git rm x" First
+Ok(Hooked(PreToolUse)) 
+> "echo rm" First
+Ok(Hooked(PreToolUse)) 
+> "git commit -m \"$(cat <<'EOF'\nrm the loop: for x; do rm y; done\nEOF\n)\"" First
+Ok(Hooked(PreToolUse)) 
 ## untyped endings are sent back with the two lines, then escalated
 > "I finished the work; CI should be green." First
 Ok(Blocked) {"decision":"block","reason":"End your turn with exactly one line and nothing else: DONE <branch> <full sha> once that commit is the pushed head of a branch with no pull request yet, DONE #<pr> <full sha> once the pull request's head is that commit, or BLOCKED #<pr> <full sha> when you cannot go on."}

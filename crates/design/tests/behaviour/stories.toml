@@ -1,5 +1,52 @@
 
 [[story]]
+name = "a flagged command hidden in a script is refused and told to unroll; a plain one passes to the harness"
+
+[[story.finish]]
+hook = "PreToolUse"
+said = 'for d in a b; do rm -rf "$d"; done'
+
+[[story.finish]]
+hook = "PreToolUse"
+said = "bash -c 'rm -rf /tmp/x'"
+
+[[story.finish]]
+hook = "PreToolUse"
+said = "find . -name x -delete"
+
+[[story.finish]]
+hook = "PreToolUse"
+said = "ls | xargs rm"
+
+[[story.finish]]
+hook = "PreToolUse"
+said = "echo $(rm x)"
+
+[[story.finish]]
+hook = "PreToolUse"
+said = "find . -type d -empty -exec rmdir {} +"
+
+[[story.finish]]
+hook = "PreToolUse"
+said = "bash <<'EOF'\nrm x\nEOF"
+
+[[story.finish]]
+hook = "PreToolUse"
+said = "rm x"
+
+[[story.finish]]
+hook = "PreToolUse"
+said = "git rm x"
+
+[[story.finish]]
+hook = "PreToolUse"
+said = "echo rm"
+
+[[story.finish]]
+hook = "PreToolUse"
+said = "git commit -m \"$(cat <<'EOF'\nrm the loop: for x; do rm y; done\nEOF\n)\""
+
+[[story]]
 name = "untyped endings are sent back with the two lines, then escalated"
 queue = ""
 

@@ -110,7 +110,7 @@ impl Settings {
     const fn matcher(event: HookEvent) -> Option<Tool> {
         match event {
             HookEvent::Stop | HookEvent::SubagentStop => None,
-            HookEvent::PostToolUse => Some(Tool::Bash),
+            HookEvent::PreToolUse | HookEvent::PostToolUse => Some(Tool::Bash),
         }
     }
 
@@ -126,6 +126,7 @@ impl Settings {
         match event {
             HookEvent::Stop => 3600,
             HookEvent::SubagentStop => 1500,
+            HookEvent::PreToolUse => 30,
             HookEvent::PostToolUse => 300,
         }
     }

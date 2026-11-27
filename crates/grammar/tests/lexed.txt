@@ -42,3 +42,58 @@ bare "a b": None
 bare "-a": None
 bare "": None
 bare "abc\n": None
+shell "for d in a b; do rm -rf \"$d\"; done": Some((Rm, Loop))
+shell "bash -c 'rm x'": Some((Rm, ShellScript))
+shell "sh -c \"rm -rf /tmp/x\"": Some((Rm, ShellScript))
+shell "zsh -ec 'cd a && rm b'": Some((Rm, ShellScript))
+shell "find . -name x -delete": Some((Delete, Find))
+shell "find . -name '*.o' -exec rm {} \\;": Some((Rm, Find))
+shell "find . -type d -empty -exec rmdir {} +": Some((Rmdir, Find))
+shell "ls | xargs rm": Some((Rm, Xargs))
+shell "ls | xargs -I {} rm {}": Some((Rm, Xargs))
+shell "printf a | xargs -0 -n1 rm -f": Some((Rm, Xargs))
+shell "echo $(rm x)": Some((Rm, Substitution))
+shell "x=\"$(rm y)\"": Some((Rm, Substitution))
+shell "echo `rm x`": Some((Rm, Substitution))
+shell "(cd a && rm b)": Some((Rm, Subshell))
+shell "cleanup() { rm -rf build; }; cleanup": Some((Rm, Function))
+shell "function tidy { rmdir out; }": Some((Rmdir, Function))
+shell "if [ -e x ]; then rm x; fi": Some((Rm, Conditional))
+shell "while read f; do rm \"$f\"; done < list": Some((Rm, Loop))
+shell "case \"$x\" in a) rm a;; esac": Some((Rm, Conditional))
+shell "bash <<'EOF'\nrm x\nEOF": Some((Rm, Heredoc))
+shell "sh <<-EOF\n\trm x\n\tEOF": Some((Rm, Heredoc))
+shell "cat <<A; bash <<B\nrm x\nA\nrm y\nB": Some((Rm, Heredoc))
+shell "bash <<A\nrm x": Some((Rm, Heredoc))
+shell "cat <<A\nrm x\nA\nrm y": None
+shell "cat <<-A\n\trm x\n\tA\nrm y": None
+shell "cat <<A\n\tA\nrm y\nA": None
+shell "cd /w && for f in *.tmp; do /bin/rm \"$f\"; done": Some((Rm, Loop))
+shell "bash -c 'for f in a; do rm $f; done'": Some((Rm, ShellScript))
+shell "for f in a; do bash -c \"rm $f\"; done": Some((Rm, Loop))
+shell "xargs sh -c 'rm \"$1\"' _": Some((Rm, Xargs))
+shell "find . -exec echo {} \\; -delete": Some((Delete, Find))
+shell "echo \"`rm x`\"": Some((Rm, Substitution))
+shell "true && { rm x; }": None
+shell "(( i++ )); echo \"$(( 1 + 2 ))\"; rm x": None
+shell "cat a 2>&1 >/dev/null | tee log; rm x": None
+shell "rm x": None
+shell "rm -rf /tmp/build && rmdir /tmp/empty": None
+shell "git rm x": None
+shell "echo rm": None
+shell "cd /w; rm a; rm b": None
+shell "\\rm x": None
+shell "git commit -m \"$(cat <<'EOF'\nfor x; do rm y; done\nEOF\n)\"": None
+shell "grep -rn 'rm -rf' . | xargs echo": None
+shell "find . -name '*.rs' -exec grep -l rm {} \\; -print": None
+shell "echo \"for x in a; do rm; done\"": None
+shell "for f in rm rmdir; do echo $f; done": None
+shell "cat <<EOF\nrm x\nEOF": None
+shell "ls # rm x": None
+shell "printf 'rm x' > script.sh": None
+shell "for d in a b; do echo \"$d\"; done; rm -rf a": None
+shell "case x in rm) echo;; esac": None
+shell "RM=rm make clean": None
+shell "rm -rf \"$(git rev-parse --show-toplevel)/target\"": None
+shell "'unterminated rm": None
+shell "": None
