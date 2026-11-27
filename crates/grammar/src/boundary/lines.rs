@@ -31,37 +31,28 @@ pub struct Fields(Vec<String>);
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Lines(Vec<String>);
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct KeptLines(Vec<String>);
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum Unsplit {}
 
-#[derive(Clone, Debug)]
-struct Line {
-    text: String,
-    kept: String,
-}
-
 impl Piece {
-    fn line(self, lexer: &mut Lexer<'_, Piece>) -> Line {
+    fn line(self, lexer: &mut Lexer<'_, Piece>) -> String {
         match self {
-            Piece::Break => Line { text: String::new(), kept: lexer.slice().to_owned() },
+            Piece::Break => String::new(),
             Piece::Text => Piece::broken(lexer),
         }
     }
 
-    fn broken(lexer: &mut Lexer<'_, Piece>) -> Line {
-        let text = lexer.slice();
-        let ending = lexer.next().map_or_default(|_break| lexer.slice());
-        Line { text: text.to_owned(), kept: [text, ending].concat() }
+    fn broken(lexer: &mut Lexer<'_, Piece>) -> String {
+        let text = lexer.slice().to_owned();
+        lexer.next();
+        text
     }
 }
 
 impl Iterator for Broken<'_> {
-    type Item = Line;
+    type Item = String;
 
-    fn next(&mut self) -> Option<Line> {
+    fn next(&mut self) -> Option<String> {
         let piece = self.0.next()?.ignoring(Unlexed::NotThisGrammar).unwrap_or(Piece::Text);
         Some(piece.line(&mut self.0))
     }
@@ -71,15 +62,7 @@ impl FromStr for Lines {
     type Err = Unsplit;
 
     fn from_str(text: &str) -> Result<Lines, Unsplit> {
-        Ok(Lines(Broken(Piece::lexer(text)).map(|line| line.text).collect()))
-    }
-}
-
-impl FromStr for KeptLines {
-    type Err = Unsplit;
-
-    fn from_str(text: &str) -> Result<KeptLines, Unsplit> {
-        Ok(KeptLines(Broken(Piece::lexer(text)).map(|line| line.kept).collect()))
+        Ok(Lines(Broken(Piece::lexer(text)).collect()))
     }
 }
 
@@ -99,15 +82,6 @@ impl AsRef<[String]> for Fields {
 }
 
 impl IntoIterator for Lines {
-    type Item = String;
-    type IntoIter = IntoIter<String>;
-
-    fn into_iter(self) -> IntoIter<String> {
-        self.0.into_iter()
-    }
-}
-
-impl IntoIterator for KeptLines {
     type Item = String;
     type IntoIter = IntoIter<String>;
 

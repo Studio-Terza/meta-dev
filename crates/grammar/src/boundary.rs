@@ -11,7 +11,7 @@ mod repository;
 
 pub use bare::Bare;
 pub use detail::{Cited, Heading};
-pub use lines::{Fields, KeptLines, Lines};
+pub use lines::{Fields, Lines};
 pub use lstart::Stamp;
 pub use migration::MigrationFile;
 pub use prose::Prose;

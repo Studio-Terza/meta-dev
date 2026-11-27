@@ -5,9 +5,7 @@ use proc_macro2::TokenStream;
 use syn::{DeriveInput, Generics, Ident};
 
 use crate::settings::Settings;
-pub(crate) use expansion::{
-    CheckedDeserializing, Constructors, Deserializing, Expansion, Formatting, Serializing, Strategy,
-};
+pub(crate) use expansion::{CheckedDeserializing, Constructors, Deserializing, Expansion, Formatting, Strategy};
 use only_field::OnlyField;
 
 pub(crate) struct Wrapped {

@@ -1,21 +1,14 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::punctuated::Punctuated;
-use syn::{Data, DeriveInput, Error, Expr, Fields, Generics, Ident, Token, Variant};
+use syn::{Data, DeriveInput, Error, Fields, Generics, Ident, Token, Variant};
 use syn::{WherePredicate, parse_quote};
 
-use crate::settings::{Checking, Expressed, Settings};
 use crate::wrapped::{Strategy, Wrapped};
 
 pub(crate) struct Generated<'input> {
     ident: &'input Ident,
     generics: &'input Generics,
-}
-
-enum Generator<'settings> {
-    Shaped,
-    Constructed(&'settings Expr, Checking),
-    Escaped(&'settings Expr),
 }
 
 struct Drawn {
@@ -25,28 +18,19 @@ struct Drawn {
 }
 
 impl Generated<'_> {
-    const CONSTRUCTED_ENUM: &str = "`from` names a struct's constructor; an enum generates its variants";
     const EMPTY_ENUM: &str = "an enum with no variants has no values to generate";
 
     pub(crate) fn expanded(tokens: TokenStream) -> TokenStream {
-        let expansion = syn::parse2(tokens).and_then(|input: DeriveInput| {
-            Settings::declared(&input.attrs).and_then(|settings| Generator::from(&settings).routed(&input))
+        let expansion = syn::parse2(tokens).and_then(|input: DeriveInput| match &input.data {
+            Data::Enum(shape) => {
+                Generated { ident: &input.ident, generics: &input.generics }.enumerated(&shape.variants)
+            }
+            Data::Struct(_) | Data::Union(_) => Ok(Wrapped::derived::<Strategy>(input.clone())),
         });
         match expansion {
             Ok(expanded) => expanded,
             Err(error) => error.to_compile_error(),
         }
-    }
-
-    fn escaped(&self, generate: &Expr) -> TokenStream {
-        self.implemented(Vec::new(), &quote!(#generate()))
-    }
-
-    fn constructed(&self, from: &Expr, checking: Checking, fields: &Fields) -> TokenStream {
-        let drawn = Drawn::from(fields);
-        let names = &drawn.names;
-        let strategy = drawn.generating(&quote!(#from(#(#names),*)), checking);
-        self.implemented(drawn.required, &strategy)
     }
 
     fn enumerated(&self, variants: &Punctuated<Variant, Token![,]>) -> syn::Result<TokenStream> {
@@ -57,7 +41,7 @@ impl Generated<'_> {
                 let members = fields.members();
                 let names = &drawn.names;
                 let built = quote!(Self::#ident { #(#members: #names),* });
-                (drawn.generating(&built, Checking::Unchecked), drawn.required)
+                (drawn.generating(&built), drawn.required)
             })
             .collect();
         let strategies = drawn.iter().map(|(strategy, _)| strategy);
@@ -93,49 +77,6 @@ impl Generated<'_> {
     }
 }
 
-impl<'input> From<&'input DeriveInput> for Generated<'input> {
-    fn from(input: &'input DeriveInput) -> Generated<'input> {
-        Generated { ident: &input.ident, generics: &input.generics }
-    }
-}
-
-impl<'settings> From<&'settings Settings> for Generator<'settings> {
-    fn from(settings: &'settings Settings) -> Generator<'settings> {
-        settings.expressed(Expressed::Generate).map_or_else(
-            || {
-                settings
-                    .expressed(Expressed::From)
-                    .map_or(Generator::Shaped, |from| Generator::Constructed(from, settings.checking()))
-            },
-            Generator::Escaped,
-        )
-    }
-}
-
-impl Generator<'_> {
-    fn routed(self, input: &DeriveInput) -> syn::Result<TokenStream> {
-        match self {
-            Generator::Escaped(generate) => Ok(Generated::from(input).escaped(generate)),
-            Generator::Constructed(from, checking) => Generator::constructing(from, checking, input),
-            Generator::Shaped => Generator::shaping(input),
-        }
-    }
-
-    fn constructing(from: &Expr, checking: Checking, input: &DeriveInput) -> syn::Result<TokenStream> {
-        match &input.data {
-            Data::Struct(shape) => Ok(Generated::from(input).constructed(from, checking, &shape.fields)),
-            Data::Enum(_) | Data::Union(_) => Err(Error::new_spanned(&input.ident, Generated::CONSTRUCTED_ENUM)),
-        }
-    }
-
-    fn shaping(input: &DeriveInput) -> syn::Result<TokenStream> {
-        match &input.data {
-            Data::Enum(shape) => Generated::from(input).enumerated(&shape.variants),
-            Data::Struct(_) | Data::Union(_) => Ok(Wrapped::derived::<Strategy>(input.clone())),
-        }
-    }
-}
-
 impl From<&Fields> for Drawn {
     fn from(fields: &Fields) -> Drawn {
         let types: Vec<_> = fields.iter().map(|field| &field.ty).collect();
@@ -159,27 +100,10 @@ impl From<&Fields> for Drawn {
 }
 
 impl Drawn {
-    fn generating(&self, built: &TokenStream, checking: Checking) -> TokenStream {
+    fn generating(&self, built: &TokenStream) -> TokenStream {
         let Drawn { source, names, .. } = self;
-        let kept = Drawn::kept(built, checking);
         quote! {
-            ::newtype::proptest::strategy::Strategy::prop_filter_map(
-                #source,
-                "the constructor refuses this value",
-                |(#(#names,)*)| #kept,
-            )
-        }
-    }
-
-    fn kept(built: &TokenStream, checking: Checking) -> TokenStream {
-        match checking {
-            Checking::Unchecked => quote!(::core::option::Option::Some(#built)),
-            Checking::Checked => quote! {
-                match #built {
-                    ::core::result::Result::Ok(made) => ::core::option::Option::Some(made),
-                    ::core::result::Result::Err(_) => ::core::option::Option::None,
-                }
-            },
+            ::newtype::proptest::strategy::Strategy::prop_map(#source, |(#(#names,)*)| #built)
         }
     }
 }

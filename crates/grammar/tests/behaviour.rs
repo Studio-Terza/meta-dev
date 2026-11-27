@@ -1,5 +1,5 @@
 use fixture::{Cases, Debugged, Failed, Fixture, Spelled};
-use grammar::{Bare, Fields, Ignoring, Inked, KeptLines, Letters, Lines, MigrationFile, Stamp, Unlexed};
+use grammar::{Bare, Fields, Ignoring, Inked, Letters, Lines, MigrationFile, Stamp, Unlexed};
 use serde::Deserialize;
 
 #[derive(Fixture, Deserialize, Debug)]
@@ -21,12 +21,11 @@ fn every_lexer_reads_its_fixture_texts_as_its_golden_says() -> Result<(), Failed
             .iter()
             .map(|text| {
                 let lines: Vec<String> = text.as_str().parse::<Lines>().into_iter().flatten().collect();
-                let kept: Vec<String> = text.as_str().parse::<KeptLines>().into_iter().flatten().collect();
                 let fields: Vec<Vec<String>> = lines
                     .iter()
                     .flat_map(|line| line.parse::<Fields>().into_iter().map(|cells| cells.as_ref().to_vec()))
                     .collect();
-                (text, lines, kept, fields)
+                (text, lines, fields)
             })
             .collect();
         let stamps: Vec<_> = texts

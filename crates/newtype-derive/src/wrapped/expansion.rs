@@ -25,9 +25,6 @@ pub(crate) struct Deserializing;
 #[derive(Debug)]
 pub(crate) struct CheckedDeserializing;
 
-#[derive(Debug)]
-pub(crate) struct Serializing;
-
 impl Constructors {
     fn chosen(checking: Checking, opened: TokenStream, guarded: TokenStream) -> TokenStream {
         match checking {
@@ -222,26 +219,5 @@ impl Expansion for CheckedDeserializing {
                 })
             },
         )
-    }
-}
-
-impl Expansion for Serializing {
-    fn of(wrapped: Wrapped) -> TokenStream {
-        let name = &wrapped.ident;
-        let inner = wrapped.field.inner();
-        let member = wrapped.field.member();
-        let mut generics = wrapped.generics;
-        generics.make_where_clause().predicates.push(parse_quote!(#inner: ::newtype::serde::Serialize));
-        let (implemented, arguments, bounds) = generics.split_for_impl();
-        quote! {
-            impl #implemented ::newtype::serde::Serialize for #name #arguments #bounds {
-                fn serialize<Leaving: ::newtype::serde::Serializer>(
-                    &self,
-                    leaving: Leaving,
-                ) -> ::core::result::Result<Leaving::Ok, Leaving::Error> {
-                    ::newtype::serde::Serialize::serialize(&self.#member, leaving)
-                }
-            }
-        }
     }
 }

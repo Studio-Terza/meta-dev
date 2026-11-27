@@ -1,279 +1,86 @@
-use std::collections::BTreeSet;
+use std::{iter, mem};
 
+use dispatch_ports::{Count, Tokens, Told, Wall};
+use file_ports::Offset;
+use fixture::{Cases, Debugged, Failed, Fixture, Properties};
+use grammar_spec_line::Attachment;
 use invariants::{Ignoring, ignored};
-use newtype::{Checked, CheckedDeserialize, Counter, Deserialize, Display, Newtype, Serialize, Wrapping};
-use newtype_derive::Arbitrary;
-use proptest::collection::vec;
+use newtype::{Checked, Counter, Wrapping};
 use proptest::prelude::{any, prop_assert, prop_assert_eq, proptest};
 use proptest::strategy::{Strategy, ValueTree};
-use proptest::test_runner::{Config, RngSeed, TestError, TestRunner};
+use proptest::test_runner::{Config, TestRunner};
+use serde::Deserialize;
+use serde_json::Value;
+use shapes::Input;
+use store_ports::Written;
 
 ignored! {
     enum Ignored {
-        Unserialised => "a value that fails to write or read as JSON is None, which the law compares",
-        Refused => "a text the check or parse refuses is the None the law expects",
+        Refused => "a text the check refuses is the None the law compares with the refused read",
     }
 }
 
-#[derive(Newtype, Arbitrary, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
-struct Rounds(usize);
-
-#[derive(Newtype, Arbitrary, Clone, Debug, PartialEq, Eq)]
-struct Label {
-    text: String,
-}
-
-#[derive(Newtype, Arbitrary, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-struct Wrapper<Wrapped>(Wrapped);
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
-#[error("the text is empty")]
-struct Empty;
-
-#[derive(Newtype, Arbitrary, Serialize, CheckedDeserialize, Clone, Debug, PartialEq, Eq)]
-#[newtype(checked)]
-struct Word(String);
-
-impl Checked for Word {
-    type Error = Empty;
-
-    fn checked(text: &String) -> Result<&String, Empty> {
-        text.chars().next().map(|_| text).ok_or(Empty)
-    }
-}
-
-#[derive(Newtype, Arbitrary, Clone, Debug, PartialEq, Eq)]
-#[newtype(checked, strategy = 0u128..1000)]
-struct Small(u128);
-
-impl Checked for Small {
-    type Error = Empty;
-
-    fn checked(number: &u128) -> Result<&u128, Empty> {
-        Some(number).filter(|candidate| **candidate < 1000).ok_or(Empty)
-    }
-}
-
-#[derive(Newtype, Arbitrary, Clone, Debug, PartialEq, Eq)]
-#[newtype(checked, strategy = "[0-9a-f]{40}")]
-struct Digest(String);
-
-impl Checked for Digest {
-    type Error = Empty;
-
-    fn checked(text: &String) -> Result<&String, Empty> {
-        Some(text).filter(|candidate| candidate.len() == 40).ok_or(Empty)
-    }
-}
-
-#[derive(Newtype, Arbitrary, Clone, Debug, PartialEq, Eq)]
-#[newtype(strategy = Strategies::even())]
-struct Even(u32);
-
-struct Strategies;
-
-impl Strategies {
-    fn even() -> impl proptest::strategy::Strategy<Value = u32> {
-        proptest::strategy::Strategy::prop_map(0u32..100, |half| half * 2)
-    }
-}
-
-#[derive(Newtype, Arbitrary, Clone, Debug, PartialEq, Eq)]
-struct Many<Item>(Vec<Item>);
-
-#[derive(Newtype, Display)]
-struct Shown(u32);
-
-#[derive(Newtype, Display)]
-struct Tagged<Tag>(Tag);
-
-#[derive(Arbitrary, Clone, Debug, PartialEq, Eq)]
-enum Shape<Mark> {
-    Dot,
-    Line(Mark),
-    Box { wide: u8, tall: u16 },
-}
-
-impl<Mark> Shape<Mark> {
-    fn kind(&self) -> &'static str {
-        match self {
-            Shape::Dot => "dot",
-            Shape::Line(_) => "line",
-            Shape::Box { .. } => "box",
-        }
-    }
-}
-
-#[derive(Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
-#[newtype(from = Span::ordered)]
-struct Span {
-    start: u8,
-    end: u8,
-}
-
-impl Span {
-    fn ordered(one: u8, other: u8) -> Span {
-        Span { start: one.min(other), end: one.max(other) }
-    }
-}
-
-#[derive(Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
-#[newtype(checked, from = Ratio::try_new)]
-struct Ratio {
-    above: u8,
-    below: u8,
-}
-
-impl Ratio {
-    fn try_new(above: u8, below: u8) -> Result<Ratio, Empty> {
-        Some(Ratio { above, below }).filter(|ratio| ratio.below != 0).ok_or(Empty)
-    }
-}
-
-#[derive(Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
-#[newtype(generate = Parity::sampled)]
-enum Parity {
-    Odd(u32),
-    Even(u32),
-}
-
-impl Parity {
-    fn sampled() -> impl proptest::strategy::Strategy<Value = Parity> {
-        proptest::strategy::Strategy::prop_map(any::<u32>(), Parity::from)
-    }
-
-    fn number(self) -> u32 {
-        match self {
-            Parity::Odd(number) | Parity::Even(number) => number,
-        }
-    }
-}
-
-impl From<u32> for Parity {
-    fn from(number: u32) -> Parity {
-        Some(number).filter(|candidate| candidate.is_multiple_of(2)).map_or(Parity::Odd(number), Parity::Even)
-    }
-}
-
-#[derive(Arbitrary, Debug)]
-#[newtype(checked, from = Refused::try_new)]
-struct Refused;
-
-impl Refused {
-    fn try_new() -> Result<Refused, Empty> {
-        Err(Empty)
-    }
-}
-
-struct Pairs;
-
-struct Json;
-
-impl Json {
-    fn written<Written: newtype::serde::Serialize>(value: &Written) -> Option<String> {
-        serde_json::to_string(value).ignoring(Ignored::Unserialised)
-    }
-
-    fn read<Read: newtype::serde::de::DeserializeOwned>(text: Option<&str>) -> Option<Read> {
-        text.and_then(|json| serde_json::from_str(json).ignoring(Ignored::Unserialised))
-    }
-
-    fn word(text: &String) -> Option<Word> {
-        Json::read(Json::written(text).as_deref())
-    }
-
-    fn built(text: &&str) -> Result<String, Empty> {
-        Word::try_new((*text).to_owned()).map(Word::into_inner)
-    }
-}
-
-impl Pairs {
-    const LARGEST: Rounds = Rounds(usize::MAX);
-    const THREE: Rounds = Rounds::new(3);
-    const NONE: Rounds = Rounds::new(0);
-
-    fn counts(rounds: &[Rounds]) -> Vec<usize> {
-        rounds.iter().copied().map(Counter::count).collect()
-    }
+#[derive(Fixture, Deserialize, Debug)]
+struct Sampled {
+    cases: Count,
 }
 
 proptest! {
-    #![proptest_config(Config { failure_persistence: None, rng_seed: RngSeed::Fixed(0), ..Config::default() })]
+    #![proptest_config(Properties::settled())]
+
     #[test]
-    fn newtypes_keep_write_count_and_generate_what_they_hold(number in any::<usize>(), text in any::<String>(), byte in any::<u8>(), rounds in any::<Rounds>(), other in any::<Rounds>(), numbers in vec(0usize..4096, 0..8), word in any::<Word>(), wrapper in any::<Wrapper<u16>>(), small in any::<Small>(), digest in any::<Digest>(), even in any::<Even>(), many in any::<Many<u8>>()) {
-        prop_assert_eq!((Rounds::new(number).into_inner(), Label::new(text.clone()).into_inner(), Wrapper::new(byte).into_inner()), (number, text.clone(), byte));
-        prop_assert_eq!(Json::read::<Rounds>(Json::written(&rounds).as_deref()), Some(rounds));
-        prop_assert_eq!(Json::read::<Wrapper<u16>>(Json::written(&wrapper).as_deref()), Some(wrapper));
-        prop_assert_eq!(Json::read::<Word>(Json::written(&word).as_deref()), Some(word.clone()));
-        prop_assert!(Word::checked(&word.into_inner()).is_ok());
-        let built = Word::try_new(text.clone()).ignoring(Ignored::Refused);
-        let read = built.as_ref().and_then(|made| Json::read::<Word>(Json::written(made).as_deref()));
-        prop_assert_eq!([Json::word(&text), read], [built.clone(), built]);
-        prop_assert_eq!(Json::written(&Rounds::new(number)), Json::written(&number));
-        prop_assert_eq!(rounds.count(), rounds.into_inner());
-        prop_assert_eq!(rounds.incremented().count(), rounds.count().saturating_add(1));
-        prop_assert_eq!(rounds.plus(other).count(), rounds.count().saturating_add(other.count()));
-        prop_assert_eq!(Rounds::total(numbers.iter().copied().map(Rounds::new)).count(), numbers.iter().sum::<usize>());
-        prop_assert!(Small::checked(&small.into_inner()).is_ok());
-        prop_assert!(Digest::checked(&digest.into_inner()).is_ok());
-        prop_assert!(even.into_inner().is_multiple_of(2));
-        prop_assert_eq!(Many::new(many.clone().into_inner()), many);
+    fn a_counter_adds_saturating_from_zero(counted in any::<Written>(), other in any::<Written>(), many in any::<Vec<Written>>()) {
+        prop_assert_eq!(Written::new(counted.into_inner()), counted);
+        prop_assert_eq!(Written::zero().count(), usize::MIN);
+        prop_assert_eq!(counted.plus(Written::zero()), counted);
+        prop_assert_eq!(counted.plus(other).count(), counted.count().saturating_add(other.count()));
+        prop_assert_eq!(counted.incremented(), counted.plus(Written::zero().incremented()));
+        prop_assert_eq!(Written::total(many.iter().copied()), many.iter().copied().fold(Written::zero(), Written::plus));
+        prop_assert_eq!(Written::new(usize::MAX).incremented(), Written::new(usize::MAX));
     }
 
     #[test]
-    fn displays_constructors_and_generators_hold_their_shape(number in any::<u32>(), tag in any::<char>(), span in any::<Span>(), ratio in any::<Ratio>(), parity in any::<Parity>()) {
-        prop_assert_eq!(Shown::new(number).to_string().parse::<u32>().ignoring(Ignored::Refused), Some(number));
-        prop_assert_eq!(Tagged::new(tag).to_string(), tag.to_string());
-        prop_assert!(span.start <= span.end);
-        prop_assert_eq!(Ratio::try_new(ratio.above, ratio.below), Ok(ratio));
-        prop_assert_eq!(Parity::from(parity.number()), parity);
+    fn a_checked_newtype_builds_and_reads_only_what_its_check_accepts(text in any::<String>()) {
+        let built = Told::try_new(text.clone()).ignoring(Ignored::Refused);
+        prop_assert_eq!(built.is_some(), Told::checked(&text).is_ok());
+        let read = serde_json::from_value::<Told>(Value::String(text.clone())).ignoring(Ignored::Refused);
+        prop_assert_eq!(&read, &built);
+        prop_assert_eq!(built.map(|made| made.to_string()), Told::checked(&text).ignoring(Ignored::Refused).cloned());
+    }
+
+    #[test]
+    fn a_plain_newtype_reads_and_shows_what_it_holds(tokens in any::<u32>(), wall in any::<i64>(), offset in any::<Offset>()) {
+        prop_assert_eq!(serde_json::from_value::<Tokens>(Value::from(tokens))?, Tokens::new(tokens));
+        prop_assert_eq!(serde_json::from_value::<Wall>(Value::from(wall))?, Wall::new(wall));
+        prop_assert_eq!(Tokens::new(tokens).to_string(), tokens.to_string());
+        prop_assert_eq!(offset.to_string(), offset.into_inner().to_string());
     }
 }
 
 #[test]
-fn a_check_decides_what_is_built() {
-    assert_eq!(Json::built(&"a"), Ok(String::from("a")));
-    assert_eq!(Json::built(&""), Err(Empty));
+fn checked_generators_draw_only_accepted_values_within_the_rejection_bound() {
+    let settled = Properties::settled();
+    let mut bounded = TestRunner::new(Config { max_local_rejects: settled.cases, ..settled });
+    let drawn = (any::<Told>(), any::<Offset>(), any::<Attachment>());
+    let accepted = bounded.run(&drawn, |(told, offset, attachment)| {
+        prop_assert!(Told::checked(&told.into_inner()).is_ok());
+        prop_assert!(Offset::checked(&offset.into_inner()).is_ok());
+        prop_assert!(Attachment::checked(&attachment.into_inner()).is_ok());
+        Ok(())
+    });
+    assert!(accepted.is_ok());
 }
 
 #[test]
-fn counters_saturate_at_the_largest() {
-    let largest = Pairs::LARGEST;
-    assert_eq!(Pairs::counts(&[largest.incremented(), largest.plus(largest)]), [usize::MAX, usize::MAX]);
-}
-
-#[test]
-fn nothing_counted_is_zero() {
-    assert_eq!(Rounds::zero(), Rounds::new(0));
-    assert_eq!(Rounds::total(std::iter::empty()), Rounds::zero());
-}
-
-#[test]
-fn derived_checked_generators_stay_under_the_rejection_bound() {
-    let bounded = || {
-        let config = Config { failure_persistence: None, rng_seed: RngSeed::Fixed(0), ..Config::default() };
-        TestRunner::new(Config { max_local_rejects: config.cases, ..config })
-    };
-    assert!(bounded().run(&any::<Word>(), |_| Ok(())).is_ok());
-    assert!(bounded().run(&any::<Small>(), |_| Ok(())).is_ok());
-    assert!(bounded().run(&any::<Digest>(), |_| Ok(())).is_ok());
-}
-
-#[test]
-fn derived_constructors_build_constants() {
-    assert_eq!((Pairs::THREE.count(), Pairs::NONE.count()), (3, 0));
-}
-
-#[test]
-fn an_enum_generates_every_variant() {
-    let mut runner = TestRunner::deterministic();
-    let kinds: BTreeSet<&str> =
-        (0..64_u8).flat_map(|_| any::<Shape<char>>().new_tree(&mut runner)).map(|tree| tree.current().kind()).collect();
-    assert_eq!(kinds, BTreeSet::from(["box", "dot", "line"]));
-}
-
-#[test]
-fn a_constructor_that_refuses_everything_aborts_generation() {
-    let refused = TestRunner::deterministic().run(&any::<Refused>(), |_| Ok(()));
-    assert!(matches!(refused, Err(TestError::Abort(_))));
+fn an_enum_generator_draws_the_values_its_golden_lists() -> Result<(), Failed> {
+    let drifted = Cases::<Sampled>::drifted(|case| {
+        let mut runner = TestRunner::new(Properties::settled());
+        let drawn =
+            iter::repeat_with(|| any::<Input>().new_tree(&mut runner).map(|tree| mem::discriminant(&tree.current())))
+                .take(usize::try_from(case.row().cases.into_inner())?)
+                .collect::<Result<Vec<_>, _>>()?;
+        Ok(Debugged(drawn).to_string())
+    })?;
+    assert_eq!(drifted, Vec::new());
+    Ok(())
 }

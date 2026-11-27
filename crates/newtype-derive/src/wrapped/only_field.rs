@@ -1,6 +1,6 @@
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{Data, DataStruct, DeriveInput, Error, Field, Fields, FieldsNamed, FieldsUnnamed, Index, Member, Type};
+use syn::{Data, DataStruct, DeriveInput, Error, Field, Fields, FieldsUnnamed, Index, Member, Type};
 
 pub(crate) struct OnlyField {
     member: Member,
@@ -34,12 +34,9 @@ impl OnlyField {
 
     fn among(fields: Fields) -> Result<OnlyField, Fields> {
         match fields {
-            Fields::Named(FieldsNamed { brace_token, named }) => {
-                Self::sole(named).map_err(|returned| Fields::Named(FieldsNamed { brace_token, named: returned }))
-            }
             Fields::Unnamed(FieldsUnnamed { paren_token, unnamed }) => Self::sole(unnamed)
                 .map_err(|returned| Fields::Unnamed(FieldsUnnamed { paren_token, unnamed: returned })),
-            Fields::Unit => Err(fields),
+            Fields::Named(_) | Fields::Unit => Err(fields),
         }
     }
 
@@ -54,11 +51,6 @@ impl OnlyField {
 
 impl From<Field> for OnlyField {
     fn from(field: Field) -> OnlyField {
-        OnlyField {
-            member: field
-                .ident
-                .map_or_else(|| Member::Unnamed(Index { index: Self::FIRST, span: field.ty.span() }), Member::Named),
-            inner: field.ty,
-        }
+        OnlyField { member: Member::Unnamed(Index { index: Self::FIRST, span: field.ty.span() }), inner: field.ty }
     }
 }
