@@ -19,7 +19,7 @@ impl<Of: Ord> FromIterator<Of> for Counts<Of> {
 }
 
 impl<Of: fmt::Display> Counts<Of> {
-    pub fn listed(&self, formatter: &mut fmt::Formatter<'_>, heading: &str) -> fmt::Result {
+    pub fn listed(&self, formatter: &mut fmt::Formatter<'_>, heading: impl fmt::Display) -> fmt::Result {
         self.0.iter().try_for_each(|(key, count)| writeln!(formatter, "{heading} {key} {count}"))
     }
 }

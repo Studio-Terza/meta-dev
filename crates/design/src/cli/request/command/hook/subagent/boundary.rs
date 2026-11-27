@@ -10,7 +10,37 @@ use invariants::Ignoring;
 use newtype::{Display, Newtype};
 use serde::Deserialize;
 
+use grammar_lines::Lines;
+
+use super::FailedJob;
 use crate::cli::request::ignored::Ignored;
+
+#[derive(Debug)]
+pub struct Excerpt {
+    failed: FailedJob,
+    lines: Vec<String>,
+}
+
+impl Excerpt {
+    const LINES: usize = 40;
+
+    pub fn tailed(failed: FailedJob, log: &str) -> Excerpt {
+        let whole: Vec<String> = match log.parse::<Lines>() {
+            Ok(lines) => lines.into_iter().collect(),
+            Err(unsplit) => match unsplit {},
+        };
+        let skipped = whole.len().saturating_sub(Excerpt::LINES);
+        Excerpt { failed, lines: whole.into_iter().skip(skipped).collect() }
+    }
+}
+
+impl fmt::Display for Excerpt {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Excerpt { failed: FailedJob { check, job }, lines } = self;
+        write!(formatter, "\n{check} (job {job}):\n")?;
+        lines.iter().try_for_each(|line| writeln!(formatter, "{line}"))
+    }
+}
 
 #[derive(Debug, Deserialize)]
 pub struct Finishing {

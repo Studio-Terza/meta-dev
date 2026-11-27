@@ -1,13 +1,14 @@
-use std::io::{self, Read};
+mod boundary;
+
 use std::iter;
 use std::os::unix::process::CommandExt;
-use std::process::{Child, ChildStdout, Command, ExitStatus, Stdio};
-use std::thread::{self, JoinHandle};
+use std::process::{Child, Command, ExitStatus, Stdio};
+use std::thread;
 use std::time::{Duration, SystemTime};
 
 use port_core::Pass;
 
-use crate::{Call, Deadline, DispatchFailure, Due, Pid, Printed, Ran, ShellFiller, Wall, shell_ops};
+use crate::{Call, Deadline, DispatchFailure, Due, Pid, Ran, ShellFiller, Wall, shell_ops};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SystemShell;
@@ -37,22 +38,6 @@ impl SystemShell {
                 None
             }
         }))
-    }
-
-    fn read(mut stdout: ChildStdout) -> JoinHandle<io::Result<String>> {
-        thread::spawn(move || {
-            let mut text = String::new();
-            stdout.read_to_string(&mut text).map(|_read| text)
-        })
-    }
-
-    fn collected(reading: Option<JoinHandle<io::Result<String>>>) -> Result<Printed, DispatchFailure> {
-        let text = reading
-            .map(|handle| handle.join().map_err(|_panicked| DispatchFailure::Unjoined))
-            .transpose()?
-            .transpose()
-            .map_err(DispatchFailure::Collect)?;
-        Ok(Printed::new(text.unwrap_or_default()))
     }
 
     fn killed(child: &mut Child) -> Result<Ran, DispatchFailure> {

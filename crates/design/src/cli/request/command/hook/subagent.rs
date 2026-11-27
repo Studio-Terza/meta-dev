@@ -8,7 +8,6 @@ use console_ports::Heard;
 use design_messages::{CheckName, FailedBefore, Failing};
 use dispatch_ports::{Clock, Dispatch, Shell};
 use file_ports::Files;
-use grammar_lines::Lines;
 use invariants::Ignoring;
 use newtype::Wrapping;
 use store_ports::Store;
@@ -21,7 +20,7 @@ use crate::cli::request::ignored::Ignored;
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
 pub use boundary::Finishing;
-use boundary::{CommitSha, JobId, Pushed, Reminder, Report, Said};
+use boundary::{CommitSha, Excerpt, JobId, Pushed, Reminder, Report, Said};
 use hub::{Hub, Verdict};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -68,12 +67,6 @@ struct Unpushed {
 struct Logged {
     pushed: Pushed,
     jobs: Vec<Excerpt>,
-}
-
-#[derive(Debug)]
-struct Excerpt {
-    failed: FailedJob,
-    lines: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -177,8 +170,6 @@ impl FailedJob {
 }
 
 impl Logged {
-    const LINES: usize = 40;
-
     fn fetched<D: Dispatch, C: Clock, G: Shell>(
         pushed: Pushed,
         failed: &[FailedJob],
@@ -186,17 +177,6 @@ impl Logged {
     ) -> Logged {
         let jobs = failed.iter().map(|job| Excerpt::tailed(job.clone(), &hub.log(job.job))).collect();
         Logged { pushed, jobs }
-    }
-}
-
-impl Excerpt {
-    fn tailed(failed: FailedJob, log: &str) -> Excerpt {
-        let whole: Vec<String> = match log.parse::<Lines>() {
-            Ok(lines) => lines.into_iter().collect(),
-            Err(unsplit) => match unsplit {},
-        };
-        let skipped = whole.len().saturating_sub(Logged::LINES);
-        Excerpt { failed, lines: whole.into_iter().skip(skipped).collect() }
     }
 }
 
@@ -230,10 +210,7 @@ impl fmt::Display for Logged {
             "CI failed on #{pull} at {}. Fix these jobs, push, then end with DONE #{pull} <full sha>.",
             self.pushed.head()
         )?;
-        self.jobs.iter().try_for_each(|Excerpt { failed: FailedJob { check, job }, lines }| {
-            write!(formatter, "\n{check} (job {job}):\n")?;
-            lines.iter().try_for_each(|line| writeln!(formatter, "{line}"))
-        })
+        self.jobs.iter().try_for_each(|excerpt| write!(formatter, "{excerpt}"))
     }
 }
 

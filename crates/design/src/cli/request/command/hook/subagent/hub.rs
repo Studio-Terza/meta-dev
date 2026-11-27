@@ -1,15 +1,15 @@
+mod boundary;
+
 use std::ops::Not;
 use std::path::Path;
 
 use design_messages::{CheckName, PullNumber};
-use dispatch_ports::{Call, Clock, Deadline, Dispatch, Ran, Shell, Timeout};
-use invariants::Ignoring;
+use dispatch_ports::{Clock, Dispatch, Ran, Shell, Timeout};
 use serde::Deserialize;
 
 use super::super::super::crew::Crew;
 use super::boundary::{CommitSha, JobId};
 use super::{FailedJob, UnreadStep};
-use crate::cli::request::ignored::Ignored;
 
 #[derive(Debug)]
 pub struct Hub<'crew, D: Dispatch, C: Clock, G: Shell> {
@@ -67,13 +67,6 @@ impl<'crew, D: Dispatch, C: Clock, G: Shell> Hub<'crew, D, C, G> {
         Hub { crew, directory }
     }
 
-    fn ran(&self, arguments: &[&str], timeout: Timeout) -> Option<Ran> {
-        let spoken = arguments.iter().map(|word| (*word).to_owned()).collect();
-        let deadline = Deadline::after(self.crew.now(), timeout);
-        let call = Call::new(Hub::<D, C, G>::PROGRAM, spoken, self.directory.to_path_buf(), deadline);
-        self.crew.ran(&call).ignoring(Ignored::Unrun)
-    }
-
     pub fn head(&self, pull: PullNumber) -> Result<CommitSha, UnreadStep> {
         let ran = self.ran(&["pr", "view", &pull.to_string(), "--json", "headRefOid"], Self::QUICK);
         let printed = ran.as_ref().and_then(Ran::succeeded).ok_or(UnreadStep::Head)?;
@@ -93,11 +86,6 @@ impl<'crew, D: Dispatch, C: Clock, G: Shell> Hub<'crew, D, C, G> {
         let printed = ran.as_ref().and_then(Ran::printed).ok_or(UnreadStep::Checks)?;
         let checks: Vec<Check> = serde_json::from_str(printed.as_ref()).map_err(|_unread| UnreadStep::Checks)?;
         Verdict::read(&checks).ok_or(UnreadStep::Checks)
-    }
-
-    pub fn log(&self, job: JobId) -> String {
-        let ran = self.ran(&["run", "view", "--job", &job.to_string(), "--log-failed"], Self::QUICK);
-        ran.as_ref().and_then(Ran::succeeded).map_or_else(|| Hub::<D, C, G>::UNLOGGED.to_owned(), ToString::to_string)
     }
 }
 
