@@ -31,7 +31,7 @@ jobs:
       - uses: rui314/setup-mold@v1
       - run: cargo fmt --check
       - run: cargo build --locked -q --bin ci
-      - run: $TIMED clippy cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+      - run: $TIMED clippy cargo clippy --locked --workspace --all-targets --all-features --profile clippy -- -D warnings
 
   test:
     runs-on: ubuntu-latest
