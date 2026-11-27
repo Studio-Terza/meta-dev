@@ -3,8 +3,8 @@ use store_ports::Schema;
 
 #[derive(Clone, Copy, Debug)]
 pub(in super::super) struct Stamped {
-    pub(super) sql: &'static str,
-    pub(super) stamp: i32,
+    sql: &'static str,
+    stamp: i32,
 }
 
 impl Stamped {
@@ -12,5 +12,13 @@ impl Stamped {
         let digest = Sha256::digest(S::SQL.as_bytes());
         let [first, second, third, fourth, ..]: [u8; 32] = digest.into();
         Stamped { sql: S::SQL, stamp: i32::from_be_bytes([first, second, third, fourth]) }
+    }
+
+    pub(super) fn sql(self) -> &'static str {
+        self.sql
+    }
+
+    pub(super) fn stamp(self) -> i32 {
+        self.stamp
     }
 }

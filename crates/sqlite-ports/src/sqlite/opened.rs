@@ -27,7 +27,7 @@ impl Opened {
         let opened = Opened::configured(Connection::open(path).map_err(Unopened::from)?)?;
         let stamp: i32 =
             opened.connection.pragma_query_value(None, Self::STAMP, |row| row.get(0)).map_err(Unopened::from)?;
-        if stamp == schema.stamp { Ok(opened) } else { opened.emptied(schema) }
+        if stamp == schema.stamp() { Ok(opened) } else { opened.emptied(schema) }
     }
 
     fn emptied(self, schema: Stamped) -> Result<Opened, StoreFailure> {
@@ -64,8 +64,8 @@ impl Opened {
     fn stamped(self, schema: Stamped) -> Result<Opened, StoreFailure> {
         self.settled(|connected| {
             let connection = connected.connection();
-            connection.execute_batch(schema.sql).map_err(Unbuilt::from)?;
-            connection.pragma_update(None, Self::STAMP, schema.stamp).map_err(Unbuilt::from)?;
+            connection.execute_batch(schema.sql()).map_err(Unbuilt::from)?;
+            connection.pragma_update(None, Self::STAMP, schema.stamp()).map_err(Unbuilt::from)?;
             Ok::<(), StoreFailure>(())
         })?;
         Ok(self)
