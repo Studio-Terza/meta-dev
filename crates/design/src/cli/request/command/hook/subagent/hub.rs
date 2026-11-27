@@ -13,7 +13,7 @@ use store_ports::Store;
 
 use super::super::super::Ground;
 use super::super::super::crew::Crew;
-use super::boundary::{Branch, Branched, CommitSha, First, JobId, Opened, Pushed};
+use super::boundary::{Branch, Branched, CommitSha, Compared, First, JobId, Opened, Pushed, Repository};
 use super::{FailedJob, UnreadStep};
 use crate::cli::request::ignored::Ignored;
 
@@ -21,6 +21,7 @@ use crate::cli::request::ignored::Ignored;
 pub struct Hub<'crew, D: Dispatch, C: Clock, G: Shell> {
     crew: &'crew Crew<'crew, D, C, G>,
     directory: &'crew Path,
+    repository: &'crew Repository,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -85,11 +86,11 @@ struct Found {
 
 #[derive(Debug, Deserialize)]
 struct Data {
-    repository: Repository,
+    repository: Holder,
 }
 
 #[derive(Debug, Deserialize)]
-struct Repository {
+struct Holder {
     #[serde(rename = "ref")]
     reference: Option<Targeted>,
 }
@@ -111,25 +112,27 @@ impl<'crew, D: Dispatch, C: Clock, G: Shell> Hub<'crew, D, C, G> {
     const REGISTERING: Timeout = Timeout::new(5 * 60);
     const POLL: Pause = Pause::new(10);
     const UNLOGGED: &'static str = "(the log could not be read)";
-    const GIT: &'static str = "git";
     const BASE: &'static str = "main";
-    const MAIN: &'static str = "origin/main";
-    const FIRST: &'static str = "--format=%(trailers:key=Spec,valueonly,separator=%x2c)";
     const REMOTE: &'static str = "query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name)\
                                   {ref(qualifiedName:$ref){target{oid}}}}";
 
-    pub fn new(crew: &'crew Crew<'crew, D, C, G>, directory: &'crew Path) -> Hub<'crew, D, C, G> {
-        Hub { crew, directory }
+    pub fn new(
+        crew: &'crew Crew<'crew, D, C, G>,
+        directory: &'crew Path,
+        repository: &'crew Repository,
+    ) -> Hub<'crew, D, C, G> {
+        Hub { crew, directory, repository }
     }
 
     fn ran(&self, arguments: &[&str], timeout: Timeout) -> Option<Ran> {
-        self.spoke(Hub::<D, C, G>::PROGRAM, arguments, timeout)
+        let named = self.repository.to_string();
+        self.spoke(&[arguments, &["-R", &named]].concat(), timeout)
     }
 
-    fn spoke(&self, program: &'static str, arguments: &[&str], timeout: Timeout) -> Option<Ran> {
+    fn spoke(&self, arguments: &[&str], timeout: Timeout) -> Option<Ran> {
         let spoken = arguments.iter().map(|word| (*word).to_owned()).collect();
         let deadline = Deadline::after(self.crew.now(), timeout);
-        let call = Call::new(program, spoken, self.directory.to_path_buf(), deadline);
+        let call = Call::new(Hub::<D, C, G>::PROGRAM, spoken, self.directory.to_path_buf(), deadline);
         self.crew.ran(&call).ignoring(Ignored::Unrun)
     }
 
@@ -157,18 +160,21 @@ impl<'crew, D: Dispatch, C: Clock, G: Shell> Hub<'crew, D, C, G> {
     fn remote(&self, branch: &Branch) -> Result<Option<CommitSha>, UnreadStep> {
         let reference = format!("ref=refs/heads/{branch}");
         let query = format!("query={}", Hub::<D, C, G>::REMOTE);
-        let asked = ["api", "graphql", "-F", "owner={owner}", "-F", "name={repo}", "-f", &reference, "-f", &query];
-        let ran = self.ran(&asked, Self::QUICK);
+        let owner = format!("owner={}", self.repository.owner());
+        let name = format!("name={}", self.repository.name());
+        let asked = ["api", "graphql", "-F", &owner, "-F", &name, "-f", &reference, "-f", &query];
+        let ran = self.spoke(&asked, Self::QUICK);
         let printed = ran.as_ref().and_then(Ran::succeeded).ok_or(UnreadStep::Remote)?;
         let found: Found = serde_json::from_str(printed.as_ref()).map_err(|_unread| UnreadStep::Remote)?;
         Ok(found.data.repository.reference.map(|targeted| targeted.target.oid))
     }
 
     fn first(&self, head: CommitSha) -> Result<First, UnreadStep> {
-        let range = format!("{}..{head}", Hub::<D, C, G>::MAIN);
-        let ran = self.spoke(Hub::<D, C, G>::GIT, &["log", "--reverse", Hub::<D, C, G>::FIRST, &range], Self::QUICK);
+        let compare = format!("repos/{}/compare/{}...{head}", self.repository, Hub::<D, C, G>::BASE);
+        let ran = self.spoke(&["api", &compare], Self::QUICK);
         let printed = ran.as_ref().and_then(Ran::succeeded).ok_or(UnreadStep::Commits)?;
-        First::read(printed.as_ref()).ok_or(UnreadStep::Commits)
+        let compared: Compared = serde_json::from_str(printed.as_ref()).map_err(|_unread| UnreadStep::Commits)?;
+        compared.first().ok_or(UnreadStep::Commits)
     }
 
     pub fn head(&self, pull: PullNumber) -> Result<CommitSha, UnreadStep> {

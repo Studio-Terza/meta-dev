@@ -166,6 +166,7 @@ dependencies = [
  "tempfile",
  "test-failure",
  "thiserror",
+ "toml",
  "transcript-ports",
 ]
 
