@@ -1,6 +1,5 @@
 mod bare;
 mod detail;
-mod feature;
 mod lines;
 mod lstart;
 mod migration;
@@ -13,7 +12,6 @@ mod shell;
 
 pub use bare::Bare;
 pub use detail::{Cited, Heading};
-pub use feature::Toggled;
 pub use lines::{Fields, Lines};
 pub use lstart::Stamp;
 pub use migration::MigrationFile;

@@ -1,10 +1,12 @@
 use std::collections::BTreeMap;
 use std::path::{Component, Path, PathBuf};
 
-use grammar::Toggled;
+use invariants::Ignoring;
+use rustc_lexer::{FrontmatterAllowed, TokenKind, tokenize};
 use toml::de::DeValue;
 
 use super::{Enabled, Enabling, Manifest, Members};
+use crate::ignored::Ignored;
 use crate::terms::Name;
 
 impl Manifest {
@@ -67,12 +69,24 @@ impl Manifest {
 
 impl Enabling {
     fn read(entry: &str) -> Enabling {
-        match Toggled::read(entry) {
-            Some(Toggled::Own(feature)) => Enabling::Own(Name::spelled(feature)),
-            Some(Toggled::Through { dependency, feature }) => {
-                Enabling::Dependency { dependency: Name::spelled(dependency), feature: Name::spelled(feature) }
+        let marks: Vec<(usize, TokenKind)> = tokenize(entry, FrontmatterAllowed::No)
+            .scan(0, |offset, token| {
+                let at = *offset;
+                *offset += usize::try_from(token.len).ignoring(Ignored::BeyondRange)?;
+                Some((at, token.kind))
+            })
+            .filter(|(_, kind)| matches!(kind, TokenKind::Colon | TokenKind::Question | TokenKind::Slash))
+            .collect();
+        match marks.as_slice() {
+            [] => Enabling::Own(Name::spelled(entry)),
+            [(slash, TokenKind::Slash)] | [(slash, TokenKind::Question), (_, TokenKind::Slash)] => {
+                let after = marks.last().map_or(*slash, |(last, _)| *last);
+                Enabling::Dependency {
+                    dependency: Name::spelled(entry.get(..*slash).unwrap_or_default()),
+                    feature: Name::spelled(entry.get(after + 1..).unwrap_or_default()),
+                }
             }
-            Some(Toggled::Optional(_)) | None => Enabling::Optional,
+            _ => Enabling::Optional,
         }
     }
 }

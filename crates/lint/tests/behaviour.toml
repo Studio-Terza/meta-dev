@@ -2013,7 +2013,7 @@ verdict = "Violations"
 [Lint.feature_only.files]
 "Cargo.toml" = """
 [workspace]
-members = ["app", "support"]
+members = ["app", "support", "base"]
 """
 "app/Cargo.toml" = """
 [package]
@@ -2032,8 +2032,11 @@ fn main() {}
 [package]
 name = "support"
 
+[dependencies]
+base = { path = "../base" }
+
 [features]
-shipped = ["sharing"]
+shipped = ["sharing", "base/based", "base?/weak", "dep:base"]
 sharing = []
 laws = []
 """
@@ -2042,6 +2045,23 @@ laws = []
 mod laws;
 #[cfg(feature = "sharing")]
 mod sharing;
+"""
+"base/Cargo.toml" = """
+[package]
+name = "base"
+
+[features]
+based = []
+weak = []
+unasked = []
+"""
+"base/src/lib.rs" = """
+#[cfg(feature = "based")]
+struct Based;
+#[cfg(feature = "weak")]
+struct Weak;
+#[cfg(feature = "unasked")]
+struct Unasked;
 """
 "support/src/laws.rs" = """
 pub(crate) struct Law;

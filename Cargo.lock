@@ -451,7 +451,6 @@ dependencies = [
  "doubles",
  "file-ports",
  "fixture",
- "grammar",
  "invariants",
  "port-core",
  "proc-macro2",

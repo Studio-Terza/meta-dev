@@ -1,1 +1,1 @@
-test budget: 5 of 9 lines are tests, at most 18% may be; cut test lines or test through fewer, table-driven cases
+test budget: 7 of 15 lines are tests, at most 18% may be; cut test lines or test through fewer, table-driven cases
