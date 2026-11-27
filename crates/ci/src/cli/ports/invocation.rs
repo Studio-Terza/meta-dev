@@ -7,15 +7,12 @@ pub struct Invocation {
 }
 
 impl Invocation {
-    pub(crate) fn new(
-        program: impl Into<OsString>,
-        arguments: impl IntoIterator<Item = impl Into<OsString>>,
-    ) -> Invocation {
+    pub fn new(program: impl Into<OsString>, arguments: impl IntoIterator<Item = impl Into<OsString>>) -> Invocation {
         Invocation { program: program.into(), arguments: arguments.into_iter().map(Into::into).collect() }
     }
 
     #[must_use]
-    pub(crate) fn program(&self) -> &OsStr {
+    pub fn program(&self) -> &OsStr {
         &self.program
     }
 

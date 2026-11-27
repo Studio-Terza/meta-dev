@@ -8,11 +8,11 @@ use std::path::Path;
 
 use file_ports::Files;
 
-pub(crate) use exit::Exit;
+pub use exit::Exit;
 pub use file_ports::Text;
 pub use invocation::Invocation;
 pub use run::Run;
-pub use system::System;
+pub use system::{System, Tee};
 
 pub trait Ports {
     type Files: Files;

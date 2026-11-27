@@ -2,14 +2,14 @@ use std::num::NonZeroU8;
 use std::process::ExitCode;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Exit {
+pub enum Exit {
     Success,
     Failure(NonZeroU8),
 }
 
 impl Exit {
     #[must_use]
-    pub(crate) fn excusing(self, excused: &[NonZeroU8]) -> Exit {
+    pub fn excusing(self, excused: &[NonZeroU8]) -> Exit {
         match self {
             Exit::Failure(code) => excused.iter().find(|allowed| **allowed == code).map_or(self, |_| Exit::Success),
             Exit::Success => self,
@@ -18,7 +18,7 @@ impl Exit {
 }
 
 impl Exit {
-    pub(crate) fn followed_by<Failed>(self, next: impl FnOnce() -> Result<Exit, Failed>) -> Result<Exit, Failed> {
+    pub fn followed_by<Failed>(self, next: impl FnOnce() -> Result<Exit, Failed>) -> Result<Exit, Failed> {
         match self {
             Exit::Success => next(),
             failed @ Exit::Failure(_) => Ok(failed),

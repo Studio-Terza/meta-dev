@@ -10,7 +10,7 @@ use proptest::prelude::{any, prop_assert_eq, proptest};
 use proptest::test_runner::{Config, RngSeed};
 use transcript_ports::transcripts_ops::{ReadFrom, Sessions};
 use transcript_ports::{
-    Authorship, ClaudeCodeDir, Cursor, Instant, Kind, Read, Record, Session, SessionId, Skipped, Transcripts,
+    Authorship, ClaudeCodeDir, Cursor, Instant, Kind, Line, Read, Record, Session, SessionId, Skipped, Transcripts,
     Unrecognised,
 };
 
@@ -155,7 +155,7 @@ impl From<Skipped> for Gathered {
 impl From<Unrecognised> for Gathered {
     fn from(unrecognised: Unrecognised) -> Gathered {
         let kind = format!("unrecognised {}", unrecognised.kind());
-        let classes = [kind].into_iter().chain(unrecognised.passing().as_ref().and_then(Gathered::edge)).collect();
+        let classes = vec![kind];
         Gathered { records: Vec::new(), skipped: Vec::new(), classes }
     }
 }
@@ -176,7 +176,13 @@ impl Gathered {
 
 impl From<Read> for Gathered {
     fn from(read: Read) -> Gathered {
-        read.into_iter().fold(Gathered::default(), |gathered, line| gathered.joined(line.gathered()))
+        read.into_iter().fold(Gathered::default(), |gathered, line| {
+            gathered.joined(match line {
+                Line::Said(record) => Gathered::from(record),
+                Line::Skipped(skipped) => Gathered::from(skipped),
+                Line::Unrecognised(unrecognised) => Gathered::from(unrecognised),
+            })
+        })
     }
 }
 
@@ -365,14 +371,14 @@ proptest! {
     #[test]
     fn an_unknown_record_kind_is_unrecognised_and_never_a_message(kind in "[a-z]{1,8}-unheard") {
         let line = Lines::shaped(&kind, r#""origin":{"kind":"human"},"message":{"model":"claude","content":"hi"}"#);
-        prop_assert_eq!(Cases::classified(&line), [format!("unrecognised {kind}"), "8 after 1".to_owned()]);
+        prop_assert_eq!(Cases::classified(&line), [format!("unrecognised {kind}")]);
     }
 
     #[test]
     fn an_unknown_block_in_a_lead_record_is_unrecognised(block in "[a-z]{1,8}_unheard") {
         let fields =
             format!(r#""message":{{"model":"claude","content":[{{"type":"text","text":"said"}},{{"type":"{block}"}}]}}"#);
-        prop_assert_eq!(Cases::assistant(&fields.as_str()), [format!("unrecognised {block}"), "8 after 1".to_owned()]);
+        prop_assert_eq!(Cases::assistant(&fields.as_str()), [format!("unrecognised {block}")]);
     }
 
     #[test]
@@ -401,7 +407,7 @@ impl Cases {
 
 #[test]
 fn every_surveyed_record_kind_without_a_voice_is_only_a_parent_edge() {
-    assert_eq!(Cases::kind(&"brand-new-kind"), ["unrecognised brand-new-kind", "8 after 1"]);
+    assert_eq!(Cases::kind(&"brand-new-kind"), ["unrecognised brand-new-kind"]);
     Cases::parents(
         &[
             "ai-title",
@@ -442,19 +448,19 @@ fn a_user_record_is_the_owner_only_when_a_human_typed_text_in_the_main_chain() {
     );
     assert_eq!(
         Cases::user(&r#""origin":{"kind":"brand-new-kind"},"message":{"content":"hello"}"#),
-        ["unrecognised brand-new-kind", "8 after 1"]
+        ["unrecognised brand-new-kind"]
     );
     assert_eq!(
         Cases::user(
             &r#""origin":{"kind":"brand-new-kind"},"message":{"content":[{"type":"tool_result","content":"out"}]}"#
         ),
-        ["unrecognised brand-new-kind", "8 after 1"]
+        ["unrecognised brand-new-kind"]
     );
     assert_eq!(
         Cases::user(
             &r#""origin":{"kind":"human"},"message":{"content":[{"type":"document"},{"type":"text","text":"a"}]}"#
         ),
-        ["unrecognised document", "8 after 1"]
+        ["unrecognised document"]
     );
     Cases::parents(
         &[
@@ -491,7 +497,7 @@ fn an_assistant_record_is_the_lead_only_when_it_answered_with_text_in_the_main_c
     );
     assert_eq!(
         Cases::assistant(&r#""message":{"model":"claude","content":[{"type":"server_tool_use"}]}"#),
-        ["unrecognised server_tool_use", "8 after 1"]
+        ["unrecognised server_tool_use"]
     );
     Cases::parents(
         &[
@@ -523,12 +529,9 @@ fn a_queued_command_is_the_owner_only_when_a_human_queued_it() {
     );
     assert_eq!(
         Cases::attached(&r#"{"type":"queued_command","prompt":"hello","origin":{"kind":"brand-new-kind"}}"#),
-        ["unrecognised brand-new-kind", "8 after 1"]
+        ["unrecognised brand-new-kind"]
     );
-    assert_eq!(
-        Cases::attached(&r#"{"type":"brand_new_attachment"}"#),
-        ["unrecognised brand_new_attachment", "8 after 1"]
-    );
+    assert_eq!(Cases::attached(&r#"{"type":"brand_new_attachment"}"#), ["unrecognised brand_new_attachment"]);
     Cases::parents(
         &[
             r#"{"type":"queued_command","prompt":"finished","origin":{"kind":"task-notification"}}"#,

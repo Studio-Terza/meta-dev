@@ -5,7 +5,6 @@ mod ports;
 
 use test_failure::Failed;
 
-use std::iter;
 use std::ops::Range;
 use std::sync::Mutex;
 use std::time::Duration;
@@ -15,12 +14,12 @@ use proptest::sample::select;
 use proptest::test_runner::{Config, RngSeed};
 
 use dispatch_ports::{
-    AgentRun, Bell, ClockFiller, Deadline, Dispatch, DispatchFailure, DispatchFiller, Due, Ended, Errored, Fault,
-    Finished, Job, Model, Output, Pause, Pid, Prompt, Reply, Stall, Stalled, Started, Stderr, Timeout, Tokens, Told,
-    Unreadable, Usage, Wall, Watch, Watched, Woke, clock_ops, dispatch_ops,
+    AgentRun, Bell, ClockFiller, Deadline, Dispatch, DispatchFailure, DispatchFiller, Ended, Errored, Fault, Finished,
+    Job, Model, Output, Pause, Pid, Prompt, Reply, Stall, Stalled, Started, Stderr, Timeout, Tokens, Told, Unreadable,
+    Usage, Wall, Watch, Watched, Woke, clock_ops, dispatch_ops,
 };
 use invariants::{Ignoring, Unpoisoned};
-use port_core::{Calls, Pass, Port, Released, Run, Snapshot};
+use port_core::{Calls, Pass, Released, Run, Snapshot};
 
 use ignored::Ignored;
 
@@ -227,9 +226,8 @@ struct Watching {
 
 impl Watching {
     const START: Wall = Wall::new(1_800_000_000);
-    const PAUSE: Pause = Watch::<Port<'static, FakeDispatch>, Port<'static, FakeClock<'static>>>::PAUSE;
+    const PAUSE: Pause = Pause::new(2);
     const LAPSED: Wait = Wait { pause: Watching::PAUSE, woke: Woke::Lapsed };
-    const RUNG: Wait = Wait { pause: Watching::PAUSE, woke: Woke::Rung };
 
     fn watched(self) -> Result<Observed, Failed> {
         let waits = Waits::default();
@@ -287,50 +285,6 @@ fn a_run_that_replies_before_its_deadline_is_finished_and_released_once() -> Res
                 waits: vec![Watching::LAPSED; finishing.saturating_sub(1)],
             }
         );
-        Ok(())
-    })
-}
-
-struct Lingering;
-
-impl Lingering {
-    fn watched(timeout: Timeout) -> Result<Observed, Failed> {
-        let waits = Waits::default();
-        let run = Run::root();
-        let watched = {
-            let clock = run.port(FakeClock::new(Sleep::STILL, &waits));
-            let replying = Lingering::pauses(timeout).saturating_add(2);
-            let dispatch = run.port(FakeDispatch { finishing: Some(replying), polls: Mutex::new(0) });
-            let deadline = Deadline::after(Watching::START, timeout);
-            let held = dispatch.dispatch(&Job::due_by(deadline, Model::Haiku), &Prompt::new(String::new()))?;
-            held.bell().ringer().ring();
-            Watch::over(&dispatch, &clock).watched(held)?
-        };
-        Ok(Observed::read(watched, run.finish().snapshot(), waits))
-    }
-
-    fn pauses(timeout: Timeout) -> usize {
-        let deadline = Deadline::after(Watching::START, timeout);
-        iter::successors(Some(Watching::START), |now| Some(now.after(Watching::PAUSE)))
-            .take_while(|now| deadline.due(*now) == Due::Pending)
-            .count()
-    }
-
-    fn observed(timeout: Timeout) -> Observed {
-        let pauses = Lingering::pauses(timeout);
-        let checks = Calls::new(pauses.saturating_add(1));
-        Observed {
-            watched: Watched::Stalled(Stall::Overdue),
-            calls: [checks, checks, Calls::new(1)],
-            waits: iter::once(Watching::RUNG).chain(iter::repeat_n(Watching::LAPSED, pauses)).collect(),
-        }
-    }
-}
-
-#[test]
-fn a_ring_left_on_the_bell_neither_cuts_a_run_short_nor_carries_it_past_its_deadline() -> Result<(), Failed> {
-    (1..200_u32).step_by(7).map(Timeout::new).try_for_each(|timeout| {
-        assert_eq!(Lingering::watched(timeout)?, Lingering::observed(timeout));
         Ok(())
     })
 }

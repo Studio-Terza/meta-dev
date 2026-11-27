@@ -1,3 +1,3 @@
 mod boundary;
 
-pub(crate) use boundary::*;
+pub use boundary::*;

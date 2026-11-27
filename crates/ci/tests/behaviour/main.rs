@@ -196,9 +196,10 @@ impl Answer {
         Answer { exit: ended.code(), out, err: AsRef::<str>::as_ref(err).to_owned() }
     }
 
-    fn refused(arguments: &[&str]) -> bool {
+    fn refused(arguments: &[&str]) -> Option<()> {
         let answer = Scratch::fresh().answer(&Script::new(), arguments);
-        (answer.exit, answer.out.as_str(), answer.err.contains("usage: ci ")) == (ExitCode::FAILURE, "", true)
+        let refusal = (answer.exit, answer.out.as_str(), answer.err.contains("usage: ci "));
+        (refusal == (ExitCode::FAILURE, "", true)).then_some(())
     }
 }
 
@@ -471,8 +472,8 @@ fn metadata_that_cannot_be_asked_for_stops_clippy_before_it_runs() -> Result<(),
 
 #[test]
 fn clippy_targets_needs_a_measured_file_and_a_stage() {
-    assert!(Answer::refused(&["clippy-targets"]));
-    assert!(Answer::refused(&["clippy-targets", "m.toml"]));
+    assert_eq!(Answer::refused(&["clippy-targets"]), Some(()));
+    assert_eq!(Answer::refused(&["clippy-targets", "m.toml"]), Some(()));
 }
 
 #[test]
@@ -1055,7 +1056,7 @@ fn unusable_input_is_refused_with_the_usage() {
         &["spec-line"][..],
         &["spec-line", "1", "extra"][..],
     ] {
-        assert!(Answer::refused(arguments), "{arguments:?}");
+        assert_eq!(Answer::refused(arguments), Some(()), "{arguments:?}");
     }
 }
 

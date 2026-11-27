@@ -12,7 +12,7 @@ use file_ports::Disk;
 use super::{Exit, Invocation, Ports, Run, Text};
 use crate::cli::ignored::Ignored;
 use invariants::Ignoring;
-pub(crate) use tee::Tee;
+pub use tee::Tee;
 
 #[derive(Debug)]
 pub struct System;
