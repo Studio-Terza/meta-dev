@@ -204,14 +204,11 @@ impl Hooks for TestShape {
     }
 
     fn macro_called(&mut self, invocation: &Macro) -> Expanded {
-        match self.holdings.last().and_then(Option::as_ref) {
-            Some(_) => TestShape::tokens(invocation.tokens.clone()).map_or_default(|()| self.literal()),
-            None => {
-                self.testing().map_or_default(|()| {
-                    self.written(invocation.tokens.clone());
-                });
-            }
-        }
+        let held = self.holdings.last().and_then(Option::as_ref).map(|_| ());
+        held.and_then(|()| TestShape::tokens(invocation.tokens.clone())).map_or_default(|()| self.literal());
+        held.xor(Some(())).and(self.testing()).map_or_default(|()| {
+            self.written(invocation.tokens.clone());
+        });
         Expanded::Nothing
     }
 

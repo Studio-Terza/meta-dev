@@ -182,7 +182,7 @@ impl<'file> Graph<'file> for NoTestOnlyApi<'file> {
     fn reduce(facts: Vec<Finding>, packages: &[Arc<Package>]) -> Vec<Finding> {
         let manifests = packages.iter().flat_map(|package| {
             package.features().iter().filter_map(|feature| {
-                NoTestOnlyApi::testing(feature.name()).map(|()| {
+                NoTestOnlyApi::testing(feature.name().text()).map(|()| {
                     Found::at(
                         feature.line(),
                         format_args!("test feature {}", feature.name()),

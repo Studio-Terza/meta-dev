@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use invariants::Ignoring;
 use proc_macro2::{Group, TokenStream, TokenTree};
 use syn::parse::discouraged::Speculative;
@@ -64,50 +62,70 @@ impl Expansion {
     }
 
     fn unvaried(body: TokenStream) -> TokenStream {
-        let trees: Vec<TokenTree> = body.into_iter().collect();
-        let dropped = Expansion::dropped(&trees);
-        let kept = trees.iter().enumerate().filter(|(at, _)| !dropped.contains(at));
-        kept.flat_map(|(at, tree)| Expansion::kept(tree, at.checked_sub(1).and_then(|before| trees.get(before))))
-            .collect()
-    }
-
-    fn kept(tree: &TokenTree, before: Option<&TokenTree>) -> Vec<TokenTree> {
-        let repeated = before.and_then(Expansion::dollar);
-        match tree {
-            TokenTree::Group(group) => repeated.map_or_else(
-                || vec![TokenTree::Group(Group::new(group.delimiter(), Expansion::unvaried(group.stream())))],
-                |()| Expansion::unvaried(group.stream()).into_iter().collect(),
-            ),
-            TokenTree::Ident(_) | TokenTree::Punct(_) | TokenTree::Literal(_) => vec![tree.clone()],
-        }
-    }
-
-    fn dropped(trees: &[TokenTree]) -> BTreeSet<usize> {
-        let dollars = trees.iter().enumerate().filter_map(|(at, tree)| Expansion::dollar(tree).map(|()| at));
-        dollars
-            .flat_map(|at| {
-                let repeated = trees.get(at + 1).and_then(|next| match next {
-                    TokenTree::Group(_) => Expansion::repeat_end(trees, at + 2),
-                    TokenTree::Ident(_) | TokenTree::Punct(_) | TokenTree::Literal(_) => None,
-                });
-                [at].into_iter().chain(repeated.map_or_default(|end| (at + 2..=end).collect::<Vec<usize>>()))
-            })
-            .collect()
-    }
-
-    fn repeat_end(trees: &[TokenTree], start: usize) -> Option<usize> {
-        [start, start + 1].into_iter().find(|at| {
-            trees.get(*at).is_some_and(|tree| match tree {
-                TokenTree::Punct(mark) => Expansion::REPEATS.contains(&mark.as_char()),
-                TokenTree::Group(_) | TokenTree::Ident(_) | TokenTree::Literal(_) => false,
-            })
-        })
+        body.into_iter().fold(Unvarying::default(), Unvarying::read).ended().into_iter().collect()
     }
 
     fn dollar(tree: &TokenTree) -> Option<()> {
         match tree {
             TokenTree::Punct(mark) => (mark.as_char() == Expansion::DOLLAR).then_some(()),
             TokenTree::Group(_) | TokenTree::Ident(_) | TokenTree::Literal(_) => None,
+        }
+    }
+
+    fn repeats(tree: &TokenTree) -> Option<()> {
+        match tree {
+            TokenTree::Punct(mark) => Expansion::REPEATS.contains(&mark.as_char()).then_some(()),
+            TokenTree::Group(_) | TokenTree::Ident(_) | TokenTree::Literal(_) => None,
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct Unvarying {
+    kept: Vec<TokenTree>,
+    mode: Mode,
+}
+
+#[derive(Debug, Default)]
+enum Mode {
+    #[default]
+    Plain,
+    Dollar,
+    Repeated(Option<TokenTree>),
+}
+
+impl Unvarying {
+    fn read(self, next: TokenTree) -> Unvarying {
+        let Unvarying { kept, mode } = self;
+        match (mode, next) {
+            (Mode::Dollar, TokenTree::Group(group)) => Unvarying {
+                kept: kept.into_iter().chain(Expansion::unvaried(group.stream())).collect(),
+                mode: Mode::Repeated(None),
+            },
+            (Mode::Repeated(_), tree) if Expansion::repeats(&tree).is_some() => Unvarying { kept, mode: Mode::Plain },
+            (Mode::Repeated(None), tree) => Unvarying { kept, mode: Mode::Repeated(Some(tree)) },
+            (Mode::Repeated(Some(held)), tree) => Unvarying { kept, mode: Mode::Plain }.flushed(Some(held)).read(tree),
+            (Mode::Plain | Mode::Dollar, tree) if Expansion::dollar(&tree).is_some() => {
+                Unvarying { kept, mode: Mode::Dollar }
+            }
+            (Mode::Plain, TokenTree::Group(group)) => {
+                let inner = TokenTree::Group(Group::new(group.delimiter(), Expansion::unvaried(group.stream())));
+                Unvarying { kept: kept.into_iter().chain([inner]).collect(), mode: Mode::Plain }
+            }
+            (Mode::Plain | Mode::Dollar, tree) => {
+                Unvarying { kept: kept.into_iter().chain([tree]).collect(), mode: Mode::Plain }
+            }
+        }
+    }
+
+    fn flushed(self, held: Option<TokenTree>) -> Unvarying {
+        held.into_iter().fold(self, Unvarying::read)
+    }
+
+    fn ended(self) -> Vec<TokenTree> {
+        match self.mode {
+            Mode::Repeated(held) => Unvarying { kept: self.kept, mode: Mode::Plain }.flushed(held).kept,
+            Mode::Plain | Mode::Dollar => self.kept,
         }
     }
 }

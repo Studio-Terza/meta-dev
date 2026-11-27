@@ -12,6 +12,7 @@ use crate::lints::{
     BoolMethods, DeadCode, Emitters, ExpressionFlow, ManualIteration, NamedLifetimes, NoDyn, NoFreeFns, NoTestOnlyApi,
     PrimitiveBoundary, ProcessStarters, PublicApiTests, PublicSurface, TestShape, TypeShape, VecOutParams,
 };
+use crate::terms::Depth;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Descent {
@@ -37,7 +38,7 @@ enum Phase {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum State {
     Awake,
-    PausedAt(usize),
+    PausedAt(Depth),
     Off,
 }
 
@@ -50,7 +51,7 @@ pub(crate) struct Pausable<Lint> {
 #[derive(Debug)]
 pub(crate) struct Walker<'file> {
     lineup: Lineup<'file>,
-    depth: usize,
+    depth: Depth,
 }
 
 impl From<Option<()>> for Descent {
@@ -83,12 +84,12 @@ impl<Lint> Pausable<Lint> {
         (self.state == State::Awake).then_some(())
     }
 
-    fn entered(&mut self, depth: usize, hook: impl FnOnce(&mut Lint) -> Descent) {
+    fn entered(&mut self, depth: Depth, hook: impl FnOnce(&mut Lint) -> Descent) {
         let over = self.active().map(|()| hook(&mut self.lint)).filter(|descent| *descent == Descent::Over);
         self.state = over.map_or(self.state, |_| State::PausedAt(depth));
     }
 
-    fn left(&mut self, depth: usize, hook: impl FnOnce(&mut Lint)) {
+    fn left(&mut self, depth: Depth, hook: impl FnOnce(&mut Lint)) {
         match self.state {
             State::Awake => hook(&mut self.lint),
             State::PausedAt(at) => self.state = if at == depth { State::Awake } else { self.state },
@@ -100,7 +101,7 @@ impl<Lint> Pausable<Lint> {
         self.active().map(|()| hook(&mut self.lint))
     }
 
-    fn held(&mut self, depth: usize, wanted: Option<()>) {
+    fn held(&mut self, depth: Depth, wanted: Option<()>) {
         let unwanted = self.active().and(wanted.xor(Some(())));
         self.state = unwanted.map_or(self.state, |()| State::PausedAt(depth));
     }
@@ -108,15 +109,15 @@ impl<Lint> Pausable<Lint> {
 
 impl Walker<'_> {
     pub(crate) fn walked<'file>(lineup: Lineup<'file>, file: &syn::File) -> Lineup<'file> {
-        let mut walker = Walker { lineup, depth: 0 };
+        let mut walker = Walker { lineup, depth: Depth::default() };
         walker.visit_file(file);
         walker.lineup
     }
 
-    fn deeper(&mut self, walk: impl FnOnce(&mut Self, usize)) {
-        self.depth += 1;
+    fn deeper(&mut self, walk: impl FnOnce(&mut Self, Depth)) {
+        self.depth = self.depth.deeper();
         walk(self, self.depth);
-        self.depth -= 1;
+        self.depth = self.depth.shallower();
     }
 }
 
@@ -147,11 +148,11 @@ macro_rules! lineup {
                 Chosen { $($lint: self.$lint.chose(|lint| Hooks::macro_called(lint, invocation)),)* }
             }
 
-            fn held(&mut self, depth: usize, chosen: Chosen, phase: Phase) {
+            fn held(&mut self, depth: Depth, chosen: Chosen, phase: Phase) {
                 $(self.$lint.held(depth, chosen.$lint.and_then(|choice| choice.admits(phase)));)*
             }
 
-            fn released(&mut self, depth: usize) {
+            fn released(&mut self, depth: Depth) {
                 $(self.$lint.left(depth, |_| {});)*
             }
         }

@@ -18,11 +18,11 @@ use crate::gate::Gate;
 use crate::graph::Graph;
 use crate::ignored::Ignored;
 use crate::source::{Place, Source};
-use crate::terms::Fix;
+use crate::terms::{Fix, Name};
 use crate::use_leaf::UseLeaf;
 use crate::walk::{Descent, Expanded, Hooks};
 use crate::workspace::Package;
-use boundary::{At, Name};
+use boundary::{At, Indexed};
 
 #[derive(Debug)]
 pub(crate) enum DeadFact {
@@ -197,7 +197,7 @@ impl Names {
 
 impl Read {
     fn named(&self, export: &Export) -> Option<()> {
-        let crate_name = Name::spelled(export.owner.crate_name());
+        let crate_name = export.owner.crate_name();
         let readers =
             self.0.iter().filter(|(reader, names)| reader.reads(export).is_some() && names.0.contains(&crate_name));
         readers.into_iter().find(|(_, names)| names.0.contains(&export.exported.name)).map(|_| ())
@@ -223,15 +223,15 @@ impl Graphed {
     }
 
     fn alive(&self) -> BTreeSet<At> {
-        let named = self.indexed().filter(|(_, export)| self.read.named(export).is_some());
-        self.grown(named.map(|(at, _)| at).collect())
+        let named = self.indexed().filter(|indexed| self.read.named(indexed.export()).is_some());
+        self.grown(named.map(Indexed::at).collect())
     }
 
     fn grown(&self, alive: BTreeSet<At>) -> BTreeSet<At> {
         let reached: BTreeSet<At> = self
             .indexed()
-            .filter(|(at, export)| !alive.contains(at) && self.used(&alive, export).is_some())
-            .map(|(at, _)| at)
+            .filter(|indexed| !alive.contains(&indexed.at()) && self.used(&alive, indexed.export()).is_some())
+            .map(Indexed::at)
             .collect();
         match reached.first() {
             Some(_) => self.grown(alive.into_iter().chain(reached).collect()),
@@ -355,7 +355,7 @@ impl<'file> Graph<'file> for DeadCode<'file> {
 
     fn facts(self) -> Vec<DeadFact> {
         let shipped = (self.source.place() == Place::Shipped).then_some(());
-        let tokens = TokenStream::from_str(self.source.text()).ignoring(Ignored::Unparsed).unwrap_or_default();
+        let tokens = TokenStream::from_str(self.source.text().as_str()).ignoring(Ignored::Unparsed).unwrap_or_default();
         let reading = DeadFact::Reading(Reading { reader: self.reader(), names: Names::of(tokens) });
         let owner = self.source.package();
         let path = self.source.shown();

@@ -4,6 +4,7 @@ use std::sync::Arc;
 use invariants::Ignoring;
 
 use crate::ignored::Ignored;
+use crate::terms::{Name, Text};
 use crate::workspace::{CrateKind, Package};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -16,7 +17,7 @@ pub(crate) enum Place {
 #[derive(Debug)]
 struct Location {
     kind: CrateKind,
-    module: Vec<String>,
+    module: Vec<Name>,
     library: Option<()>,
 }
 
@@ -24,7 +25,7 @@ struct Location {
 pub(crate) struct Source {
     real: Arc<Path>,
     shown: Arc<Path>,
-    text: String,
+    text: Text,
     package: Arc<Package>,
     location: Location,
     reached: CrateKind,
@@ -40,14 +41,14 @@ impl Location {
 
     fn of(package: &Package, real: &Path, fallback: CrateKind) -> Location {
         let inside = real.strip_prefix(package.directory()).ignoring(Ignored::Outside).unwrap_or(real);
-        let parts: Vec<String> =
-            inside.components().map(|component| component.as_os_str().to_string_lossy().into_owned()).collect();
-        let target = parts.first().and_then(|first| Location::TARGETS.iter().find(|(name, _)| first == name));
+        let parts: Vec<Name> =
+            inside.components().map(|component| Name::spelled(&component.as_os_str().to_string_lossy())).collect();
+        let target = parts.first().and_then(|first| Location::TARGETS.iter().find(|(name, _)| first == *name));
         match (parts.as_slice(), target) {
             ([source, rest @ ..], _) if source == Location::SOURCE => Location {
                 kind: CrateKind::Library,
                 module: Location::modules(rest),
-                library: (rest == [Location::LIBRARY]).then_some(()),
+                library: matches!(rest, [only] if only == Location::LIBRARY).then_some(()),
             },
             ([_, rest @ ..], Some((_, kind))) => {
                 Location { kind: *kind, module: Location::modules(rest.get(1..).unwrap_or_default()), library: None }
@@ -56,13 +57,13 @@ impl Location {
         }
     }
 
-    fn modules(parts: &[String]) -> Vec<String> {
+    fn modules(parts: &[Name]) -> Vec<Name> {
         let named = parts.iter().map(|part| {
-            let path = Path::new(part);
+            let path = Path::new(part.text());
             let source = path.extension().filter(|extension| *extension == Location::EXTENSION);
             source
                 .and_then(|_| path.file_stem())
-                .map_or_else(|| part.clone(), |stem| stem.to_string_lossy().into_owned())
+                .map_or_else(|| part.clone(), |stem| Name::spelled(&stem.to_string_lossy()))
         });
         named.filter(|name| name != Location::MODULE).collect()
     }
@@ -81,7 +82,7 @@ impl Source {
         real: Arc<Path>,
         shown: Arc<Path>,
         reached: CrateKind,
-        text: String,
+        text: Text,
     ) -> Source {
         let location = Location::of(&package, &real, reached);
         Source { real, shown, text, package, location, reached }
@@ -95,7 +96,7 @@ impl Source {
         &self.shown
     }
 
-    pub(crate) fn text(&self) -> &str {
+    pub(crate) fn text(&self) -> &Text {
         &self.text
     }
 
@@ -115,7 +116,7 @@ impl Source {
         self.location.library
     }
 
-    pub(crate) fn own_crate(&self) -> Option<String> {
+    pub(crate) fn own_crate(&self) -> Option<Name> {
         (self.place() == Place::Shipped && self.reached != CrateKind::Binary).then(|| self.package.crate_name())
     }
 
@@ -123,6 +124,7 @@ impl Source {
         let last_word = self
             .package
             .name()
+            .text()
             .chars()
             .rev()
             .skip_while(|letter| !letter.is_alphanumeric())

@@ -23,7 +23,7 @@ impl<'file> Style<'file> for NoComments<'file> {
     }
 
     fn found(self) -> Vec<Found> {
-        NoComments::commented(self.source.text())
+        NoComments::commented(self.source.text().as_str())
             .into_iter()
             .map(|line| Found::at(line, "comment", NoComments::FIX))
             .collect()

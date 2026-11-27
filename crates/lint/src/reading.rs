@@ -18,6 +18,7 @@ use crate::ignored::Ignored;
 use crate::lints::{Facts, Lints};
 use crate::source::Source;
 use crate::spent::{Spent, Stage};
+use crate::terms::{Line, Name, Text};
 use crate::workspace::{CrateKind, CrateRoot, Package, Tree};
 
 #[derive(Debug, Default)]
@@ -62,9 +63,9 @@ enum Nesting {
 
 #[derive(Debug)]
 struct Declared {
-    name: String,
-    inline: Vec<String>,
-    path: Option<String>,
+    name: Name,
+    inline: Vec<Name>,
+    path: Option<PathBuf>,
     gate: Gate,
 }
 
@@ -111,14 +112,14 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
     fn fresh(&self, module: &Module) -> Read {
         let shown = self.tree.shown(&module.real);
         match self.files.read_text(&module.real) {
-            Ok(text) => self.parsed(module, shown, text.as_ref().to_owned()),
+            Ok(text) => self.parsed(module, shown, Text::read(text.as_ref().to_owned())),
             Err(source) => Read::failed(Failure::Read { path: shown.to_path_buf(), source }),
         }
     }
 
-    fn parsed(&self, module: &Module, shown: Arc<Path>, text: String) -> Read {
+    fn parsed(&self, module: &Module, shown: Arc<Path>, text: Text) -> Read {
         let mut spent = Spent::default();
-        let parsed = spent.timed(self.timer, Stage::Parse, || syn::parse_file(&text));
+        let parsed = spent.timed(self.timer, Stage::Parse, || syn::parse_file(text.as_str()));
         match parsed {
             Ok(file) => {
                 let source =
@@ -126,7 +127,7 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
                 self.linted(module, &source, &file, spent)
             }
             Err(source) => {
-                Read::failed(Failure::Parse { path: shown.to_path_buf(), line: source.span().start().line, source })
+                Read::failed(Failure::Parse { path: shown.to_path_buf(), line: Line::of(source.span()), source })
             }
         }
     }
@@ -149,7 +150,7 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
         here.joined(below)
     }
 
-    fn declared(items: &[Item], inline: &[String], gate: Gate) -> Vec<Declared> {
+    fn declared(items: &[Item], inline: &[Name], gate: Gate) -> Vec<Declared> {
         let modules = items.iter().filter_map(|item| match item {
             Item::Mod(module) => Some(module),
             _ => None,
@@ -157,10 +158,10 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
         modules
             .flat_map(|module| {
                 let gated = gate.and(Gate::of(&module.attrs));
-                let name = module.ident.to_string();
+                let name = Name::of(&module.ident);
                 match &module.content {
                     Some((_, inner)) => {
-                        let deeper: Vec<String> = inline.iter().cloned().chain([name]).collect();
+                        let deeper: Vec<Name> = inline.iter().cloned().chain([name]).collect();
                         Reader::<F, T>::declared(inner, &deeper, gated)
                     }
                     None => vec![Declared {
@@ -174,11 +175,11 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
             .collect()
     }
 
-    fn path_attribute(module: &ItemMod) -> Option<String> {
+    fn path_attribute(module: &ItemMod) -> Option<PathBuf> {
         module.attrs.iter().filter(|attribute| attribute.path().is_ident(Reader::<F, T>::PATH_ATTRIBUTE)).find_map(
             |attribute| match &attribute.meta {
                 Meta::NameValue(pair) => match &pair.value {
-                    Expr::Lit(ExprLit { lit: Lit::Str(path), .. }) => Some(path.value()),
+                    Expr::Lit(ExprLit { lit: Lit::Str(path), .. }) => Some(PathBuf::from(path.value())),
                     _ => None,
                 },
                 Meta::Path(_) | Meta::List(_) => None,
@@ -193,13 +194,13 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
             Nesting::Beside => directory.clone(),
             Nesting::Below => directory.join(real.file_stem().unwrap_or_default()),
         };
-        let nested = declared.inline.iter().fold(own, |inside, name| inside.join(name));
+        let nested = declared.inline.iter().fold(own, |inside, name| inside.join(name.text()));
         let candidates: Vec<PathBuf> = match &declared.path {
             Some(path) if declared.inline.is_empty() => vec![directory.join(path)],
             Some(path) => vec![nested.join(path)],
             None => vec![
                 nested.join(format!("{}.rs", declared.name)),
-                nested.join(&declared.name).join(Reader::<F, T>::MODULE_FILE),
+                nested.join(declared.name.text()).join(Reader::<F, T>::MODULE_FILE),
             ],
         };
         let chosen = candidates

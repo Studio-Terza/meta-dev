@@ -5,7 +5,7 @@ use crate::finding::{Found, Rule};
 use crate::gate::Gate;
 use crate::source::Source;
 use crate::style::{Reads, Style};
-use crate::terms::Fix;
+use crate::terms::{Fix, Word};
 use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Debug, Default)]
@@ -19,9 +19,9 @@ impl VecOutParams {
     fn vec_out(parameter: &Type) -> Option<()> {
         match parameter {
             Type::Reference(reference) => {
-                reference.mutability.and_then(|_| VecOutParams::last_named(&reference.elem, "Vec")).map(|_| ())
+                reference.mutability.and_then(|_| VecOutParams::last_named(&reference.elem, Word("Vec"))).map(|_| ())
             }
-            Type::Path(_) => VecOutParams::last_named(parameter, "Option")
+            Type::Path(_) => VecOutParams::last_named(parameter, Word("Option"))
                 .and_then(|option| match &option.arguments {
                     PathArguments::AngleBracketed(arguments) => arguments.args.first(),
                     PathArguments::None | PathArguments::Parenthesized(_) => None,
@@ -34,7 +34,7 @@ impl VecOutParams {
         }
     }
 
-    fn last_named<'ty>(ty: &'ty Type, name: &str) -> Option<&'ty syn::PathSegment> {
+    fn last_named(ty: &Type, name: Word) -> Option<&syn::PathSegment> {
         match ty {
             Type::Path(TypePath { path, .. }) => path.segments.last().filter(|segment| segment.ident == name),
             _ => None,
