@@ -34,6 +34,7 @@ pub struct Backtest {
     split: Split,
     set: Set,
     every: usize,
+    offset: usize,
 }
 
 #[derive(strum::Display, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
@@ -107,7 +108,7 @@ impl Backtest {
     const CONCURRENT: usize = 8;
     const HEADER: &'static str = "set\tsplit\tindex\tgold\tretrieved\tfound\trecall\tmillis\ttokens\n";
 
-    pub fn spoken([tree, session, pairs, rows, split, set, every]: [&&str; 7]) -> Result<Backtest, Failure> {
+    pub fn spoken([tree, session, pairs, rows, split, set, every, offset]: [&&str; 8]) -> Result<Backtest, Failure> {
         Ok(Backtest {
             tree: PathBuf::from(tree),
             session: PathBuf::from(session),
@@ -116,6 +117,7 @@ impl Backtest {
             split: Split::named(split)?,
             set: Set::named(set)?,
             every: every.parse::<usize>().map_err(|_unparsed| Failure::Usage)?,
+            offset: offset.parse::<usize>().map_err(|_unparsed| Failure::Usage)?,
         })
     }
 
@@ -135,7 +137,7 @@ impl Backtest {
         let chosen: Vec<&Case<'_>> = cases
             .iter()
             .filter(|case| case.set == self.set && case.split == self.split)
-            .filter(|case| case.index.checked_rem(self.every).is_none_or(|left| left == 0))
+            .filter(|case| case.index.checked_rem(self.every).is_none_or(|left| left == self.offset))
             .collect();
         files.write(&self.rows, Bytes::from(Backtest::HEADER))?;
         let walking = Walking::new(crew);

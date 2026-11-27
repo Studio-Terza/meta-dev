@@ -57,8 +57,8 @@ impl Command {
             [Self::HOOK, event] => Hook::named(event).map(Command::Hook),
             [Self::WALK, tree] => Ok(Command::Walk(Walk::from(PathBuf::from(tree)))),
             [Self::PAIRS, tree, session, pairs] => Ok(Command::Pairs(Pairs::new([tree, session, pairs]))),
-            [Self::BACKTEST, tree, session, pairs, rows, split, set, every] => {
-                Backtest::spoken([tree, session, pairs, rows, split, set, every]).map(Command::Backtest)
+            [Self::BACKTEST, tree, session, pairs, rows, split, set, every, offset] => {
+                Backtest::spoken([tree, session, pairs, rows, split, set, every, offset]).map(Command::Backtest)
             }
             _ => Err(Failure::Usage),
         }

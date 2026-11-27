@@ -13,7 +13,7 @@ use crate::Outcome;
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
     #[error(
-        "usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | --settings) | walk <tree> | pairs <tree> <session> <pairs> | backtest <tree> <session> <pairs> <rows> (tune | test) (stop | pair) <every>)"
+        "usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | --settings) | walk <tree> | pairs <tree> <session> <pairs> | backtest <tree> <session> <pairs> <rows> (tune | test) (stop | pair) <every> <offset>)"
     )]
     Usage,
     #[error("a walking thread panicked")]

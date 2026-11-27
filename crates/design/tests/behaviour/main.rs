@@ -620,9 +620,10 @@ fn words_the_cli_does_not_know_are_refused_with_the_usage() -> Result<(), Failed
         &["backtest", "tree.json"][..],
         &["backtest", "tree.json", "session.jsonl", "pairs.jsonl"][..],
         &["backtest", "tree.json", "session.jsonl", "pairs.jsonl", "rows.tsv", "tune", "stop"][..],
-        &["backtest", "tree.json", "session.jsonl", "pairs.jsonl", "rows.tsv", "dev", "stop", "1"][..],
-        &["backtest", "tree.json", "session.jsonl", "pairs.jsonl", "rows.tsv", "tune", "brute", "1"][..],
-        &["backtest", "tree.json", "session.jsonl", "pairs.jsonl", "rows.tsv", "tune", "stop", "one"][..],
+        &["backtest", "tree.json", "session.jsonl", "pairs.jsonl", "rows.tsv", "dev", "stop", "1", "0"][..],
+        &["backtest", "tree.json", "session.jsonl", "pairs.jsonl", "rows.tsv", "tune", "brute", "1", "0"][..],
+        &["backtest", "tree.json", "session.jsonl", "pairs.jsonl", "rows.tsv", "tune", "stop", "one", "0"][..],
+        &["backtest", "tree.json", "session.jsonl", "pairs.jsonl", "rows.tsv", "tune", "stop", "1", "-1"][..],
         &["pairs", "tree.json", "session.jsonl"][..],
         &[][..],
     ] {
@@ -706,7 +707,7 @@ fn a_backtest_scores_each_logged_stop_against_the_owner_words_it_quoted() -> Res
         Choice::new(QUESTION, "[1]"),
         Choice::new(ASKED_NEXT, "[1, 2]"),
     ]);
-    let said = home.said(&["backtest", &tree, &session, &pairs, &home.rows(), "test", "stop", "1"], "", &replies);
+    let said = home.said(&["backtest", &tree, &session, &pairs, &home.rows(), "test", "stop", "1", "0"], "", &replies);
     let rows = [
         "set\tsplit\tindex\tgold\tretrieved\tfound\trecall\tmillis\ttokens\n".to_owned(),
         format!("stop\ttest\t1\t1\t3\t1\t1.000\t{STEP}\t14\n"),
@@ -740,7 +741,7 @@ fn a_backtest_of_one_split_walks_only_its_stops_and_counts_a_missed_quote_agains
     ])?;
     let pairs = home.paired(&[])?;
     let replies = Replies::choosing(&[Choice::new(RULINGS, "[1]"), Choice::new(QUESTION, "[1]")]);
-    let said = home.said(&["backtest", &tree, &session, &pairs, &home.rows(), "tune", "stop", "1"], "", &replies);
+    let said = home.said(&["backtest", &tree, &session, &pairs, &home.rows(), "tune", "stop", "1", "0"], "", &replies);
     assert_eq!(replies.prompts().len(), 2);
     assert_eq!(
         said.shown,
@@ -772,16 +773,16 @@ fn a_backtest_of_pairs_walks_every_nth_question_of_its_split_and_drops_answers_o
         serde_json::json!({"at": 3_usize, "question": "Shall I merge it now?", "answer_uuid": "o1"}),
         serde_json::json!({"at": 4_usize, "question": "Is the second part done?", "answer_uuid": "p2"}),
     ])?;
-    let replies = Replies::choosing(&[Choice::new(RULINGS, "[1]"), Choice::new(FORCING, "[1]")]);
-    let said = home.said(&["backtest", &tree, &session, &pairs, &home.rows(), "tune", "pair", "2"], "", &replies);
-    assert_eq!(replies.prompts().len(), 2);
+    let replies = Replies::choosing(&[Choice::new(RULINGS, "[1]"), Choice::new("walk then", "[2]")]);
+    let said = home.said(&["backtest", &tree, &session, &pairs, &home.rows(), "tune", "pair", "2", "1"], "", &replies);
+    assert_eq!(replies.prompts().len(), 1);
     assert_eq!(
         said.shown,
         [
             "set\tsplit\tindex\tgold\tretrieved\tfound\trecall\tmillis\ttokens\n",
-            &format!("pair\ttune\t0\t1\t2\t0\t0.000\t{STEP}\t14\n"),
+            &format!("pair\ttune\t1\t1\t1\t1\t1.000\t{STEP}\t7\n"),
             "summary\tset\tsplit\tcases\trecall\tfull\tretrieved\tmillis\tp90\ttokens\n",
-            &format!("summary\tpair\ttune\t1\t0.000\t0.000\t2\t{STEP}\t{STEP}\t14\n"),
+            &format!("summary\tpair\ttune\t1\t1.000\t1.000\t1\t{STEP}\t{STEP}\t7\n"),
             "brute\tstops\tmillis\tp90\ttokens\n",
             "brute\t0\t0\t0\t0\n",
             "extra\tsplit\tindex\tuuid\tstop\tmessage\n",
