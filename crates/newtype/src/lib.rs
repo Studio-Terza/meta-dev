@@ -7,7 +7,7 @@ pub use boundary::{Checked, Counter, Guarded, Newtype, Wrapping, kind};
 pub use enumerated::Enumerated;
 pub use ignored::Ignored;
 pub use invariants::Ignoring;
-pub use newtype_derive::{Arbitrary, CheckedDeserialize, Deserialize, Display, Listed, Newtype, Serialize, Spelled};
+pub use newtype_derive::{Arbitrary, CheckedDeserialize, Display, Listed, Newtype, Spelled};
 pub use stored::{Inner, Listed, Optional, Spelled, Stored, Validated};
 
 pub use proptest;

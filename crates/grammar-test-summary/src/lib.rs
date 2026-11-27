@@ -2,4 +2,4 @@
 
 mod boundary;
 
-pub use boundary::{Opened, Summary};
+pub use boundary::Summary;
