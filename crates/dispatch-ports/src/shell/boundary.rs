@@ -15,7 +15,13 @@ pub struct Spoken(String);
 
 impl From<&Call> for Spoken {
     fn from(call: &Call) -> Spoken {
-        Spoken([call.program].into_iter().chain(call.arguments.iter().map(String::as_str)).collect::<Vec<&str>>().join(" "))
+        Spoken(
+            [call.program]
+                .into_iter()
+                .chain(call.arguments.iter().map(String::as_str))
+                .collect::<Vec<&str>>()
+                .join(" "),
+        )
     }
 }
 

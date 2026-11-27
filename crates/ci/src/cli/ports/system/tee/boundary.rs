@@ -1,13 +1,13 @@
 use std::io::{self, Write};
 
 #[derive(Debug)]
-pub struct Tee<First, Second> {
+pub(crate) struct Tee<First, Second> {
     first: First,
     second: Second,
 }
 
 impl<First: Write, Second: Write> Tee<First, Second> {
-    pub fn new(first: First, second: Second) -> Tee<First, Second> {
+    pub(crate) fn new(first: First, second: Second) -> Tee<First, Second> {
         Tee { first, second }
     }
 }

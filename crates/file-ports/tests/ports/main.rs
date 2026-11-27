@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use file_ports::{Bytes,Cached, Disk, Files, Kind, Memory, Offset};
+use file_ports::{Bytes, Cached, Disk, Files, Kind, Memory, Offset};
 use newtype::Wrapping;
 use proptest::prelude::{any, prop_assert_eq, proptest};
 

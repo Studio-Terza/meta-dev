@@ -11,10 +11,10 @@ use proptest::prelude::{any, prop_assert, prop_assert_eq, proptest};
 use test_failure::Failed;
 
 use dispatch_ports::{
-    Agent, AgentRun, AnsweringShell, Call, Clock, Deadline, Dispatch, DispatchFailure, Ended, Finished,
-    HeadlessClaude, Job, MemoryClock, Model, Moment, Output, Pause, Pid, Printed, Prompt, Ran, ReplayedDispatch,
-    Reply, Shell, Spoken, Stall, Started, Stderr, SystemClock, SystemShell, Timeout, Tokens, Usage, Wall, Watch,
-    Watched, Woke, clock_ops, dispatch_ops, shell_ops,
+    Agent, AgentRun, AnsweringShell, Call, Clock, Deadline, Dispatch, DispatchFailure, Ended, Finished, HeadlessClaude,
+    Job, MemoryClock, Model, Moment, Output, Pause, Pid, Printed, Prompt, Ran, ReplayedDispatch, Reply, Shell, Spoken,
+    Stall, Started, Stderr, SystemClock, SystemShell, Timeout, Tokens, Usage, Wall, Watch, Watched, Woke, clock_ops,
+    dispatch_ops, shell_ops,
 };
 use newtype::Counter;
 use port_core::{Released, Run};

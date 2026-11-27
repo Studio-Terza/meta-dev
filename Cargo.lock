@@ -69,7 +69,6 @@ dependencies = [
  "serde",
  "serde_json",
  "strum",
- "test-failure",
  "text-lines",
  "thiserror",
  "toml",
