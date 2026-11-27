@@ -10,7 +10,7 @@ use transcript_ports::ReadFailure;
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
     #[error(
-        "usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | subagent-stop | post-tool-use | --settings))"
+        "usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | subagent-stop | pre-tool-use | post-tool-use | --settings))"
     )]
     Usage,
     #[error("the environment does not name {0:?}")]

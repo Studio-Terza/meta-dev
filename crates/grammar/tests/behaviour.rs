@@ -1,5 +1,5 @@
 use fixture::{Cases, Debugged, Failed, Fixture, Spelled};
-use grammar::{Bare, Fields, Ignoring, Inked, Letters, Lines, MigrationFile, Stamp, Unlexed};
+use grammar::{Bare, Fields, Ignoring, Inked, Letters, Lines, MigrationFile, Nested, Stamp, Unlexed};
 use serde::Deserialize;
 
 #[derive(Fixture, Deserialize, Debug)]
@@ -10,6 +10,7 @@ struct Texts {
     slugs: Vec<Spelled>,
     migrations: Vec<Spelled>,
     bare: Vec<Spelled>,
+    shell: Vec<Spelled>,
 }
 
 #[test]
@@ -48,7 +49,12 @@ fn every_lexer_reads_its_fixture_texts_as_its_golden_says() -> Result<(), Failed
             })
             .collect();
         let bare: Vec<_> = texts.bare.iter().map(|text| (text, Bare::word(text.as_str()))).collect();
-        Ok(Debugged((lines, stamps, replies, slugs, migrations, bare)).to_string())
+        let shell: Vec<_> = texts
+            .shell
+            .iter()
+            .map(|text| (text, Nested::read(text.as_str()).map(|nested| (nested.flagged(), nested.construct()))))
+            .collect();
+        Ok(Debugged((lines, stamps, replies, slugs, migrations, bare, shell)).to_string())
     })?;
     assert_eq!(drifted, Vec::new());
     Ok(())

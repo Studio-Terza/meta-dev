@@ -1,18 +1,21 @@
+use std::collections::BTreeSet;
 use std::fmt;
-use std::path::PathBuf;
+use std::path::{Component, PathBuf};
 
 use grammar::{Fields, Lines};
 
-use super::{Deletion, Row};
 use crate::boundary::Said;
 use crate::failure::Failure;
 
 #[derive(Debug)]
 pub(super) struct Shards(usize);
 
+#[derive(Debug)]
+pub(super) struct Changed;
+
 impl Shards {
-    pub(super) fn sharing(untested: usize, per_shard: usize) -> Shards {
-        Shards(untested.div_ceil(per_shard).max(1))
+    pub(super) fn sharing(selected: usize, per_shard: usize) -> Shards {
+        Shards(selected.div_ceil(per_shard).max(1))
     }
 
     pub(super) fn count(&self) -> usize {
@@ -20,25 +23,25 @@ impl Shards {
     }
 }
 
-impl Row {
-    const UNTOUCHED: &'static str = "0";
+impl Changed {
+    const TESTS: &'static str = "tests";
 
-    pub(super) fn read(numstat: &str) -> Result<Vec<Row>, Failure> {
-        numstat
+    pub(super) fn tested(numstat: &str) -> Result<BTreeSet<PathBuf>, Failure> {
+        let tests = Component::Normal(Changed::TESTS.as_ref());
+        let paths: Vec<PathBuf> = numstat
             .parse::<Lines>()
             .into_iter()
             .flatten()
             .map(|line| match line.parse::<Fields>().as_ref().map(AsRef::as_ref) {
-                Ok([_, deleted, path]) => Ok(Row { deleted: Deletion::counted(deleted), path: PathBuf::from(path) }),
+                Ok([_, _, path]) => Ok(PathBuf::from(path)),
                 Ok(_) | Err(_) => Err(Failure::Numstat(Said::spoken(&line))),
             })
-            .collect()
-    }
-}
-
-impl Deletion {
-    fn counted(deleted: &str) -> Deletion {
-        if deleted == Row::UNTOUCHED { Deletion::Untouched } else { Deletion::Lost }
+            .collect::<Result<_, Failure>>()?;
+        Ok(paths
+            .into_iter()
+            .filter(|path| path.components().any(|part| part == tests))
+            .map(|path| path.components().take_while(|part| *part != tests).collect())
+            .collect())
     }
 }
 

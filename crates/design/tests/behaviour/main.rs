@@ -6,8 +6,8 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
-use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, SystemTime};
 use test_failure::Failed;
 
@@ -26,6 +26,7 @@ use port_core::Pass;
 use serde::Deserialize;
 use serde_json::Value;
 use sqlite_ports::SqliteOpener;
+use store_ports::{Opens, Schema};
 use tempfile::TempDir;
 
 use ports::Design;
@@ -56,15 +57,8 @@ const TRIMMING: u32 = 1;
 const READING: u32 = 2;
 const STEP: i64 = 5;
 const READS: i64 = 10_000;
-const STORE: &str = ".meta/design.sqlite";
 const PLACED: &str = "placed";
 const MERGEABLE: &str = "pr view 12 --json mergeable -R o/r";
-
-static MIGRATED: LazyLock<Result<Vec<u8>, Failed>> = LazyLock::new(|| {
-    let home = Home::new()?;
-    home.said(&["stops"], "", &Replies::default());
-    Ok(fs::read(home.workspace().join(STORE))?)
-});
 
 #[derive(Debug)]
 struct Stepping {
@@ -252,6 +246,25 @@ struct Said {
     answer: console_ports::Answer,
 }
 
+#[derive(Debug, Default)]
+struct InMemoryStoresByPath {
+    stores: Mutex<BTreeMap<PathBuf, Sqlite>>,
+}
+
+type Sqlite = <SqliteOpener as Opens>::Store;
+
+impl Opens for &InMemoryStoresByPath {
+    type Store = Sqlite;
+
+    fn file<S: Schema>(&self, path: PathBuf) -> Sqlite {
+        self.stores.lock().unpoisoned().entry(path).or_insert_with(|| SqliteOpener.in_memory::<S>()).clone()
+    }
+
+    fn in_memory<S: Schema>(&self) -> Sqlite {
+        SqliteOpener.in_memory::<S>()
+    }
+}
+
 #[derive(Debug)]
 struct Rerooted {
     temporary: PathBuf,
@@ -317,11 +330,12 @@ impl FilesFiller for Rerooted {
 struct Home {
     directory: TempDir,
     at: SystemTime,
+    stores: InMemoryStoresByPath,
 }
 
 impl Home {
     fn new() -> Result<Home, Failed> {
-        let home = Home { directory: TempDir::new()?, at: SystemTime::now() };
+        let home = Home { directory: TempDir::new()?, at: SystemTime::now(), stores: InMemoryStoresByPath::default() };
         fs::create_dir_all(home.workspace().join(".meta"))?;
         home.configured(LOCAL)?;
         Ok(home)
@@ -405,6 +419,17 @@ impl Home {
         self.heard(&["hook", "post-tool-use"], &input.to_string(), &Replies::default(), github)
     }
 
+    fn ran(&self, command: &str) -> Said {
+        let input = serde_json::json!({
+            "session_id": "s",
+            "hook_event_name": "PreToolUse",
+            "cwd": AGENT,
+            "tool_name": "Bash",
+            "tool_input": {"command": command, "description": "run it"},
+        });
+        self.heard(&["hook", "pre-tool-use"], &input.to_string(), &Replies::default(), &GitHub::default())
+    }
+
     fn heard(&self, arguments: &[&str], input: &str, replies: &Replies, github: &GitHub) -> Said {
         let environment: Variables = [
             (OsString::from("HOME"), self.path().as_os_str().to_owned()),
@@ -417,7 +442,7 @@ impl Home {
         let files = Rerooted { temporary: self.path().join("tmp") };
         let clock = Stepping::at(self.at);
         let agents = Agents::new(|_kept: PathBuf| Agent { replies }, clock, Gh { github });
-        let uttered = Cli::new(&environment, files, SqliteOpener, agents).rooted(words);
+        let uttered = Cli::new(&environment, files, &self.stores, agents).rooted(words);
         let shown = AsRef::<Shown>::as_ref(&uttered).clone();
         let ended = uttered.ended();
         let answer = console_ports::Answer::reported(ended.as_ref()).showing(&shown);
@@ -555,9 +580,6 @@ impl Scenario {
 
     fn shown(&self) -> Result<String, Failed> {
         let home = Home::answered()?;
-        let migrated = MIGRATED.as_ref().map_err(|failed| Failed::from(format!("{failed:?}")))?;
-        fs::create_dir_all(home.workspace().join(".meta"))?;
-        fs::write(home.workspace().join(STORE), migrated)?;
         let replies = (self.replies)()?;
         (self.setup)(&home)?;
         let ran: Vec<String> = self
@@ -711,6 +733,7 @@ struct Finish {
 enum Hooked {
     #[default]
     SubagentStop,
+    PreToolUse,
     PostToolUse,
 }
 
@@ -796,6 +819,7 @@ impl Story {
                 let github = GitHub::answering(&finish.answers.iter().map(Scripted::answer).collect::<Vec<_>>());
                 let said = match finish.hook {
                     Hooked::SubagentStop => home.finished(&finish.said, finish.turn == Turn::Reminded, &github),
+                    Hooked::PreToolUse => home.ran(&finish.said),
                     Hooked::PostToolUse => home.used(&finish.said, &github),
                 };
                 let timeline = github.timeline(home.at);
@@ -868,6 +892,7 @@ fn the_hook_settings_are_printed_as_json_at_exit_zero() -> Result<(), Failed> {
     let settings: Value = serde_json::from_str(&exited.out)?;
     assert_eq!((exited.code, exited.err), (ExitCode::SUCCESS, String::new()));
     assert!(settings.pointer("/hooks/Stop/0/hooks/0/command").and_then(Value::as_str).is_some());
+    assert_eq!(settings.pointer("/hooks/PreToolUse/0/matcher").and_then(Value::as_str), Some("Bash"));
     Ok(())
 }
 
