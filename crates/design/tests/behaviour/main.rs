@@ -882,8 +882,16 @@ fn the_design_binary_wires_the_real_ports_and_reads_its_event_from_standard_inpu
     fs::create_dir_all(home.path().join(".claude/projects").join(slug))?;
     let rooted = ["--workspace", &workspace.to_string_lossy(), "hook", "stop"].map(str::to_owned);
     let words: Vec<&str> = rooted.iter().map(String::as_str).collect();
-    let continuing = Design::fed(home.path(), &words, "{\"stop_hook_active\":true}")?;
-    assert_eq!((continuing.status.code(), continuing.stdout, continuing.stderr), (Some(0_i32), Vec::new(), Vec::new()));
+    let unreadable = Design::fed(home.path(), &words, "not json")?;
+    assert_eq!((unreadable.status.code(), unreadable.stdout), (Some(1_i32), Vec::new()));
+    assert!(String::from_utf8(unreadable.stderr)?.contains("cannot read the hook input: "));
+    Ok(())
+}
+
+#[test]
+fn a_continuing_stop_hook_exits_at_zero_and_prints_nothing() -> Result<(), Failed> {
+    let exited = Home::answered()?.said(&["hook", "stop"], "{\"stop_hook_active\":true}", &Replies::default()).exited();
+    assert_eq!(exited, Exited { code: ExitCode::SUCCESS, out: String::new(), err: String::new() });
     Ok(())
 }
 
