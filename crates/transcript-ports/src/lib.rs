@@ -29,9 +29,9 @@ pub use read_failure::ReadFailure;
 pub use record::Record;
 pub use session::Session;
 pub use session_id::SessionId;
-pub use skipped::Skipped;
+pub(crate) use skipped::Skipped;
 pub use transcripts::{Transcripts, transcripts_ops};
-pub use unrecognised::Unrecognised;
+pub(crate) use unrecognised::Unrecognised;
 
 invariants::ignored! {
     pub(crate) enum Ignored {

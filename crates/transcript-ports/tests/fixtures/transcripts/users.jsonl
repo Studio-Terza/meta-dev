@@ -1,0 +1,25 @@
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","origin":{"kind":"human"},"message":{"content":"typed"}}
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","origin":{"kind":"human"},"message":{"content":[{"type":"image","source":{}},{"type":"text","text":"look"}]}}
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","origin":{"kind":"brand-new-kind"},"message":{"content":"hello"}}
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","origin":{"kind":"brand-new-kind"},"message":{"content":[{"type":"tool_result","content":"out"}]}}
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","origin":{"kind":"human"},"message":{"content":[{"type":"document"},{"type":"text","text":"a"}]}}
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","origin":{"kind":"human"},"message":{"content":[{"type":"tool_result","content":"out"}]}}
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","origin":{"kind":"human"},"isSidechain":true,"isMeta":true,"message":{"content":"relayed"}}
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","origin":{"kind":"task-notification"},"message":{"content":"finished"}}
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","origin":{"kind":"task-notification"},"isSidechain":true,"isMeta":true,"message":{"content":"finished"}}
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","origin":{"kind":"coordinator"},"isSidechain":true,"isMeta":true,"message":{"content":"go"}}
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","origin":{"kind":"peer"},"isMeta":true,"message":{"content":"hello"}}
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","origin":{"kind":"peer"},"isSidechain":true,"isMeta":true,"message":{"content":"hello"}}
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","origin":{"kind":"unclassified"},"isSidechain":true,"message":{"content":[{"type":"tool_result","content":"out"}]}}
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","origin":{"kind":"unclassified"},"isSidechain":true,"message":{"content":"brief"}}
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","origin":{"kind":"auto-continuation"},"isMeta":true,"message":{"content":"continue"}}
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","origin":null,"message":{"content":[{"type":"tool_result","content":"out"}]}}
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","isSidechain":true,"message":{"content":[{"type":"tool_result","content":"out"}]}}
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","message":{"content":"<command-name>/compact</command-name>"}}
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","isMeta":true,"message":{"content":"caveat"}}
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","isSidechain":true,"message":{"content":"brief"}}
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","isSidechain":true,"isMeta":true,"message":{"content":"brief"}}
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","message":{"content":[{"type":"text","text":"[Request interrupted by user]"}]}}
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","isMeta":true,"message":{"content":[{"type":"text","text":"skill"}]}}
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","isSidechain":true,"message":{"content":[{"type":"text","text":"a"},{"type":"tool_result","content":"b"}]}}
+{"type":"user","uuid":"8","parentUuid":"1","sessionId":"s1","timestamp":"2026-01-01T00:00:08Z","isCompactSummary":true,"isVisibleInTranscriptOnly":true,"message":{"content":"summary"}}

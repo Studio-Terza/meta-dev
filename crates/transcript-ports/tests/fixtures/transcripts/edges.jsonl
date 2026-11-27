@@ -1,0 +1,3 @@
+{"type":"assistant","uuid":"2","parentUuid":null,"sessionId":"s1","timestamp":"2026-01-01T00:00:02Z","origin":null,"message":{"model":"claude","content":[{"type":"text","text":"first"},{"type":"tool_use"},{"type":"text","text":"second"}]}}
+{"type":"system","subtype":"turn_duration","uuid":"5","parentUuid":"2","sessionId":"s1"}
+{"type":"permission-mode","sessionId":"s1"}
