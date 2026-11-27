@@ -18,6 +18,7 @@ test = false
 console-ports = { path = "../console-ports" }
 file-ports = { path = "../file-ports" }
 invariants = { path = "../invariants" }
+newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 proc-macro2.workspace = true
 rayon = "1.12.0"

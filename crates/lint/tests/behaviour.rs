@@ -1,212 +1,213 @@
 use std::ffi::OsString;
-use std::fmt;
-use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Memory};
+use file_ports::{Bytes, Disk, Files, Memory};
 use lint::{Cli, Verdict};
 use test_failure::Failed;
 use timer_ports::Monotonic;
 
-const FIXTURES: &str = "tests/fixtures";
 const GOLDENS: &str = "tests/goldens";
-const STORED_MANIFEST: &str = "manifest.toml";
-const MANIFEST: &str = "Cargo.toml";
+const GOLDEN_EXTENSION: &str = "txt";
 const RECORD: &str = "RECORD_GOLDENS";
+const NEWLINE: char = '\n';
+const SPACE: char = ' ';
+const OUT: &str = "--- out\n";
+const ERR: &str = "--- err\n";
+const MANIFEST: &str = "Cargo.toml";
+const SOURCE: &str = "src/lib.rs";
+const FREE: &str = "tests/.fixtures/current";
+const FREE_SOURCE: &str = "tests/.fixtures/current/src/lib.rs";
+const DEEP_MANIFEST: &str = "tests/.fixtures/deep/Cargo.toml";
+const DEEP_HEAD: &str = "struct Deep;\nimpl Deep {\n    fn deep() -> Deep {\n        ";
+const DEEP_CORE: &str = "Deep";
+const DEEP_TAIL: &str = "\n    }\n}\n";
+const OPEN: &str = "(";
+const CLOSE: &str = ")";
 const DEPTH: usize = 5_000;
-const FREE_FN: &str = "free functions are not allowed; make them associated functions or methods:\nsrc/lib.rs:1: fn free; make it an associated function or a method\n";
+const WORKSPACE: &str = "tests/.fixtures/workspace";
+const UNWRITABLE: &str = "tests/goldens/unwritable.txt";
+const UNPACKAGED: &str = "tests/goldens/unpackaged.txt";
+const PACKAGED: &str = "tests/goldens/packaged.txt";
+const DEEP: &str = "tests/goldens/deep.txt";
+const REPORT: &str = "--report";
 
 #[derive(Debug)]
 struct Case {
     golden: &'static str,
     fixture: &'static str,
-    mount: &'static str,
     arguments: &'static [&'static str],
 }
 
 #[derive(Debug)]
-struct Entry {
-    path: PathBuf,
-    bytes: Bytes,
-}
-
-#[derive(Debug)]
-struct Shown {
+struct Said {
     verdict: Verdict,
-    out: String,
-    err: String,
+    word: &'static str,
 }
 
-#[derive(Debug)]
-struct Unwritable;
-
-const LINTS: [&str; 13] = [
-    "bool_methods",
-    "expression_flow",
-    "manual_iteration",
-    "named_lifetimes",
-    "no_comments",
-    "no_dyn",
-    "no_free_fns",
-    "no_test_only_api",
-    "process_starters",
-    "public_api_tests",
-    "public_surface",
-    "type_shape",
-    "vec_out_params",
+const SAID: [Said; 3] = [
+    Said { verdict: Verdict::Clean, word: "Clean\n" },
+    Said { verdict: Verdict::Violations, word: "Violations\n" },
+    Said { verdict: Verdict::Refused, word: "Refused\n" },
 ];
 
-const CASES: [Case; 13] = [
-    Case { golden: "workspace", fixture: "workspace", mount: ".", arguments: &["."] },
-    Case { golden: "workspace_report", fixture: "workspace", mount: ".", arguments: &["--report", "."] },
-    Case { golden: "workspace_timings", fixture: "workspace", mount: ".", arguments: &["--timings", "."] },
-    Case { golden: "two_roots", fixture: "workspace", mount: ".", arguments: &["--report", "app", "store-ports"] },
-    Case { golden: "mounted", fixture: "no_dyn", mount: "/corpus", arguments: &["/corpus"] },
-    Case { golden: "flow", fixture: "flow", mount: ".", arguments: &["."] },
-    Case { golden: "starters", fixture: "starters", mount: ".", arguments: &["."] },
-    Case { golden: "surface", fixture: "surface", mount: ".", arguments: &["."] },
-    Case { golden: "test_code", fixture: "test_code", mount: ".", arguments: &["."] },
-    Case { golden: "broken", fixture: "broken", mount: ".", arguments: &["."] },
-    Case { golden: "broken_report", fixture: "broken", mount: ".", arguments: &["--report", "."] },
-    Case { golden: "bad_manifest", fixture: "bad_manifest", mount: ".", arguments: &["."] },
-    Case { golden: "unreadable", fixture: "bad_manifest", mount: "/corpus", arguments: &["/nowhere", "/corpus/notes"] },
+const CASES: [Case; 29] = [
+    Case {
+        golden: "bool_methods",
+        fixture: "tests/.fixtures/bool_methods",
+        arguments: &["tests/.fixtures/bool_methods"],
+    },
+    Case { golden: "dead_code", fixture: "tests/.fixtures/dead_code", arguments: &["tests/.fixtures/dead_code"] },
+    Case {
+        golden: "expression_flow",
+        fixture: "tests/.fixtures/expression_flow",
+        arguments: &["tests/.fixtures/expression_flow"],
+    },
+    Case {
+        golden: "manual_iteration",
+        fixture: "tests/.fixtures/manual_iteration",
+        arguments: &["tests/.fixtures/manual_iteration"],
+    },
+    Case {
+        golden: "named_lifetimes",
+        fixture: "tests/.fixtures/named_lifetimes",
+        arguments: &["tests/.fixtures/named_lifetimes"],
+    },
+    Case { golden: "no_comments", fixture: "tests/.fixtures/no_comments", arguments: &["tests/.fixtures/no_comments"] },
+    Case { golden: "no_dyn", fixture: "tests/.fixtures/no_dyn", arguments: &["tests/.fixtures/no_dyn"] },
+    Case { golden: "no_free_fns", fixture: "tests/.fixtures/no_free_fns", arguments: &["tests/.fixtures/no_free_fns"] },
+    Case {
+        golden: "no_test_only_api",
+        fixture: "tests/.fixtures/no_test_only_api",
+        arguments: &["tests/.fixtures/no_test_only_api"],
+    },
+    Case {
+        golden: "primitive_boundary",
+        fixture: "tests/.fixtures/primitive_boundary",
+        arguments: &["tests/.fixtures/primitive_boundary"],
+    },
+    Case {
+        golden: "process_starters",
+        fixture: "tests/.fixtures/process_starters",
+        arguments: &["tests/.fixtures/process_starters"],
+    },
+    Case {
+        golden: "public_api_tests",
+        fixture: "tests/.fixtures/public_api_tests",
+        arguments: &["tests/.fixtures/public_api_tests"],
+    },
+    Case {
+        golden: "public_surface",
+        fixture: "tests/.fixtures/public_surface",
+        arguments: &["tests/.fixtures/public_surface"],
+    },
+    Case { golden: "test_shape", fixture: "tests/.fixtures/test_shape", arguments: &["tests/.fixtures/test_shape"] },
+    Case { golden: "type_shape", fixture: "tests/.fixtures/type_shape", arguments: &["tests/.fixtures/type_shape"] },
+    Case {
+        golden: "vec_out_params",
+        fixture: "tests/.fixtures/vec_out_params",
+        arguments: &["tests/.fixtures/vec_out_params"],
+    },
+    Case { golden: "workspace", fixture: WORKSPACE, arguments: &[WORKSPACE] },
+    Case { golden: "workspace_report", fixture: WORKSPACE, arguments: &[REPORT, WORKSPACE] },
+    Case { golden: "workspace_timings", fixture: WORKSPACE, arguments: &["--timings", WORKSPACE] },
+    Case {
+        golden: "two_roots",
+        fixture: WORKSPACE,
+        arguments: &[REPORT, "tests/.fixtures/workspace/app", "tests/.fixtures/workspace/store-ports"],
+    },
+    Case { golden: "flow", fixture: "tests/.fixtures/flow", arguments: &["tests/.fixtures/flow"] },
+    Case { golden: "starters", fixture: "tests/.fixtures/starters", arguments: &["tests/.fixtures/starters"] },
+    Case { golden: "surface", fixture: "tests/.fixtures/surface", arguments: &["tests/.fixtures/surface"] },
+    Case { golden: "test_code", fixture: "tests/.fixtures/test_code", arguments: &["tests/.fixtures/test_code"] },
+    Case { golden: "broken", fixture: "tests/.fixtures/broken", arguments: &["tests/.fixtures/broken"] },
+    Case { golden: "broken_report", fixture: "tests/.fixtures/broken", arguments: &[REPORT, "tests/.fixtures/broken"] },
+    Case {
+        golden: "bad_manifest",
+        fixture: "tests/.fixtures/bad_manifest",
+        arguments: &["tests/.fixtures/bad_manifest"],
+    },
+    Case {
+        golden: "unreadable",
+        fixture: "tests/.fixtures/bad_manifest",
+        arguments: &["/nowhere", "tests/.fixtures/bad_manifest/notes"],
+    },
+    Case { golden: "mounted", fixture: "tests/.fixtures/no_dyn", arguments: &["./tests/.fixtures/no_dyn"] },
 ];
 
 #[test]
 fn every_case_prints_its_golden_output() -> Result<(), Failed> {
-    let named = LINTS.map(|lint| Case { golden: lint, fixture: lint, mount: ".", arguments: &["."] });
-    let drifted: Vec<String> = named
+    let drifted = CASES
         .iter()
-        .chain(CASES.iter())
-        .map(Case::drifted)
-        .collect::<Result<Vec<Option<String>>, Failed>>()?
-        .into_iter()
-        .flatten()
-        .collect();
-    assert_eq!(drifted, Vec::<String>::new());
+        .map(|case| {
+            let files = Memory::default();
+            Disk.mirror(Path::new(case.fixture), &files)?;
+            let mut out = Vec::new();
+            let mut err = Vec::new();
+            let given = case.arguments.iter().map(OsString::from);
+            let verdict = Cli::from_args(given).verdict(&files, Monotonic::default(), &mut out, &mut err);
+            let letters: Vec<char> = String::from_utf8(out)?.chars().collect();
+            let unnumbered: String = letters
+                .chunk_by(|letter, _| *letter != NEWLINE)
+                .flat_map(|line| line.iter().skip_while(|letter| **letter == SPACE || letter.is_ascii_digit()))
+                .collect();
+            let said = SAID.iter().filter(|said| said.verdict == verdict).map(|said| said.word);
+            let shown: String = said.chain([OUT, &unnumbered, ERR, &String::from_utf8(err)?]).collect();
+            let golden = Path::new(GOLDENS).join(case.golden).with_extension(GOLDEN_EXTENSION);
+            std::env::var_os(RECORD).map_or(Ok(()), |_| Disk.write(&golden, Bytes::new(shown.clone().into_bytes())))?;
+            let expected = Disk.read_text(&golden)?;
+            Ok((expected.as_ref() != shown).then_some(case.golden))
+        })
+        .collect::<Result<Vec<Option<&str>>, Failed>>()?;
+    assert_eq!(drifted.into_iter().flatten().collect::<Vec<&str>>(), Vec::<&str>::new());
     Ok(())
 }
 
 #[test]
 fn no_argument_reads_the_current_directory() -> Result<(), Failed> {
-    let files: Memory = [(PathBuf::from("src/lib.rs"), Bytes::new(b"fn free() {}\n".to_vec()))].into_iter().collect();
-    let unpackaged = Shown::ran(&files, &[])?;
-    assert_eq!((unpackaged.verdict, unpackaged.err.as_str()), (Verdict::Refused, "no Rust sources found under .\n"));
-    let manifested: Memory = [
-        (PathBuf::from(MANIFEST), Bytes::new(b"[package]\nname = \"p\"\n".to_vec())),
-        (PathBuf::from("src/lib.rs"), Bytes::new(b"fn free() {}\n".to_vec())),
-    ]
-    .into_iter()
-    .collect();
-    let packaged = Shown::ran(&manifested, &[])?;
-    assert_eq!((packaged.verdict, packaged.err.as_str()), (Verdict::Violations, FREE_FN));
-    let exits = [Verdict::Clean, Verdict::Violations, Verdict::Refused].map(ExitCode::from);
-    assert_eq!(format!("{exits:?}"), format!("{:?}", [ExitCode::SUCCESS, ExitCode::FAILURE, ExitCode::FAILURE]));
+    let files: Memory = [(PathBuf::from(SOURCE), Disk.read(Path::new(FREE_SOURCE))?)].into_iter().collect();
+    let mut unpackaged = Vec::new();
+    let refused = Cli::from_args([]).verdict(&files, Monotonic::default(), &mut Vec::new(), &mut unpackaged);
+    files.write(Path::new(MANIFEST), Disk.read(&Path::new(FREE).join(MANIFEST))?)?;
+    let mut packaged = Vec::new();
+    let violated = Cli::from_args([]).verdict(&files, Monotonic::default(), &mut Vec::new(), &mut packaged);
+    let expected = [Disk.read(Path::new(UNPACKAGED))?, Disk.read(Path::new(PACKAGED))?];
+    assert_eq!(
+        (refused, violated, [Bytes::new(unpackaged), Bytes::new(packaged)]),
+        (Verdict::Refused, Verdict::Violations, expected)
+    );
     Ok(())
 }
 
 #[test]
+fn verdicts_become_exit_codes() {
+    let exits = [Verdict::Clean, Verdict::Violations, Verdict::Refused].map(ExitCode::from);
+    assert_eq!(exits, [ExitCode::SUCCESS, ExitCode::FAILURE, ExitCode::FAILURE]);
+}
+
+#[test]
 fn deeply_nested_code_is_read_whole() -> Result<(), Failed> {
-    let nested = format!(
-        "pub struct Deep;\nimpl Deep {{\n    pub fn deep() -> u8 {{\n        {}1{}\n    }}\n}}\n",
-        "(".repeat(DEPTH),
-        ")".repeat(DEPTH)
-    );
+    let nested = [DEEP_HEAD, &OPEN.repeat(DEPTH), DEEP_CORE, &CLOSE.repeat(DEPTH), DEEP_TAIL].concat();
     let files: Memory = [
-        (PathBuf::from(MANIFEST), Bytes::new(b"[package]\nname = \"deep\"\n".to_vec())),
-        (PathBuf::from("src/lib.rs"), Bytes::new(nested.into_bytes())),
+        (PathBuf::from(MANIFEST), Disk.read(Path::new(DEEP_MANIFEST))?),
+        (PathBuf::from(SOURCE), Bytes::new(nested.into_bytes())),
     ]
     .into_iter()
     .collect();
-    let shown = Shown::ran(&files, &[])?;
-    assert_eq!((shown.verdict, shown.err.as_str()), (Verdict::Clean, ""));
+    let mut err = Vec::new();
+    let verdict = Cli::from_args([]).verdict(&files, Monotonic::default(), &mut Vec::new(), &mut err);
+    assert_eq!((verdict, Bytes::new(err)), (Verdict::Clean, Disk.read(Path::new(DEEP))?));
     Ok(())
 }
 
 #[test]
 fn output_that_cannot_be_written_refuses_the_run() -> Result<(), Failed> {
-    let files = Case::mounted("workspace", ".")?;
+    let files = Memory::default();
+    Disk.mirror(Path::new(WORKSPACE), &files)?;
     let mut err = Vec::new();
-    let arguments = ["--report", "."].map(OsString::from);
-    let verdict = Cli::from_args(arguments).verdict(&files, Monotonic::default(), &mut Unwritable, &mut err);
-    assert_eq!((verdict, String::from_utf8(err)?), (Verdict::Refused, "cannot write the output: refused\n".to_owned()));
+    let mut nowhere: &mut [u8] = &mut [];
+    let arguments = [REPORT, WORKSPACE].map(OsString::from);
+    let verdict = Cli::from_args(arguments).verdict(&files, Monotonic::default(), &mut nowhere, &mut err);
+    assert_eq!((verdict, Bytes::new(err)), (Verdict::Refused, Disk.read(Path::new(UNWRITABLE))?));
     Ok(())
-}
-
-impl Case {
-    fn drifted(&self) -> Result<Option<String>, Failed> {
-        let files = Case::mounted(self.fixture, self.mount)?;
-        let shown = Shown::ran(&files, self.arguments)?.to_string();
-        let golden = Path::new(env!("CARGO_MANIFEST_DIR")).join(GOLDENS).join(format!("{}.txt", self.golden));
-        std::env::var_os(RECORD).map_or(Ok(()), |_| Disk.write(&golden, Bytes::new(shown.clone().into_bytes())))?;
-        let expected = Disk.read_text(&golden)?;
-        Ok((shown != expected.as_ref()).then(|| format!("{}:\n{shown}", self.golden)))
-    }
-
-    fn mounted(fixture: &str, mount: &str) -> Result<Memory, FileFailure> {
-        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join(FIXTURES).join(fixture);
-        let entries = Case::copied(&source, Path::new(mount))?;
-        Ok(entries.into_iter().map(|entry| (entry.path, entry.bytes)).collect())
-    }
-
-    fn copied(found: &Path, target: &Path) -> Result<Vec<Entry>, FileFailure> {
-        match Disk.kind(found) {
-            Kind::Directory => {
-                let inside = Disk.entries(found)?;
-                let copied = inside.iter().map(|inner| {
-                    let name = inner.file_name().unwrap_or_default();
-                    let renamed = if name == STORED_MANIFEST { MANIFEST.as_ref() } else { name };
-                    Case::copied(inner, &target.join(renamed))
-                });
-                Ok(copied.collect::<Result<Vec<Vec<Entry>>, FileFailure>>()?.into_iter().flatten().collect())
-            }
-            Kind::File | Kind::Link | Kind::Missing => {
-                let path = match target.strip_prefix(".") {
-                    Ok(relative) => relative.to_path_buf(),
-                    Err(_) => target.to_path_buf(),
-                };
-                Ok(vec![Entry { path, bytes: Disk.read(found)? }])
-            }
-        }
-    }
-}
-
-impl Shown {
-    fn ran(files: &Memory, arguments: &[&str]) -> Result<Shown, Failed> {
-        let mut out = Vec::new();
-        let mut err = Vec::new();
-        let given = arguments.iter().map(OsString::from);
-        let verdict = Cli::from_args(given).verdict(files, Monotonic::default(), &mut out, &mut err);
-        Ok(Shown { verdict, out: String::from_utf8(out)?, err: String::from_utf8(err)? })
-    }
-
-    fn unnumbered(line: &[char]) -> String {
-        let timed = line.first().is_some_and(|first| *first == ' ' || first.is_ascii_digit());
-        let label = line.iter().skip_while(|letter| **letter == ' ' || letter.is_ascii_digit());
-        if timed { label.collect() } else { line.iter().collect() }
-    }
-}
-
-impl fmt::Display for Shown {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let letters: Vec<char> = self.out.chars().collect();
-        writeln!(formatter, "{:?}\n--- out", self.verdict)?;
-        letters
-            .chunk_by(|letter, _| *letter != '\n')
-            .map(Shown::unnumbered)
-            .try_for_each(|line| formatter.write_str(&line))?;
-        writeln!(formatter, "--- err")?;
-        formatter.write_str(&self.err)
-    }
-}
-
-impl Write for Unwritable {
-    fn write(&mut self, _: &[u8]) -> io::Result<usize> {
-        Err(io::Error::other("refused"))
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
 }

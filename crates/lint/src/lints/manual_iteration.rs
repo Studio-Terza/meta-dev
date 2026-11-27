@@ -5,7 +5,7 @@ use syn::{
 };
 
 use crate::expansion::Expansion;
-use crate::finding::{Found, Rule};
+use crate::finding::{Fix, Found, Rule};
 use crate::gate::Gate;
 use crate::source::Source;
 use crate::style::{Reads, Style};
@@ -16,9 +16,7 @@ pub(crate) struct ManualIteration {
 }
 
 #[derive(Debug, Default)]
-struct Constructed {
-    calls: usize,
-}
+struct Constructed(Option<()>);
 
 impl ManualIteration {
     const ITERATOR_CONSTRUCTORS: [&'static str; 16] = [
@@ -100,7 +98,7 @@ impl<'ast> Visit<'ast> for ManualIteration {
             Found::spanned(
                 expr.for_token.span,
                 "loop that only accumulates",
-                "extend or collect from an iterator instead",
+                Fix("extend or collect from an iterator instead"),
             )
         }));
         visit::visit_expr_for_loop(self, expr);
@@ -110,13 +108,13 @@ impl<'ast> Visit<'ast> for ManualIteration {
         let constructed = ManualIteration::mutable_init(local).filter(|init| {
             let mut calls = Constructed::default();
             calls.visit_expr(init);
-            calls.calls > 0
+            calls.0.is_some()
         });
         self.found.extend(constructed.map(|_| {
             Found::spanned(
                 local.span(),
                 "mutable iterator local",
-                "drive it with combinators such as format, collect, or fold",
+                Fix("drive it with combinators such as format, collect, or fold"),
             )
         }));
         visit::visit_local(self, local);
@@ -125,8 +123,8 @@ impl<'ast> Visit<'ast> for ManualIteration {
 
 impl<'ast> Visit<'ast> for Constructed {
     fn visit_expr_method_call(&mut self, call: &'ast ExprMethodCall) {
-        let constructs = ManualIteration::ITERATOR_CONSTRUCTORS.iter().any(|name| call.method == name);
-        self.calls += usize::from(constructs);
+        let constructs = ManualIteration::ITERATOR_CONSTRUCTORS.iter().find(|name| call.method == **name);
+        self.0 = self.0.or(constructs.map(|_| ()));
         visit::visit_expr_method_call(self, call);
     }
 

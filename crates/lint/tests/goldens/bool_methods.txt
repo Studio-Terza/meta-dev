@@ -1,7 +1,38 @@
 Violations
 --- out
 --- err
+free functions are not allowed; make them associated functions or methods:
+tests/.fixtures/bool_methods/src/lib.rs:19: fn outer; make it an associated function or a method
+tests/.fixtures/bool_methods/src/lib.rs:20: fn inner; make it an associated function or a method
+tests/.fixtures/bool_methods/src/lib.rs:24: fn gated; make it an associated function or a method
+tests go through public APIs:
+tests/.fixtures/bool_methods/src/lib.rs:23: test code in src; move it to the package's tests directory and call the public API from there
 a function returning bool forgets what it found and makes the caller branch on a flag:
-src/lib.rs:3: fn is_on -> bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
-src/lib.rs:4: fn has_power -> bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
-src/lib.rs:5: fn is_off -> bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
+tests/.fixtures/bool_methods/src/lib.rs:3: fn is_on returns bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
+tests/.fixtures/bool_methods/src/lib.rs:4: fn has_power returns bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
+tests/.fixtures/bool_methods/src/lib.rs:5: fn is_off returns bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
+tests/.fixtures/bool_methods/src/lib.rs:6: fn maybe returns bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
+tests/.fixtures/bool_methods/src/lib.rs:7: fn judge returns bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
+tests/.fixtures/bool_methods/src/lib.rs:17: fn probed returns bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
+tests/.fixtures/bool_methods/src/lib.rs:20: fn inner returns bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
+tests/.fixtures/bool_methods/src/lib.rs:24: fn gated returns bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
+tests/.fixtures/bool_methods/tests/probe.rs:7: fn ready returns bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
+primitives stay at the boundary: outside a module named boundary, signatures, fields and variants carry types with meaning:
+tests/.fixtures/bool_methods/src/lib.rs:3: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/.fixtures/bool_methods/src/lib.rs:4: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/.fixtures/bool_methods/src/lib.rs:5: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/.fixtures/bool_methods/src/lib.rs:6: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/.fixtures/bool_methods/src/lib.rs:7: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/.fixtures/bool_methods/src/lib.rs:17: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/.fixtures/bool_methods/src/lib.rs:20: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/.fixtures/bool_methods/src/lib.rs:24: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests run production code paths: no literals in a test body and no test helpers beyond a test table:
+tests/.fixtures/bool_methods/src/lib.rs:24: test helper fn gated; test through the production code path; a test file holds tests and their table
+tests/.fixtures/bool_methods/tests/probe.rs:5: test helper type Probing; test through the production code path; a test file holds tests and their table
+tests/.fixtures/bool_methods/tests/probe.rs:7: test helper fn ready; test through the production code path; a test file holds tests and their table
+every pub item is named by another workspace crate:
+tests/.fixtures/bool_methods/src/lib.rs:1: pub Switch is named by no other crate; make it private or delete it
+tests/.fixtures/bool_methods/src/lib.rs:3: pub is_on is named by no other crate; make it private or delete it
+tests/.fixtures/bool_methods/src/lib.rs:4: pub has_power is named by no other crate; make it private or delete it
+tests/.fixtures/bool_methods/src/lib.rs:10: pub State is named by no other crate; make it private or delete it
+tests/.fixtures/bool_methods/src/lib.rs:16: pub Probe is named by no other crate; make it private or delete it

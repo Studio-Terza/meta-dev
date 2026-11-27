@@ -1,3 +1,5 @@
+use std::fmt;
+
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{
@@ -6,10 +8,11 @@ use syn::{
 };
 
 use crate::expansion::Expansion;
-use crate::finding::{Found, Rule};
+use crate::finding::{Fix, Found, Rule};
 use crate::gate::Gate;
 use crate::source::Source;
 use crate::style::{Reads, Style};
+use crate::word::Word;
 
 #[derive(Debug, Default)]
 pub(crate) struct TypeShape {
@@ -25,48 +28,43 @@ enum Shape {
 #[derive(Debug, Default)]
 struct Shapes(Vec<Shape>);
 
-impl Shape {
-    fn problem(self) -> &'static str {
-        match self {
+impl fmt::Display for Shape {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
             Shape::Tuple => "tuple in a signature or field",
             Shape::StringError => "Result with a String error",
-        }
+        })
     }
+}
 
-    fn fix(self) -> &'static str {
+impl Shape {
+    fn fix(self) -> Fix {
         match self {
-            Shape::Tuple => "values that travel together are a struct",
-            Shape::StringError => "errors are an enum with thiserror",
+            Shape::Tuple => Fix("values that travel together are a struct"),
+            Shape::StringError => Fix("errors are an enum with thiserror"),
         }
     }
 }
 
 impl TypeShape {
-    const BOOL_FIX: &'static str = "a stored flag is a stored mode, make it an enum or a type parameter";
+    const BOOL_FIX: Fix = Fix("a stored flag is a stored mode, make it an enum or a type parameter");
+    const BOOL: Word = Word("bool");
+    const STRING: Word = Word("String");
 
     fn rooted(&mut self, ty: &Type) {
         let mut shapes = Shapes::default();
         shapes.visit_type(ty);
         let span = ty.span();
-        self.found.extend(shapes.0.into_iter().map(|shape| Found::spanned(span, shape.problem(), shape.fix())));
+        self.found.extend(shapes.0.into_iter().map(|shape| Found::spanned(span, shape, shape.fix())));
     }
 
     fn fields<'field>(&mut self, fields: impl Iterator<Item = &'field Field>) {
         fields.for_each(|field| {
-            let flag = TypeShape::last_named(&field.ty, "bool");
+            let flag = TypeShape::BOOL.last(&field.ty);
             let span = field.ident.as_ref().map_or_else(|| field.ty.span(), syn::Ident::span);
-            self.found.extend(flag.map(|()| Found::spanned(span, "bool field", TypeShape::BOOL_FIX)));
+            self.found.extend(flag.map(|_| Found::spanned(span, "bool field", TypeShape::BOOL_FIX)));
             self.rooted(&field.ty);
         });
-    }
-
-    fn last_named(ty: &Type, name: &str) -> Option<()> {
-        match ty {
-            Type::Path(TypePath { path, .. }) => {
-                path.segments.last().filter(|segment| segment.ident == name).map(|_| ())
-            }
-            _ => None,
-        }
     }
 }
 
@@ -122,10 +120,10 @@ impl<'ast> Visit<'ast> for Shapes {
                 PathArguments::None | PathArguments::Parenthesized(_) => None,
             })
             .and_then(|argument| match argument {
-                GenericArgument::Type(error) => TypeShape::last_named(error, "String"),
+                GenericArgument::Type(error) => TypeShape::STRING.last(error),
                 _ => None,
             });
-        self.0.extend(error.map(|()| Shape::StringError));
+        self.0.extend(error.map(|_| Shape::StringError));
         visit::visit_type_path(self, path);
     }
 }

@@ -2,4 +2,9 @@ Violations
 --- out
 --- err
 no dyn: every type is known at compile time, so code takes a generic, returns impl Trait or names an enum instead of a trait object:
-src/shapes.rs:4: dyn trait object; take a generic, return impl Trait, or list the known types in an enum
+tests/.fixtures/no_dyn/src/shapes.rs:4: dyn trait object; take a generic, return impl Trait, or list the known types in an enum
+every pub item is named by another workspace crate:
+tests/.fixtures/no_dyn/src/lib.rs:1: pub shapes is named by no other crate; make it private or delete it
+tests/.fixtures/no_dyn/src/shapes.rs:1: pub Shape is named by no other crate; make it private or delete it
+tests/.fixtures/no_dyn/src/shapes.rs:3: pub Shapes is named by no other crate; make it private or delete it
+tests/.fixtures/no_dyn/src/shapes.rs:7: pub NAMED is named by no other crate; make it private or delete it

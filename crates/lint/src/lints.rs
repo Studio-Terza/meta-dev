@@ -1,4 +1,5 @@
 mod bool_methods;
+mod dead_code;
 mod expression_flow;
 mod manual_iteration;
 mod named_lifetimes;
@@ -6,9 +7,11 @@ mod no_comments;
 mod no_dyn;
 mod no_free_fns;
 mod no_test_only_api;
+mod primitive_boundary;
 mod process_starters;
 mod public_api_tests;
 mod public_surface;
+mod test_shape;
 mod type_shape;
 mod vec_out_params;
 
@@ -23,6 +26,7 @@ use crate::spent::{Spent, Stage};
 use crate::style::Style;
 use crate::workspace::Package;
 use bool_methods::BoolMethods;
+use dead_code::{DeadCode, DeadFact};
 use expression_flow::ExpressionFlow;
 use manual_iteration::ManualIteration;
 use named_lifetimes::NamedLifetimes;
@@ -30,9 +34,11 @@ use no_comments::NoComments;
 use no_dyn::NoDyn;
 use no_free_fns::NoFreeFns;
 use no_test_only_api::NoTestOnlyApi;
+use primitive_boundary::PrimitiveBoundary;
 pub(crate) use process_starters::ProcessStarters;
 use public_api_tests::{ApiFact, PublicApiTests};
 use public_surface::{PublicSurface, SurfaceFact};
+use test_shape::TestShape;
 use type_shape::TypeShape;
 use vec_out_params::VecOutParams;
 
@@ -41,6 +47,7 @@ pub(crate) struct Facts {
     surface: Vec<SurfaceFact>,
     api: Vec<ApiFact>,
     test_only: Vec<Finding>,
+    dead: Vec<DeadFact>,
 }
 
 #[derive(Debug, Default)]
@@ -70,11 +77,14 @@ impl<'run, Clock: Timer> Lints<'run, Clock> {
             lints.styled::<ProcessStarters>(spent),
             lints.styled::<BoolMethods>(spent),
             lints.styled::<NoDyn>(spent),
+            lints.styled::<PrimitiveBoundary>(spent),
+            lints.styled::<TestShape>(spent),
         ];
         let facts = Facts {
             surface: lints.graphed::<PublicSurface>(spent),
             api: lints.graphed::<PublicApiTests>(spent),
             test_only: lints.graphed::<NoTestOnlyApi>(spent),
+            dead: lints.graphed::<DeadCode>(spent),
         };
         Linted { found: found.into_iter().flatten().collect(), facts }
     }
@@ -105,6 +115,7 @@ impl Facts {
             surface: self.surface.into_iter().chain(later.surface).collect(),
             api: self.api.into_iter().chain(later.api).collect(),
             test_only: self.test_only.into_iter().chain(later.test_only).collect(),
+            dead: self.dead.into_iter().chain(later.dead).collect(),
         }
     }
 
@@ -112,6 +123,7 @@ impl Facts {
         let surface = PublicSurface::reduce(self.surface, packages);
         let api = PublicApiTests::reduce(self.api, packages);
         let test_only = NoTestOnlyApi::reduce(self.test_only, packages);
-        surface.into_iter().chain(api).chain(test_only).collect()
+        let dead = DeadCode::reduce(self.dead, packages);
+        surface.into_iter().chain(api).chain(test_only).chain(dead).collect()
     }
 }

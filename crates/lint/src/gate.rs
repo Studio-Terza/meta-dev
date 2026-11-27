@@ -4,6 +4,7 @@ use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 use syn::{Attribute, ItemImpl, Meta, MetaList, Token};
 
+use crate::budget::Count;
 use crate::ignored::Ignored;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -91,8 +92,8 @@ impl TestMark {
         here.chain(nested.flatten()).collect()
     }
 
-    pub(crate) fn counted(tokens: TokenStream) -> usize {
-        TestMark::written(tokens).iter().filter_map(TestMark::on).count()
+    pub(crate) fn counted(tokens: TokenStream) -> Count {
+        Count::new(TestMark::written(tokens).iter().filter_map(TestMark::on).count())
     }
 
     fn attribute(mark: &TokenTree, body: &TokenTree) -> Option<Attribute> {

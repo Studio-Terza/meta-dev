@@ -556,6 +556,7 @@ dependencies = [
  "console-ports",
  "file-ports",
  "invariants",
+ "newtype",
  "port-core",
  "proc-macro2",
  "ra-ap-rustc_lexer",

@@ -2,4 +2,4 @@ Refused
 --- out
 --- err
 cannot read /nowhere: entity not found
-no Rust sources found under /corpus/notes
+no Rust sources found under tests/.fixtures/bad_manifest/notes

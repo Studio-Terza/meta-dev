@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 
 use invariants::Ignoring;
+use newtype::{Newtype, Wrapping};
 use proc_macro2::{Group, TokenStream, TokenTree};
 use syn::parse::discouraged::Speculative;
 use syn::parse::{ParseStream, Parser};
@@ -12,6 +13,9 @@ use crate::ignored::Ignored;
 
 #[derive(Debug)]
 pub(crate) struct Expansion(Vec<Stmt>);
+
+#[derive(Newtype, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct At(usize);
 
 impl Expansion {
     const DOLLAR: char = '$';
@@ -66,7 +70,7 @@ impl Expansion {
     fn unvaried(body: TokenStream) -> TokenStream {
         let trees: Vec<TokenTree> = body.into_iter().collect();
         let dropped = Expansion::dropped(&trees);
-        let kept = trees.iter().enumerate().filter(|(at, _)| !dropped.contains(at));
+        let kept = trees.iter().enumerate().filter(|(at, _)| !dropped.contains(&At::new(*at)));
         kept.flat_map(|(at, tree)| Expansion::kept(tree, at.checked_sub(1).and_then(|before| trees.get(before))))
             .collect()
     }
@@ -82,22 +86,24 @@ impl Expansion {
         }
     }
 
-    fn dropped(trees: &[TokenTree]) -> BTreeSet<usize> {
+    fn dropped(trees: &[TokenTree]) -> BTreeSet<At> {
         let dollars = trees.iter().enumerate().filter_map(|(at, tree)| Expansion::dollar(tree).map(|()| at));
         dollars
             .flat_map(|at| {
                 let repeated = trees.get(at + 1).and_then(|next| match next {
-                    TokenTree::Group(_) => Expansion::repeat_end(trees, at + 2),
+                    TokenTree::Group(_) => Expansion::repeat_end(trees, At::new(at + 2)),
                     TokenTree::Ident(_) | TokenTree::Punct(_) | TokenTree::Literal(_) => None,
                 });
-                [at].into_iter().chain(repeated.map_or_default(|end| (at + 2..=end).collect::<Vec<usize>>()))
+                let span = repeated.map_or_default(|end| (at + 2..=end.into_inner()).collect::<Vec<usize>>());
+                [at].into_iter().chain(span).map(At::new)
             })
             .collect()
     }
 
-    fn repeat_end(trees: &[TokenTree], start: usize) -> Option<usize> {
-        [start, start + 1].into_iter().find(|at| {
-            trees.get(*at).is_some_and(|tree| match tree {
+    fn repeat_end(trees: &[TokenTree], start: At) -> Option<At> {
+        let first = start.into_inner();
+        [first, first + 1].into_iter().map(At::new).find(|at| {
+            trees.get(at.into_inner()).is_some_and(|tree| match tree {
                 TokenTree::Punct(mark) => Expansion::REPEATS.contains(&mark.as_char()),
                 TokenTree::Group(_) | TokenTree::Ident(_) | TokenTree::Literal(_) => false,
             })

@@ -1,14 +1,21 @@
+mod boundary;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
 use std::path::{Component, Path, PathBuf};
 
 use toml::de::{DeTable, DeValue};
 
+use boundary::Glob;
+
 #[derive(Debug, Default)]
 struct Members {
-    listed: Vec<String>,
-    excluded: Vec<String>,
+    listed: Vec<Pattern>,
+    excluded: Vec<Pattern>,
 }
+
+#[derive(Debug)]
+struct Pattern(String);
 
 #[derive(Debug)]
 pub(crate) struct Manifest {
@@ -19,46 +26,37 @@ pub(crate) struct Manifest {
 }
 
 impl Members {
-    const ANY: char = '*';
+    const MEMBERS: &'static str = "members";
+    const EXCLUDE: &'static str = "exclude";
 
     fn of(workspace: &DeValue<'_>) -> Members {
-        let names = |key: &str| -> Vec<String> {
+        let names = |key: &str| -> Vec<Pattern> {
             let listed =
                 workspace.as_table().and_then(|table| table.get(key)).and_then(|value| value.get_ref().as_array());
             listed.map_or_default(|names| {
-                names.iter().filter_map(|name| name.get_ref().as_str()).map(str::to_owned).collect()
+                names.iter().filter_map(|name| name.get_ref().as_str()).map(|name| Pattern(name.to_owned())).collect()
             })
         };
-        Members { listed: names("members"), excluded: names("exclude") }
+        Members { listed: names(Members::MEMBERS), excluded: names(Members::EXCLUDE) }
     }
 
     fn admits(&self, relative: &Path) -> Option<()> {
-        let matched =
-            |patterns: &[String]| patterns.iter().any(|pattern| Members::matches(pattern, relative).is_some());
+        let matched = |patterns: &[Pattern]| patterns.iter().any(|pattern| pattern.matches(relative).is_some());
         (matched(&self.listed) && !matched(&self.excluded)).then_some(())
     }
+}
 
-    fn matches(pattern: &str, relative: &Path) -> Option<()> {
+impl Pattern {
+    fn matches(&self, relative: &Path) -> Option<()> {
         let wanted: Vec<Component<'_>> =
-            Path::new(pattern).components().filter(|part| matches!(part, Component::Normal(_))).collect();
+            Path::new(&self.0).components().filter(|part| matches!(part, Component::Normal(_))).collect();
         let found: Vec<Component<'_>> = relative.components().collect();
         let fitting = wanted.iter().zip(&found).all(|(expected, part)| {
             let letters: Vec<char> = expected.as_os_str().to_string_lossy().chars().collect();
             let spelled: Vec<char> = part.as_os_str().to_string_lossy().chars().collect();
-            Members::fits(&letters, &spelled).is_some()
+            Glob::fits(&letters, &spelled).is_some()
         });
         (wanted.len() == found.len() && fitting).then_some(())
-    }
-
-    fn fits(pattern: &[char], text: &[char]) -> Option<()> {
-        match pattern.split_first() {
-            None => text.is_empty().then_some(()),
-            Some((&Members::ANY, rest)) => Members::fits(rest, text).or_else(|| Members::fits(pattern, text.get(1..)?)),
-            Some((letter, rest)) => {
-                let (first, tail) = text.split_first()?;
-                (first == letter).then_some(()).and_then(|()| Members::fits(rest, tail))
-            }
-        }
     }
 }
 

@@ -6,24 +6,25 @@ use syn::visit::{self, Visit};
 use syn::{Expr, ExprLit, ImplItemFn, ItemFn, ItemImpl, ItemMacro, ItemMod, Lit, Macro, Meta};
 
 use crate::expansion::Expansion;
-use crate::finding::{Finding, Found, Rule};
+use crate::finding::{Finding, Fix, Found, Line, Rule};
 use crate::gate::{Gate, TestMark};
 use crate::graph::Graph;
+use crate::name::Name;
 use crate::source::{Place, Source};
 use crate::workspace::Package;
 
 #[derive(Debug)]
 pub(crate) enum ApiFact {
     Found(Finding),
-    Emitter(String),
-    Invoked { name: String, path: Arc<Path>, line: usize },
+    Emitter(Name),
+    Invoked { name: Name, path: Arc<Path>, line: Line },
 }
 
 #[derive(Debug)]
 pub(crate) struct PublicApiTests<'file> {
     source: &'file Source,
     facts: Vec<ApiFact>,
-    inline: Vec<String>,
+    inline: Vec<Name>,
 }
 
 #[derive(Debug, Default)]
@@ -31,11 +32,11 @@ struct Emitters(Vec<ApiFact>);
 
 impl PublicApiTests<'_> {
     const IN_SOURCE: &'static str = "test code in src";
-    const IN_SOURCE_FIX: &'static str = "move it to the package's tests directory and call the public API from there";
+    const IN_SOURCE_FIX: Fix = Fix("move it to the package's tests directory and call the public API from there");
     const PATH_ATTRIBUTE: &'static str = "path";
     const SOURCE_DIRECTORY: &'static str = "src";
 
-    fn in_source(&mut self, line: usize) {
+    fn in_source(&mut self, line: Line) {
         let found = Found::at(line, PublicApiTests::IN_SOURCE, PublicApiTests::IN_SOURCE_FIX);
         self.facts.push(ApiFact::Found(found.in_file(Rule::PublicApiTests, self.source.shown())));
     }
@@ -44,7 +45,7 @@ impl PublicApiTests<'_> {
         (self.source.place() == Place::Shipped).then_some(())
     }
 
-    fn skipped(&mut self, line: usize, walk: impl FnOnce(&mut Emitters)) {
+    fn skipped(&mut self, line: Line, walk: impl FnOnce(&mut Emitters)) {
         self.in_source(line);
         let mut emitters = Emitters::default();
         walk(&mut emitters);
@@ -64,14 +65,14 @@ impl PublicApiTests<'_> {
             );
         let directory = self.source.real().parent().map_or_default(Path::to_path_buf);
         let source = PublicApiTests::lexical(&self.source.package().directory().join(PublicApiTests::SOURCE_DIRECTORY));
-        let within = self.inline.iter().fold(PathBuf::new(), |inside, name| inside.join(name));
+        let within = self.inline.iter().fold(PathBuf::new(), |inside, name| inside.join(&**name));
         let reaching =
             target.filter(|path| PublicApiTests::lexical(&directory.join(&within).join(path)).starts_with(&source));
         self.facts.extend(reaching.map(|_| {
             let found = Found::spanned(
                 module.ident.span(),
                 "test file includes a module from src with #[path]",
-                "call the public API instead",
+                Fix("call the public API instead"),
             );
             ApiFact::Found(found.in_file(Rule::PublicApiTests, self.source.shown()))
         }));
@@ -94,7 +95,7 @@ impl Emitters {
         let name = definition.ident.as_ref()?;
         Expansion::defining(&definition.mac)?;
         let tested = TestMark::written(definition.mac.tokens.clone()).iter().find_map(TestMark::on).map(|_| ());
-        tested.map(|()| ApiFact::Emitter(name.to_string()))
+        tested.map(|()| ApiFact::Emitter(Name::of(name)))
     }
 }
 
@@ -112,13 +113,13 @@ impl<'ast> Visit<'ast> for PublicApiTests<'_> {
     }
 
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        let line = module.ident.span().start().line;
+        let line = Line::of(module.ident.span());
         let skipped = self.shipped().and_then(|()| Gate::of(&module.attrs).entered().xor(Some(())));
         if skipped.is_some() {
             self.skipped(line, |emitters| emitters.visit_item_mod(module));
         } else {
             self.shipped().xor(Some(())).map_or_default(|()| self.reached(module));
-            self.inline.push(module.ident.to_string());
+            self.inline.push(Name::of(&module.ident));
             visit::visit_item_mod(self, module);
             self.inline.pop();
         }
@@ -127,7 +128,7 @@ impl<'ast> Visit<'ast> for PublicApiTests<'_> {
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
         let skipped = self.shipped().and_then(|()| Gate::of(&item.attrs).entered().xor(Some(())));
         match skipped {
-            Some(()) => self.skipped(item.impl_token.span.start().line, |emitters| emitters.visit_item_impl(item)),
+            Some(()) => self.skipped(Line::of(item.impl_token.span), |emitters| emitters.visit_item_impl(item)),
             None => visit::visit_item_impl(self, item),
         }
     }
@@ -135,7 +136,7 @@ impl<'ast> Visit<'ast> for PublicApiTests<'_> {
     fn visit_impl_item_fn(&mut self, function: &'ast ImplItemFn) {
         let skipped = self.shipped().and_then(|()| Gate::of(&function.attrs).entered().xor(Some(())));
         match skipped {
-            Some(()) => self.skipped(function.sig.ident.span().start().line, |emitters| {
+            Some(()) => self.skipped(Line::of(function.sig.ident.span()), |emitters| {
                 emitters.visit_impl_item_fn(function);
             }),
             None => visit::visit_impl_item_fn(self, function),
@@ -143,7 +144,7 @@ impl<'ast> Visit<'ast> for PublicApiTests<'_> {
     }
 
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        let line = function.sig.ident.span().start().line;
+        let line = Line::of(function.sig.ident.span());
         let skipped = self.shipped().and_then(|()| Gate::of(&function.attrs).entered().xor(Some(())));
         if skipped.is_some() {
             self.skipped(line, |emitters| emitters.visit_item_fn(function));
@@ -156,11 +157,11 @@ impl<'ast> Visit<'ast> for PublicApiTests<'_> {
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
         let called = self.shipped().and(Expansion::defining(invocation).xor(Some(())));
-        let line = invocation.bang_token.span.start().line;
+        let line = Line::of(invocation.bang_token.span);
         let marked = called
             .and_then(|()| TestMark::written(invocation.tokens.clone()).iter().find_map(TestMark::on).map(|_| ()));
         let invoked = called.and(invocation.path.get_ident()).map(|name| ApiFact::Invoked {
-            name: name.to_string(),
+            name: Name::of(name),
             path: Arc::clone(self.source.shown()),
             line,
         });
@@ -185,7 +186,7 @@ impl<'file> Graph<'file> for PublicApiTests<'file> {
     }
 
     fn reduce(facts: Vec<ApiFact>, _: &[Arc<Package>]) -> Vec<Finding> {
-        let emitters: BTreeSet<String> = facts
+        let emitters: BTreeSet<Name> = facts
             .iter()
             .filter_map(|fact| match fact {
                 ApiFact::Emitter(name) => Some(name.clone()),

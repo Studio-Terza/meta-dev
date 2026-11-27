@@ -3,5 +3,5 @@ Refused
 test budget, report only:
 broken: 0 tests in 1 files, 0 of 3 lines, 0 process starts
 --- err
-cannot parse src/bad.rs:1: cannot parse string into token stream
-cannot read src/missing.rs: entity not found
+cannot parse tests/.fixtures/broken/src/bad.rs:1: cannot parse string into token stream
+cannot read tests/.fixtures/broken/src/missing.rs: entity not found

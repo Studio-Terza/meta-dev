@@ -2,7 +2,7 @@ use proc_macro2::{TokenStream, TokenTree};
 use syn::visit::{self, Visit};
 use syn::{Macro, TypeTraitObject};
 
-use crate::finding::{Found, Rule};
+use crate::finding::{Fix, Found, Rule};
 use crate::source::Source;
 use crate::style::{Reads, Style};
 
@@ -29,7 +29,7 @@ impl NoDyn {
         Found::spanned(
             span,
             "dyn trait object",
-            "take a generic, return impl Trait, or list the known types in an enum",
+            Fix("take a generic, return impl Trait, or list the known types in an enum"),
         )
     }
 }

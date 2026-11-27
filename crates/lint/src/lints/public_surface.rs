@@ -7,21 +7,22 @@ use syn::visit::{self, Visit};
 use syn::{Item, ItemUse, Macro, Visibility};
 
 use crate::expansion::Expansion;
-use crate::finding::{Finding, Found, Rule};
+use crate::finding::{Finding, Fix, Found, Line, Rule};
 use crate::graph::Graph;
+use crate::name::Name;
 use crate::source::{Place, Source};
 use crate::use_leaf::UseLeaf;
 use crate::workspace::Package;
 
 #[derive(Debug)]
 pub(crate) enum SurfaceFact {
-    Export { crate_name: String, name: String, path: Arc<Path>, line: usize },
-    Sighting { crate_name: String, reached: Reached, reader: Reader },
+    Export { crate_name: Name, name: Name, path: Arc<Path>, line: Line },
+    Sighting { crate_name: Name, reached: Reached, reader: Reader },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Reached {
-    Named(String),
+    Named(Name),
     Glob,
 }
 
@@ -42,7 +43,7 @@ enum Used {
 
 #[derive(Debug, Default)]
 struct Reach {
-    names: BTreeSet<String>,
+    names: BTreeSet<Name>,
     used: Used,
 }
 
@@ -50,7 +51,7 @@ struct Reach {
 pub(crate) struct PublicSurface<'file> {
     source: &'file Source,
     reader: Reader,
-    own_crate: Option<String>,
+    own_crate: Option<Name>,
     facts: Vec<SurfaceFact>,
 }
 
@@ -71,7 +72,7 @@ impl Reach {
 
 impl PublicSurface<'_> {
     fn sighting(&self, first: Option<&Ident>, reached: Reached) -> Option<SurfaceFact> {
-        let foreign = first.map(Ident::to_string).filter(|named| Some(named) != self.own_crate.as_ref());
+        let foreign = first.map(Name::of).filter(|named| Some(named) != self.own_crate.as_ref());
         foreign.map(|crate_name| SurfaceFact::Sighting { crate_name, reached, reader: self.reader })
     }
 
@@ -88,9 +89,9 @@ impl PublicSurface<'_> {
         let facts: Vec<SurfaceFact> = exported
             .map(|ident| SurfaceFact::Export {
                 crate_name: crate_name.clone(),
-                name: ident.to_string(),
+                name: Name::of(ident),
                 path: Arc::clone(path),
-                line: ident.span().start().line,
+                line: Line::of(ident.span()),
             })
             .collect();
         self.facts.extend(facts);
@@ -108,9 +109,9 @@ impl<'ast> Visit<'ast> for PublicSurface<'_> {
             .iter()
             .flat_map(|leaf| {
                 let first = leaf.path().first().copied();
-                let reached = leaf.end().original().map_or(Reached::Glob, |name| Reached::Named(name.to_string()));
+                let reached = leaf.end().original().map_or(Reached::Glob, |name| Reached::Named(Name::of(name)));
                 let module =
-                    leaf.path().get(1).and_then(|module| self.sighting(first, Reached::Named(module.to_string())));
+                    leaf.path().get(1).and_then(|module| self.sighting(first, Reached::Named(Name::of(module))));
                 self.sighting(first, reached).into_iter().chain(module)
             })
             .collect();
@@ -120,7 +121,7 @@ impl<'ast> Visit<'ast> for PublicSurface<'_> {
     fn visit_path(&mut self, path: &'ast syn::Path) {
         let first = path.segments.first().map(|segment| &segment.ident);
         let second = path.segments.iter().nth(1);
-        let sighting = second.and_then(|named| self.sighting(first, Reached::Named(named.ident.to_string())));
+        let sighting = second.and_then(|named| self.sighting(first, Reached::Named(Name::of(&named.ident))));
         self.facts.extend(sighting);
         visit::visit_path(self, path);
     }
@@ -162,13 +163,13 @@ impl<'file> Graph<'file> for PublicSurface<'file> {
     }
 
     fn reduce(facts: Vec<SurfaceFact>, _: &[Arc<Package>]) -> Vec<Finding> {
-        let reaches = facts.iter().fold(BTreeMap::new(), |mut reaches: BTreeMap<&str, Reach>, fact| {
+        let reaches = facts.iter().fold(BTreeMap::new(), |mut reaches: BTreeMap<&Name, Reach>, fact| {
             let sighted = match fact {
                 SurfaceFact::Sighting { crate_name, reached, reader } => Some(crate_name).zip(Some((reached, *reader))),
                 SurfaceFact::Export { .. } => None,
             };
             sighted.map_or_default(|(crate_name, (reached, reader))| {
-                reaches.entry(crate_name.as_str()).or_default().absorb(reached, reader);
+                reaches.entry(crate_name).or_default().absorb(reached, reader);
             });
             reaches
         });
@@ -176,13 +177,13 @@ impl<'file> Graph<'file> for PublicSurface<'file> {
             .iter()
             .filter_map(|fact| match fact {
                 SurfaceFact::Export { crate_name, name, path, line } => {
-                    let reach = reaches.get(crate_name.as_str());
+                    let reach = reaches.get(crate_name);
                     let unnamed = reach.filter(|known| known.used == Used::Named && !known.names.contains(name));
                     unnamed.map(|_| {
                         Found::at(
                             *line,
                             format_args!("{name} is exported but no other crate names it"),
-                            "export it when a user appears",
+                            Fix("export it when a user appears"),
                         )
                         .in_file(Rule::PublicSurface, path)
                     })

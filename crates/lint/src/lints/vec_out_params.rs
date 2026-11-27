@@ -1,12 +1,13 @@
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
-use syn::{FnArg, GenericArgument, ItemImpl, ItemMod, Macro, PathArguments, Signature, Type, TypePath};
+use syn::{FnArg, GenericArgument, ItemImpl, ItemMod, Macro, PathArguments, Signature, Type};
 
 use crate::expansion::Expansion;
-use crate::finding::{Found, Rule};
+use crate::finding::{Fix, Found, Rule};
 use crate::gate::Gate;
 use crate::source::Source;
 use crate::style::{Reads, Style};
+use crate::word::Word;
 
 #[derive(Debug, Default)]
 pub(crate) struct VecOutParams {
@@ -14,14 +15,17 @@ pub(crate) struct VecOutParams {
 }
 
 impl VecOutParams {
-    const FIX: &'static str = "give the collection a type that owns its rules";
+    const FIX: Fix = Fix("give the collection a type that owns its rules");
+    const VEC: Word = Word("Vec");
+    const OPTION: Word = Word("Option");
 
     fn vec_out(parameter: &Type) -> Option<()> {
         match parameter {
             Type::Reference(reference) => {
-                reference.mutability.and_then(|_| VecOutParams::last_named(&reference.elem, "Vec")).map(|_| ())
+                reference.mutability.and_then(|_| VecOutParams::VEC.last(&reference.elem)).map(|_| ())
             }
-            Type::Path(_) => VecOutParams::last_named(parameter, "Option")
+            Type::Path(_) => VecOutParams::OPTION
+                .last(parameter)
                 .and_then(|option| match &option.arguments {
                     PathArguments::AngleBracketed(arguments) => arguments.args.first(),
                     PathArguments::None | PathArguments::Parenthesized(_) => None,
@@ -30,13 +34,6 @@ impl VecOutParams {
                     GenericArgument::Type(inner) => VecOutParams::vec_out(inner),
                     _ => None,
                 }),
-            _ => None,
-        }
-    }
-
-    fn last_named<'ty>(ty: &'ty Type, name: &str) -> Option<&'ty syn::PathSegment> {
-        match ty {
-            Type::Path(TypePath { path, .. }) => path.segments.last().filter(|segment| segment.ident == name),
             _ => None,
         }
     }

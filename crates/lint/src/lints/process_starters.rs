@@ -1,9 +1,12 @@
+use newtype::{Counter, Newtype, Wrapping};
 use proc_macro2::{TokenStream, TokenTree};
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{ItemMod, ItemUse, Macro, Path};
 
-use crate::finding::{Found, Rule};
+use crate::budget::Count;
+use crate::finding::{Fix, Found, Line, Rule};
+use crate::name::Name;
 use crate::source::Source;
 use crate::style::{Reads, Style};
 use crate::use_leaf::UseLeaf;
@@ -12,8 +15,11 @@ use crate::use_leaf::UseLeaf;
 pub(crate) struct ProcessStarters {
     scope: Scope,
     modules: Vec<Module>,
-    open: Vec<usize>,
+    open: Vec<Slot>,
 }
+
+#[derive(Newtype, Clone, Copy, Debug)]
+struct Slot(usize);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Scope {
@@ -30,21 +36,21 @@ struct Module {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Bound {
-    Command(String),
-    Process(String),
+    Command(Name),
+    Process(Name),
 }
 
 #[derive(Debug)]
 struct Spelled {
-    line: usize,
-    segments: Vec<String>,
+    line: Line,
+    segments: Vec<Name>,
 }
 
 #[derive(Debug, Default)]
 struct Run {
-    segments: Vec<String>,
-    line: Option<usize>,
-    colons: usize,
+    segments: Vec<Name>,
+    line: Option<Line>,
+    colons: Count,
     found: Vec<Spelled>,
 }
 
@@ -56,19 +62,19 @@ impl ProcessStarters {
     const STD: &'static str = "std";
     const OWN: &'static str = "self";
 
-    pub(crate) fn everywhere(file: &syn::File) -> usize {
+    pub(crate) fn everywhere(file: &syn::File) -> Count {
         let mut scan = ProcessStarters::scanning(Scope::Everywhere, None);
         scan.visit_file(file);
-        scan.starts().len()
+        Count::new(scan.starts().len())
     }
 
     fn scanning(scope: Scope, ported: Option<()>) -> ProcessStarters {
-        ProcessStarters { scope, modules: vec![Module { ported, ..Module::default() }], open: vec![0] }
+        ProcessStarters { scope, modules: vec![Module { ported, ..Module::default() }], open: vec![Slot::new(0)] }
     }
 
     fn current(&mut self) -> Option<&mut Module> {
         let at = self.open.last().copied();
-        at.and_then(|index| self.modules.get_mut(index))
+        at.and_then(|slot| self.modules.get_mut(slot.into_inner()))
     }
 
     fn admitted(&mut self) -> Option<&mut Module> {
@@ -76,7 +82,7 @@ impl ProcessStarters {
         self.current().filter(|module| scope == Scope::Everywhere || module.ported.is_none())
     }
 
-    fn starts(&self) -> Vec<usize> {
+    fn starts(&self) -> Vec<Line> {
         self.modules
             .iter()
             .flat_map(|module| module.spelled.iter().filter_map(|spelled| spelled.started(&module.imports)))
@@ -85,16 +91,16 @@ impl ProcessStarters {
 }
 
 impl Spelled {
-    fn started(&self, imports: &[Bound]) -> Option<usize> {
+    fn started(&self, imports: &[Bound]) -> Option<Line> {
         let (last, rest) = self.segments.split_last()?;
-        (last == ProcessStarters::NEW).then_some(())?;
+        (**last == *ProcessStarters::NEW).then_some(())?;
         let (owner, ahead) = rest.split_last()?;
         let imported = imports.contains(&Bound::Command(owner.clone())).then_some(());
         let qualified = ahead
             .last()
-            .filter(|_| owner == ProcessStarters::COMMAND)
+            .filter(|_| **owner == *ProcessStarters::COMMAND)
             .filter(|module| {
-                *module == ProcessStarters::PROCESS || imports.contains(&Bound::Process((*module).clone()))
+                ***module == *ProcessStarters::PROCESS || imports.contains(&Bound::Process((*module).clone()))
             })
             .map(|_| ());
         imported.or(qualified).map(|()| self.line)
@@ -103,22 +109,22 @@ impl Spelled {
 
 impl Bound {
     fn of_leaf(leaf: &UseLeaf<'_>) -> Option<Bound> {
-        let parent = leaf.path().last()?.to_string();
+        let parent = Name::of(leaf.path().last()?);
         let end = leaf.end();
         let spelled = end.original().zip(end.bound());
         spelled.map_or_else(
-            || (parent == ProcessStarters::PROCESS).then(|| Bound::Command(ProcessStarters::COMMAND.to_owned())),
-            |(original, bound)| Bound::named(&parent, &original.to_string(), bound.to_string()),
+            || (*parent == *ProcessStarters::PROCESS).then(|| Bound::Command(Name::spelled(ProcessStarters::COMMAND))),
+            |(original, bound)| Bound::named(&parent, &Name::of(original), Name::of(bound)),
         )
     }
 
-    fn named(parent: &str, original: &str, bound: String) -> Option<Bound> {
-        let in_process = (parent == ProcessStarters::PROCESS).then_some(());
-        let command = in_process.filter(|()| original == ProcessStarters::COMMAND);
-        let itself = in_process.filter(|()| original == ProcessStarters::OWN);
-        let from_std = (parent == ProcessStarters::STD && original == ProcessStarters::PROCESS).then_some(());
+    fn named(parent: &Name, original: &Name, bound: Name) -> Option<Bound> {
+        let in_process = (**parent == *ProcessStarters::PROCESS).then_some(());
+        let command = in_process.filter(|()| **original == *ProcessStarters::COMMAND);
+        let itself = in_process.filter(|()| **original == *ProcessStarters::OWN);
+        let from_std = (**parent == *ProcessStarters::STD && **original == *ProcessStarters::PROCESS).then_some(());
         let module_name =
-            if bound == ProcessStarters::OWN { ProcessStarters::PROCESS.to_owned() } else { bound.clone() };
+            if *bound == *ProcessStarters::OWN { Name::spelled(ProcessStarters::PROCESS) } else { bound.clone() };
         let module = itself.or(from_std).map(|()| Bound::Process(module_name));
         command.map(|()| Bound::Command(bound)).or(module)
     }
@@ -139,26 +145,31 @@ impl Run {
                 Run { found: found.into_iter().chain(Run::scanned(group.stream())).collect(), ..Run::default() }
             }
             TokenTree::Ident(ident) => {
-                let joined = self.segments.first().map_or(Some(()), |_| (self.colons == Run::SEPARATOR).then_some(()));
+                let joined = self
+                    .segments
+                    .first()
+                    .map_or(Some(()), |_| (self.colons.into_inner() == Run::SEPARATOR).then_some(()));
                 let run = match joined {
                     Some(()) => self,
                     None => self.ended(),
                 };
                 Run {
-                    line: run.line.or(Some(ident.span().start().line)),
-                    segments: run.segments.into_iter().chain([ident.to_string()]).collect(),
-                    colons: 0,
+                    line: run.line.or(Some(Line::of(ident.span()))),
+                    segments: run.segments.into_iter().chain([Name::of(&ident)]).collect(),
+                    colons: Count::zero(),
                     found: run.found,
                 }
             }
-            TokenTree::Punct(punct) if punct.as_char() == Run::COLON => Run { colons: self.colons + 1, ..self },
+            TokenTree::Punct(punct) if punct.as_char() == Run::COLON => {
+                Run { colons: self.colons.incremented(), ..self }
+            }
             TokenTree::Punct(_) | TokenTree::Literal(_) => self.ended(),
         }
     }
 
     fn ended(self) -> Run {
         let Run { segments, line, colons, found } = self;
-        let whole = line.filter(|_| colons == 0 && segments.len() >= Run::SEPARATOR);
+        let whole = line.filter(|_| colons == Count::zero() && segments.len() >= Run::SEPARATOR);
         let spelled = whole.map(|at| Spelled { line: at, segments });
         Run { found: found.into_iter().chain(spelled).collect(), ..Run::default() }
     }
@@ -168,7 +179,7 @@ impl<'ast> Visit<'ast> for ProcessStarters {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         let named = (module.ident == ProcessStarters::PORTS).then_some(());
         let ported = named.or(self.current().and_then(|enclosing| enclosing.ported));
-        self.open.push(self.modules.len());
+        self.open.push(Slot::new(self.modules.len()));
         self.modules.push(Module { ported, ..Module::default() });
         visit::visit_item_mod(self, module);
         self.open.pop();
@@ -181,8 +192,8 @@ impl<'ast> Visit<'ast> for ProcessStarters {
 
     fn visit_path(&mut self, path: &'ast Path) {
         let spelled = Spelled {
-            line: path.span().start().line,
-            segments: path.segments.iter().map(|segment| segment.ident.to_string()).collect(),
+            line: Line::of(path.span()),
+            segments: path.segments.iter().map(|segment| Name::of(&segment.ident)).collect(),
         };
         self.admitted().map_or_default(|module| module.spelled.push(spelled));
         visit::visit_path(self, path);
@@ -210,7 +221,7 @@ impl<'file> Style<'file> for ProcessStarters {
                 Found::at(
                     line,
                     "starts a std::process::Command",
-                    "move it behind a port: a crate whose name ends in ports, or a module named ports",
+                    Fix("move it behind a port: a crate whose name ends in ports, or a module named ports"),
                 )
             })
             .collect()

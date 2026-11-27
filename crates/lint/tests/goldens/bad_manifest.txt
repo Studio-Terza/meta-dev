@@ -1,7 +1,7 @@
 Refused
 --- out
 --- err
-cannot parse Cargo.toml: TOML parse error at line 1, column 5
+cannot parse tests/.fixtures/bad_manifest/Cargo.toml: TOML parse error at line 1, column 5
   |
 1 | not toml [[
   |     ^

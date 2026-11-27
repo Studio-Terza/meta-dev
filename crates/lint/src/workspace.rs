@@ -1,3 +1,4 @@
+mod boundary;
 mod manifest;
 
 use std::ffi::OsStr;
@@ -10,7 +11,10 @@ use invariants::Ignoring;
 use toml::de::{DeTable, DeValue};
 
 use crate::failure::Failure;
+use crate::finding::Line;
 use crate::ignored::Ignored;
+use crate::name::Name;
+use boundary::Toml;
 use manifest::Manifest;
 
 #[derive(Debug)]
@@ -55,16 +59,16 @@ pub(crate) enum CrateKind {
 
 #[derive(Debug)]
 pub(crate) struct Feature {
-    name: String,
-    line: usize,
+    name: Name,
+    line: Line,
 }
 
 impl Feature {
-    pub(crate) fn name(&self) -> &str {
+    pub(crate) fn name(&self) -> &Name {
         &self.name
     }
 
-    pub(crate) fn line(&self) -> usize {
+    pub(crate) fn line(&self) -> Line {
         self.line
     }
 }
@@ -72,7 +76,7 @@ impl Feature {
 #[derive(Debug)]
 pub(crate) struct Package {
     directory: PathBuf,
-    name: String,
+    name: Name,
     manifest: Arc<Path>,
     features: Vec<Feature>,
 }
@@ -82,11 +86,11 @@ impl Package {
         &self.directory
     }
 
-    pub(crate) fn crate_name(&self) -> String {
-        self.name.chars().map(|letter| if letter == '-' { '_' } else { letter }).collect()
+    pub(crate) fn crate_name(&self) -> Name {
+        Name::spelled(self.name.chars().map(|letter| if letter == '-' { '_' } else { letter }).collect::<String>())
     }
 
-    pub(crate) fn name(&self) -> &str {
+    pub(crate) fn name(&self) -> &Name {
         &self.name
     }
 
@@ -214,31 +218,14 @@ impl Workspace {
             .map_err(|source| Failure::Manifest { path: manifest.to_path_buf(), source })?
             .into_inner();
         let directory = manifest.parent().map_or_default(Path::to_path_buf);
-        let name = table.get("package").and_then(|package| Workspace::string(package.get_ref(), "name"));
+        let name = table.get("package").and_then(|package| Toml::string(package.get_ref(), Toml::NAME));
         let package = name.map(|named| Package {
             directory: directory.clone(),
-            name: named.to_owned(),
+            name: Name::spelled(named),
             manifest: tree.shown(manifest),
-            features: Workspace::features(text.as_ref(), &table),
+            features: Toml::features(text.as_ref(), &table),
         });
         Ok(Listed { package, manifest: Manifest::new(directory, &table) })
-    }
-
-    fn string<'value>(value: &'value DeValue<'_>, key: &str) -> Option<&'value str> {
-        value.as_table().and_then(|table| table.get(key)).and_then(|found| found.get_ref().as_str())
-    }
-
-    fn features(text: &str, table: &DeTable<'_>) -> Vec<Feature> {
-        let declared = table.get("features").and_then(|features| features.get_ref().as_table());
-        declared.map_or_default(|features| {
-            features
-                .iter()
-                .map(|(key, _)| Feature {
-                    name: key.get_ref().to_string(),
-                    line: text.get(..key.span().start).map_or(0, |before| before.matches('\n').count()) + 1,
-                })
-                .collect()
-        })
     }
 
     fn roots(files: &impl Files, package: &Arc<Package>) -> Vec<CrateRoot> {
@@ -279,7 +266,7 @@ impl Workspace {
                     };
                     tables
                         .into_iter()
-                        .filter_map(|target| Workspace::string(target, "path"))
+                        .filter_map(|target| Toml::string(target, Toml::PATH))
                         .map(|path| CrateRoot::new(package.directory.join(path), *kind, package))
                         .collect::<Vec<CrateRoot>>()
                 })

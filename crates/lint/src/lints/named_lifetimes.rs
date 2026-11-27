@@ -2,7 +2,7 @@ use syn::visit::{self, Visit};
 use syn::{LifetimeParam, Macro};
 
 use crate::expansion::Expansion;
-use crate::finding::{Found, Rule};
+use crate::finding::{Fix, Found, Rule};
 use crate::source::Source;
 use crate::style::{Reads, Style};
 
@@ -13,7 +13,7 @@ pub(crate) struct NamedLifetimes {
 
 impl NamedLifetimes {
     const SHORTEST: usize = 2;
-    const FIX: &'static str = "name the lifetime with a word that says what it borrows from";
+    const FIX: Fix = Fix("name the lifetime with a word that says what it borrows from");
 }
 
 impl<'ast> Visit<'ast> for NamedLifetimes {

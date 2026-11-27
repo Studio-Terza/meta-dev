@@ -12,9 +12,10 @@ use syn::{
 };
 
 use crate::expansion::Expansion;
-use crate::finding::{Found, Rule};
+use crate::finding::{Fix, Found, Line, Rule};
 use crate::gate::Gate;
 use crate::ignored::Ignored;
+use crate::name::Name;
 use crate::source::Source;
 use crate::style::{Reads, Style};
 
@@ -26,14 +27,14 @@ pub(crate) struct ExpressionFlow {
 
 #[derive(Debug, Default)]
 struct Locals {
-    declared: BTreeMap<String, usize>,
-    touched: BTreeSet<String>,
+    declared: BTreeMap<Name, Line>,
+    touched: BTreeSet<Name>,
 }
 
 impl ExpressionFlow {
     const WRITING_MACROS: [&'static str; 2] = ["write", "writeln"];
-    const LOOP_FIX: &'static str = "drive an iterator with combinators, const fns excepted";
-    const ASSIGN_FIX: &'static str = "build the value in one expression or give its type an updater method";
+    const LOOP_FIX: Fix = Fix("drive an iterator with combinators, const fns excepted");
+    const ASSIGN_FIX: Fix = Fix("build the value in one expression or give its type an updater method");
 
     fn function(
         &mut self,
@@ -52,7 +53,7 @@ impl ExpressionFlow {
                 Found::at(
                     line,
                     "mutable local that is only reassigned",
-                    "a mutable binding is borrowed as &mut or has methods called on it",
+                    Fix("a mutable binding is borrowed as &mut or has methods called on it"),
                 )
             }));
         });
@@ -61,7 +62,7 @@ impl ExpressionFlow {
     fn touched(&mut self, name: Option<&Ident>) {
         let scope = self.scopes.last_mut();
         scope.zip(name).map_or_default(|(locals, ident)| {
-            locals.touched.insert(ident.to_string());
+            locals.touched.insert(Name::of(ident));
         });
     }
 
@@ -170,7 +171,7 @@ impl<'ast> Visit<'ast> for ExpressionFlow {
                 Found::spanned(
                     statement.span(),
                     "if or match whose value is dropped",
-                    "let it produce the value the function returns",
+                    Fix("let it produce the value the function returns"),
                 )
             })
             .collect();
@@ -183,7 +184,7 @@ impl<'ast> Visit<'ast> for ExpressionFlow {
             Found::spanned(
                 expr.if_token.span,
                 "if without else yields nothing",
-                "use then_some, filter, or an else branch that produces the value",
+                Fix("use then_some, filter, or an else branch that produces the value"),
             )
         }));
         visit::visit_expr_if(self, expr);
@@ -198,7 +199,7 @@ impl<'ast> Visit<'ast> for ExpressionFlow {
         self.found.push(Found::spanned(
             expr.for_token.span,
             "for loop",
-            "drive the iterator with combinators, const fns excepted",
+            Fix("drive the iterator with combinators, const fns excepted"),
         ));
         visit::visit_expr_for_loop(self, expr);
     }
@@ -229,10 +230,10 @@ impl<'ast> Visit<'ast> for ExpressionFlow {
             Pat::Ident(binding) => binding.mutability.map(|_| &binding.ident),
             _ => None,
         };
-        let line = local.let_token.span.start().line;
+        let line = Line::of(local.let_token.span);
         let scope = self.scopes.last_mut();
         scope.zip(declared).map_or_default(|(locals, name)| {
-            locals.declared.insert(name.to_string(), line);
+            locals.declared.insert(Name::of(name), line);
         });
         visit::visit_local(self, local);
     }
