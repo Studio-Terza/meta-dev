@@ -9,6 +9,7 @@ mod ports {
     use console_ports::Variables;
     use design::Arguments;
     use serde::Deserialize;
+    use tempfile::Builder;
     use test_failure::Failed;
 
     #[test]
@@ -33,6 +34,12 @@ mod ports {
             .map(|directory| directory.join(&binary))
             .find(|candidate| candidate.is_file())
             .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
+        fs::create_dir_all(&home)?;
+        fs::remove_dir_all(&home)?;
+        let scratch = Builder::new()
+            .prefix(home.file_name().unwrap_or_default())
+            .rand_bytes(usize::default())
+            .tempdir_in(home.parent().unwrap_or(&home))?;
         fs::create_dir_all(&projects)?;
         let shown = cases
             .into_iter()
@@ -51,7 +58,7 @@ mod ports {
                 Ok((output.status.code(), String::from_utf8(output.stdout)?, String::from_utf8(output.stderr)?))
             })
             .collect::<Result<Vec<_>, Failed>>()?;
-        fs::remove_dir_all(&home)?;
+        scratch.close()?;
         assert_eq!(shown, serde_json::from_slice::<Vec<_>>(&fs::read(golden)?)?);
         Ok(())
     }

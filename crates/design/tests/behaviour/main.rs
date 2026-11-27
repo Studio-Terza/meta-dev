@@ -15,6 +15,7 @@ use file_ports::Disk;
 use newtype::Wrapping;
 use serde::Deserialize;
 use sqlite_ports::SqliteOpener;
+use tempfile::Builder;
 use test_failure::Failed;
 
 #[test]
@@ -38,6 +39,10 @@ fn each_scenario_answers_with_its_golden_output() -> Result<(), Failed> {
     )>::deserialize(&mut rows)?;
     fs::create_dir_all(&base)?;
     fs::remove_dir_all(&base)?;
+    let scratch = Builder::new()
+        .prefix(base.file_name().unwrap_or_default())
+        .rand_bytes(usize::default())
+        .tempdir_in(base.parent().unwrap_or(&base))?;
     let at = SystemTime::now();
     let answered = scenarios
         .into_iter()
@@ -80,7 +85,7 @@ fn each_scenario_answers_with_its_golden_output() -> Result<(), Failed> {
             Ok((said, kept))
         })
         .collect::<Result<Vec<_>, Failed>>()?;
-    fs::remove_dir_all(&base)?;
+    scratch.close()?;
     assert_eq!(answered, serde_json::from_slice::<Vec<_>>(&fs::read(golden)?)?);
     Ok(())
 }

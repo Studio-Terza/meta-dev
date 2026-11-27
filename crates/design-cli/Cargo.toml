@@ -20,6 +20,7 @@ sqlite-ports = { path = "../sqlite-ports" }
 serde.workspace = true
 serde_json.workspace = true
 test-failure = { path = "../test-failure" }
+tempfile.workspace = true
 
 [lints]
 workspace = true
