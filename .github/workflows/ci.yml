@@ -49,7 +49,7 @@ jobs:
       - uses: actions/cache/restore@v4
         with:
           path: target
-          key: target-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          key: target-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'Cargo.toml', '.github/workflows/ci.yml') }}
           restore-keys: target-${{ runner.os }}-
       - run: '"$TIMER" timed ci/limits.toml test-compile --since ../test-compile.start cargo test --locked --workspace --no-run --timings'
       - run: '"$TIMER" timed ci/limits.toml test-run cargo test --locked --workspace'
@@ -63,7 +63,7 @@ jobs:
         if: always()
         with:
           path: target
-          key: target-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          key: target-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'Cargo.toml', '.github/workflows/ci.yml') }}
 
   lint:
     runs-on: ubuntu-latest
