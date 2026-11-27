@@ -15,5 +15,13 @@ newtype = { path = "../newtype" }
 port-derive = { path = "../port-derive" }
 thiserror.workspace = true
 
+[dev-dependencies]
+design-messages = { path = "../design-messages" }
+dispatch-ports = { path = "../dispatch-ports" }
+fixture = { path = "../fixture" }
+serde.workspace = true
+sqlite-ports = { path = "../sqlite-ports" }
+store-ports = { path = "../store-ports" }
+
 [lints]
 workspace = true

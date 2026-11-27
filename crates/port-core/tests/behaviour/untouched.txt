@@ -1,0 +1,21 @@
+(
+    (
+        [],
+        Wall(
+            1800000000,
+        ),
+    ),
+    [
+        Counted {
+            name: OpName(
+                "dispatch_ports::clock::clock_ops::Clock::now",
+            ),
+            calls: Calls(
+                1,
+            ),
+        },
+    ],
+    Ok(
+        (),
+    ),
+)

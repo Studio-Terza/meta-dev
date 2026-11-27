@@ -9,7 +9,6 @@ pub(crate) enum Spine {
 
 #[derive(IntoStaticStr, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
 enum Spelled {
-    Option,
     Result,
     Held,
 }
@@ -33,7 +32,7 @@ impl Spine {
 impl Spelled {
     fn spine(self) -> Spine {
         match self {
-            Spelled::Option | Spelled::Result => Spine::Wrapper,
+            Spelled::Result => Spine::Wrapper,
             Spelled::Held => Spine::Held,
         }
     }

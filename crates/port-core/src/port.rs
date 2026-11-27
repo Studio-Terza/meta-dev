@@ -29,41 +29,11 @@ impl<'run, F> Port<'run, F> {
         body(&self.filler, Pass::minted())
     }
 
-    pub fn counted_acquire<O: Op, T: Holds>(&self, body: impl FnOnce(&F, Pass<'_, O>) -> T) -> T::Held<'run> {
+    pub fn counted_acquire<O: Op, R: Release, E>(
+        &self,
+        body: impl FnOnce(&F, Pass<'_, O>) -> Result<R, E>,
+    ) -> Result<Held<'run, R>, E> {
         self.run.count(O::NAME);
-        body(&self.filler, Pass::minted()).held(Acquired(self.run))
-    }
-}
-
-#[derive(Debug)]
-pub struct Acquired<'run>(&'run Run);
-
-pub trait Holds {
-    type Held<'run>;
-
-    fn held(self, acquired: Acquired<'_>) -> Self::Held<'_>;
-}
-
-impl<R: Release> Holds for R {
-    type Held<'run> = Held<'run, R>;
-
-    fn held(self, acquired: Acquired<'_>) -> Self::Held<'_> {
-        Held::acquired(self, acquired.0)
-    }
-}
-
-impl<R: Release> Holds for Option<R> {
-    type Held<'run> = Option<Held<'run, R>>;
-
-    fn held(self, acquired: Acquired<'_>) -> Self::Held<'_> {
-        self.map(|resource| Held::acquired(resource, acquired.0))
-    }
-}
-
-impl<R: Release, E> Holds for Result<R, E> {
-    type Held<'run> = Result<Held<'run, R>, E>;
-
-    fn held(self, acquired: Acquired<'_>) -> Self::Held<'_> {
-        self.map(|resource| Held::acquired(resource, acquired.0))
+        body(&self.filler, Pass::minted()).map(|resource| Held::acquired(resource, self.run))
     }
 }

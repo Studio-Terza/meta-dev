@@ -1,0 +1,47 @@
+(
+    (
+        [
+            Cursors(
+                {},
+            ),
+            Cursors(
+                {},
+            ),
+        ],
+        Err(
+            Claimed,
+        ),
+        Ok(
+            (),
+        ),
+    ),
+    OpName(
+        "design_messages::session_cursors::SessionCursors",
+    ),
+    [
+        Counted {
+            name: OpName(
+                "design_messages::session_cursors::SessionCursors",
+            ),
+            calls: Calls(
+                2,
+            ),
+        },
+        Counted {
+            name: OpName(
+                "store_ports::store::store_ops::Store::lock",
+            ),
+            calls: Calls(
+                3,
+            ),
+        },
+        Counted {
+            name: OpName(
+                "store_ports::store_lock::StoreLock::release",
+            ),
+            calls: Calls(
+                2,
+            ),
+        },
+    ],
+)

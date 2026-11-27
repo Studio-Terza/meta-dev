@@ -106,7 +106,7 @@ impl Declared {
 
     fn required(item: &mut TraitItem) -> Option<&mut TraitItemFn> {
         match item {
-            TraitItem::Fn(function) => Some(function).filter(|required| required.default.is_none()),
+            TraitItem::Fn(function) => Some(function),
             _ => None,
         }
     }

@@ -1,0 +1,47 @@
+(
+    (
+        [
+            Wall(
+                1800000001,
+            ),
+            Wall(
+                1800000006,
+            ),
+            Wall(
+                1800000026,
+            ),
+        ],
+        Wall(
+            1800000026,
+        ),
+    ),
+    [
+        Counted {
+            name: OpName(
+                "dispatch_ports::clock::clock_ops::Clock::moment",
+            ),
+            calls: Calls(
+                4,
+            ),
+        },
+        Counted {
+            name: OpName(
+                "dispatch_ports::clock::clock_ops::Clock::now",
+            ),
+            calls: Calls(
+                1,
+            ),
+        },
+        Counted {
+            name: OpName(
+                "dispatch_ports::clock::clock_ops::Clock::waited",
+            ),
+            calls: Calls(
+                3,
+            ),
+        },
+    ],
+    Ok(
+        (),
+    ),
+)

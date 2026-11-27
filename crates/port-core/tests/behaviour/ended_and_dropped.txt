@@ -1,0 +1,42 @@
+(
+    (
+        Pid(
+            7,
+        ),
+        Ok(
+            (),
+        ),
+        Pid(
+            7,
+        ),
+    ),
+    [
+        OpName(
+            "dispatch_ports::agent_run::AgentRun",
+        ),
+        OpName(
+            "dispatch_ports::agent_run::AgentRun::release",
+        ),
+        OpName(
+            "dispatch_ports::dispatch::dispatch_ops::Dispatch::dispatch",
+        ),
+    ],
+    [
+        Counted {
+            name: OpName(
+                "dispatch_ports::agent_run::AgentRun::release",
+            ),
+            calls: Calls(
+                2,
+            ),
+        },
+        Counted {
+            name: OpName(
+                "dispatch_ports::dispatch::dispatch_ops::Dispatch::dispatch",
+            ),
+            calls: Calls(
+                2,
+            ),
+        },
+    ],
+)
