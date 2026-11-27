@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::io::{self, ErrorKind};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::{env, fmt, fs};
 
 use invariants::Ignoring;
@@ -48,6 +49,28 @@ impl fmt::Debug for Spelled {
 
 #[derive(Debug)]
 pub struct Debugged<Shown>(pub Shown);
+
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Parsed<Read>(Read);
+
+impl<Read> Parsed<Read> {
+    pub fn value(&self) -> &Read {
+        &self.0
+    }
+}
+
+impl<'de, Read: FromStr<Err: fmt::Display>> serde::Deserialize<'de> for Parsed<Read> {
+    fn deserialize<Reader: serde::Deserializer<'de>>(reader: Reader) -> Result<Parsed<Read>, Reader::Error> {
+        let text = String::deserialize(reader)?;
+        text.parse().map(Parsed).map_err(serde::de::Error::custom)
+    }
+}
+
+impl<Read: fmt::Debug> fmt::Debug for Parsed<Read> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&self.0, formatter)
+    }
+}
 
 impl Spelled {
     #[must_use]

@@ -1,0 +1,27 @@
+[Cached.described.entry.describe]
+columns = [
+    { name = "a", type_info = "Text" },
+    { name = "b", type_info = "Integer" },
+    { name = "c", type_info = "Null" },
+]
+parameters = { Right = 0 }
+nullable = [true, false]
+
+[Cached.spelled.entry.describe]
+columns = []
+parameters = { Right = 2 }
+nullable = []
+
+[[Cached.spelled.tables]]
+name = "r"
+overwritten = "body"
+columns = [
+    { name = "id", origin = "generated_key" },
+    { name = "body", origin = "given" },
+    { name = "at", origin = "generated" },
+]
+
+[[Cached.spelled.tables]]
+name = "s"
+overwritten = "id"
+columns = [{ name = "id", origin = "generated_key" }]

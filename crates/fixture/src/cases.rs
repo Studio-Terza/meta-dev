@@ -16,14 +16,15 @@ pub struct Case<Row> {
 
 impl<Row: Fixture> Cases<Row> {
     pub fn drifted<Printed: Display>(
-        printing: impl Fn(&Case<Row>) -> Result<Printed, Failed>,
+        printing: impl Fn(Case<Row>) -> Result<Printed, Failed>,
     ) -> Result<Vec<Drift>, Failed> {
         let mut rows = Row::STORY.rows::<Row>()?;
         let entries = Row::STORY.entries()?;
         let compared = entries.into_iter().map(|(name, entry)| {
             let golden = entry.golden(&name)?;
-            let case = Case { row: rows.remove(&name), directory: entry.directory().map(Path::to_path_buf), name };
-            golden.compared(&case.name, printing(&case)?)
+            let row = rows.remove(&name);
+            let case = Case { row, directory: entry.directory().map(Path::to_path_buf), name: name.clone() };
+            golden.compared(&name, printing(case)?)
         });
         compared.filter_map(Result::transpose).collect()
     }
@@ -42,5 +43,9 @@ impl<Row> Case<Row> {
 
     pub fn row(&self) -> Result<&Row, Failed> {
         self.row.as_ref().ok_or_else(|| self.name.unrowed())
+    }
+
+    pub fn into_row(self) -> Result<Row, Failed> {
+        self.row.ok_or_else(|| self.name.unrowed())
     }
 }

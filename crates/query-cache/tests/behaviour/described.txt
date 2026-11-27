@@ -1,0 +1,52 @@
+(
+    [
+        0,
+    ],
+    Err(
+        "the query takes 0 parameters but 255 are bound",
+    ),
+    [],
+    [
+        (
+            Some(
+                "::std::string::String",
+            ),
+            Some(
+                (),
+            ),
+            Described {
+                column: Column {
+                    name: "a",
+                    type_info: Text,
+                },
+                nullable: Possible,
+            },
+        ),
+        (
+            Some(
+                "i64",
+            ),
+            None,
+            Described {
+                column: Column {
+                    name: "b",
+                    type_info: Integer,
+                },
+                nullable: Never,
+            },
+        ),
+        (
+            None,
+            Some(
+                (),
+            ),
+            Described {
+                column: Column {
+                    name: "c",
+                    type_info: Unmapped,
+                },
+                nullable: Possible,
+            },
+        ),
+    ],
+)
