@@ -47,7 +47,7 @@ pub enum Known {
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
-pub enum Entry {
+pub(crate) enum Entry {
     Known(Known),
     Unknown(Unrecognised),
 }

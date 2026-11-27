@@ -14,7 +14,7 @@ use boundary::Told;
 
 #[derive(Debug, thiserror::Error)]
 #[error("releasing {resource} failed: {failure}")]
-pub struct ReleaseFailure {
+pub(crate) struct ReleaseFailure {
     resource: OpName,
     failure: Told,
 }

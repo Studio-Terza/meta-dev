@@ -13,7 +13,10 @@ pub(crate) struct Pairing {
 }
 
 impl Pairing {
-    pub(crate) fn joined(limits: BTreeMap<Stage, Limit>, measured: BTreeMap<Stage, Seconds>) -> BTreeMap<Stage, Pairing> {
+    pub(crate) fn joined(
+        limits: BTreeMap<Stage, Limit>,
+        measured: BTreeMap<Stage, Seconds>,
+    ) -> BTreeMap<Stage, Pairing> {
         measured.into_iter().fold(
             limits.into_iter().map(|(stage, limit)| (stage, Pairing { limit: Some(limit), measured: None })).collect(),
             |mut joined, (stage, seconds)| {

@@ -99,7 +99,11 @@ impl Reading {
         &self.ty
     }
 
-    pub(crate) fn stepped<'earlier>(&self, into: &Ident, earlier: impl Iterator<Item = &'earlier Ident>) -> TokenStream {
+    pub(crate) fn stepped<'earlier>(
+        &self,
+        into: &Ident,
+        earlier: impl Iterator<Item = &'earlier Ident>,
+    ) -> TokenStream {
         let past = &self.past;
         let rest = past.first().map_or_else(|| quote!(self.__fields), |_| quote!(self.__fields.past(&[#(#past),*])?));
         let read = self.spec.taking.read(&rest, &self.ty);
