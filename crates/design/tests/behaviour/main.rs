@@ -27,6 +27,8 @@ use serde_json::Value;
 use sqlite_ports::SqliteOpener;
 use tempfile::TempDir;
 
+use ports::Design;
+
 const OWNER: &str = "Merge only when CI is green.";
 const QUESTION: &str = "Shall I merge the branch now?";
 const NONE: fn(&Home) -> Result<(), Failed> = |_| Ok(());
@@ -805,4 +807,80 @@ impl Story {
         };
         Ok(format!("## {}\n{}{queue}", self.name, finished.concat()))
     }
+}
+
+mod ports {
+    use std::io::Write;
+    use std::path::Path;
+    use std::process::{Command, Output, Stdio};
+    use test_failure::Failed;
+
+    #[derive(Debug)]
+    pub struct Design;
+
+    impl Design {
+        pub fn run(home: &Path, arguments: &[&str]) -> Result<Output, Failed> {
+            Design::fed(home, arguments, "")
+        }
+
+        pub fn fed(home: &Path, arguments: &[&str], input: &str) -> Result<Output, Failed> {
+            let mut child = Command::new(env!("CARGO_BIN_EXE_design"))
+                .env("HOME", home)
+                .current_dir(home)
+                .args(arguments)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()?;
+            child.stdin.take().ok_or("the child's stdin is not piped")?.write_all(input.as_bytes())?;
+            Ok(child.wait_with_output()?)
+        }
+    }
+}
+
+#[test]
+fn an_unknown_command_exits_with_failure_and_prints_the_usage() -> Result<(), Failed> {
+    let home = TempDir::new()?;
+    let output = Design::run(home.path(), &["frobnicate"])?;
+    assert_eq!(
+        (output.status.code(), String::from_utf8(output.stdout)?, String::from_utf8(output.stderr)?),
+        (Some(1_i32), String::new(), format!("{}\n", Failure::Usage))
+    );
+    Ok(())
+}
+
+#[test]
+fn the_hook_settings_are_printed_as_json_at_exit_zero() -> Result<(), Failed> {
+    let home = TempDir::new()?;
+    let output = Design::run(home.path(), &["hook", "--settings"])?;
+    let settings: Value = serde_json::from_slice(&output.stdout)?;
+    assert_eq!((output.status.code(), output.stderr), (Some(0_i32), Vec::new()));
+    assert!(settings.pointer("/hooks/Stop/0/hooks/0/command").and_then(Value::as_str).is_some());
+    Ok(())
+}
+
+#[test]
+fn a_stop_hook_reads_its_event_from_standard_input() -> Result<(), Failed> {
+    let home = TempDir::new()?;
+    let workspace = home.path().join("work");
+    let slug = Letters::slugged(&workspace.to_string_lossy());
+    fs::create_dir_all(home.path().join(".claude/projects").join(slug))?;
+    let rooted = ["--workspace", &workspace.to_string_lossy(), "hook", "stop"].map(str::to_owned);
+    let words: Vec<&str> = rooted.iter().map(String::as_str).collect();
+    let continuing = Design::fed(home.path(), &words, "{\"stop_hook_active\":true}")?;
+    let unreadable = Design::fed(home.path(), &words, "not json")?;
+    assert_eq!((continuing.status.code(), continuing.stdout, continuing.stderr), (Some(0_i32), Vec::new(), Vec::new()));
+    assert!(String::from_utf8(unreadable.stderr)?.contains("cannot read the hook input: "));
+    Ok(())
+}
+
+#[test]
+fn ingest_of_a_workspace_without_transcripts_fails_naming_the_transcripts() -> Result<(), Failed> {
+    let home = TempDir::new()?;
+    let workspace = home.path().join("work");
+    fs::create_dir_all(&workspace)?;
+    let output = Design::run(home.path(), &["--workspace", &workspace.to_string_lossy(), "ingest"])?;
+    assert_eq!((output.status.code(), output.stdout), (Some(1_i32), Vec::new()));
+    assert!(String::from_utf8(output.stderr)?.contains("cannot reach the transcripts: "));
+    Ok(())
 }
