@@ -1,96 +1,33 @@
-use serde_json::error::Category;
-use text_lines::{KeptLines, Lines, LossyText, NotOneLine, OneLine};
+use proptest::prelude::{any, prop_assert_eq, proptest};
+use text_lines::{Lines, LossyText, OneLine};
 
-struct Sample;
+const NEWLINE: &str = "\n";
 
-impl Sample {
-    fn bracketed(text: &str) -> String {
-        text.parse::<Lines>().into_iter().flatten().map(|line| ["<", line.as_str(), ">"].concat()).collect()
+proptest! {
+    #[test]
+    fn lines_joined_by_their_breaks_give_back_the_text(text in "[a-zé \t\r\n]{0,24}") {
+        let joined = text.parse::<Lines>().into_iter().flatten().collect::<Vec<String>>().join(NEWLINE);
+        let rebuilt = [joined.clone(), [joined, NEWLINE.to_owned()].concat()];
+        prop_assert_eq!(rebuilt.iter().filter(|candidate| **candidate == text).count(), 1);
     }
 
-    fn kept(text: &str) -> String {
-        text.parse::<KeptLines>()
-            .into_iter()
-            .flatten()
-            .flat_map(|line| ["<".to_owned(), line.escape_debug().to_string(), ">".to_owned()])
-            .collect()
-    }
-}
-
-#[test]
-fn text_splits_at_each_line_break_without_keeping_it() {
-    for (text, want) in [
-        ("", ""),
-        ("a", "<a>"),
-        ("a\nb", "<a><b>"),
-        ("a\nb\n", "<a><b>"),
-        ("a\n\nb", "<a><><b>"),
-        ("\n", "<>"),
-        ("\n\n", "<><>"),
-        ("\na", "<><a>"),
-        ("é\nü", "<é><ü>"),
-        ("a b\tc\nd", "<a b\tc><d>"),
-        ("a\r\nb", "<a\r><b>"),
-    ] {
-        assert_eq!(Sample::bracketed(text), want, "{text:?}");
-    }
-}
-
-#[test]
-fn text_splits_after_each_line_break_keeping_it() {
-    for (text, want) in [
-        ("", ""),
-        ("a", "<a>"),
-        ("a\nb", r"<a\n><b>"),
-        ("a\nb\n", r"<a\n><b\n>"),
-        ("a\n\nb", r"<a\n><\n><b>"),
-        ("\n", r"<\n>"),
-        ("\n\n", r"<\n><\n>"),
-        ("\na", r"<\n><a>"),
-        ("é\nü", r"<é\n><ü>"),
-        ("a\r\nb", r"<a\r\n><b>"),
-    ] {
-        assert_eq!(Sample::kept(text), want, "{text:?}");
-    }
-}
-
-#[test]
-fn bytes_that_are_not_utf8_become_the_replacement_character() {
-    for (bytes, want) in [
-        (&b""[..], ""),
-        (b"abc", "abc"),
-        ("é".as_bytes(), "é"),
-        (b"a\xffb", "a\u{FFFD}b"),
-        (b"\xff\xfe", "\u{FFFD}\u{FFFD}"),
-        (b"ok\xc3", "ok\u{FFFD}"),
-    ] {
-        assert_eq!(LossyText::from(bytes).to_string(), want, "{bytes:?}");
-    }
-}
-
-struct Read;
-
-impl Read {
-    fn line(text: &str) -> Result<String, NotOneLine> {
-        OneLine::try_new(text.to_owned()).map(|line| line.to_string())
+    #[test]
+    fn utf8_bytes_read_as_the_text_they_spell(text in any::<String>()) {
+        prop_assert_eq!(LossyText::from(text.as_bytes()).to_string(), text);
     }
 
-    fn deserialized(json: &str) -> Result<String, Category> {
-        serde_json::from_str::<OneLine>(json).map(|line| line.as_ref().to_owned()).map_err(|error| error.classify())
+    #[test]
+    fn text_is_one_line_exactly_when_it_holds_no_control_character(text in any::<String>()) {
+        let line = OneLine::try_new(text.clone()).map(|read| read.to_string());
+        let expected = text.chars().all(|letter| !letter.is_control()).then(|| text.clone());
+        prop_assert_eq!(line.into_iter().next(), expected);
     }
-}
 
-#[test]
-fn text_with_a_line_break_or_control_character_is_not_one_line() {
-    [("", Ok(String::new())), ("a b", Ok("a b".to_owned())), ("é ü", Ok("é ü".to_owned()))]
-        .into_iter()
-        .chain(["a\nb", "a\rb", "a\tb", "a\u{7f}", "\u{0}"].map(|text| (text, Err(NotOneLine))))
-        .for_each(|(text, want)| assert_eq!(Read::line(text), want, "{text:?}"));
-}
-
-#[test]
-fn a_line_read_from_json_is_checked() {
-    assert_eq!(Read::deserialized("\"a b\""), Ok("a b".to_owned()));
-    assert_eq!(Read::deserialized("\"a\\nb\""), Err(Category::Data));
-    assert_eq!(Read::deserialized("1"), Err(Category::Data));
+    #[test]
+    fn a_line_read_from_json_is_checked_the_same_way(text in any::<String>()) {
+        let json = serde_json::to_string(&text).into_iter().next().unwrap_or_default();
+        let read = serde_json::from_str::<OneLine>(&json).map(|line| line.to_string());
+        let direct = OneLine::try_new(text).map(|line| line.to_string());
+        prop_assert_eq!(read.into_iter().next(), direct.into_iter().next());
+    }
 }

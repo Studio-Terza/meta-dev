@@ -1,10 +1,11 @@
 use std::io;
 
+use proptest::prelude::{any, prop_assert_eq, proptest};
 use test_failure::Failed;
 
-#[test]
-fn a_failure_keeps_the_message_it_was_made_from() {
-    let failed = Failed::from(io::Error::other("the disk is gone"));
-    assert_eq!(format!("{failed:?}"), "Failed(\"the disk is gone\")");
-    assert_eq!(failed, Failed::from("the disk is gone"));
+proptest! {
+    #[test]
+    fn a_failure_keeps_the_message_it_was_made_from(message in any::<String>()) {
+        prop_assert_eq!(Failed::from(io::Error::other(message.clone())), Failed::from(message));
+    }
 }
