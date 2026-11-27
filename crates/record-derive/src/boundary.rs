@@ -8,7 +8,7 @@ use syn::{Data, DataStruct, DeriveInput, Error, Fields, Ident, Type};
 use reading::Reading;
 
 #[derive(Debug)]
-pub struct Record {
+pub(crate) struct Record {
     ident: Ident,
     source: Type,
     readings: Vec<Reading>,

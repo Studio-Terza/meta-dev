@@ -10,27 +10,27 @@ mod keyword {
     syn::custom_keyword!(generate);
 }
 
-pub enum Setting {
+pub(crate) enum Setting {
     Checked,
     Expressed(Expressed, Box<Expr>),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Expressed {
+pub(crate) enum Expressed {
     Strategy,
     From,
     Generate,
 }
 
 impl Setting {
-    pub fn checking(&self) -> Option<Checking> {
+    pub(crate) fn checking(&self) -> Option<Checking> {
         match self {
             Setting::Checked => Some(Checking::Checked),
             Setting::Expressed(..) => None,
         }
     }
 
-    pub fn expressed(&self, wanted: Expressed) -> Option<&Expr> {
+    pub(crate) fn expressed(&self, wanted: Expressed) -> Option<&Expr> {
         match self {
             Setting::Expressed(named, expression) => (*named == wanted).then_some(expression.as_ref()),
             Setting::Checked => None,

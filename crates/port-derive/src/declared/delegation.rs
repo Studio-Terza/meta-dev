@@ -4,7 +4,7 @@ use quote::quote;
 use super::method::{Method, Parameter};
 use super::{Declared, Rendered};
 
-pub struct Delegation;
+pub(crate) struct Delegation;
 
 impl Rendered for Delegation {
     fn rendered(declared: &Declared) -> TokenStream {

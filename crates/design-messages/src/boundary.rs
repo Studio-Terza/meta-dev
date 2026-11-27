@@ -11,7 +11,7 @@ use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Uui
 use crate::Said;
 
 #[derive(Debug)]
-pub struct MessageRow {
+pub(crate) struct MessageRow {
     uuid: Uuid,
     session: SessionId,
     parent: Option<Uuid>,
@@ -30,7 +30,7 @@ pub(crate) struct SaidRow {
 
 #[derive(Clone, Debug, PartialEq, Eq, Columns, store_ports::Record)]
 #[record(table = "cursors")]
-pub struct CursorRow {
+pub(crate) struct CursorRow {
     #[record(key)]
     session: SessionId,
     read_to: Offset,

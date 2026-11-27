@@ -3,16 +3,16 @@ mod setting;
 use syn::punctuated::Punctuated;
 use syn::{Attribute, Expr, Stmt, Token, Type, WherePredicate, parse_quote};
 
-pub use setting::Expressed;
+pub(crate) use setting::Expressed;
 use setting::Setting;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Checking {
+pub(crate) enum Checking {
     Unchecked,
     Checked,
 }
 
-pub struct Settings {
+pub(crate) struct Settings {
     checking: Checking,
     declared: Vec<Setting>,
 }
@@ -20,7 +20,7 @@ pub struct Settings {
 impl Settings {
     const ATTRIBUTE: &'static str = "newtype";
 
-    pub fn declared(attributes: &[Attribute]) -> syn::Result<Settings> {
+    pub(crate) fn declared(attributes: &[Attribute]) -> syn::Result<Settings> {
         let lists = attributes
             .iter()
             .filter(|attribute| attribute.path().is_ident(Self::ATTRIBUTE))
@@ -31,11 +31,11 @@ impl Settings {
         Ok(Settings { checking, declared })
     }
 
-    pub fn expressed(&self, wanted: Expressed) -> Option<&Expr> {
+    pub(crate) fn expressed(&self, wanted: Expressed) -> Option<&Expr> {
         self.declared.iter().find_map(|setting| setting.expressed(wanted))
     }
 
-    pub fn required(&self, inner: &Type) -> Vec<WherePredicate> {
+    pub(crate) fn required(&self, inner: &Type) -> Vec<WherePredicate> {
         match self.expressed(Expressed::Strategy) {
             None => vec![
                 parse_quote!(Self: ::core::fmt::Debug),
@@ -46,21 +46,21 @@ impl Settings {
         }
     }
 
-    pub fn parameters(&self, inner: &Type) -> Type {
+    pub(crate) fn parameters(&self, inner: &Type) -> Type {
         self.expressed(Expressed::Strategy).map_or_else(
             || parse_quote!(<#inner as ::newtype::proptest::arbitrary::Arbitrary>::Parameters),
             |_| parse_quote!(()),
         )
     }
 
-    pub fn source(&self, inner: &Type) -> Vec<Stmt> {
+    pub(crate) fn source(&self, inner: &Type) -> Vec<Stmt> {
         match self.expressed(Expressed::Strategy) {
             Some(strategy) => parse_quote!(let _ = parameters; let inner = #strategy;),
             None => parse_quote!(let inner = ::newtype::proptest::arbitrary::any_with::<#inner>(parameters);),
         }
     }
 
-    pub fn checking(&self) -> Checking {
+    pub(crate) fn checking(&self) -> Checking {
         self.checking
     }
 }

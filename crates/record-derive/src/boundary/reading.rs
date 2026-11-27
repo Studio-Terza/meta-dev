@@ -29,7 +29,7 @@ struct Spec {
 }
 
 #[derive(Debug)]
-pub struct Reading {
+pub(crate) struct Reading {
     ident: Ident,
     ty: Type,
     spec: Spec,
@@ -76,7 +76,7 @@ impl Spec {
 }
 
 impl Reading {
-    pub fn declared(field: &Field) -> syn::Result<Reading> {
+    pub(crate) fn declared(field: &Field) -> syn::Result<Reading> {
         let ident = field.ident.clone().ok_or_else(|| Error::new_spanned(field, "a record's fields are named"))?;
         let found =
             field.attrs.iter().find_map(|attribute| Keyword::named(attribute).map(|keyword| (keyword, attribute)));
@@ -91,15 +91,15 @@ impl Reading {
         Ok(Reading { ident, ty: field.ty.clone(), spec, past: past.into_iter().flatten().collect() })
     }
 
-    pub fn ident(&self) -> &Ident {
+    pub(crate) fn ident(&self) -> &Ident {
         &self.ident
     }
 
-    pub fn field_type(&self) -> &Type {
+    pub(crate) fn field_type(&self) -> &Type {
         &self.ty
     }
 
-    pub fn stepped<'earlier>(&self, into: &Ident, earlier: impl Iterator<Item = &'earlier Ident>) -> TokenStream {
+    pub(crate) fn stepped<'earlier>(&self, into: &Ident, earlier: impl Iterator<Item = &'earlier Ident>) -> TokenStream {
         let past = &self.past;
         let rest = past.first().map_or_else(|| quote!(self.__fields), |_| quote!(self.__fields.past(&[#(#past),*])?));
         let read = self.spec.taking.read(&rest, &self.ty);

@@ -8,11 +8,11 @@ use syn::{FnArg, Generics, Ident, ReturnType, TraitItemFn, Type};
 
 use super::boundary::Spelling;
 use super::names::OpsName;
-pub use parameter::Parameter;
+pub(crate) use parameter::Parameter;
 use per_type::PerType;
-pub use returned::Returned;
+pub(crate) use returned::Returned;
 
-pub struct Method {
+pub(crate) struct Method {
     name: Ident,
     generics: Generics,
     parameters: Vec<Parameter>,
@@ -22,7 +22,7 @@ pub struct Method {
 }
 
 impl Method {
-    pub fn declared(function: &mut TraitItemFn) -> Method {
+    pub(crate) fn declared(function: &mut TraitItemFn) -> Method {
         let per_type = PerType::stripped(function);
         let signature = &function.sig;
         let parameters = signature
@@ -49,31 +49,31 @@ impl Method {
         }
     }
 
-    pub fn name(&self) -> &Ident {
+    pub(crate) fn name(&self) -> &Ident {
         &self.name
     }
 
-    pub fn generics(&self) -> &Generics {
+    pub(crate) fn generics(&self) -> &Generics {
         &self.generics
     }
 
-    pub fn parameters(&self) -> &[Parameter] {
+    pub(crate) fn parameters(&self) -> &[Parameter] {
         &self.parameters
     }
 
-    pub fn output(&self) -> &ReturnType {
+    pub(crate) fn output(&self) -> &ReturnType {
         &self.output
     }
 
-    pub fn returned(&self) -> &Returned {
+    pub(crate) fn returned(&self) -> &Returned {
         &self.returned
     }
 
-    pub fn op_struct(&self) -> Option<Ident> {
+    pub(crate) fn op_struct(&self) -> Option<Ident> {
         self.per_type.as_ref().map_or_else(|| Some(Spelling::camel(&self.name)), |_| None)
     }
 
-    pub fn pass(&self, ops: &OpsName) -> TokenStream {
+    pub(crate) fn pass(&self, ops: &OpsName) -> TokenStream {
         let named = self.per_type.clone().unwrap_or_else(|| {
             let op = Spelling::camel(&self.name);
             quote!(#ops::#op)

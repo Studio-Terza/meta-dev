@@ -5,12 +5,12 @@ use syn::{DeriveInput, Generics, Ident};
 use super::declared::{Constant, Spelling};
 
 #[derive(Clone, Copy, Debug)]
-pub enum Derived {
+pub(crate) enum Derived {
     Op,
     Resource,
 }
 
-pub struct Named {
+pub(crate) struct Named {
     ident: Ident,
     generics: Generics,
 }
@@ -34,7 +34,7 @@ impl Derived {
 }
 
 impl Named {
-    pub fn expanded(tokens: TokenStream, derived: Derived) -> TokenStream {
+    pub(crate) fn expanded(tokens: TokenStream, derived: Derived) -> TokenStream {
         let expansion = syn::parse2::<DeriveInput>(tokens)
             .map(|DeriveInput { ident, generics, .. }| Named { ident, generics })
             .map(|named| named.implementing(derived));

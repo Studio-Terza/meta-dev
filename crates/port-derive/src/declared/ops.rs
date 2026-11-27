@@ -6,7 +6,7 @@ use super::method::Method;
 use super::names::CallerName;
 use super::{Declared, Rendered};
 
-pub struct Ops;
+pub(crate) struct Ops;
 
 impl Rendered for Ops {
     fn rendered(declared: &Declared) -> TokenStream {

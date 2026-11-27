@@ -6,7 +6,7 @@ use syn::{Data, DataStruct, DeriveInput, Error, Field, Fields, FieldsNamed};
 use crate::expanded::Expanding;
 
 #[derive(Debug)]
-pub struct Columns {
+pub(crate) struct Columns {
     row: DeriveInput,
     fields: Vec<Field>,
 }

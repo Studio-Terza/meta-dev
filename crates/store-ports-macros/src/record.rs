@@ -8,7 +8,7 @@ use crate::expanded::Expanding;
 use query_cache::Origin;
 
 #[derive(Debug)]
-pub struct Record {
+pub(crate) struct Record {
     visibility: Visibility,
     row: Ident,
     table: LitStr,
@@ -63,7 +63,7 @@ impl Expanding for Record {
         Ok(quote! {
             #[derive(Clone, Debug, PartialEq, Eq)]
             #visibility struct #fresh {
-                #(#visibility #given_names: #given_types,)*
+                #(pub #given_names: #given_types,)*
             }
 
             impl ::core::convert::From<&#row> for #fresh {

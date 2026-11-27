@@ -5,10 +5,10 @@ use proc_macro2::TokenStream;
 use syn::{DeriveInput, Generics, Ident};
 
 use crate::settings::Settings;
-pub use expansion::{CheckedDeserializing, Constructors, Deserializing, Expansion, Formatting, Serializing, Strategy};
+pub(crate) use expansion::{CheckedDeserializing, Constructors, Deserializing, Expansion, Formatting, Serializing, Strategy};
 use only_field::OnlyField;
 
-pub struct Wrapped {
+pub(crate) struct Wrapped {
     ident: Ident,
     generics: Generics,
     field: OnlyField,
@@ -16,14 +16,14 @@ pub struct Wrapped {
 }
 
 impl Wrapped {
-    pub fn expanded<Derived: Expansion>(tokens: TokenStream) -> TokenStream {
+    pub(crate) fn expanded<Derived: Expansion>(tokens: TokenStream) -> TokenStream {
         match syn::parse2(tokens).map(Self::derived::<Derived>) {
             Ok(expansion) => expansion,
             Err(error) => error.to_compile_error(),
         }
     }
 
-    pub fn derived<Derived: Expansion>(input: DeriveInput) -> TokenStream {
+    pub(crate) fn derived<Derived: Expansion>(input: DeriveInput) -> TokenStream {
         match Self::split(input).map(Derived::of) {
             Ok(expansion) => expansion,
             Err(error) => error.to_compile_error(),

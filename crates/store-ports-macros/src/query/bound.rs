@@ -4,13 +4,13 @@ use syn::parse::{Parse, ParseStream};
 use syn::{Ident, Token, Type};
 
 #[derive(Debug)]
-pub struct Bound {
+pub(crate) struct Bound {
     name: Ident,
     column: Type,
 }
 
 impl Bound {
-    pub fn encoded(&self) -> TokenStream {
+    pub(crate) fn encoded(&self) -> TokenStream {
         let Bound { name, column } = self;
         let encode = quote!(::store_ports::IntoArgument::into_argument);
         let raw = quote!(::store_ports::Column);

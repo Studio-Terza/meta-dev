@@ -5,13 +5,13 @@ use named::{Named, Slot};
 
 mod named;
 
-pub enum Returned {
+pub(crate) enum Returned {
     Plain,
     Acquired(ReturnType),
 }
 
 impl Returned {
-    pub fn parsed(output: &ReturnType) -> Returned {
+    pub(crate) fn parsed(output: &ReturnType) -> Returned {
         match output {
             ReturnType::Default => Returned::Plain,
             ReturnType::Type(arrow, tree) => Self::unheld(tree)
@@ -19,14 +19,14 @@ impl Returned {
         }
     }
 
-    pub fn filler_output<'method>(&'method self, declared: &'method ReturnType) -> &'method ReturnType {
+    pub(crate) fn filler_output<'method>(&'method self, declared: &'method ReturnType) -> &'method ReturnType {
         match self {
             Returned::Plain => declared,
             Returned::Acquired(filler) => filler,
         }
     }
 
-    pub fn counting(&self) -> Ident {
+    pub(crate) fn counting(&self) -> Ident {
         match self {
             Returned::Plain => format_ident!("counted_call"),
             Returned::Acquired(_) => format_ident!("counted_acquire"),
