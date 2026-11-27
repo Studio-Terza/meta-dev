@@ -5,6 +5,7 @@ use crate::finding::{Found, Rule};
 use crate::gate::Gate;
 use crate::source::Source;
 use crate::style::{Reads, Style};
+use crate::terms::Fix;
 use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Debug, Default)]
@@ -16,8 +17,8 @@ pub(crate) struct BoolMethods {
 struct Flags(Option<()>);
 
 impl BoolMethods {
-    const FIX: &'static str =
-        "return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty";
+    const FIX: Fix =
+        Fix("return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty");
 }
 
 impl<'ast> Visit<'ast> for Flags {

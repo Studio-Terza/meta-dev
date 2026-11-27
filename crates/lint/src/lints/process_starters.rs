@@ -5,6 +5,7 @@ use syn::{ItemMod, ItemUse, Macro, Path};
 use crate::finding::{Found, Rule};
 use crate::source::Source;
 use crate::style::{Reads, Style};
+use crate::terms::{Fix, Line};
 use crate::use_leaf::UseLeaf;
 use crate::walk::{Descent, Expanded, Hooks};
 
@@ -29,14 +30,14 @@ enum Bound {
 
 #[derive(Debug)]
 struct Spelled {
-    line: usize,
+    line: Line,
     segments: Vec<String>,
 }
 
 #[derive(Debug, Default)]
 struct Run {
     segments: Vec<String>,
-    line: Option<usize>,
+    line: Option<Line>,
     colons: usize,
     found: Vec<Spelled>,
 }
@@ -48,6 +49,7 @@ impl ProcessStarters {
     const NEW: &'static str = "new";
     const STD: &'static str = "std";
     const OWN: &'static str = "self";
+    const FIX: Fix = Fix("move it behind a port: a crate whose name ends in ports, or a module named ports");
 
     fn scanning(ported: Option<()>) -> ProcessStarters {
         ProcessStarters { modules: vec![Module { ported, ..Module::default() }], open: vec![0] }
@@ -62,7 +64,7 @@ impl ProcessStarters {
         self.current().filter(|module| module.ported.is_none())
     }
 
-    fn starts(&self) -> Vec<usize> {
+    fn starts(&self) -> Vec<Line> {
         self.modules
             .iter()
             .flat_map(|module| module.spelled.iter().filter_map(|spelled| spelled.started(&module.imports)))
@@ -71,7 +73,7 @@ impl ProcessStarters {
 }
 
 impl Spelled {
-    fn started(&self, imports: &[Bound]) -> Option<usize> {
+    fn started(&self, imports: &[Bound]) -> Option<Line> {
         let (last, rest) = self.segments.split_last()?;
         (last == ProcessStarters::NEW).then_some(())?;
         let (owner, ahead) = rest.split_last()?;
@@ -131,7 +133,7 @@ impl Run {
                     None => self.ended(),
                 };
                 Run {
-                    line: run.line.or(Some(ident.span().start().line)),
+                    line: run.line.or(Some(Line::of(ident.span()))),
                     segments: run.segments.into_iter().chain([ident.to_string()]).collect(),
                     colons: 0,
                     found: run.found,
@@ -171,7 +173,7 @@ impl Hooks for ProcessStarters {
 
     fn path(&mut self, path: &Path) -> Descent {
         let spelled = Spelled {
-            line: path.span().start().line,
+            line: Line::of(path.span()),
             segments: path.segments.iter().map(|segment| segment.ident.to_string()).collect(),
         };
         self.admitted().map_or_default(|module| module.spelled.push(spelled));
@@ -195,15 +197,6 @@ impl<'file> Style<'file> for ProcessStarters {
 
     fn found(self) -> Vec<Found> {
         let lines = self.starts();
-        lines
-            .into_iter()
-            .map(|line| {
-                Found::at(
-                    line,
-                    "starts a std::process::Command",
-                    "move it behind a port: a crate whose name ends in ports, or a module named ports",
-                )
-            })
-            .collect()
+        lines.into_iter().map(|line| Found::at(line, "starts a std::process::Command", ProcessStarters::FIX)).collect()
     }
 }

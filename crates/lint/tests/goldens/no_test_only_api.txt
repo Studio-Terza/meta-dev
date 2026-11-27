@@ -17,3 +17,15 @@ Cargo.toml:4: test feature test-utils; remove the feature and test through the A
 src/feature.rs:1: test feature test-utils; remove the feature and test through the API every build has
 src/gated.rs:2: visible item gated on test; remove the gate and test through the real public API
 src/hidden.rs:2: #[doc(hidden)] on a visible item; document it as real API, or make it private
+tests run production code paths: no literals in a test body and no test helpers beyond a test table:
+tests/t.rs:2: test helper fn t; test through the production code path; a test file holds tests and their table
+every pub item is named by another workspace crate:
+src/hidden.rs:2: pub f is named by no other crate; make it private or delete it
+src/lib.rs:1: pub gated is named by no other crate; make it private or delete it
+src/lib.rs:2: pub hidden is named by no other crate; make it private or delete it
+src/lib.rs:3: pub plain is named by no other crate; make it private or delete it
+src/lib.rs:4: pub feature is named by no other crate; make it private or delete it
+src/lib.rs:5: pub staged is named by no other crate; make it private or delete it
+src/plain.rs:1: pub f is named by no other crate; make it private or delete it
+src/staged.rs:1: pub A is named by no other crate; make it private or delete it
+src/staged.rs:3: pub staged is named by no other crate; make it private or delete it

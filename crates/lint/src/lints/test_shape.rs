@@ -11,6 +11,7 @@ use crate::finding::{Found, Rule};
 use crate::gate::{Gate, TestMark};
 use crate::source::{Place, Source};
 use crate::style::{Reads, Style};
+use crate::terms::Fix;
 use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Debug)]
@@ -60,9 +61,9 @@ enum Helper {
 }
 
 impl TestShape {
-    const LITERAL_FIX: &'static str =
-        "read expected values from a golden file and inputs from a fixture or a proptest strategy";
-    const HELPER_FIX: &'static str = "test through the production code path; a test file holds tests and their table";
+    const LITERAL_FIX: Fix =
+        Fix("read expected values from a golden file and inputs from a fixture or a proptest strategy");
+    const HELPER_FIX: Fix = Fix("test through the production code path; a test file holds tests and their table");
     const DECLARING: &'static str = "fn";
     const MARK: char = '#';
     const TRUTHS: [&'static str; 2] = ["true", "false"];
@@ -71,23 +72,25 @@ impl TestShape {
         self.tested.or(self.gated.iter().flatten().next().copied())
     }
 
-    fn helper(&mut self, kind: Helper, name: &Ident) {
+    fn helped(&self, kind: Helper, name: &Ident) -> Option<Found> {
         let problem = match kind {
             Helper::Function => format!("test helper fn {name}"),
             Helper::Type => format!("test helper type {name}"),
         };
-        let found = self.testing().map(|()| Found::spanned(name.span(), problem, TestShape::HELPER_FIX));
+        self.testing().map(|()| Found::spanned(name.span(), problem, TestShape::HELPER_FIX))
+    }
+
+    fn helper(&mut self, kind: Helper, name: &Ident) {
+        let found = self.helped(kind, name);
         self.found.extend(found);
     }
 
     fn function(&mut self, attributes: &[Attribute], name: &Ident) -> Descent {
-        match TestMark::among(attributes) {
-            Some(_) => self.holdings.push(Some(Holding { name: name.clone(), kind: Held::Test, flagged: None })),
-            None => {
-                self.helper(Helper::Function, name);
-                self.holdings.push(None);
-            }
-        }
+        let holding =
+            TestMark::among(attributes).map(|_| Holding { name: name.clone(), kind: Held::Test, flagged: None });
+        let helper = holding.is_none().then(|| self.helped(Helper::Function, name)).flatten();
+        self.found.extend(helper);
+        self.holdings.push(holding);
         Descent::Into
     }
 
@@ -104,7 +107,7 @@ impl TestShape {
     fn literal(&mut self) {
         let unflagged = self.holdings.last_mut().and_then(Option::as_mut).filter(|holding| holding.flagged.is_none());
         let found = unflagged.map(|holding| {
-            holding.flagged = Some(());
+            holding.flagged.replace(());
             let name = &holding.name;
             let problem = match holding.kind {
                 Held::Test => format!("literal in test {name}"),
@@ -191,9 +194,13 @@ impl<'ast> Visit<'ast> for Named {
 impl Hooks for TestShape {
     fn left_file(&mut self, _: &syn::File) {
         let rows = self.rows();
-        let helpers: Vec<Ident> =
-            self.shapes.iter().filter(|shape| !rows.contains(&shape.name)).map(|shape| shape.name.clone()).collect();
-        helpers.iter().for_each(|name| self.helper(Helper::Type, name));
+        let helpers: Vec<Found> = self
+            .shapes
+            .iter()
+            .filter(|shape| !rows.contains(&shape.name))
+            .filter_map(|shape| self.helped(Helper::Type, &shape.name))
+            .collect();
+        self.found.extend(helpers);
     }
 
     fn macro_called(&mut self, invocation: &Macro) -> Expanded {

@@ -8,13 +8,14 @@ use syn::{Item, ItemUse, Macro, Visibility};
 use crate::finding::{Finding, Found, Rule};
 use crate::graph::Graph;
 use crate::source::{Place, Source};
+use crate::terms::{Fix, Line};
 use crate::use_leaf::UseLeaf;
 use crate::walk::{Descent, Expanded, Hooks};
 use crate::workspace::Package;
 
 #[derive(Debug)]
 pub(crate) enum SurfaceFact {
-    Export { crate_name: String, name: String, path: Arc<Path>, line: usize },
+    Export { crate_name: String, name: String, path: Arc<Path>, line: Line },
     Sighting { crate_name: String, reached: Reached, reader: Reader },
 }
 
@@ -69,6 +70,8 @@ impl Reach {
 }
 
 impl PublicSurface<'_> {
+    const FIX: Fix = Fix("export it when a user appears");
+
     fn sighting(&self, first: Option<&Ident>, reached: Reached) -> Option<SurfaceFact> {
         let foreign = first.map(Ident::to_string).filter(|named| Some(named) != self.own_crate.as_ref());
         foreign.map(|crate_name| SurfaceFact::Sighting { crate_name, reached, reader: self.reader })
@@ -89,7 +92,7 @@ impl PublicSurface<'_> {
                 crate_name: crate_name.clone(),
                 name: ident.to_string(),
                 path: Arc::clone(path),
-                line: ident.span().start().line,
+                line: Line::of(ident.span()),
             })
             .collect();
         self.facts.extend(facts);
@@ -175,7 +178,7 @@ impl<'file> Graph<'file> for PublicSurface<'file> {
                         Found::at(
                             *line,
                             format_args!("{name} is exported but no other crate names it"),
-                            "export it when a user appears",
+                            PublicSurface::FIX,
                         )
                         .in_file(Rule::PublicSurface, path)
                     })

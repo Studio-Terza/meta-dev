@@ -52,7 +52,44 @@ shipped code has no test-only API:
 src/lib.rs:90: visible item gated on test; remove the gate and test through the real public API
 src/lib.rs:115: visible item gated on test; remove the gate and test through the real public API
 a function returning bool forgets what it found and makes the caller branch on a flag:
-src/lib.rs:123: fn inner_flag -> bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
-src/lib.rs:150: fn probe -> bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
+src/lib.rs:115: fn probe returns bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
+src/lib.rs:123: fn inner_flag returns bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
+src/lib.rs:150: fn probe returns bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
 no dyn: every type is known at compile time, so code takes a generic, returns impl Trait or names an enum instead of a trait object:
 src/lib.rs:120: dyn trait object; take a generic, return impl Trait, or list the known types in an enum
+primitives stay at the boundary: outside a module named boundary, signatures, fields and variants carry types with meaning:
+src/lib.rs:2: u8 in a field; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/lib.rs:3: u8 in a field; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/lib.rs:6: String in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/lib.rs:33: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/lib.rs:48: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/lib.rs:78: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/lib.rs:101: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/lib.rs:101: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/lib.rs:106: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/lib.rs:109: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/lib.rs:109: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/lib.rs:115: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/lib.rs:119: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/lib.rs:123: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/lib.rs:123: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/lib.rs:128: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/lib.rs:128: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/lib.rs:132: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/lib.rs:132: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/lib.rs:150: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/lib.rs:151: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+every pub item is named by another workspace crate:
+src/lib.rs:1: pub Flow is named by no other crate; make it private or delete it
+src/lib.rs:6: pub touched is named by no other crate; make it private or delete it
+src/lib.rs:33: pub constant is named by no other crate; make it private or delete it
+src/lib.rs:40: pub outer is named by no other crate; make it private or delete it
+src/lib.rs:48: pub accumulating is named by no other crate; make it private or delete it
+src/lib.rs:69: pub SKIPPED is named by no other crate; make it private or delete it
+src/lib.rs:77: pub Shaped is named by no other crate; make it private or delete it
+src/lib.rs:119: pub boxed is named by no other crate; make it private or delete it
+src/lib.rs:123: pub inner_flag is named by no other crate; make it private or delete it
+src/lib.rs:126: pub Paired is named by no other crate; make it private or delete it
+src/lib.rs:128: pub paired is named by no other crate; make it private or delete it
+src/lib.rs:132: pub gathered is named by no other crate; make it private or delete it
+src/lib.rs:149: pub Probe is named by no other crate; make it private or delete it

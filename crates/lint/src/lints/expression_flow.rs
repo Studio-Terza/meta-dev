@@ -15,6 +15,7 @@ use crate::gate::Gate;
 use crate::ignored::Ignored;
 use crate::source::Source;
 use crate::style::{Reads, Style};
+use crate::terms::{Fix, Line, Name};
 use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Debug, Default)]
@@ -25,14 +26,18 @@ pub(crate) struct ExpressionFlow {
 
 #[derive(Debug, Default)]
 struct Locals {
-    declared: BTreeMap<String, usize>,
-    touched: BTreeSet<String>,
+    declared: BTreeMap<Name, Line>,
+    touched: BTreeSet<Name>,
 }
 
 impl ExpressionFlow {
     const WRITING_MACROS: [&'static str; 2] = ["write", "writeln"];
-    const LOOP_FIX: &'static str = "drive an iterator with combinators, const fns excepted";
-    const ASSIGN_FIX: &'static str = "build the value in one expression or give its type an updater method";
+    const LOOP_FIX: Fix = Fix("drive an iterator with combinators, const fns excepted");
+    const ASSIGN_FIX: Fix = Fix("build the value in one expression or give its type an updater method");
+    const REASSIGN_FIX: Fix = Fix("a mutable binding is borrowed as &mut or has methods called on it");
+    const DROPPED_FIX: Fix = Fix("let it produce the value the function returns");
+    const ELSE_FIX: Fix = Fix("use then_some, filter, or an else branch that produces the value");
+    const FOR_FIX: Fix = Fix("drive the iterator with combinators, const fns excepted");
 
     fn opened(&mut self, attributes: &[Attribute], signature: &Signature, body: Option<&Block>) -> Descent {
         let scanned = Gate::of(attributes).entered().and(body).filter(|_| signature.constness.is_none());
@@ -43,19 +48,17 @@ impl ExpressionFlow {
     fn closed(&mut self) {
         let closed = self.scopes.pop().unwrap_or_default();
         let reassigned = closed.declared.into_iter().filter(|(name, _)| !closed.touched.contains(name));
-        self.found.extend(reassigned.map(|(_, line)| {
-            Found::at(
-                line,
-                "mutable local that is only reassigned",
-                "a mutable binding is borrowed as &mut or has methods called on it",
-            )
-        }));
+        self.found.extend(
+            reassigned.map(|(_, line)| {
+                Found::at(line, "mutable local that is only reassigned", ExpressionFlow::REASSIGN_FIX)
+            }),
+        );
     }
 
     fn touched(&mut self, name: Option<&Ident>) {
         let scope = self.scopes.last_mut();
         scope.zip(name).map_or_default(|(locals, ident)| {
-            locals.touched.insert(ident.to_string());
+            locals.touched.insert(Name::of(ident));
         });
     }
 
@@ -171,11 +174,7 @@ impl Hooks for ExpressionFlow {
         let dropped = block.stmts.iter().filter(|statement| ExpressionFlow::dropped(statement, last).is_some());
         let found: Vec<Found> = dropped
             .map(|statement| {
-                Found::spanned(
-                    statement.span(),
-                    "if or match whose value is dropped",
-                    "let it produce the value the function returns",
-                )
+                Found::spanned(statement.span(), "if or match whose value is dropped", ExpressionFlow::DROPPED_FIX)
             })
             .collect();
         self.found.extend(found);
@@ -183,13 +182,11 @@ impl Hooks for ExpressionFlow {
     }
 
     fn expr_if(&mut self, expr: &ExprIf) -> Descent {
-        self.found.extend(expr.else_branch.is_none().then(|| {
-            Found::spanned(
-                expr.if_token.span,
-                "if without else yields nothing",
-                "use then_some, filter, or an else branch that produces the value",
-            )
-        }));
+        self.found.extend(
+            expr.else_branch.is_none().then(|| {
+                Found::spanned(expr.if_token.span, "if without else yields nothing", ExpressionFlow::ELSE_FIX)
+            }),
+        );
         Descent::Into
     }
 
@@ -199,11 +196,7 @@ impl Hooks for ExpressionFlow {
     }
 
     fn expr_for_loop(&mut self, expr: &ExprForLoop) -> Descent {
-        self.found.push(Found::spanned(
-            expr.for_token.span,
-            "for loop",
-            "drive the iterator with combinators, const fns excepted",
-        ));
+        self.found.push(Found::spanned(expr.for_token.span, "for loop", ExpressionFlow::FOR_FIX));
         Descent::Into
     }
 
@@ -233,10 +226,10 @@ impl Hooks for ExpressionFlow {
             Pat::Ident(binding) => binding.mutability.map(|_| &binding.ident),
             _ => None,
         };
-        let line = local.let_token.span.start().line;
+        let line = Line::of(local.let_token.span);
         let scope = self.scopes.last_mut();
         scope.zip(declared).map_or_default(|(locals, name)| {
-            locals.declared.insert(name.to_string(), line);
+            locals.declared.insert(Name::of(name), line);
         });
         Descent::Into
     }

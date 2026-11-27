@@ -9,6 +9,7 @@ use crate::finding::{Found, Rule};
 use crate::gate::Gate;
 use crate::source::Source;
 use crate::style::{Reads, Style};
+use crate::terms::{Count, Fix};
 use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Debug, Default)]
@@ -21,8 +22,8 @@ pub(crate) struct ManualIteration {
 struct Counting {
     local: *const Local,
     init: *const Expr,
-    at: usize,
-    calls: usize,
+    at: Count,
+    calls: Count,
     reading: Reading,
 }
 
@@ -53,6 +54,8 @@ impl ManualIteration {
         "peekable",
     ];
     const ACCUMULATORS: [&'static str; 4] = ["push", "extend", "insert", "push_str"];
+    const ACCUMULATING_FIX: Fix = Fix("extend or collect from an iterator instead");
+    const COUNTING_FIX: Fix = Fix("drive it with combinators such as format, collect, or fold");
 
     fn accumulator(block: &Block) -> Option<&ExprMethodCall> {
         match block.stmts.as_slice() {
@@ -115,22 +118,18 @@ impl Hooks for ManualIteration {
 
     fn expr_for_loop(&mut self, expr: &ExprForLoop) -> Descent {
         self.found.extend(ManualIteration::accumulator(&expr.body).map(|_| {
-            Found::spanned(
-                expr.for_token.span,
-                "loop that only accumulates",
-                "extend or collect from an iterator instead",
-            )
+            Found::spanned(expr.for_token.span, "loop that only accumulates", ManualIteration::ACCUMULATING_FIX)
         }));
         Descent::Into
     }
 
     fn local(&mut self, local: &Local) -> Descent {
-        let at = self.found.len();
+        let at = Count::counted(self.found.len());
         let counting = ManualIteration::mutable_init(local).map(|init| Counting {
             local,
             init,
             at,
-            calls: 0,
+            calls: Count::default(),
             reading: Reading::Waiting,
         });
         self.counting.extend(counting);
@@ -138,14 +137,13 @@ impl Hooks for ManualIteration {
     }
 
     fn left_local(&mut self, local: &Local) {
-        let counted = self.counting.pop_if(|counting| ptr::eq(counting.local, local)).filter(|ended| ended.calls > 0);
+        let counted = self
+            .counting
+            .pop_if(|counting| ptr::eq(counting.local, local))
+            .filter(|ended| ended.calls > Count::default());
         counted.map_or_default(|ended| {
-            let found = Found::spanned(
-                local.span(),
-                "mutable iterator local",
-                "drive it with combinators such as format, collect, or fold",
-            );
-            self.found.insert(ended.at, found);
+            let found = Found::spanned(local.span(), "mutable iterator local", ManualIteration::COUNTING_FIX);
+            self.found.insert(ended.at.number(), found);
         });
     }
 
@@ -159,7 +157,7 @@ impl Hooks for ManualIteration {
     }
 
     fn expr_method_call(&mut self, call: &ExprMethodCall) -> Descent {
-        let constructs = ManualIteration::ITERATOR_CONSTRUCTORS.iter().any(|name| call.method == name);
+        let constructs = ManualIteration::ITERATOR_CONSTRUCTORS.iter().find(|name| call.method == name).map(|_| ());
         self.counting.iter_mut().for_each(|counting| counting.counted(constructs));
         Descent::Into
     }
@@ -170,8 +168,9 @@ impl Counting {
         self.reading = reading;
     }
 
-    fn counted(&mut self, constructs: bool) {
-        self.calls += usize::from(constructs && self.reading == Reading::Inside);
+    fn counted(&mut self, constructs: Option<()>) {
+        let inside = constructs.filter(|()| self.reading == Reading::Inside);
+        self.calls = inside.map_or(self.calls, |()| self.calls.incremented());
     }
 }
 

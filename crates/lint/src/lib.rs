@@ -11,6 +11,7 @@ mod reading;
 mod source;
 mod spent;
 mod style;
+mod terms;
 mod use_leaf;
 mod walk;
 mod workspace;

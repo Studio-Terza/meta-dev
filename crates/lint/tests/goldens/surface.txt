@@ -8,3 +8,19 @@ a crate exports exactly what another crate uses:
 consumer/src/lib.rs:4: extras is exported but no other crate names it; export it when a user appears
 provider/src/lib.rs:5: Alias is exported but no other crate names it; export it when a user appears
 provider/src/lib.rs:5: Unnamed is exported but no other crate names it; export it when a user appears
+every pub item is named by another workspace crate:
+consumer/src/extras.rs:1: pub Extra is named by no other crate; make it private or delete it
+globbed/src/lib.rs:1: pub Anything is named by no other crate; make it private or delete it
+provider/src/inner.rs:4: pub Tested is named by no other crate; make it private or delete it
+provider/src/inner.rs:6: pub Unnamed is named by no other crate; make it private or delete it
+provider/src/inner.rs:7: pub Private is named by no other crate; make it private or delete it
+provider/src/inner.rs:8: pub Crated is named by no other crate; make it private or delete it
+provider/src/inner.rs:9: pub own is named by no other crate; make it private or delete it
+provider/src/internal.rs:1: pub Internal is named by no other crate; make it private or delete it
+provider/src/lib.rs:5: pub Alias is named by no other crate; make it private or delete it
+provider/src/lib.rs:5: pub Tested is named by no other crate; make it private or delete it
+provider/src/lib.rs:5: pub Unnamed is named by no other crate; make it private or delete it
+provider/src/main.rs:3: pub fmt is named by no other crate; make it private or delete it
+provider/src/shapes.rs:1: pub Shape is named by no other crate; make it private or delete it
+provider/src/shapes.rs:2: pub deeper is named by no other crate; make it private or delete it
+unused/src/lib.rs:1: pub Nobody is named by no other crate; make it private or delete it

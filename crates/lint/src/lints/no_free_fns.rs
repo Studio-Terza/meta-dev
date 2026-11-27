@@ -3,6 +3,7 @@ use syn::{ItemFn, Macro};
 use crate::finding::{Found, Rule};
 use crate::source::Source;
 use crate::style::{Reads, Style};
+use crate::terms::Fix;
 use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Debug, Default)]
@@ -12,7 +13,7 @@ pub(crate) struct NoFreeFns {
 
 impl NoFreeFns {
     const REQUIRED_FREE: [&'static str; 4] = ["test", "proc_macro", "proc_macro_derive", "proc_macro_attribute"];
-    const FIX: &'static str = "make it an associated function or a method";
+    const FIX: Fix = Fix("make it an associated function or a method");
 
     fn exempt(function: &ItemFn) -> Option<()> {
         let main = (function.sig.ident == "main").then_some(());

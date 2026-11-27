@@ -18,6 +18,7 @@ use crate::gate::Gate;
 use crate::graph::Graph;
 use crate::ignored::Ignored;
 use crate::source::{Place, Source};
+use crate::terms::Fix;
 use crate::use_leaf::UseLeaf;
 use crate::walk::{Descent, Expanded, Hooks};
 use crate::workspace::Package;
@@ -92,7 +93,7 @@ struct Graphed {
 
 impl DeadCode<'_> {
     const ENTRY_POINTS: [&'static str; 3] = ["proc_macro", "proc_macro_derive", "proc_macro_attribute"];
-    const FIX: &'static str = "make it private or delete it";
+    const FIX: Fix = Fix("make it private or delete it");
 
     fn export(visibility: &Visibility, attributes: &[Attribute], name: &Ident, interface: Names) -> Option<Exported> {
         let entry = attributes
@@ -312,8 +313,11 @@ impl Hooks for DeadCode<'_> {
 
     fn item_use(&mut self, item: &ItemUse) -> Descent {
         let leaves = UseLeaf::of_tree(&item.tree);
-        let bound: Vec<&Ident> = leaves.iter().filter_map(|leaf| leaf.end().bound()).collect();
-        bound.into_iter().for_each(|name| self.exporting(&item.vis, &item.attrs, name, Names::default()));
+        let exported = leaves
+            .iter()
+            .filter_map(|leaf| leaf.end().bound())
+            .filter_map(|name| DeadCode::export(&item.vis, &item.attrs, name, Names::default()));
+        self.exported.extend(exported);
         Descent::Over
     }
 
@@ -373,7 +377,6 @@ impl<'file> Graph<'file> for DeadCode<'file> {
             graphed
         });
         let alive = graphed.alive();
-        let dead: Vec<&Export> = graphed.dead(&alive).collect();
-        dead.into_iter().map(|export| export.exported.found.clone().in_file(Rule::DeadCode, &export.path)).collect()
+        graphed.dead(&alive).map(|export| export.exported.found.clone().in_file(Rule::DeadCode, &export.path)).collect()
     }
 }

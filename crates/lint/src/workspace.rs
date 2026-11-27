@@ -11,6 +11,7 @@ use toml::de::{DeTable, DeValue};
 
 use crate::failure::Failure;
 use crate::ignored::Ignored;
+use crate::terms::Line;
 use manifest::Manifest;
 
 #[derive(Debug)]
@@ -56,7 +57,7 @@ pub(crate) enum CrateKind {
 #[derive(Debug)]
 pub(crate) struct Feature {
     name: String,
-    line: usize,
+    line: Line,
 }
 
 impl Feature {
@@ -64,7 +65,7 @@ impl Feature {
         &self.name
     }
 
-    pub(crate) fn line(&self) -> usize {
+    pub(crate) fn line(&self) -> Line {
         self.line
     }
 }
@@ -235,7 +236,9 @@ impl Workspace {
                 .iter()
                 .map(|(key, _)| Feature {
                     name: key.get_ref().to_string(),
-                    line: text.get(..key.span().start).map_or(0, |before| before.matches('\n').count()) + 1,
+                    line: Line::numbered(
+                        text.get(..key.span().start).map_or(0, |before| before.matches('\n').count()) + 1,
+                    ),
                 })
                 .collect()
         })

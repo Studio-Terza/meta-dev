@@ -10,6 +10,7 @@ use syn::{
 use crate::finding::{Found, Rule};
 use crate::source::Source;
 use crate::style::{Reads, Style};
+use crate::terms::Fix;
 use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Debug)]
@@ -38,8 +39,8 @@ struct Named<'path>(&'path TypePath);
 
 impl PrimitiveBoundary {
     const BOUNDARY: &'static str = "boundary";
-    const FIX: &'static str =
-        "take and return a newtype or a type that carries meaning, or move the code into a module named boundary";
+    const FIX: Fix =
+        Fix("take and return a newtype or a type that carries meaning, or move the code into a module named boundary");
 
     fn inside(&self) -> Option<()> {
         self.bounded.or(self.modules.iter().flatten().next().copied())

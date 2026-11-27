@@ -5,6 +5,8 @@ use std::sync::Arc;
 
 use proc_macro2::Span;
 
+use crate::terms::{Fix, Line, Problem};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Rule {
     NoComments,
@@ -25,9 +27,9 @@ pub(crate) enum Rule {
     DeadCode,
 }
 
-impl Rule {
-    fn headline(self) -> &'static str {
-        match self {
+impl fmt::Display for Rule {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
             Rule::NoComments => "comments are not allowed in this repository",
             Rule::NoFreeFns => "free functions are not allowed; make them associated functions or methods",
             Rule::VecOutParams => {
@@ -54,24 +56,24 @@ impl Rule {
                 "tests run production code paths: no literals in a test body and no test helpers beyond a test table"
             }
             Rule::DeadCode => "every pub item is named by another workspace crate",
-        }
+        })
     }
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Found {
-    line: usize,
-    problem: String,
-    fix: &'static str,
+    line: Line,
+    problem: Problem,
+    fix: Fix,
 }
 
 impl Found {
-    pub(crate) fn at(line: usize, problem: impl fmt::Display, fix: &'static str) -> Found {
-        Found { line, problem: problem.to_string(), fix }
+    pub(crate) fn at(line: Line, problem: impl fmt::Display, fix: Fix) -> Found {
+        Found { line, problem: Problem::said(problem), fix }
     }
 
-    pub(crate) fn spanned(span: Span, problem: impl fmt::Display, fix: &'static str) -> Found {
-        Found::at(span.start().line, problem, fix)
+    pub(crate) fn spanned(span: Span, problem: impl fmt::Display, fix: Fix) -> Found {
+        Found::at(Line::of(span), problem, fix)
     }
 
     pub(crate) fn in_file(self, rule: Rule, path: &Arc<Path>) -> Finding {
@@ -95,7 +97,7 @@ impl Findings {
             (earlier.rule, &earlier.path, earlier.found.line).cmp(&(later.rule, &later.path, later.found.line))
         });
         self.0.chunk_by(|earlier, later| earlier.rule == later.rule).try_for_each(|group| {
-            group.first().map_or(Ok(()), |leading| writeln!(err, "{}:", leading.rule.headline()))?;
+            group.first().map_or(Ok(()), |leading| writeln!(err, "{}:", leading.rule))?;
             group.iter().try_for_each(|finding| {
                 let Found { line, problem, fix } = &finding.found;
                 writeln!(err, "{}:{line}: {problem}; {fix}", finding.path.display())

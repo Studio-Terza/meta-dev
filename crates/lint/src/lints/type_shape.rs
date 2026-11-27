@@ -10,6 +10,7 @@ use crate::finding::{Found, Rule};
 use crate::gate::Gate;
 use crate::source::Source;
 use crate::style::{Reads, Style};
+use crate::terms::{Fix, Line};
 use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Debug, Default)]
@@ -23,7 +24,7 @@ pub(crate) struct TypeShape {
 #[derive(Clone, Copy, Debug)]
 struct Root {
     at: *const Type,
-    line: usize,
+    line: Line,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -40,16 +41,16 @@ impl Shape {
         }
     }
 
-    fn fix(self) -> &'static str {
+    fn fix(self) -> Fix {
         match self {
-            Shape::Tuple => "values that travel together are a struct",
-            Shape::StringError => "errors are an enum with thiserror",
+            Shape::Tuple => Fix("values that travel together are a struct"),
+            Shape::StringError => Fix("errors are an enum with thiserror"),
         }
     }
 }
 
 impl TypeShape {
-    const BOOL_FIX: &'static str = "a stored flag is a stored mode, make it an enum or a type parameter";
+    const BOOL_FIX: Fix = Fix("a stored flag is a stored mode, make it an enum or a type parameter");
 
     fn rooted<'ty>(&mut self, roots: impl Iterator<Item = &'ty Type>) -> Descent {
         self.marks.push(self.roots.len());
@@ -140,7 +141,7 @@ impl Hooks for TypeShape {
 
     fn ty(&mut self, ty: &Type) -> Descent {
         let at = ptr::from_ref(ty);
-        let opened = self.open.xor(Some(Root { at, line: ty.span().start().line }));
+        let opened = self.open.xor(Some(Root { at, line: Line::of(ty.span()) }));
         self.open = self.open.or(opened.filter(|_| self.roots.contains(&at)));
         Descent::Into
     }

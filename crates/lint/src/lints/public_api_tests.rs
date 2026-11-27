@@ -9,21 +9,22 @@ use crate::finding::{Finding, Found, Rule};
 use crate::gate::{Gate, TestMark};
 use crate::graph::Graph;
 use crate::source::{Place, Source};
+use crate::terms::{Fix, Line, Name};
 use crate::walk::{Descent, Expanded, Hooks};
 use crate::workspace::Package;
 
 #[derive(Debug)]
 pub(crate) enum ApiFact {
     Found(Finding),
-    Emitter(String),
-    Invoked { name: String, path: Arc<Path>, line: usize },
+    Emitter(Name),
+    Invoked { name: Name, path: Arc<Path>, line: Line },
 }
 
 #[derive(Debug)]
 pub(crate) struct PublicApiTests<'file> {
     source: &'file Source,
     facts: Vec<ApiFact>,
-    inline: Vec<String>,
+    inline: Vec<Name>,
 }
 
 #[derive(Debug, Default)]
@@ -31,16 +32,17 @@ pub(crate) struct Emitters(Vec<ApiFact>);
 
 impl PublicApiTests<'_> {
     const IN_SOURCE: &'static str = "test code in src";
-    const IN_SOURCE_FIX: &'static str = "move it to the package's tests directory and call the public API from there";
+    const IN_SOURCE_FIX: Fix = Fix("move it to the package's tests directory and call the public API from there");
     const PATH_ATTRIBUTE: &'static str = "path";
     const SOURCE_DIRECTORY: &'static str = "src";
+    const REACHED_FIX: Fix = Fix("call the public API instead");
 
-    fn in_source(&mut self, line: usize) {
+    fn in_source(&mut self, line: Line) {
         let fact = self.found_in_source(line);
         self.facts.push(fact);
     }
 
-    fn found_in_source(&self, line: usize) -> ApiFact {
+    fn found_in_source(&self, line: Line) -> ApiFact {
         let found = Found::at(line, PublicApiTests::IN_SOURCE, PublicApiTests::IN_SOURCE_FIX);
         ApiFact::Found(found.in_file(Rule::PublicApiTests, self.source.shown()))
     }
@@ -49,7 +51,7 @@ impl PublicApiTests<'_> {
         (self.source.place() == Place::Shipped).then_some(())
     }
 
-    fn walked(&mut self, attributes: &[Attribute], line: usize) -> Option<()> {
+    fn walked(&mut self, attributes: &[Attribute], line: Line) -> Option<()> {
         let skipped = self.shipped().and_then(|()| Gate::of(attributes).entered().xor(Some(())));
         skipped.map_or_default(|()| self.in_source(line));
         skipped.xor(Some(()))
@@ -68,14 +70,14 @@ impl PublicApiTests<'_> {
             );
         let directory = self.source.real().parent().map_or_default(Path::to_path_buf);
         let source = PublicApiTests::lexical(&self.source.package().directory().join(PublicApiTests::SOURCE_DIRECTORY));
-        let within = self.inline.iter().fold(PathBuf::new(), |inside, name| inside.join(name));
+        let within = self.inline.iter().fold(PathBuf::new(), |inside, name| inside.join(name.text()));
         let reaching =
             target.filter(|path| PublicApiTests::lexical(&directory.join(&within).join(path)).starts_with(&source));
         self.facts.extend(reaching.map(|_| {
             let found = Found::spanned(
                 module.ident.span(),
                 "test file includes a module from src with #[path]",
-                "call the public API instead",
+                PublicApiTests::REACHED_FIX,
             );
             ApiFact::Found(found.in_file(Rule::PublicApiTests, self.source.shown()))
         }));
@@ -102,7 +104,7 @@ impl Emitters {
         let name = definition.ident.as_ref()?;
         Expansion::defining(&definition.mac)?;
         let tested = TestMark::written(definition.mac.tokens.clone()).iter().find_map(TestMark::on).map(|_| ());
-        tested.map(|()| ApiFact::Emitter(name.to_string()))
+        tested.map(|()| ApiFact::Emitter(Name::of(name)))
     }
 }
 
@@ -115,10 +117,10 @@ impl Hooks for Emitters {
 
 impl Hooks for PublicApiTests<'_> {
     fn item_mod(&mut self, module: &ItemMod) -> Descent {
-        let walked = self.walked(&module.attrs, module.ident.span().start().line);
+        let walked = self.walked(&module.attrs, Line::of(module.ident.span()));
         walked.map_or_default(|()| {
             self.shipped().xor(Some(())).map_or_default(|()| self.reached(module));
-            self.inline.push(module.ident.to_string());
+            self.inline.push(Name::of(&module.ident));
         });
         Descent::from(walked)
     }
@@ -128,15 +130,15 @@ impl Hooks for PublicApiTests<'_> {
     }
 
     fn item_impl(&mut self, item: &ItemImpl) -> Descent {
-        Descent::from(self.walked(&item.attrs, item.impl_token.span.start().line))
+        Descent::from(self.walked(&item.attrs, Line::of(item.impl_token.span)))
     }
 
     fn impl_item_fn(&mut self, function: &ImplItemFn) -> Descent {
-        Descent::from(self.walked(&function.attrs, function.sig.ident.span().start().line))
+        Descent::from(self.walked(&function.attrs, Line::of(function.sig.ident.span())))
     }
 
     fn item_fn(&mut self, function: &ItemFn) -> Descent {
-        let line = function.sig.ident.span().start().line;
+        let line = Line::of(function.sig.ident.span());
         let walked = self.walked(&function.attrs, line);
         let marked = walked.and(self.shipped()).and(TestMark::among(&function.attrs));
         marked.map_or_default(|_| self.in_source(line));
@@ -145,11 +147,11 @@ impl Hooks for PublicApiTests<'_> {
 
     fn macro_called(&mut self, invocation: &Macro) -> Expanded {
         let called = self.shipped().and(Expansion::defining(invocation).xor(Some(())));
-        let line = invocation.bang_token.span.start().line;
+        let line = Line::of(invocation.bang_token.span);
         let marked = called
             .and_then(|()| TestMark::written(invocation.tokens.clone()).iter().find_map(TestMark::on).map(|_| ()));
         let invoked = called.and(invocation.path.get_ident()).map(|name| ApiFact::Invoked {
-            name: name.to_string(),
+            name: Name::of(name),
             path: Arc::clone(self.source.shown()),
             line,
         });
@@ -171,7 +173,7 @@ impl<'file> Graph<'file> for PublicApiTests<'file> {
     }
 
     fn reduce(facts: Vec<ApiFact>, _: &[Arc<Package>]) -> Vec<Finding> {
-        let emitters: BTreeSet<String> = facts
+        let emitters: BTreeSet<Name> = facts
             .iter()
             .filter_map(|fact| match fact {
                 ApiFact::Emitter(name) => Some(name.clone()),

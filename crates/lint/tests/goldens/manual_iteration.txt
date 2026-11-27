@@ -21,3 +21,17 @@ iterators are driven by combinators, not by hand:
 src/accumulating.rs:2: loop that only accumulates; extend or collect from an iterator instead
 src/filtered.rs:2: loop that only accumulates; extend or collect from an iterator instead
 src/mutable.rs:2: mutable iterator local; drive it with combinators such as format, collect, or fold
+primitives stay at the boundary: outside a module named boundary, signatures, fields and variants carry types with meaning:
+src/accumulating.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/accumulating.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/counter.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/filtered.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/filtered.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/mutable.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/working.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+every pub item is named by another workspace crate:
+src/lib.rs:1: pub mutable is named by no other crate; make it private or delete it
+src/lib.rs:2: pub accumulating is named by no other crate; make it private or delete it
+src/lib.rs:3: pub filtered is named by no other crate; make it private or delete it
+src/lib.rs:4: pub counter is named by no other crate; make it private or delete it
+src/lib.rs:5: pub working is named by no other crate; make it private or delete it

@@ -4,6 +4,7 @@ use syn::{Macro, TypeTraitObject};
 use crate::finding::{Found, Rule};
 use crate::source::Source;
 use crate::style::{Reads, Style};
+use crate::terms::Fix;
 use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Debug, Default)]
@@ -29,7 +30,7 @@ impl NoDyn {
         Found::spanned(
             span,
             "dyn trait object",
-            "take a generic, return impl Trait, or list the known types in an enum",
+            Fix("take a generic, return impl Trait, or list the known types in an enum"),
         )
     }
 }

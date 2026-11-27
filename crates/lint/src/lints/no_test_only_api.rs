@@ -1,3 +1,5 @@
+mod boundary;
+
 use std::sync::Arc;
 
 use proc_macro2::{TokenStream, TokenTree};
@@ -7,6 +9,7 @@ use crate::finding::{Finding, Found, Rule};
 use crate::gate::Gate;
 use crate::graph::Graph;
 use crate::source::{Place, Source};
+use crate::terms::Fix;
 use crate::walk::{Descent, Expanded, Hooks};
 use crate::workspace::Package;
 
@@ -42,9 +45,11 @@ impl Hidden {
     fn found(self, visibility: &Visibility) -> Option<Found> {
         let (problem, fix) = match self {
             Hidden::GatedOnTest => {
-                ("visible item gated on test", "remove the gate and test through the real public API")
+                ("visible item gated on test", Fix("remove the gate and test through the real public API"))
             }
-            Hidden::DocHidden => ("#[doc(hidden)] on a visible item", "document it as real API, or make it private"),
+            Hidden::DocHidden => {
+                ("#[doc(hidden)] on a visible item", Fix("document it as real API, or make it private"))
+            }
         };
         match visibility {
             Visibility::Public(token) => Some(Found::spanned(token.span, problem, fix)),
@@ -58,18 +63,7 @@ impl NoTestOnlyApi<'_> {
     const TEST_WORDS: [&'static str; 5] = ["test", "tests", "testing", "mock", "mocks"];
     const CONDITIONS: [&'static str; 2] = ["cfg", "cfg_attr"];
     const FEATURE: &'static str = "feature";
-    const FEATURE_FIX: &'static str = "remove the feature and test through the API every build has";
-
-    fn testing(feature: &str) -> Option<()> {
-        let letters: Vec<char> = feature.chars().collect();
-        letters
-            .chunk_by(|left, right| left.is_alphanumeric() == right.is_alphanumeric())
-            .any(|word| {
-                let spelled: String = word.iter().collect();
-                NoTestOnlyApi::TEST_WORDS.contains(&spelled.as_str())
-            })
-            .then_some(())
-    }
+    const FEATURE_FIX: Fix = Fix("remove the feature and test through the API every build has");
 
     fn features(tokens: TokenStream) -> Vec<Found> {
         let trees: Vec<TokenTree> = tokens.into_iter().collect();

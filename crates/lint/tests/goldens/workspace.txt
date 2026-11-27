@@ -30,4 +30,12 @@ app/src/lib.rs:11: test code in src; move it to the package's tests directory an
 app/src/lib.rs:14: test code in src; move it to the package's tests directory and call the public API from there
 shipped code has no test-only API:
 app/Cargo.toml:5: test feature mock-data; remove the feature and test through the API every build has
+tests run production code paths: no literals in a test body and no test helpers beyond a test table:
+app/tests/flows.rs:1: test helper fn helper; test through the production code path; a test file holds tests and their table
+app/tests/suite/main.rs:2: test helper fn suite; test through the production code path; a test file holds tests and their table
+app/tests/suite/ports.rs:1: test helper fn spawn; test through the production code path; a test file holds tests and their table
+every pub item is named by another workspace crate:
+app/src/lib.rs:1: pub nested is named by no other crate; make it private or delete it
+store-ports/src/lib.rs:1: pub Store is named by no other crate; make it private or delete it
+store-ports/src/lib.rs:3: pub run is named by no other crate; make it private or delete it
 test budget: 36 of 80 lines are tests, at most 18% may be; cut test lines or test through fewer, table-driven cases
