@@ -1,16 +1,17 @@
 use design_messages::Tally;
 use dispatch_ports::{
-    Clock, Deadline, Dispatch, Finished, Job, Model, Moment, Prompt, Reply, Stall, Timeout, Usage, Wall, Watch,
-    Watching,
+    Call, Clock, Deadline, Dispatch, DispatchFailure, Finished, Job, Model, Moment, Prompt, Ran, Reply, Shell, Stall,
+    Timeout, Usage, Wall, Watch, Watching,
 };
 use newtype::Wrapping;
 
 use crate::cli::failure::Failure;
 
 #[derive(Debug)]
-pub struct Crew<'ports, D: Dispatch, C: Clock> {
+pub struct Crew<'ports, D: Dispatch, C: Clock, G: Shell> {
     dispatch: &'ports D,
     clock: &'ports C,
+    shell: &'ports G,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -22,13 +23,17 @@ pub struct Heard {
     tokens: Tally,
 }
 
-impl<'ports, D: Dispatch, C: Clock> Crew<'ports, D, C> {
-    pub fn new(dispatch: &'ports D, clock: &'ports C) -> Crew<'ports, D, C> {
-        Crew { dispatch, clock }
+impl<'ports, D: Dispatch, C: Clock, G: Shell> Crew<'ports, D, C, G> {
+    pub fn new(dispatch: &'ports D, clock: &'ports C, shell: &'ports G) -> Crew<'ports, D, C, G> {
+        Crew { dispatch, clock, shell }
     }
 
     pub fn now(&self) -> Wall {
         self.clock.now()
+    }
+
+    pub fn ran(&self, call: &Call) -> Result<Ran, DispatchFailure> {
+        self.shell.ran(call)
     }
 
     pub fn moment(&self) -> Moment {

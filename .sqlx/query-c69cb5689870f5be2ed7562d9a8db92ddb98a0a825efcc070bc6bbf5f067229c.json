@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nDELETE FROM failed_checks\nWHERE\n  pull = ?1\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "c69cb5689870f5be2ed7562d9a8db92ddb98a0a825efcc070bc6bbf5f067229c"
+}

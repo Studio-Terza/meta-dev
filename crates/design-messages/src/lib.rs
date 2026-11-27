@@ -2,6 +2,7 @@
 
 mod boundary;
 mod cursors;
+mod failed_checks;
 mod owner_said;
 mod session_cursors;
 mod session_records;
@@ -9,6 +10,7 @@ mod stop_trail;
 mod stream_schema;
 
 pub use cursors::Cursors;
+pub use failed_checks::{CheckName, FailedBefore, Failing, PullNumber};
 pub use owner_said::{LastSaid, OwnerHistory, Quote, Said, Unabridged};
 pub use session_cursors::SessionCursors;
 pub use session_records::SessionRecords;

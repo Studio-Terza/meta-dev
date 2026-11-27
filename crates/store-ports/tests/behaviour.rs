@@ -1,9 +1,10 @@
 use std::collections::BTreeSet;
+use std::num::NonZeroU32;
 use std::path::PathBuf;
 use std::sync::LazyLock;
 use test_failure::Failed;
 
-use design_messages::{Fate, Halt, SessionCursors, StreamSchema};
+use design_messages::{CheckName, Fate, Halt, PullNumber, SessionCursors, StreamSchema};
 use dispatch_ports::{Pid, Tokens, Wall};
 use file_ports::Offset;
 use invariants::{Ignoring, ignored};
@@ -344,6 +345,20 @@ fn every_named_column_reads_back_as_its_variant() {
     for author in [Authorship::Owner, Authorship::Lead] {
         assert_eq!(Stored::back::<Authorship>(&author.raw()), Some(author));
     }
+}
+
+#[test]
+fn a_pull_number_and_a_check_name_read_back_and_refuse_zero_blank_and_control_characters() -> Result<(), Failed> {
+    let pull = NonZeroU32::new(u32::MAX).map(PullNumber::new);
+    let check = CheckName::try_new("CI / test (macos)".to_owned())?;
+    assert_eq!(pull.and_then(|number| Stored::back::<PullNumber>(&number.raw())), pull);
+    assert_eq!(Stored::back::<CheckName>(&check.raw()), Some(check));
+    assert!(matches!(PullNumber::from_raw(0), Err(ColumnFailure::Unfit(_))));
+    assert!(matches!(PullNumber::from_raw(i64::from(u32::MAX) + 1), Err(ColumnFailure::Unfit(_))));
+    for refused in ["", "ci\ntest", "\u{7f}"] {
+        assert!(matches!(CheckName::from_raw(refused.to_owned()), Err(ColumnFailure::Refused(_))), "{refused:?}");
+    }
+    Ok(())
 }
 
 type Sqlite = <SqliteOpener as store_ports::Opens>::Store;

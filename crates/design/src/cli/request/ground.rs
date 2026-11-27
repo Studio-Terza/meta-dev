@@ -1,4 +1,6 @@
-use file_ports::Files;
+use std::fmt;
+
+use file_ports::{Bytes, FileFailure, Files};
 use grammar::Queue;
 use invariants::Ignoring;
 use port_core::{Port, Run};
@@ -32,6 +34,10 @@ impl<'run, F: Files, S: Store> Ground<'run, F, S> {
     pub fn queue(&self) -> Option<Queue> {
         let text = self.files.read_text(self.located.queue()).ignoring(Ignored::Unqueued)?;
         Some(Queue::read(text.as_ref()))
+    }
+
+    pub fn queued(&self, line: impl fmt::Display) -> Result<(), FileFailure> {
+        self.files.append(self.located.queue(), &Bytes::new(format!("{line}\n").into_bytes()))
     }
 
     pub fn transcripts(self) -> Port<'run, ClaudeCodeDir<F>> {

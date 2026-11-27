@@ -8,7 +8,7 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 
 use console_ports::Environment;
-use dispatch_ports::{ClockFiller, DispatchFiller};
+use dispatch_ports::{ClockFiller, DispatchFiller, ShellFiller};
 use file_ports::Files;
 use port_core::Run;
 use store_ports::Opens;
@@ -19,32 +19,33 @@ use request::{Crew, Ground, Kept, Request};
 use uttered::{Settled, Uttered};
 
 #[derive(Debug)]
-pub struct Agents<H, C> {
+pub struct Agents<H, C, G> {
     hired: H,
     clock: C,
+    shell: G,
 }
 
 #[derive(Debug)]
-pub struct Cli<'environment, E: Environment, F: Files, O, H, C> {
+pub struct Cli<'environment, E: Environment, F: Files, O, H, C, G> {
     environment: &'environment E,
     files: F,
     opened: O,
-    agents: Agents<H, C>,
+    agents: Agents<H, C, G>,
 }
 
-impl<H, C: ClockFiller> Agents<H, C> {
-    pub fn new(hired: H, clock: C) -> Agents<H, C> {
-        Agents { hired, clock }
+impl<H, C: ClockFiller, G: ShellFiller> Agents<H, C, G> {
+    pub fn new(hired: H, clock: C, shell: G) -> Agents<H, C, G> {
+        Agents { hired, clock, shell }
     }
 }
 
-impl<'environment, E: Environment, F: Files, O, H, C: ClockFiller> Cli<'environment, E, F, O, H, C> {
+impl<'environment, E: Environment, F: Files, O, H, C: ClockFiller, G: ShellFiller> Cli<'environment, E, F, O, H, C, G> {
     pub fn new(
         environment: &'environment E,
         files: F,
         opened: O,
-        agents: Agents<H, C>,
-    ) -> Cli<'environment, E, F, O, H, C> {
+        agents: Agents<H, C, G>,
+    ) -> Cli<'environment, E, F, O, H, C, G> {
         Cli { environment, files, opened, agents }
     }
 
@@ -83,10 +84,11 @@ impl<'environment, E: Environment, F: Files, O, H, C: ClockFiller> Cli<'environm
         let store = run.port(request.opened(&located, &self.opened));
         let dispatch = run.port((self.agents.hired)(located.kept(Kept::Agents)));
         let clock = run.port(self.agents.clock);
+        let shell = run.port(self.agents.shell);
         request.command().written(
             self.environment,
             Ground::new(run, self.files, located, &store),
-            &Crew::new(&dispatch, &clock),
+            &Crew::new(&dispatch, &clock, &shell),
         )
     }
 }
