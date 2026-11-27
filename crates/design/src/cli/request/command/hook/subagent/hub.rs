@@ -1,9 +1,10 @@
 use std::fmt;
+use std::iter;
 use std::ops::Not;
 use std::path::Path;
 
 use design_messages::{CheckName, PullNumber};
-use dispatch_ports::{Call, Clock, Deadline, Dispatch, Ran, Shell, Timeout};
+use dispatch_ports::{Call, Clock, Deadline, Dispatch, Due, Pause, Ran, Shell, Timeout};
 use file_ports::Files;
 use grammar_spec_line::Attachment;
 use invariants::Ignoring;
@@ -32,6 +33,12 @@ pub enum Verdict {
 struct Head {
     #[serde(rename = "headRefOid")]
     head: CommitSha,
+}
+
+#[derive(Debug, Deserialize)]
+struct Listed {
+    #[serde(rename = "name")]
+    _name: CheckName,
 }
 
 #[derive(Debug, Deserialize)]
@@ -101,6 +108,8 @@ impl<'crew, D: Dispatch, C: Clock, G: Shell> Hub<'crew, D, C, G> {
     const PROGRAM: &'static str = "gh";
     const QUICK: Timeout = Timeout::new(60);
     const WATCH: Timeout = Timeout::new(20 * 60);
+    const REGISTERING: Timeout = Timeout::new(5 * 60);
+    const POLL: Pause = Pause::new(10);
     const UNLOGGED: &'static str = "(the log could not be read)";
     const GIT: &'static str = "git";
     const BASE: &'static str = "main";
@@ -166,6 +175,26 @@ impl<'crew, D: Dispatch, C: Clock, G: Shell> Hub<'crew, D, C, G> {
         let ran = self.ran(&["pr", "view", &pull.to_string(), "--json", "headRefOid"], Self::QUICK);
         let printed = ran.as_ref().and_then(Ran::succeeded).ok_or(UnreadStep::Head)?;
         serde_json::from_str::<Head>(printed.as_ref()).map(|read| read.head).map_err(|_unread| UnreadStep::Head)
+    }
+
+    pub fn registered(&self, pull: PullNumber) -> Result<(), UnreadStep> {
+        let deadline = Deadline::after(self.crew.now(), Self::REGISTERING);
+        iter::repeat_with(|| self.crew.now())
+            .take_while(|now| deadline.due(*now) == Due::Pending)
+            .find_map(|_now| self.listed(pull).or_else(|| self.paused()))
+            .ok_or(UnreadStep::NoChecks)
+    }
+
+    fn paused(&self) -> Option<()> {
+        self.crew.paused(Self::POLL);
+        None
+    }
+
+    fn listed(&self, pull: PullNumber) -> Option<()> {
+        let ran = self.ran(&["pr", "checks", &pull.to_string(), "--json", "name,state"], Self::QUICK);
+        let printed = ran.as_ref().and_then(Ran::printed)?;
+        let listed: Vec<Listed> = serde_json::from_str(printed.as_ref()).ignoring(Ignored::Unlisted)?;
+        listed.first().map(|_check| ())
     }
 
     pub fn watched(&self, pull: PullNumber) -> Result<(), UnreadStep> {

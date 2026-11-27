@@ -53,6 +53,7 @@ pub enum UnreadStep {
     Watch,
     Overdue,
     Checks,
+    NoChecks,
     Remote,
     Commits,
     Spec,
@@ -165,6 +166,7 @@ impl Pushed {
     ) -> Result<Ending, UnreadStep> {
         let held = hub.head(self.pull())?;
         if held == self.head() {
+            hub.registered(self.pull())?;
             hub.watched(self.pull())?;
             Ok(self.judged(hub.checks(self.pull())?, store))
         } else {
