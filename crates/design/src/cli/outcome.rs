@@ -7,4 +7,6 @@ pub enum Outcome {
     Hooked(HookEvent),
     Blocked,
     Trailed,
+    Walked,
+    Backtested,
 }

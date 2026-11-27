@@ -86,6 +86,11 @@ impl StopRow {
     pub fn ended(self, fate: Fate, millis: Tally) -> StopRow {
         StopRow { fate, millis, ..self }
     }
+
+    #[must_use]
+    pub fn spent(&self) -> [Tally; 2] {
+        [self.millis, self.tokens]
+    }
 }
 
 impl OverrunRow {

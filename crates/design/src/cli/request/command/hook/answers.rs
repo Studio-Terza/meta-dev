@@ -8,7 +8,7 @@ use transcript_ports::Body;
 use super::super::crew::{Crew, Heard};
 use crate::cli::failure::Failure;
 use boundary::Asked;
-pub use boundary::{Answers, Search};
+pub use boundary::{Answers, Replied, Search};
 
 #[derive(Debug)]
 pub struct Answering<'ports, S: Store, D: Dispatch, C: Clock> {

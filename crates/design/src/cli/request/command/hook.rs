@@ -13,6 +13,7 @@ use super::ingest::Ingest;
 use crate::HookEvent;
 use crate::cli::failure::Failure;
 use crate::cli::uttered::Uttered;
+pub use answers::Replied;
 use boundary::{Observed, Settings, Stopping};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

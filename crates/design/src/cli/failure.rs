@@ -12,8 +12,14 @@ use crate::Outcome;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
-    #[error("usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | --settings))")]
+    #[error(
+        "usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | --settings) | walk <tree> | backtest <tree> <session> [tune | test])"
+    )]
     Usage,
+    #[error("cannot read the tree: {0}")]
+    Tree(#[source] serde_json::Error),
+    #[error("the message to walk with holds a NUL or is longer than u32::MAX bytes")]
+    Unasked,
     #[error("the environment does not name {0:?}")]
     Unset(OsString),
     #[error("the workspace path {0:?} is not text")]

@@ -5,7 +5,7 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::atomic::{AtomicI64, AtomicU32, Ordering};
 use std::time::{Duration, SystemTime};
 use test_failure::Failed;
 
@@ -18,6 +18,7 @@ use dispatch_ports::{
 use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Offset, Size, Stamps, Text};
 use grammar_slug::Letters;
 use invariants::Unpoisoned;
+use newtype::Wrapping;
 use port_core::Pass;
 use serde_json::Value;
 use sqlite_ports::SqliteOpener;
@@ -33,9 +34,17 @@ const QUIET: Duration = Duration::from_mins(20);
 const BUSY: Duration = Duration::from_mins(19);
 const ASKED: &str = "{\"type\":\"user\"}\n";
 const TEMPORARY: &str = "/private/tmp";
-const TRIMMING: u32 = 1;
-const READING: u32 = 2;
 const STEP: i64 = 5;
+const TREE: &str = r#"{"roots": [
+  {"altitude": "ideal", "domain": "meta-dev", "label": "Ship the stop hook.", "label_uuid": "o1", "messages": [], "children": [
+    {"altitude": "ruling", "domain": "meta-dev", "label": "Merge only when CI is green.", "label_uuid": "o1", "messages": ["o1", "p2"], "children": []},
+    {"altitude": "ruling", "domain": "meta-dev", "label": "Never force-push.", "label_uuid": "p3", "messages": ["p3"], "children": []}
+  ]},
+  {"altitude": "ideal", "domain": "trips", "label": "Walk from Rome to Naples.", "label_uuid": "p4", "messages": ["p4"], "children": []}
+]}"#;
+const ROOTS: &str = "Walk from Rome";
+const RULINGS: &str = "Never force-push";
+const ASKED_NEXT: &str = "What next?";
 
 #[derive(Debug)]
 struct Stepping {
@@ -61,13 +70,43 @@ impl ClockFiller for Stepping {
 struct Replies {
     quotes: String,
     kept: String,
+    choices: Vec<Choice>,
     refused: Option<Told>,
     asked: Mutex<Vec<String>>,
+    dispatched: AtomicU32,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Choice {
+    seen: &'static str,
+    chosen: &'static str,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct LoggedStop {
+    said: &'static str,
+    quoted: &'static [&'static str],
+}
+
+impl Choice {
+    const fn new(seen: &'static str, chosen: &'static str) -> Choice {
+        Choice { seen, chosen }
+    }
+}
+
+impl LoggedStop {
+    const fn new(said: &'static str, quoted: &'static [&'static str]) -> LoggedStop {
+        LoggedStop { said, quoted }
+    }
 }
 
 impl Replies {
     fn quoting(quotes: &str, kept: &str) -> Replies {
-        Replies { quotes: quotes.to_owned(), kept: kept.to_owned(), refused: None, asked: Mutex::new(Vec::new()) }
+        Replies { quotes: quotes.to_owned(), kept: kept.to_owned(), ..Replies::default() }
+    }
+
+    fn choosing(choices: &[Choice]) -> Replies {
+        Replies { choices: choices.to_vec(), ..Replies::default() }
     }
 
     fn refusing() -> Result<Replies, Failed> {
@@ -76,6 +115,15 @@ impl Replies {
 
     fn prompts(&self) -> Vec<String> {
         self.asked.lock().unpoisoned().clone()
+    }
+
+    fn answer(&self, pid: Pid) -> String {
+        let asked = self.asked.lock().unpoisoned();
+        let prompt = asked.iter().zip(0_u32..).find(|(_text, number)| *number == pid.into_inner());
+        let text = prompt.map_or("", |(text, _number)| text.as_str());
+        let chosen = self.choices.iter().find(|choice| text.contains(choice.seen));
+        let fallback = if text.contains("numbered") { &self.kept } else { &self.quotes };
+        chosen.map_or_else(|| fallback.clone(), |choice| choice.chosen.to_owned())
     }
 }
 
@@ -92,8 +140,9 @@ impl DispatchFiller for Agent<'_> {
         prompt: &Prompt,
     ) -> Result<AgentRun, DispatchFailure> {
         let text: String = String::from_utf8(AsRef::<[u8]>::as_ref(prompt).to_vec()).into_iter().collect();
-        let pid = Pid::new(if text.contains("numbered") { TRIMMING } else { READING });
-        self.replies.asked.lock().unpoisoned().push(text);
+        let mut asked = self.replies.asked.lock().unpoisoned();
+        let pid = Pid::new(self.replies.dispatched.fetch_add(1, Ordering::Relaxed));
+        asked.push(text);
         Ok(AgentRun::new(pid, *job.as_ref()))
     }
 
@@ -102,10 +151,10 @@ impl DispatchFiller for Agent<'_> {
         _pass: Pass<'_, dispatch_ops::Output>,
         run: &mut AgentRun,
     ) -> Result<Option<Output>, DispatchFailure> {
-        let reply = if run.pid() == Pid::new(TRIMMING) { &self.replies.kept } else { &self.replies.quotes };
+        let reply = self.replies.answer(run.pid());
         let usage = Usage::new(Tokens::new(3), Tokens::new(4), Tokens::new(0), Tokens::new(0));
         Ok(Some(self.replies.refused.clone().map_or_else(
-            || Output::Finished(Finished::new(Reply::new(reply.clone()), usage)),
+            || Output::Finished(Finished::new(Reply::new(reply), usage)),
             |told| Output::Errored(Errored::new(told, usage)),
         )))
     }
@@ -300,6 +349,33 @@ impl Home {
         fs::create_dir_all(&folder)?;
         fs::write(folder.join(file), text)?;
         Ok(())
+    }
+
+    fn planted(&self, tree: &str) -> Result<String, Failed> {
+        let path = self.path().join("tree.json");
+        fs::write(&path, tree)?;
+        Ok(path.to_string_lossy().into_owned())
+    }
+
+    fn logged(&self, stops: &[LoggedStop]) -> Result<String, Failed> {
+        let lines: Vec<String> = stops
+            .iter()
+            .flat_map(|stop| {
+                let quotes: Vec<String> =
+                    stop.quoted.iter().map(|uuid| [uuid, " 2026-01-01T00:00:00Z: \"x\"\n"].concat()).collect();
+                let injected = ["Stop hook feedback:\nEarlier owner words bearing on this:\n", &quotes.concat()].concat();
+                [
+                    serde_json::json!({"type": "assistant", "message": {"content": [{"type": "text", "text": stop.said}]}}),
+                    serde_json::json!({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "t"}]}}),
+                    serde_json::json!({"type": "system", "subtype": "stop_hook_summary", "hookErrors": [injected]}),
+                    serde_json::json!({"type": "user", "message": {"content": injected}}),
+                ]
+            })
+            .map(|entry| format!("{entry}\n"))
+            .collect();
+        let path = self.path().join("session.jsonl");
+        fs::write(&path, [lines.concat(), "{\"type\": \"user\", \"mess".to_owned()].concat())?;
+        Ok(path.to_string_lossy().into_owned())
     }
 }
 
@@ -517,9 +593,16 @@ fn an_ingest_after_the_transcript_grows_moves_the_cursor_once() -> Result<(), Fa
 fn words_the_cli_does_not_know_are_refused_with_the_usage() -> Result<(), Failed> {
     let home = Home::new()?;
     let usage = Failure::Usage.to_string();
-    for words in
-        [&["frobnicate"][..], &["hook"][..], &["hook", "stop", "--settings"][..], &["ingest", "--wet"][..], &[][..]]
-    {
+    for words in [
+        &["frobnicate"][..],
+        &["hook"][..],
+        &["hook", "stop", "--settings"][..],
+        &["ingest", "--wet"][..],
+        &["walk"][..],
+        &["backtest", "tree.json"][..],
+        &["backtest", "tree.json", "session.jsonl", "dev"][..],
+        &[][..],
+    ] {
         let said = home.said(words, "", &Replies::default());
         assert_eq!((said.shown.as_str(), said.ended), ("", Err(Refusal(usage.clone()))), "{words:?}");
     }
@@ -530,5 +613,114 @@ fn words_the_cli_does_not_know_are_refused_with_the_usage() -> Result<(), Failed
 fn a_stop_hook_that_cannot_read_its_input_fails() -> Result<(), Failed> {
     let said = Home::answered()?.said(&["hook", "stop"], "not json", &Replies::default());
     assert!(said.ended.is_err_and(|failure| failure.0.contains("cannot read the hook input: ")));
+    Ok(())
+}
+
+#[test]
+fn a_walk_descends_only_the_chosen_topics_and_prints_the_messages_under_them() -> Result<(), Failed> {
+    let home = Home::new()?;
+    let tree = home.planted(TREE)?;
+    let replies = Replies::choosing(&[Choice::new(ROOTS, "[1]"), Choice::new(RULINGS, "[1]")]);
+    let said = home.said(&["walk", &tree], QUESTION, &replies);
+    assert_eq!((said.shown.as_str(), said.ended), ("o1\np2\n", Ok(Outcome::Walked)));
+    let prompts = replies.prompts();
+    assert_eq!(prompts.len(), 2);
+    assert!(prompts.iter().all(|prompt| prompt.contains(QUESTION)));
+    assert!(prompts.first().is_some_and(|prompt| {
+        prompt.contains("\n1. [ideal | meta-dev] Ship the stop hook.\n2. [ideal | trips] Walk from Rome to Naples.")
+    }));
+    assert!(prompts.get(1).is_some_and(|prompt| prompt.contains("\n2. [ruling | meta-dev] Never force-push.")));
+    Ok(())
+}
+
+#[test]
+fn a_walk_whose_reply_does_not_parse_descends_every_topic() -> Result<(), Failed> {
+    let home = Home::new()?;
+    let tree = home.planted(TREE)?;
+    let replies = Replies::choosing(&[Choice::new(ROOTS, "I think topic one")]);
+    let said = home.said(&["walk", &tree], QUESTION, &replies);
+    assert_eq!((said.shown.as_str(), said.ended), ("o1\np2\np3\np4\n", Ok(Outcome::Walked)));
+    assert_eq!(replies.prompts().len(), 2);
+    Ok(())
+}
+
+#[test]
+fn a_walk_where_no_topic_bears_prints_nothing() -> Result<(), Failed> {
+    let home = Home::new()?;
+    let tree = home.planted(TREE)?;
+    let replies = Replies::choosing(&[Choice::new(ROOTS, "[]")]);
+    let said = home.said(&["walk", &tree], QUESTION, &replies);
+    assert_eq!((said.shown.as_str(), said.ended), ("", Ok(Outcome::Walked)));
+    assert_eq!(replies.prompts().len(), 1);
+    Ok(())
+}
+
+#[test]
+fn a_walk_over_a_tree_that_is_not_the_tree_shape_fails() -> Result<(), Failed> {
+    let home = Home::new()?;
+    let tree = home.planted("{\"roots\": [{\"label\": \"x\"}]}")?;
+    let said = home.said(&["walk", &tree], QUESTION, &Replies::default());
+    assert!(said.ended.is_err_and(|failure| failure.0.contains("cannot read the tree: ")));
+    Ok(())
+}
+
+#[test]
+fn a_backtest_scores_each_logged_stop_against_the_owner_words_it_quoted() -> Result<(), Failed> {
+    let home = Home::answered()?;
+    home.said(
+        &["hook", "stop"],
+        &home.asking(),
+        &Replies::quoting(&format!("[{{\"uuid\": \"o1\", \"quote\": \"{OWNER}\"}}]"), "[1]"),
+    );
+    let tree = home.planted(TREE)?;
+    let session = home.logged(&[LoggedStop::new(QUESTION, &["o1"]), LoggedStop::new(ASKED_NEXT, &["p4"])])?;
+    let replies = Replies::choosing(&[
+        Choice::new(RULINGS, "[1]"),
+        Choice::new(QUESTION, "[1]"),
+        Choice::new(ASKED_NEXT, "[1, 2]"),
+    ]);
+    let said = home.said(&["backtest", &tree, &session], "", &replies);
+    assert_eq!(said.ended, Ok(Outcome::Backtested));
+    assert_eq!(
+        said.shown,
+        [
+            "stop\tsplit\tindex\tgold\tretrieved\tfound\trecall\tmillis\ttokens\n",
+            &format!("stop\ttune\t0\t1\t2\t1\t1.000\t{STEP}\t14\n"),
+            &format!("stop\ttest\t1\t1\t3\t1\t1.000\t{STEP}\t14\n"),
+            "summary\tsplit\tstops\trecall\tfull\tretrieved\tmillis\ttokens\n",
+            &format!("summary\ttune\t1\t1.000\t1.000\t2\t{STEP}\t14\n"),
+            &format!("summary\ttest\t1\t1.000\t1.000\t3\t{STEP}\t14\n"),
+            "brute\tstops\tmillis\ttokens\n",
+            &format!("brute\t1\t{STEP}\t14\n"),
+            "extra\tsplit\tindex\tuuid\tstop\tmessage\n",
+            &format!("extra\ttest\t1\to1\t\"{ASKED_NEXT}\"\t\"{OWNER}\"\n"),
+        ]
+        .concat()
+    );
+    Ok(())
+}
+
+#[test]
+fn a_backtest_of_one_split_walks_only_its_stops_and_counts_a_missed_quote_against_recall() -> Result<(), Failed> {
+    let home = Home::new()?;
+    let tree = home.planted(TREE)?;
+    let session = home.logged(&[LoggedStop::new(QUESTION, &["o1", "p3"]), LoggedStop::new(ASKED_NEXT, &["p4"])])?;
+    let replies = Replies::choosing(&[Choice::new(RULINGS, "[1]"), Choice::new(QUESTION, "[1]")]);
+    let said = home.said(&["backtest", &tree, &session, "tune"], "", &replies);
+    assert_eq!(replies.prompts().len(), 2);
+    assert_eq!(
+        said.shown,
+        [
+            "stop\tsplit\tindex\tgold\tretrieved\tfound\trecall\tmillis\ttokens\n",
+            &format!("stop\ttune\t0\t2\t2\t1\t0.500\t{STEP}\t14\n"),
+            "summary\tsplit\tstops\trecall\tfull\tretrieved\tmillis\ttokens\n",
+            &format!("summary\ttune\t1\t0.500\t0.000\t2\t{STEP}\t14\n"),
+            "brute\tstops\tmillis\ttokens\n",
+            "brute\t0\t0\t0\n",
+            "extra\tsplit\tindex\tuuid\tstop\tmessage\n",
+            &format!("extra\ttune\t0\tp2\t\"{QUESTION}\"\t\"\"\n"),
+        ]
+        .concat()
+    );
     Ok(())
 }

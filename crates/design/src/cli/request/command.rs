@@ -1,7 +1,9 @@
+mod backtest;
 mod crew;
 mod hook;
 mod ingest;
 mod stops;
+mod walk;
 
 use std::path::PathBuf;
 
@@ -17,16 +19,20 @@ use super::persistence::Persistence;
 use crate::cli::failure::Failure;
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
+use backtest::{Backtest, Split};
 pub use crew::Crew;
 use hook::Hook;
 use ingest::Ingest;
 use stops::Trail;
+use walk::Walk;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Command {
     Ingest(Persistence),
     Stops,
     Hook(Hook),
+    Walk(Walk),
+    Backtest(Backtest),
 }
 
 impl Command {
@@ -35,6 +41,8 @@ impl Command {
     const STOPS: &'static str = "stops";
     const HOOK: &'static str = "hook";
     const SETTINGS: &'static str = "--settings";
+    const WALK: &'static str = "walk";
+    const BACKTEST: &'static str = "backtest";
 
     pub fn spoken(words: &[&str]) -> Result<Command, Failure> {
         match words {
@@ -43,14 +51,20 @@ impl Command {
             [Self::STOPS] => Ok(Command::Stops),
             [Self::HOOK, Self::SETTINGS] => Ok(Command::Hook(Hook::Settings)),
             [Self::HOOK, event] => Hook::named(event).map(Command::Hook),
+            [Self::WALK, tree] => Ok(Command::Walk(Walk::from(PathBuf::from(tree)))),
+            [Self::BACKTEST, tree, session] => Ok(Command::Backtest(Backtest::new([tree, session], Split::VARIANTS))),
+            [Self::BACKTEST, tree, session, split] => {
+                Split::named(split).map(|named| Command::Backtest(Backtest::new([tree, session], &[named])))
+            }
             _ => Err(Failure::Usage),
         }
     }
 
-    pub fn opened<O: Opens>(self, path: PathBuf, opens: &O) -> O::Store {
+    pub fn opened<O: Opens>(&self, path: PathBuf, opens: &O) -> O::Store {
         match self {
             Command::Ingest(persistence) => persistence.opened(path, opens),
-            Command::Stops | Command::Hook(_) => Persistence::File.opened(path, opens),
+            Command::Walk(_) => Persistence::DryRun.opened(path, opens),
+            Command::Stops | Command::Hook(_) | Command::Backtest(_) => Persistence::File.opened(path, opens),
         }
     }
 
@@ -69,6 +83,8 @@ impl Command {
                 .map(|rows| Uttered::new(Shown::said(Trail::from(rows)), Ok(Outcome::Trailed)))
                 .map_err(Failure::from),
             Command::Hook(hook) => hook.answered(environment, ground, crew),
+            Command::Walk(walk) => walk.answered(environment, &ground, crew),
+            Command::Backtest(backtest) => backtest.answered(&ground, crew),
         }
     }
 }

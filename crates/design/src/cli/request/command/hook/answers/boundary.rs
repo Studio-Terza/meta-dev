@@ -117,9 +117,19 @@ impl Reading<'_> {
     }
 }
 
+impl<'reply> From<&'reply Reply> for Replied<'reply> {
+    fn from(reply: &'reply Reply) -> Replied<'reply> {
+        Replied(reply)
+    }
+}
+
 impl Replied<'_> {
     pub fn listed<T: DeserializeOwned>(self) -> Vec<T> {
-        serde_json::from_str(&self.braced('[', ']')).ignoring(Ignored::Unpicked).unwrap_or_default()
+        self.parsed(Ignored::Unpicked).unwrap_or_default()
+    }
+
+    pub fn parsed<T: DeserializeOwned>(self, ignored: Ignored) -> Option<Vec<T>> {
+        serde_json::from_str(&self.braced('[', ']')).ignoring(ignored)
     }
 
     fn braced(self, open: char, close: char) -> String {
