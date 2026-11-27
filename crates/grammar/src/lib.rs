@@ -8,7 +8,6 @@ mod migration;
 mod reply;
 mod unlexed;
 mod unspelled;
-mod words;
 
 pub use bare::Bare;
 pub use invariants::Ignoring;
@@ -19,4 +18,3 @@ pub use migration::MigrationFile;
 pub use reply::Inked;
 pub use unlexed::Unlexed;
 use unspelled::Unspelled;
-pub use words::Words;

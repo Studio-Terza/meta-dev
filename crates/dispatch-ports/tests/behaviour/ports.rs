@@ -36,7 +36,7 @@ fn an_agent_that_prints_its_result_is_watched_to_that_reply_and_usage() -> Resul
         let echo =
             run.port(HeadlessClaude::new(PathBuf::from(env!("CARGO_MANIFEST_DIR")), Agent::new("sh", &["-c", "cat"])));
         let clock = run.port(SystemClock);
-        let deadline = Deadline::after(clock.now(), Timeout::new(5));
+        let deadline = Deadline::after(clock.now(), Timeout::new(2));
         let held = echo.dispatch(&Job::due_by(deadline, Model::Haiku), &Prompt::new(printed.to_owned()))?;
         Watch::over(&echo, &clock).watched(held)?
     };
@@ -60,7 +60,7 @@ impl Modelled {
             let echo =
                 run.port(HeadlessClaude::new(PathBuf::from(env!("CARGO_MANIFEST_DIR")), Agent::new("sh", &MODELLED)));
             let clock = run.port(SystemClock);
-            let deadline = Deadline::after(clock.now(), Timeout::new(5));
+            let deadline = Deadline::after(clock.now(), Timeout::new(2));
             let held = echo
                 .dispatch(&Job::due_by(deadline, model), &Prompt::new(String::new()))
                 .ignoring(Ignored::Unstalled)?;

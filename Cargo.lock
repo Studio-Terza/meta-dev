@@ -508,7 +508,6 @@ dependencies = [
 name = "port-derive"
 version = "0.1.0"
 dependencies = [
- "grammar",
  "proc-macro2",
  "quote",
  "strum",

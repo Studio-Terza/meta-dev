@@ -1,4 +1,3 @@
-use grammar::Words;
 use proc_macro2::{Ident, Span};
 use quote::{ToTokens, format_ident};
 use syn::LitStr;
@@ -26,11 +25,24 @@ impl Spelling {
     }
 
     fn ops_module_text(caller: &Ident) -> String {
-        format!("{}_ops", Words::lowered_humps(&caller.to_string()).join("_"))
+        let text = caller.to_string();
+        let gaps =
+            std::iter::once(None).chain(text.chars().skip(1).map(|letter| letter.is_ascii_uppercase().then_some('_')));
+        let snake: String =
+            text.chars().zip(gaps).flat_map(|(letter, gap)| gap.into_iter().chain(letter.to_lowercase())).collect();
+        format!("{snake}_ops")
     }
 
     pub fn camel(method: &Ident) -> Ident {
-        Ident::new(&Words::camel(&method.to_string()), method.span())
+        let text = method.to_string();
+        let raised = std::iter::once('_').chain(text.chars()).map(|before| before == '_');
+        let camel: String = text
+            .chars()
+            .zip(raised)
+            .filter(|(letter, _)| *letter != '_')
+            .flat_map(|(letter, upper)| if upper { letter.to_uppercase().collect::<Vec<char>>() } else { vec![letter] })
+            .collect();
+        Ident::new(&camel, method.span())
     }
 
     pub fn input(position: usize) -> Ident {
