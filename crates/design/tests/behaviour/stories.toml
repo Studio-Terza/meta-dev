@@ -806,3 +806,11 @@ ran = "cd - && mv a b"
 
 [[story.step]]
 ran = "cd $REPO && echo a > /tmp/out.txt"
+
+[[story]]
+name = "a ruling whose message id is not eight or more hexadecimal digits does not parse"
+transcript = [["user", "o1", "Merge only when CI is green."], ["assistant", "p1", "Understood."]]
+queue = "[[item]]\nruling = { asked = \"4c37\" }\n\n[[item]]\nruling = { asked = \"not-a-message-id\" }\n"
+
+[[story.step]]
+stop = {}

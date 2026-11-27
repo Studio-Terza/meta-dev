@@ -34,11 +34,11 @@ const TEMPORARY: &str = "/private/tmp";
 const ROOT: &str = "/home";
 const TEMPORARY_REAL: &str = "tmp";
 const LOCAL: &str = "queue = \"/home/placed/queue.toml\"\nspecs = \"/home/placed/specs\"\nrepository = \"o/r\"\n";
-const READS: i64 = 100_000;
+const READS: i64 = 10_000;
 
 invariants! {
     enum Invariant {
-        Endless => "a story step reads the fixed test clock fewer than a hundred thousand times",
+        Endless => "a story step reads the fixed test clock fewer than ten thousand times",
     }
 }
 

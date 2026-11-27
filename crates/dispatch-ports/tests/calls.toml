@@ -5,17 +5,17 @@ pause = 0
 program = "sh"
 arguments = ["-c", "cat"]
 fed = "a prompt handed on standard input"
-seconds = 30
+seconds = 3
 
 [[call]]
 program = "sh"
 arguments = ["-c", "printf 'printed'; exit 3"]
-seconds = 30
+seconds = 3
 
 [[call]]
 program = "sh"
 arguments = ["-c", "cat; printf 'read nothing'"]
-seconds = 30
+seconds = 3
 
 [[call]]
 program = "sleep"
@@ -25,4 +25,4 @@ seconds = 1
 [[call]]
 program = "a-program-that-is-not-installed"
 arguments = []
-seconds = 30
+seconds = 3

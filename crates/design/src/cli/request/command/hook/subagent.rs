@@ -263,15 +263,6 @@ impl fmt::Display for Stale<'_> {
     }
 }
 
-impl fmt::Display for At {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            At::Pull(pushed) => write!(formatter, "#{} {}", pushed.pull(), pushed.head()),
-            At::Branch(branched) => write!(formatter, "{} {}", branched.branch(), branched.head()),
-        }
-    }
-}
-
 impl fmt::Display for Unpushed {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Unpushed { pushed, held } = self;
