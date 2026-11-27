@@ -4,8 +4,8 @@ use std::ffi::OsString;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, SystemTime};
 use test_failure::Failed;
 
@@ -34,6 +34,13 @@ const TRIMMING: u32 = 1;
 const READING: u32 = 2;
 const STEP: i64 = 5;
 const READS: i64 = 10_000;
+const STORE: &str = ".meta/design.sqlite";
+
+static MIGRATED: LazyLock<Result<Vec<u8>, Failed>> = LazyLock::new(|| {
+    let home = Home::new()?;
+    home.said(&["stops"], "", &Replies::default());
+    Ok(fs::read(home.workspace().join(STORE))?)
+});
 
 #[derive(Debug)]
 struct Stepping {
@@ -379,6 +386,9 @@ impl Scenario {
 
     fn shown(&self) -> Result<String, Failed> {
         let home = Home::answered()?;
+        let migrated = MIGRATED.as_ref().map_err(|failed| Failed::from(format!("{failed:?}")))?;
+        fs::create_dir_all(home.workspace().join(".meta"))?;
+        fs::write(home.workspace().join(STORE), migrated)?;
         let replies = (self.replies)()?;
         (self.setup)(&home)?;
         let ran: Vec<String> = self

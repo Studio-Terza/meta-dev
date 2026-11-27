@@ -39,24 +39,6 @@ jobs:
   test:
     runs-on: ubuntu-latest
     env:
-      TIMER: ${{ github.workspace }}/../timer/debug/ci
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/toolchain
-      - uses: rui314/setup-mold@v1
-      - name: the timer, built apart from the stage it times
-        run: RUSTC_WRAPPER= cargo build --locked -q --bin ci --target-dir ../timer
-      - name: test-compile starts here, before the cache is set up
-        run: date +%s.%N > ../test-compile.start
-      - uses: mozilla-actions/sccache-action@v0.0.9
-        with:
-          version: v0.19.0
-      - run: '"$TIMER" timed ci/limits.toml test-compile --since ../test-compile.start cargo test --locked --workspace --no-run'
-      - run: '"$TIMER" timed ci/limits.toml test-run cargo test --locked --workspace'
-
-  test-archive:
-    runs-on: ubuntu-latest
-    env:
       RUSTC_WRAPPER: ""
       TIMER: ${{ github.workspace }}/../timer/debug/ci
     steps:
