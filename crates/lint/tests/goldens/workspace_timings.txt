@@ -31,6 +31,7 @@ app/src/flat/below.rs:1: fn below; make it an associated function or a method
 app/src/inline/beside.rs:1: fn beside; make it an associated function or a method
 app/src/inline/deep.rs:1: fn deep; make it an associated function or a method
 app/src/nested/child.rs:1: fn child; make it an associated function or a method
+app/src/sibling.rs:1: fn sibling; make it an associated function or a method
 app/tests/flows.rs:1: fn helper; make it an associated function or a method
 app/tests/flows.rs:7: fn cased; make it an associated function or a method
 app/tests/flows.rs:9: fn listed; make it an associated function or a method

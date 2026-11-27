@@ -1,7 +1,7 @@
 Clean
 --- out
 test budget, report only:
-app: 7 tests in 20 files, 36 of 69 lines, 1 process starts
+app: 7 tests in 21 files, 36 of 72 lines, 1 process starts
 kept: 0 tests in 1 files, 0 of 1 lines, 0 process starts
 linked: 0 tests in 1 files, 0 of 1 lines, 0 process starts
 store_ports: 0 tests in 1 files, 0 of 6 lines, 1 process starts
