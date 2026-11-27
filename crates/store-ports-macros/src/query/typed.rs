@@ -1,3 +1,5 @@
+mod boundary;
+
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{ToTokens, quote};
 use syn::ext::IdentExt;
@@ -70,14 +72,6 @@ impl Parse for ColumnName {
         let nullability = Nullability::parsed(input)?;
         let overridden = input.parse::<Option<Token![:]>>()?.map(|_colon| input.parse::<Type>()).transpose()?;
         Ok(ColumnName { ident, nullability, overridden })
-    }
-}
-
-impl TryFrom<String> for ColumnName {
-    type Error = syn::Error;
-
-    fn try_from(name: String) -> syn::Result<ColumnName> {
-        syn::parse_str(&name)
     }
 }
 
