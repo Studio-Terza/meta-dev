@@ -22,6 +22,8 @@ defaults:
 jobs:
   clippy:
     runs-on: ubuntu-latest
+    env:
+      TIMER: ${{ github.workspace }}/../timer/debug/ci
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/toolchain
@@ -30,8 +32,28 @@ jobs:
           version: v0.19.0
       - uses: rui314/setup-mold@v1
       - run: cargo fmt --check
-      - run: cargo build --locked -q --bin ci
-      - run: $TIMED clippy cargo clippy --locked --workspace --all-targets --all-features --profile clippy -- -D warnings
+      - name: the timer, built apart from the stage it times
+        run: cargo build --locked -q --bin ci --target-dir ../timer
+      - name: the target key, from what decides the third-party builds
+        id: target
+        run: |
+          {
+            grep -B2 '^source = ' Cargo.lock
+            cat rust-toolchain.toml Cargo.toml
+            env | grep -E '^(RUSTFLAGS|RUSTC_WRAPPER|CARGO_[A-Z_]+)=' | sort
+          } | sha256sum | cut -c1-64 | sed 's/^/key=clippy-${{ runner.os }}-/' >> "$GITHUB_OUTPUT"
+      - name: clippy starts here, before target/ is restored
+        run: date +%s.%N > ../clippy.start
+      - uses: actions/cache/restore@v4
+        with:
+          path: target
+          key: ${{ steps.target.outputs.key }}
+      - run: '"$TIMER" timed ci/limits.toml clippy --since ../clippy.start cargo clippy --locked --workspace --all-targets --all-features --profile clippy -- -D warnings'
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: target
+          key: ${{ steps.target.outputs.key }}
 
   test:
     runs-on: ubuntu-latest
