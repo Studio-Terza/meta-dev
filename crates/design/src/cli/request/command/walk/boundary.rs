@@ -124,7 +124,7 @@ impl<'asked, 'tree> Choosing<'asked, 'tree> {
          Reply with JSON only, no prose and no code fence: a list of topic numbers, such as [3, 1]. Reply [] only if the agent's message has nothing to do with any topic below.\n";
 
     const FLAT: &'static str = "The owner's earlier messages are filed in a tree of topics. Below, every topic is listed by number, named by one sentence the owner wrote, with its altitude (ideal, plan, feature or ruling) and its domain. A topic holds the owner messages filed under it and under every topic beneath it.\n\
-         List the topics that bear directly on the agent's message: those holding an earlier answer to anything it asks, or a decision, rule, preference or instruction about the work it reports or plans. Prefer the most specific topic that bears; name a broad topic only when the message concerns all of it. A missed topic costs more than an extra one, so when unsure between specific topics, include each of them.\n\
+         List the topics that bear directly on the agent's message: those holding an earlier answer to anything it asks, a decision, rule, preference or instruction about the work it reports or plans, or a standing rule about how the agent should work, report, test or decide that applies to what it is doing now. Prefer the most specific topics that bear; name a broad topic only when the message concerns all of it. A missed topic costs far more than an extra one, so include every specific topic that may hold such words, often ten or more.\n\
          Reply with JSON only, no prose and no code fence: a list of topic numbers, such as [12, 4]. Reply [] if none bear on it.\n";
 }
 
