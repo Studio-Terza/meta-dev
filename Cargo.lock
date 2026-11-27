@@ -142,6 +142,7 @@ dependencies = [
  "hex",
  "invariants",
  "newtype",
+ "port-core",
  "ports",
  "serde",
  "serde_json",
@@ -161,6 +162,7 @@ dependencies = [
  "grammar",
  "invariants",
  "newtype",
+ "port-core",
  "ports",
  "strum",
  "thiserror",
@@ -246,7 +248,7 @@ dependencies = [
  "file-ports",
  "invariants",
  "lint",
- "ports",
+ "port-core",
  "proptest",
 ]
 
@@ -365,7 +367,7 @@ dependencies = [
  "console-ports",
  "file-ports",
  "invariants",
- "ports",
+ "port-core",
  "proc-macro2",
  "ra-ap-rustc_lexer",
  "rayon",
@@ -463,6 +465,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
 
 [[package]]
+name = "port-core"
+version = "0.1.0"
+dependencies = [
+ "invariants",
+ "newtype",
+ "port-derive",
+ "thiserror",
+]
+
+[[package]]
 name = "port-derive"
 version = "0.1.0"
 dependencies = [
@@ -481,7 +493,7 @@ dependencies = [
  "grammar",
  "invariants",
  "newtype",
- "port-derive",
+ "port-core",
  "proptest",
  "rusqlite",
  "serde",

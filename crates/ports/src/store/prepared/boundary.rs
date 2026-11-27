@@ -1,8 +1,8 @@
 use std::fmt::Debug;
 use std::vec;
 
-use crate::port::Op;
 use crate::store::{Argument, Batch, ColumnFailure, Columns, Counts, Done, StoreFailure, Value};
+use port_core::Op;
 
 pub trait Execute: Debug {
     fn fetched(&mut self, sql: &'static str, arguments: Vec<Argument>) -> Result<Vec<Vec<Value>>, StoreFailure>;

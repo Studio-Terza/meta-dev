@@ -5,9 +5,9 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use crate::port::{Pass, Release, ReleaseReceipt, Released, Resource};
 use crate::store::Busy;
 use invariants::Unpoisoned;
+use port_core::{Pass, Release, ReleaseReceipt, Released, Resource};
 use refusal::Refusal;
 
 #[derive(Debug, Resource)]

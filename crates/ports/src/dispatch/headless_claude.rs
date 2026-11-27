@@ -9,8 +9,8 @@ use crate::dispatch::{
     Agent, AgentRun, Bell, DispatchFailure, DispatchFiller, Ended, Ignored, Job, Model, Output, Pid, Prompt, Started,
     dispatch_ops,
 };
-use crate::port::Pass;
 use invariants::Ignoring;
+use port_core::Pass;
 
 #[derive(Clone, Debug)]
 pub struct HeadlessClaude {

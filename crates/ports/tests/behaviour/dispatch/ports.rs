@@ -5,12 +5,12 @@ use std::time::{Duration, Instant};
 use test_failure::Failed;
 
 use invariants::Ignoring;
+use port_core::{Calls, Run};
 use ports::dispatch::{
     Agent, Call, Clock, Deadline, Dispatch, Ended, Finished, HeadlessClaude, Job, Model, Pause, Pid, Printed, Prompt,
     Ran, Reply, Shell, Stall, Started, SystemClock, SystemShell, Timeout, Tokens, Usage, Watch, Watched, Woke,
     shell_ops,
 };
-use ports::port::{Calls, Run};
 
 use super::{FakeClock, Ignored, Sleep, Wait, Waits, Watching};
 

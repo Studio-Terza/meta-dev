@@ -1,7 +1,7 @@
 use file_ports::FileFailure;
 
-use crate::port::port;
 use crate::transcript::{Cursor, Read, ReadFailure, Session};
+use port_core::port;
 
 #[port]
 pub trait Transcripts {

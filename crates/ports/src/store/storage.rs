@@ -1,6 +1,6 @@
-use crate::port::{Held, port};
 use crate::store::store_lock::StoreLock;
 use crate::store::{Batch, Busy, Created, Query, Record, StoreFailure};
+use port_core::{Held, port};
 
 #[port]
 pub trait Store {

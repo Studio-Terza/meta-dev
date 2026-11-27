@@ -1,4 +1,4 @@
-use ports::port::Op;
+use port_core::Op;
 use ports::store::{Counts, Done, Execute, StoreFailure};
 use ports::transcript::{Authorship, Cursor, Kind, Line, SessionId};
 

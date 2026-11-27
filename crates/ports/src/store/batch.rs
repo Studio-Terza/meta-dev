@@ -1,5 +1,5 @@
-use crate::port::{Op, OpName};
 use crate::store::{Done, Execute, StoreFailure, Written};
+use port_core::{Op, OpName};
 
 pub trait Batch: Op {
     type Failure: From<StoreFailure>;

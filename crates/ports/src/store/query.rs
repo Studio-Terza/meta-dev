@@ -1,5 +1,5 @@
-use crate::port::Op;
 use crate::store::{Execute, StoreFailure};
+use port_core::Op;
 
 pub trait Query: Op {
     type Rows;

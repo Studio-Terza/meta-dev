@@ -3,8 +3,8 @@ mod boundary;
 use std::process::{Child, Command, Stdio};
 
 use crate::dispatch::{Bell, Deadline, DispatchFailure, Output, Pid};
-use crate::port::{Pass, Release, ReleaseReceipt, Released, Resource};
 use boundary::Process;
+use port_core::{Pass, Release, ReleaseReceipt, Released, Resource};
 
 pub(crate) use boundary::Exchange;
 

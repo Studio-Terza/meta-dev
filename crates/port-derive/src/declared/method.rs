@@ -78,6 +78,6 @@ impl Method {
             let op = Spelling::camel(&self.name);
             quote!(#ops::#op)
         });
-        quote! { ::ports::port::Pass<'_, #named> }
+        quote! { ::port_core::Pass<'_, #named> }
     }
 }

@@ -12,7 +12,7 @@ impl Rendered for Delegation {
         let filler = declared.filler_name();
         let items = declared.as_ref().iter().map(Self::delegated_item);
         quote! {
-            impl<'run, F: #filler> #name for ::ports::port::Port<'run, F> {
+            impl<'run, F: #filler> #name for ::port_core::Port<'run, F> {
                 #(#items)*
             }
         }

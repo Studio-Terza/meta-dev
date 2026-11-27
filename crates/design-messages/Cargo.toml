@@ -16,6 +16,7 @@ invariants = { path = "../invariants" }
 file-ports = { path = "../file-ports" }
 grammar = { path = "../grammar" }
 newtype = { path = "../newtype" }
+port-core = { path = "../port-core" }
 ports = { path = "../ports" }
 strum.workspace = true
 thiserror.workspace = true

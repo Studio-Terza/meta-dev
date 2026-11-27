@@ -8,7 +8,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use crate::port::Pass;
+use port_core::Pass;
 
 use crate::store::{
     Batch, Busy, Claim, Created, Opens, Provenance, Query, Record, Schema, StoreFailure, StoreFiller, StoreLock,

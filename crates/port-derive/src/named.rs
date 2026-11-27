@@ -20,8 +20,8 @@ impl Derived {
 
     fn implemented(self) -> TokenStream {
         match self {
-            Derived::Op => quote!(::ports::port::Op),
-            Derived::Resource => quote!(::ports::port::Resource),
+            Derived::Op => quote!(::port_core::Op),
+            Derived::Resource => quote!(::port_core::Resource),
         }
     }
 
@@ -59,6 +59,6 @@ impl Named {
     fn constant(&self, constant: Constant) -> TokenStream {
         let declared = Spelling::constant(constant);
         let path = Spelling::type_path(&self.ident, constant);
-        quote! { const #declared: ::ports::port::OpName = ::ports::port::OpName::new(concat!(module_path!(), #path)); }
+        quote! { const #declared: ::port_core::OpName = ::port_core::OpName::new(concat!(module_path!(), #path)); }
     }
 }

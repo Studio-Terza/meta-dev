@@ -6,7 +6,7 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, SystemTime};
 
 use crate::dispatch::{Call, Deadline, DispatchFailure, Due, Pid, Printed, Ran, ShellFiller, Wall, shell_ops};
-use crate::port::Pass;
+use port_core::Pass;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SystemShell;

@@ -3,8 +3,8 @@ use std::io;
 use std::path::PathBuf;
 
 use file_ports::FileFailure;
+use port_core::{ReleaseFailures, Snapshot};
 use ports::dispatch::DispatchFailure;
-use ports::port::{ReleaseFailures, Snapshot};
 use ports::store::{Busy, StoreFailure, Unlock};
 use ports::transcript::ReadFailure;
 

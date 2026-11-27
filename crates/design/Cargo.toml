@@ -22,6 +22,7 @@ file-ports = { path = "../file-ports" }
 grammar = { path = "../grammar" }
 hex.workspace = true
 newtype = { path = "../newtype" }
+port-core = { path = "../port-core" }
 ports = { path = "../ports" }
 serde.workspace = true
 serde_json.workspace = true

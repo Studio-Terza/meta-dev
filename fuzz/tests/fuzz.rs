@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use file_ports::{Bytes, Memory};
 use invariants::{Ignoring, ignored};
 use lint::{Cli, Verdict};
-use ports::timer::Monotonic;
+use port_core::timer::Monotonic;
 use proptest::collection::vec;
 use proptest::prelude::{BoxedStrategy, Strategy, any, prop_assert_eq, prop_oneof};
 use proptest::sample::{Index, select};

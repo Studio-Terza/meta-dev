@@ -1,9 +1,12 @@
+extern crate self as port_core;
+
 mod calls;
 mod held;
 mod metered;
 mod op;
 mod run;
 mod snapshot;
+pub mod timer;
 
 pub use calls::Calls;
 pub use held::{Held, Release, ReleaseReceipt, Released, Resource};

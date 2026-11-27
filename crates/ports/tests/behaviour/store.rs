@@ -8,8 +8,8 @@ use design_messages::{CheckName, Fate, Halt, PullNumber, SessionCursors, StreamS
 use file_ports::Offset;
 use invariants::{Ignoring, ignored};
 use newtype::Enumerated;
+use port_core::{Op, Run};
 use ports::dispatch::{Pid, Tokens, Wall};
-use ports::port::{Op, Run};
 use ports::sqlite::SqliteOpener;
 use ports::store::{
     Batch, Busy, Column, ColumnFailure, Columns, Execute, Migrator, Query, Schema, Store, StoreFailure, Version,

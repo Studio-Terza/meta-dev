@@ -15,7 +15,6 @@ use ::ports::dispatch::{
     Moment, Output, Pause, Pid, Printed, Prompt, Ran, Reply, ShellFiller, Started, Tokens, Told, Usage, Wall,
     clock_ops, dispatch_ops, shell_ops,
 };
-use ::ports::port::Pass;
 use ::ports::sqlite::SqliteOpener;
 use console_ports::{Heard, Shown, Variables};
 use design::{Agents, Cli, Failure, HookEvent, Outcome};
@@ -23,6 +22,7 @@ use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Offset, Size, Stamps, Te
 use grammar::Letters;
 use invariants::{Unpoisoned, invariant, invariants};
 use newtype::Wrapping;
+use port_core::Pass;
 use serde::Deserialize;
 use serde_json::Value;
 use tempfile::TempDir;

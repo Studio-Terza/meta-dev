@@ -4,7 +4,7 @@ use file_ports::{Bytes, FileFailure, Files};
 use grammar::Lines;
 use grammar::{Attachment, Cited, Heading, Queue};
 use invariants::Ignoring;
-use ports::port::{Port, Run};
+use port_core::{Port, Run};
 use ports::store::Store;
 use ports::transcript::ClaudeCodeDir;
 

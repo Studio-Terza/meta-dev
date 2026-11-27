@@ -1,6 +1,6 @@
 mod boundary;
 
-use ports::port::Op;
+use port_core::Op;
 
 #[derive(Clone, Copy, Debug, Op)]
 pub struct SessionCursors;

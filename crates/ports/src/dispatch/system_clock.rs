@@ -1,7 +1,7 @@
 use std::time::{Duration, SystemTime};
 
 use crate::dispatch::{Bell, ClockFiller, Moment, Pause, Wall, clock_ops};
-use crate::port::Pass;
+use port_core::Pass;
 
 #[derive(Debug)]
 pub struct SystemClock;

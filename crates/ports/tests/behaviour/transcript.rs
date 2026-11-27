@@ -6,7 +6,7 @@ use test_failure::Failed;
 use file_ports::{Bytes, Disk, Files, Memory};
 use grammar::KeptLines;
 use invariants::{Ignoring, ignored};
-use ports::port::{Calls, Run};
+use port_core::{Calls, Run};
 use ports::transcript::transcripts_ops::{ReadFrom, Sessions};
 use ports::transcript::{
     Authorship, Body, ClaudeCodeDir, Cursor, Instant, Kind, Line, Read, Record, SessionId, Skipped, Transcripts,

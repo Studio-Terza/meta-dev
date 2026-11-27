@@ -1,5 +1,5 @@
 use crate::dispatch::{Bell, Moment, Pause, Wall};
-use crate::port::port;
+use port_core::port;
 
 #[port]
 pub trait Clock {

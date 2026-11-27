@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::io::{self, Write};
 
-use ports::timer::{Elapsed, Timer};
+use port_core::timer::{Elapsed, Timer};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Stage {

@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use console_ports::Shown;
-use ports::port::{ReleaseFailures, Snapshot};
+use port_core::{ReleaseFailures, Snapshot};
 
 use super::failure::Failure;
 use crate::Outcome;

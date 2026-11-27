@@ -21,7 +21,7 @@ required-features = ["campaign"]
 file-ports = { path = "../crates/file-ports" }
 invariants = { path = "../crates/invariants" }
 lint = { path = "../crates/lint" }
-ports = { path = "../crates/ports" }
+port-core = { path = "../crates/port-core" }
 proptest.workspace = true
 
 [lints]

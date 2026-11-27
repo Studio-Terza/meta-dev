@@ -1,5 +1,5 @@
-use crate::port::Op;
 use crate::store::{Argument, Columns, Execute, Prepared, StoreFailure};
+use port_core::Op;
 
 pub trait Record: Columns + Sized {
     type Key;

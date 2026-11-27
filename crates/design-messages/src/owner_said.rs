@@ -1,6 +1,6 @@
 mod boundary;
 
-use ports::port::Op;
+use port_core::Op;
 use ports::transcript::SessionId;
 
 pub use boundary::{Quote, Said, Unabridged};

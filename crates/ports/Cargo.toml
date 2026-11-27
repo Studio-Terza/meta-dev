@@ -18,7 +18,7 @@ file-ports = { path = "../file-ports" }
 grammar = { path = "../grammar" }
 invariants = { path = "../invariants" }
 newtype = { path = "../newtype" }
-port-derive = { path = "../port-derive" }
+port-core = { path = "../port-core" }
 rusqlite = { version = "0.37.0", default-features = false, features = ["serialize"] }
 serde.workspace = true
 serde_json.workspace = true

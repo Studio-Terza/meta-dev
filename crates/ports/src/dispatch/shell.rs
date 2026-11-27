@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use newtype::{Display, Newtype};
 
 use crate::dispatch::{Deadline, DispatchFailure};
-use crate::port::port;
+use port_core::port;
 
 #[port]
 pub trait Shell {

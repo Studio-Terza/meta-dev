@@ -23,8 +23,8 @@ use ::ports::dispatch::{
     Finished, Job, Model, Output, Pause, Pid, Prompt, Reply, Stall, Stalled, Started, Stderr, Timeout, Told,
     Unreadable, Usage, Wall, Watch, Watched, Woke, clock_ops, dispatch_ops,
 };
-use ::ports::port::{Calls, Pass, Port, Released, Run, Snapshot};
 use invariants::{Ignoring, Unpoisoned, invariant, invariants};
+use port_core::{Calls, Pass, Port, Released, Run, Snapshot};
 
 use ignored::Ignored;
 

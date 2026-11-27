@@ -3,7 +3,7 @@ use std::sync::Mutex;
 
 use invariants::{Ignoring, Unpoisoned, ignored};
 use newtype::Counter;
-use ports::port::{
+use port_core::{
     Calls, Counted, Held, Measured, Metered, Op, Pass, Port, Release, ReleaseReceipt, Released, Resource, Run, port,
 };
 

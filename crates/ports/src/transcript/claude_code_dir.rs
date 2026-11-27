@@ -9,10 +9,10 @@ use file_ports::{FileFailure, Files};
 use invariants::{Ignoring, ignored};
 use newtype::Wrapping;
 
-use crate::port::Pass;
 use crate::transcript::transcripts::{TranscriptsFiller, transcripts_ops};
 use crate::transcript::{Cursor, Read, ReadFailure, Session, SessionId};
 use extension::Extension;
+use port_core::Pass;
 
 ignored! {
     enum Ignored {

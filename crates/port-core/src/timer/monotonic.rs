@@ -1,7 +1,7 @@
 use std::sync::OnceLock;
 use std::time::Instant;
 
-use crate::port::Pass;
+use crate::Pass;
 use crate::timer::Moment;
 use crate::timer::timing::{TimerFiller, timer_ops};
 

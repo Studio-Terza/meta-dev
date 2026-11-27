@@ -1,6 +1,6 @@
 mod boundary;
 
-use ports::port::Op;
+use port_core::Op;
 
 pub use boundary::{CheckName, PullNumber};
 
