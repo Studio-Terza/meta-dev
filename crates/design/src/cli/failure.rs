@@ -2,11 +2,11 @@ use std::ffi::OsString;
 use std::io;
 use std::path::PathBuf;
 
+use dispatch_ports::DispatchFailure;
 use file_ports::FileFailure;
 use port_core::{ReleaseFailures, Snapshot};
-use ports::dispatch::DispatchFailure;
-use ports::store::{Busy, StoreFailure, Unlock};
-use ports::transcript::ReadFailure;
+use store_ports::{Busy, StoreFailure, Unlock};
+use transcript_ports::ReadFailure;
 
 use crate::Outcome;
 

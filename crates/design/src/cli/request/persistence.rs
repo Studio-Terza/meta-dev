@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use design_messages::StreamSchema;
-use ports::store::Opens;
+use store_ports::Opens;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Persistence {

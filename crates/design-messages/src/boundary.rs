@@ -4,9 +4,9 @@ use std::collections::BTreeMap;
 
 use file_ports::Offset;
 use newtype::Wrapping;
-use ports::store::Record as _;
-use ports::store::{Columns, Done, Execute, Prepared, StoreFailure};
-use ports::transcript::{Authorship, Body, Cursor, Instant, Record, SessionId, Uuid};
+use store_ports::Record as _;
+use store_ports::{Columns, Done, Execute, Prepared, StoreFailure};
+use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Uuid};
 
 use crate::Said;
 
@@ -28,7 +28,7 @@ pub(crate) struct SaidRow {
     body: Body,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Columns, ports::store::Record)]
+#[derive(Clone, Debug, PartialEq, Eq, Columns, store_ports::Record)]
 #[record(table = "cursors")]
 pub struct CursorRow {
     #[record(key)]
@@ -81,7 +81,7 @@ impl SaidRow {
         author: Authorship,
         statements: &mut impl Execute,
     ) -> Result<Vec<SaidRow>, StoreFailure> {
-        statements.rows(ports::store::query!(
+        statements.rows(store_ports::query!(
             SaidRow,
             r#"
 SELECT
@@ -111,7 +111,7 @@ LIMIT
     }
 
     fn all(statements: &mut impl Execute) -> Result<Vec<SaidRow>, StoreFailure> {
-        statements.rows(ports::store::query!(
+        statements.rows(store_ports::query!(
             SaidRow,
             r#"
 SELECT
@@ -129,7 +129,7 @@ FROM
 impl MessageRow {
     pub(crate) fn inserted(&self) -> Prepared<()> {
         let MessageRow { uuid, session, parent, at, author, body } = self;
-        ports::store::query!(
+        store_ports::query!(
             r#"
 INSERT
   OR IGNORE INTO messages (uuid, session, parent, at, author, body)
@@ -152,7 +152,7 @@ impl CursorRow {
     }
 
     pub(crate) fn all(statements: &mut impl Execute) -> Result<Vec<CursorRow>, StoreFailure> {
-        statements.rows(ports::store::query!(
+        statements.rows(store_ports::query!(
             CursorRow,
             r#"
 SELECT

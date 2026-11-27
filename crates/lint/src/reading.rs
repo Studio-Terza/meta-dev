@@ -6,9 +6,9 @@ use std::sync::{Arc, Mutex};
 
 use file_ports::{FileFailure, Files, Kind};
 use invariants::{Ignoring, Unpoisoned};
-use port_core::timer::Timer;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use syn::{Expr, ExprLit, Item, ItemMod, Lit, Meta};
+use timer_ports::Timer;
 
 use crate::budget::Budget;
 use crate::failure::Failure;

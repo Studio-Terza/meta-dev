@@ -58,8 +58,8 @@ impl Expanding for Record {
         let key_name = &key.name;
         let key_type = &key.column;
         let keyed = key.bound();
-        let query = quote!(::ports::store::query!);
-        let prepared = quote!(::ports::store::Prepared);
+        let query = quote!(::store_ports::query!);
+        let prepared = quote!(::store_ports::Prepared);
         Ok(quote! {
             #[derive(Clone, Debug, PartialEq, Eq)]
             #visibility struct #fresh {
@@ -72,7 +72,7 @@ impl Expanding for Record {
                 }
             }
 
-            impl ::ports::store::Record for #row {
+            impl ::store_ports::Record for #row {
                 type Key = #key_type;
 
                 type New = #fresh;
@@ -109,7 +109,7 @@ impl Expanding for Record {
                     #query(#row, #list)
                 }
 
-                fn overwrites(argument: &::ports::store::Argument) -> ::std::vec::Vec<#prepared<()>> {
+                fn overwrites(argument: &::store_ports::Argument) -> ::std::vec::Vec<#prepared<()>> {
                     ::std::vec![#(#prepared::written(#overwrites, ::std::vec![::core::clone::Clone::clone(argument)]),)*]
                 }
             }

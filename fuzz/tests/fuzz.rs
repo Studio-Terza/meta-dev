@@ -7,11 +7,11 @@ use std::time::{Duration, Instant};
 use file_ports::{Bytes, Memory};
 use invariants::{Ignoring, ignored};
 use lint::{Cli, Verdict};
-use port_core::timer::Monotonic;
 use proptest::collection::vec;
 use proptest::prelude::{BoxedStrategy, Strategy, any, prop_assert_eq, prop_oneof};
 use proptest::sample::{Index, select};
 use proptest::test_runner::{Config, TestCaseError, TestError, TestRunner};
+use timer_ports::Monotonic;
 
 ignored! {
     enum Ignored {

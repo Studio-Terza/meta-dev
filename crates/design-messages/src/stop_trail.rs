@@ -1,7 +1,7 @@
 mod boundary;
 
 use port_core::Op;
-use ports::transcript::Body;
+use transcript_ports::Body;
 
 pub use boundary::{Fate, Halt, StopRow, Tally};
 

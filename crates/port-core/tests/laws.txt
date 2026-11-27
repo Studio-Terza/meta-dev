@@ -1,0 +1,15 @@
+no calls: ; 0 sessions in []; settled
+each call counts once: [1, 1, 1]; 3 sessions in [laws::transcripts_ops::Transcripts::sessions 3]; settled
+a provided method counts its calls: [["a"], ["b"]]; 1 sessions in [laws::transcripts_ops::Transcripts::read_from 2, laws::transcripts_ops::Transcripts::sessions 1]; settled
+scoped threads: 4; 4 sessions in [laws::transcripts_ops::Transcripts::sessions 4]; settled
+runs keep their own counts: 1 Some("each call counts once: [1, 1, 1]; 3 sessions in [laws::transcripts_ops::Transcripts::sessions 3]; settled\n"); 1 sessions in [laws::transcripts_ops::Transcripts::sessions 1]; settled
+ops list in name order: ["a", "a"] 1 Ok(Ok(())); 1 sessions in [laws::SessionLock::release 1, laws::transcripts_ops::Transcripts::lock 1, laws::transcripts_ops::Transcripts::read_from 1, laws::transcripts_ops::Transcripts::sessions 1]; settled
+per-type ops: 2 2 ["a", "b"]; 0 sessions in [laws::Count 2, laws::Names 1]; settled
+a fallible lock dropped: Some(Intact); 0 sessions in [laws::SessionLock::release 1, laws::transcripts_ops::Transcripts::lock 1]; settled
+an optional lock dropped: Some(Intact); 0 sessions in [laws::SessionLock::release 1, laws::transcripts_ops::Transcripts::try_lock 1]; settled
+a bare lock dropped: Intact; 0 sessions in [laws::SessionLock::release 1, laws::transcripts_ops::Transcripts::lock_bare 1]; settled
+a broken lock ended: Ok(Err(Gone)); 0 sessions in [laws::SessionLock::release 1, laws::transcripts_ops::Transcripts::lock 1]; settled
+a broken lock dropped: Ok(Broken); 0 sessions in [laws::SessionLock::release 1, laws::transcripts_ops::Transcripts::lock 1]; releasing laws::SessionLock failed: the session lock was already gone (0 further release failures)
+a lock changed through its hold: Intact Err(Gone); 0 sessions in [laws::SessionLock::release 1, laws::transcripts_ops::Transcripts::lock_bare 1]; settled
+a two-word trait: (); 0 sessions in [laws::session_cache_ops::SessionCache::clear 1]; settled
+names: laws::SessionLock laws::SessionLock::release laws::Count; 0 sessions in []; settled

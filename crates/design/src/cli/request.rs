@@ -9,7 +9,7 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 use console_ports::Environment;
-use ports::store::Opens;
+use store_ports::Opens;
 
 use super::failure::Failure;
 use command::Command;

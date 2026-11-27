@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use ports::transcript::{Cursor, SessionId};
+use transcript_ports::{Cursor, SessionId};
 
 use crate::boundary::CursorRow;
 

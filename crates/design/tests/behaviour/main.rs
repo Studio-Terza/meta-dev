@@ -10,14 +10,13 @@ use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, SystemTime};
 use test_failure::Failed;
 
-use ::ports::dispatch::{
+use console_ports::{Heard, Shown, Variables};
+use design::{Agents, Cli, Failure, HookEvent, Outcome};
+use dispatch_ports::{
     AgentRun, Bell, Call, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Ended, Errored, Finished, Job,
     Moment, Output, Pause, Pid, Printed, Prompt, Ran, Reply, ShellFiller, Started, Tokens, Told, Usage, Wall,
     clock_ops, dispatch_ops, shell_ops,
 };
-use ::ports::sqlite::SqliteOpener;
-use console_ports::{Heard, Shown, Variables};
-use design::{Agents, Cli, Failure, HookEvent, Outcome};
 use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Offset, Size, Stamps, Text};
 use grammar::Letters;
 use invariants::{Unpoisoned, invariant, invariants};
@@ -25,6 +24,7 @@ use newtype::Wrapping;
 use port_core::Pass;
 use serde::Deserialize;
 use serde_json::Value;
+use sqlite_ports::SqliteOpener;
 use tempfile::TempDir;
 
 use ports::Design;

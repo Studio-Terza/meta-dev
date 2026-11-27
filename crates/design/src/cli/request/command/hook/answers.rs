@@ -1,9 +1,9 @@
 mod boundary;
 
 use design_messages::{OwnerHistory, Quote, Said, Tally};
-use ports::dispatch::{Clock, Dispatch, Model, Prompt, Shell, Timeout};
-use ports::store::Store;
-use ports::transcript::Body;
+use dispatch_ports::{Clock, Dispatch, Model, Prompt, Shell, Timeout};
+use store_ports::Store;
+use transcript_ports::Body;
 
 use super::super::crew::{Crew, Heard};
 use crate::cli::failure::Failure;

@@ -1,7 +1,7 @@
 use std::num::NonZeroU32;
 
 use newtype::{Checked, CheckedDeserialize, Display, Newtype};
-use ports::store::{Batch, Columns, Execute, Prepared, Query, StoreFailure};
+use store_ports::{Batch, Columns, Execute, Prepared, Query, StoreFailure};
 
 use super::{FailedBefore, Failing};
 
@@ -32,7 +32,7 @@ impl Checked for CheckName {
 
 impl FailedBefore {
     fn cleared(pull: PullNumber) -> Prepared<()> {
-        ports::store::query!(
+        store_ports::query!(
             r#"
 DELETE FROM failed_checks
 WHERE
@@ -43,7 +43,7 @@ WHERE
     }
 
     fn inserted(pull: PullNumber, name: &CheckName) -> Prepared<()> {
-        ports::store::query!(
+        store_ports::query!(
             r#"
 INSERT
   OR IGNORE INTO failed_checks (pull, name)
@@ -75,7 +75,7 @@ impl Query for FailedBefore {
 
     fn rows(self, statements: &mut impl Execute) -> Result<Vec<CheckName>, StoreFailure> {
         let FailedBefore(pull) = self;
-        let rows = statements.rows(ports::store::query!(
+        let rows = statements.rows(store_ports::query!(
             FailedCheckRow,
             r#"
 SELECT

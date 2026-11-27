@@ -63,7 +63,7 @@ impl ToTokens for Found {
         let version = self.file.version();
         let description = self.file.description();
         let path = self.path.to_string_lossy();
-        let new = quote!(::ports::store::Migration::new);
+        let new = quote!(::store_ports::Migration::new);
         tokens.extend(quote!(#new(#version, #description, include_str!(#path))));
     }
 }

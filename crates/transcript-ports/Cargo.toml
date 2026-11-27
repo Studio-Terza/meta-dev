@@ -1,0 +1,28 @@
+[package]
+name = "transcript-ports"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+file-ports = { path = "../file-ports" }
+grammar = { path = "../grammar" }
+invariants = { path = "../invariants" }
+newtype = { path = "../newtype" }
+port-core = { path = "../port-core" }
+serde.workspace = true
+serde_json.workspace = true
+strum.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+test-failure = { path = "../test-failure" }
+proptest.workspace = true
+
+[lints]
+workspace = true

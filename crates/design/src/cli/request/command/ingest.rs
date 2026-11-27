@@ -4,8 +4,8 @@ use std::fmt;
 
 use design_messages::{Cursors, SessionCursors, SessionRecords};
 use newtype::Counter;
-use ports::store::{Counted, Store, Written};
-use ports::transcript::{Authorship, Cursor, Kind, Line, Session, SessionId, Transcripts};
+use store_ports::{Counted, Store, Written};
+use transcript_ports::{Authorship, Cursor, Kind, Line, Session, SessionId, Transcripts};
 
 use crate::cli::Count;
 use crate::cli::failure::Failure;

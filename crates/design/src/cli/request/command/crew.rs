@@ -1,12 +1,12 @@
 use std::path::Path;
 
 use design_messages::Tally;
-use invariants::Ignoring;
-use newtype::Wrapping;
-use ports::dispatch::{
+use dispatch_ports::{
     Bell, Call, Clock, Deadline, Dispatch, Finished, Job, Model, Moment, Pause, Prompt, Ran, Reply, Shell, Stall,
     Timeout, Usage, Wall, Watch, Watching,
 };
+use invariants::Ignoring;
+use newtype::Wrapping;
 
 use crate::cli::failure::Failure;
 use crate::cli::request::ignored::Ignored;

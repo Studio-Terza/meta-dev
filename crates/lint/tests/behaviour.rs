@@ -6,8 +6,8 @@ use std::process::ExitCode;
 
 use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Memory};
 use lint::{Cli, Verdict};
-use port_core::timer::Monotonic;
 use test_failure::Failed;
+use timer_ports::Monotonic;
 
 const FIXTURES: &str = "tests/fixtures";
 const GOLDENS: &str = "tests/goldens";

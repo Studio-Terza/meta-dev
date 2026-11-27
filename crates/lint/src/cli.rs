@@ -6,8 +6,8 @@ use std::process::ExitCode;
 use file_ports::Files;
 use invariants::Ignoring;
 use port_core::Run;
-use port_core::timer::{Timer, TimerFiller};
 use rayon::ThreadPoolBuilder;
+use timer_ports::{Timer, TimerFiller};
 
 use crate::failure::Failure;
 use crate::finding::Findings;

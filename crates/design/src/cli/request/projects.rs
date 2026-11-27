@@ -5,7 +5,7 @@ use std::path::{Component, Path, PathBuf};
 
 use console_ports::Environment;
 use file_ports::Files;
-use ports::transcript::ClaudeCodeDir;
+use transcript_ports::ClaudeCodeDir;
 
 use crate::cli::failure::Failure;
 use slug::Slug;

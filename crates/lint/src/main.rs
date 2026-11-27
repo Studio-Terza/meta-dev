@@ -3,7 +3,7 @@ use std::process::ExitCode;
 use console_ports::Process;
 use file_ports::Disk;
 use lint::{Cli, Verdict};
-use port_core::timer::Monotonic;
+use timer_ports::Monotonic;
 
 fn main() -> ExitCode {
     Process::stream(|arguments, out, err| {

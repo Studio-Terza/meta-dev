@@ -24,6 +24,7 @@ rayon = "1.12.0"
 rustc_lexer.workspace = true
 syn.workspace = true
 thiserror.workspace = true
+timer-ports = { path = "../timer-ports" }
 toml.workspace = true
 
 [dev-dependencies]

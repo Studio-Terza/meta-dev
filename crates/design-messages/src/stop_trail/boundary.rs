@@ -3,9 +3,9 @@ use std::iter::Sum;
 
 use invariants::Ignoring;
 use newtype::{Arbitrary, Display, Listed, Newtype};
-use ports::store::{Batch, Columns, Execute, Prepared, Query, StoreFailure};
-use ports::transcript::{Body, SessionId};
+use store_ports::{Batch, Columns, Execute, Prepared, Query, StoreFailure};
 use strum::{IntoStaticStr, VariantArray};
+use transcript_ports::{Body, SessionId};
 
 use super::{Overran, Overruns, StopTrail, Stopped};
 use crate::boundary::ignored::Ignored;
@@ -91,7 +91,7 @@ impl StopRow {
 impl OverrunRow {
     fn inserted(&self) -> Prepared<()> {
         let OverrunRow { task } = self;
-        ports::store::query!(
+        store_ports::query!(
             r#"
 INSERT
   OR IGNORE INTO overruns (task)
@@ -117,7 +117,7 @@ impl Batch for Stopped {
 
     fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         let Stopped(StopRow { session, shells, agents, halt, read, quoted, kept, fate, tokens, millis }) = self;
-        statements.written(ports::store::query!(
+        statements.written(store_ports::query!(
             r#"
 INSERT INTO
   stops (
@@ -165,7 +165,7 @@ impl Query for StopTrail {
     type Rows = Vec<StopRow>;
 
     fn rows(self, statements: &mut impl Execute) -> Result<Vec<StopRow>, StoreFailure> {
-        statements.rows(ports::store::query!(
+        statements.rows(store_ports::query!(
             StopRow,
             r#"
 SELECT
@@ -192,7 +192,7 @@ impl Query for Overruns {
     type Rows = Vec<Body>;
 
     fn rows(self, statements: &mut impl Execute) -> Result<Vec<Body>, StoreFailure> {
-        let rows = statements.rows(ports::store::query!(
+        let rows = statements.rows(store_ports::query!(
             OverrunRow,
             r#"
 SELECT

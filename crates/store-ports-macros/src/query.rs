@@ -33,7 +33,7 @@ impl Expanding for Query {
         let values = quote!(::std::vec![#(#arguments),*]);
         let prepared = row.map_or_else(
             || {
-                let written = quote!(::ports::store::Prepared::written);
+                let written = quote!(::store_ports::Prepared::written);
                 Ok(quote!(#written(#sql, #values)))
             },
             |columns| {
@@ -41,9 +41,9 @@ impl Expanding for Query {
                 let columned: syn::Result<Vec<Typed>> =
                     described.iter().map(|column| Typed::described(column, source.span())).collect();
                 columned.map(|typed| {
-                    let read = quote!(::ports::store::Prepared::read);
-                    let taken = quote!(::ports::store::Values);
-                    let rows = quote!(::ports::store::Columns);
+                    let read = quote!(::store_ports::Prepared::read);
+                    let taken = quote!(::store_ports::Values);
+                    let rows = quote!(::store_ports::Columns);
                     quote! {
                         #read(#sql, #values, |values: &mut #taken| {
                             type __Raw = <#columns as #rows>::Raw;

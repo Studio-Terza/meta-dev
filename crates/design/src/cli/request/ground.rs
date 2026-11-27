@@ -5,8 +5,8 @@ use grammar::Lines;
 use grammar::{Attachment, Cited, Heading, Queue};
 use invariants::Ignoring;
 use port_core::{Port, Run};
-use ports::store::Store;
-use ports::transcript::ClaudeCodeDir;
+use store_ports::Store;
+use transcript_ports::ClaudeCodeDir;
 
 use super::ignored::Ignored;
 use super::local::{Local, QueueFile, SpecsFolder};

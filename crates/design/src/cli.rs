@@ -8,10 +8,10 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 
 use console_ports::Environment;
+use dispatch_ports::{ClockFiller, DispatchFiller, ShellFiller};
 use file_ports::Files;
 use port_core::Run;
-use ports::dispatch::{ClockFiller, DispatchFiller, ShellFiller};
-use ports::store::Opens;
+use store_ports::Opens;
 
 pub use count::Count;
 pub use failure::Failure;
