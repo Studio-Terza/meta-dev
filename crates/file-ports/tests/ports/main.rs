@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use file_ports::{Bytes, Cached, Disk, Files, Kind, Memory, Offset};
+use file_ports::{Bytes, Cached, Disk, Files, Kind, Memory, Offset, Size};
 use newtype::Wrapping;
 use proptest::prelude::{any, prop_assert_eq, proptest};
 
@@ -86,6 +86,8 @@ proptest! {
         prop_assert_eq!(cached.read(&path)?, first);
         cached.write(&path, second.clone())?;
         prop_assert_eq!(&cached.read(&path)?, &second);
-        prop_assert_eq!(memory.read(&path)?, second);
+        prop_assert_eq!(&memory.read(&path)?, &second);
+        prop_assert_eq!(cached.size(&path)?, memory.size(&path)?);
+        prop_assert_eq!(cached.size(&path)?, Size::from(&second));
     }
 }

@@ -30,12 +30,6 @@ impl PartialEq<Ident> for Name {
     }
 }
 
-impl PartialEq<str> for Name {
-    fn eq(&self, other: &str) -> bool {
-        self.0 == other
-    }
-}
-
 impl fmt::Display for Name {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.0)
