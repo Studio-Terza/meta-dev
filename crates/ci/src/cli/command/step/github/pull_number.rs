@@ -1,10 +1,3 @@
-use newtype::{Arbitrary, Display, Newtype};
+mod boundary;
 
-#[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
-pub(crate) struct PullNumber(String);
-
-impl AsRef<str> for PullNumber {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
+pub(crate) use boundary::*;

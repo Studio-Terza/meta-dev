@@ -2,11 +2,13 @@ use std::fmt;
 
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
-use syn::{Fields, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, ItemUnion, Macro, Signature, TypePath};
+use syn::{
+    ImplItemType, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, ItemUnion, Macro, Signature, TraitItemType,
+    TypePath,
+};
 
 use crate::expansion::Expansion;
 use crate::finding::{Fix, Found, Rule};
-use crate::gate::Gate;
 use crate::source::Source;
 use crate::style::{Reads, Style};
 
@@ -23,6 +25,8 @@ enum Holder {
     Variant,
     Parameter,
     Alias,
+    Implemented,
+    Associated,
 }
 
 #[derive(Debug, Default)]
@@ -44,13 +48,6 @@ impl PrimitiveBoundary {
             Found::spanned(primitive.span(), format_args!("{} in {holder}", Named(primitive)), PrimitiveBoundary::FIX)
         }));
     }
-
-    fn wrapped(item: &ItemStruct) -> Option<()> {
-        match &item.fields {
-            Fields::Unnamed(fields) => (fields.unnamed.len() == 1).then_some(()),
-            Fields::Named(_) | Fields::Unit => None,
-        }
-    }
 }
 
 impl fmt::Display for Holder {
@@ -61,6 +58,8 @@ impl fmt::Display for Holder {
             Holder::Variant => "a variant",
             Holder::Parameter => "a type parameter",
             Holder::Alias => "a type alias",
+            Holder::Implemented => "an implemented trait or type",
+            Holder::Associated => "an associated type",
         })
     }
 }
@@ -100,7 +99,23 @@ impl<'ast> Visit<'ast> for PrimitiveBoundary {
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        Gate::inherent(item).entered().map_or_default(|()| visit::visit_item_impl(self, item));
+        self.read(Holder::Implemented, |primitives| {
+            primitives.visit_generics(&item.generics);
+            primitives.visit_type(&item.self_ty);
+            item.trait_.iter().for_each(|(_, path, _)| primitives.visit_path(path));
+        });
+        visit::visit_item_impl(self, item);
+    }
+
+    fn visit_impl_item_type(&mut self, item: &'ast ImplItemType) {
+        self.read(Holder::Associated, |primitives| primitives.visit_type(&item.ty));
+    }
+
+    fn visit_trait_item_type(&mut self, item: &'ast TraitItemType) {
+        self.read(Holder::Associated, |primitives| {
+            item.default.iter().for_each(|(_, ty)| primitives.visit_type(ty));
+            item.bounds.iter().for_each(|bound| primitives.visit_type_param_bound(bound));
+        });
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
@@ -112,8 +127,7 @@ impl<'ast> Visit<'ast> for PrimitiveBoundary {
     }
 
     fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
-        let fields = PrimitiveBoundary::wrapped(item).xor(Some(())).map(|()| &item.fields);
-        self.read(Holder::Field, |primitives| fields.into_iter().for_each(|read| primitives.visit_fields(read)));
+        self.read(Holder::Field, |primitives| primitives.visit_fields(&item.fields));
         self.read(Holder::Parameter, |primitives| primitives.visit_generics(&item.generics));
     }
 
@@ -135,7 +149,7 @@ impl<'ast> Visit<'ast> for PrimitiveBoundary {
 
 impl<'file> Style<'file> for PrimitiveBoundary {
     const RULE: Rule = Rule::PrimitiveBoundary;
-    const READS: Reads = Reads::Shipped;
+    const READS: Reads = Reads::Every;
 
     fn new(source: &'file Source) -> PrimitiveBoundary {
         PrimitiveBoundary { found: Vec::new(), bounded: source.bounded() }

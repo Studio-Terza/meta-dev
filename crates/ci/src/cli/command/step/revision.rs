@@ -1,4 +1,3 @@
-use newtype::{Arbitrary, Display, Newtype};
+mod boundary;
 
-#[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
-pub(crate) struct Revision(String);
+pub(crate) use boundary::*;

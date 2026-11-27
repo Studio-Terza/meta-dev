@@ -1,4 +1,3 @@
-use newtype::{Display, Newtype};
+mod boundary;
 
-#[derive(Newtype, Display, Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct Title<'title>(&'title str);
+pub(crate) use boundary::*;

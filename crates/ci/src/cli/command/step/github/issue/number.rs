@@ -1,6 +1,3 @@
-use newtype::{Arbitrary, Display, Newtype};
-use serde::Deserialize;
+mod boundary;
 
-#[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
-#[serde(transparent)]
-pub(crate) struct Number(u64);
+pub(crate) use boundary::*;

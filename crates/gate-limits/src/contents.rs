@@ -1,4 +1,3 @@
-use newtype::{Arbitrary, Newtype};
+mod boundary;
 
-#[derive(Newtype, Arbitrary, Clone, Debug)]
-pub(crate) struct Contents(String);
+pub(crate) use boundary::*;
