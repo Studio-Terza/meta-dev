@@ -38,7 +38,7 @@ impl<H, C: ClockFiller> Agents<H, C> {
     }
 }
 
-impl<'environment, E: Environment, F: Files, O, H, C: ClockFiller> Cli<'environment, E, F, O, H, C> {
+impl<'environment, E: Environment, F: Files, O, H, C: ClockFiller + Sync> Cli<'environment, E, F, O, H, C> {
     pub fn new(
         environment: &'environment E,
         files: F,
@@ -48,7 +48,7 @@ impl<'environment, E: Environment, F: Files, O, H, C: ClockFiller> Cli<'environm
         Cli { environment, files, opened, agents }
     }
 
-    pub fn rooted<D: DispatchFiller>(self, arguments: impl Iterator<Item = OsString>) -> Uttered<Settled>
+    pub fn rooted<D: DispatchFiller + Sync>(self, arguments: impl Iterator<Item = OsString>) -> Uttered<Settled>
     where
         O: Opens,
         H: FnOnce(PathBuf) -> D,
@@ -58,7 +58,7 @@ impl<'environment, E: Environment, F: Files, O, H, C: ClockFiller> Cli<'environm
         uttered.settled(run.finish().settled())
     }
 
-    pub fn report<D: DispatchFiller>(self, run: &Run, arguments: impl Iterator<Item = OsString>) -> Uttered
+    pub fn report<D: DispatchFiller + Sync>(self, run: &Run, arguments: impl Iterator<Item = OsString>) -> Uttered
     where
         O: Opens,
         H: FnOnce(PathBuf) -> D,
@@ -69,7 +69,7 @@ impl<'environment, E: Environment, F: Files, O, H, C: ClockFiller> Cli<'environm
         }
     }
 
-    fn answered<D: DispatchFiller>(
+    fn answered<D: DispatchFiller + Sync>(
         self,
         run: &Run,
         arguments: impl Iterator<Item = OsString>,

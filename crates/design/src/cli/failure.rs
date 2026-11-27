@@ -13,9 +13,11 @@ use crate::Outcome;
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
     #[error(
-        "usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | --settings) | walk <tree> | backtest <tree> <session> [tune | test])"
+        "usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | --settings) | walk <tree> | pairs <tree> <session> <pairs> | backtest <tree> <session> <pairs> <rows> [tune | test])"
     )]
     Usage,
+    #[error("a walking thread panicked")]
+    Panicked,
     #[error("cannot read the tree: {0}")]
     Tree(#[source] serde_json::Error),
     #[error("the message to walk with holds a NUL or is longer than u32::MAX bytes")]

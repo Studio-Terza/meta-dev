@@ -2,6 +2,7 @@ mod backtest;
 mod crew;
 mod hook;
 mod ingest;
+mod pairs;
 mod stops;
 mod walk;
 
@@ -23,6 +24,7 @@ use backtest::{Backtest, Split};
 pub use crew::Crew;
 use hook::Hook;
 use ingest::Ingest;
+use pairs::Pairs;
 use stops::Trail;
 use walk::Walk;
 
@@ -32,6 +34,7 @@ pub enum Command {
     Stops,
     Hook(Hook),
     Walk(Walk),
+    Pairs(Pairs),
     Backtest(Backtest),
 }
 
@@ -43,6 +46,7 @@ impl Command {
     const SETTINGS: &'static str = "--settings";
     const WALK: &'static str = "walk";
     const BACKTEST: &'static str = "backtest";
+    const PAIRS: &'static str = "pairs";
 
     pub fn spoken(words: &[&str]) -> Result<Command, Failure> {
         match words {
@@ -52,10 +56,12 @@ impl Command {
             [Self::HOOK, Self::SETTINGS] => Ok(Command::Hook(Hook::Settings)),
             [Self::HOOK, event] => Hook::named(event).map(Command::Hook),
             [Self::WALK, tree] => Ok(Command::Walk(Walk::from(PathBuf::from(tree)))),
-            [Self::BACKTEST, tree, session] => Ok(Command::Backtest(Backtest::new([tree, session], Split::VARIANTS))),
-            [Self::BACKTEST, tree, session, split] => {
-                Split::named(split).map(|named| Command::Backtest(Backtest::new([tree, session], &[named])))
+            [Self::PAIRS, tree, session, pairs] => Ok(Command::Pairs(Pairs::new([tree, session, pairs]))),
+            [Self::BACKTEST, tree, session, pairs, rows] => {
+                Ok(Command::Backtest(Backtest::new([tree, session, pairs, rows], Split::VARIANTS)))
             }
+            [Self::BACKTEST, tree, session, pairs, rows, split] => Split::named(split)
+                .map(|named| Command::Backtest(Backtest::new([tree, session, pairs, rows], &[named]))),
             _ => Err(Failure::Usage),
         }
     }
@@ -63,12 +69,12 @@ impl Command {
     pub fn opened<O: Opens>(&self, path: PathBuf, opens: &O) -> O::Store {
         match self {
             Command::Ingest(persistence) => persistence.opened(path, opens),
-            Command::Walk(_) => Persistence::DryRun.opened(path, opens),
+            Command::Walk(_) | Command::Pairs(_) => Persistence::DryRun.opened(path, opens),
             Command::Stops | Command::Hook(_) | Command::Backtest(_) => Persistence::File.opened(path, opens),
         }
     }
 
-    pub fn written<F: Files, S: Store, D: Dispatch, C: Clock>(
+    pub fn written<F: Files, S: Store, D: Dispatch + Sync, C: Clock + Sync>(
         self,
         environment: &impl Environment,
         ground: Ground<'_, F, S>,
@@ -84,6 +90,7 @@ impl Command {
                 .map_err(Failure::from),
             Command::Hook(hook) => hook.answered(environment, ground, crew),
             Command::Walk(walk) => walk.answered(environment, &ground, crew),
+            Command::Pairs(pairs) => pairs.answered(&ground, crew),
             Command::Backtest(backtest) => backtest.answered(&ground, crew),
         }
     }

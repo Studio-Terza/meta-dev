@@ -1,11 +1,12 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
+use std::cell::Cell;
 use std::ffi::OsString;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicI64, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, SystemTime};
 use test_failure::Failed;
 
@@ -45,11 +46,16 @@ const TREE: &str = r#"{"roots": [
 const ROOTS: &str = "Walk from Rome";
 const RULINGS: &str = "Never force-push";
 const ASKED_NEXT: &str = "What next?";
+const FORCING: &str = "Should I force-push?";
+const FORCED: &str = "Done. Should I force-push the branch?";
 
 #[derive(Debug)]
 struct Stepping {
     now: SystemTime,
-    moments: AtomicI64,
+}
+
+thread_local! {
+    static MOMENTS: Cell<i64> = const { Cell::new(0) };
 }
 
 impl ClockFiller for Stepping {
@@ -58,7 +64,7 @@ impl ClockFiller for Stepping {
     }
 
     fn moment(&self, _pass: Pass<'_, clock_ops::Moment>) -> Moment {
-        Moment::new(self.moments.fetch_add(STEP, Ordering::Relaxed))
+        Moment::new(MOMENTS.with(|moments| moments.replace(moments.get().saturating_add(STEP))))
     }
 
     fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, _pause: Pause, _bell: &Bell) -> Wall {
@@ -83,20 +89,14 @@ struct Choice {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct LoggedStop {
-    said: &'static str,
-    quoted: &'static [&'static str],
+enum Logline {
+    Stop { said: &'static str, quoted: &'static [&'static str] },
+    Owner { uuid: &'static str, said: &'static str },
 }
 
 impl Choice {
     const fn new(seen: &'static str, chosen: &'static str) -> Choice {
         Choice { seen, chosen }
-    }
-}
-
-impl LoggedStop {
-    const fn new(said: &'static str, quoted: &'static [&'static str]) -> LoggedStop {
-        LoggedStop { said, quoted }
     }
 }
 
@@ -310,7 +310,7 @@ impl Home {
         .hearing(Heard::new(input.to_owned()));
         let words = ["--workspace", "work"].iter().chain(arguments).map(OsString::from);
         let files = Rerooted { temporary: self.path().join("tmp") };
-        let clock = Stepping { now: self.at, moments: AtomicI64::default() };
+        let clock = Stepping { now: self.at };
         let uttered =
             Cli::new(&environment, files, SqliteOpener, Agents::new(|_kept: PathBuf| Agent { replies }, clock))
                 .rooted(words);
@@ -357,25 +357,43 @@ impl Home {
         Ok(path.to_string_lossy().into_owned())
     }
 
-    fn logged(&self, stops: &[LoggedStop]) -> Result<String, Failed> {
-        let lines: Vec<String> = stops
-            .iter()
-            .flat_map(|stop| {
+    fn logged(&self, lines: &[Logline]) -> Result<String, Failed> {
+        let entries: Vec<String> = lines.iter().flat_map(Logline::entries).map(|entry| format!("{entry}\n")).collect();
+        let path = self.path().join("session.jsonl");
+        fs::write(&path, [entries.concat(), "{\"type\": \"user\", \"mess".to_owned()].concat())?;
+        Ok(path.to_string_lossy().into_owned())
+    }
+
+    fn paired(&self, lines: &[Value]) -> Result<String, Failed> {
+        let path = self.path().join("pairs.jsonl");
+        fs::write(&path, lines.iter().map(|line| format!("{line}\n")).collect::<Vec<String>>().concat())?;
+        Ok(path.to_string_lossy().into_owned())
+    }
+
+    fn rows(&self) -> String {
+        self.path().join("rows.tsv").to_string_lossy().into_owned()
+    }
+}
+
+impl Logline {
+    fn entries(&self) -> Vec<Value> {
+        match self {
+            Logline::Stop { said, quoted } => {
                 let quotes: Vec<String> =
-                    stop.quoted.iter().map(|uuid| [uuid, " 2026-01-01T00:00:00Z: \"x\"\n"].concat()).collect();
-                let injected = ["Stop hook feedback:\nEarlier owner words bearing on this:\n", &quotes.concat()].concat();
-                [
-                    serde_json::json!({"type": "assistant", "message": {"content": [{"type": "text", "text": stop.said}]}}),
+                    quoted.iter().map(|uuid| [uuid, " 2026-01-01T00:00:00Z: \"x\"\n"].concat()).collect();
+                let injected =
+                    ["Stop hook feedback:\nEarlier owner words bearing on this:\n", &quotes.concat()].concat();
+                vec![
+                    serde_json::json!({"type": "assistant", "message": {"content": [{"type": "text", "text": said}]}}),
                     serde_json::json!({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "t"}]}}),
                     serde_json::json!({"type": "system", "subtype": "stop_hook_summary", "hookErrors": [injected]}),
-                    serde_json::json!({"type": "user", "message": {"content": injected}}),
+                    serde_json::json!({"type": "user", "uuid": "i1", "message": {"content": injected}}),
                 ]
-            })
-            .map(|entry| format!("{entry}\n"))
-            .collect();
-        let path = self.path().join("session.jsonl");
-        fs::write(&path, [lines.concat(), "{\"type\": \"user\", \"mess".to_owned()].concat())?;
-        Ok(path.to_string_lossy().into_owned())
+            }
+            Logline::Owner { uuid, said } => {
+                vec![serde_json::json!({"type": "user", "uuid": uuid, "message": {"content": said}})]
+            }
+        }
     }
 }
 
@@ -600,7 +618,9 @@ fn words_the_cli_does_not_know_are_refused_with_the_usage() -> Result<(), Failed
         &["ingest", "--wet"][..],
         &["walk"][..],
         &["backtest", "tree.json"][..],
-        &["backtest", "tree.json", "session.jsonl", "dev"][..],
+        &["backtest", "tree.json", "session.jsonl", "pairs.jsonl"][..],
+        &["backtest", "tree.json", "session.jsonl", "pairs.jsonl", "rows.tsv", "dev"][..],
+        &["pairs", "tree.json", "session.jsonl"][..],
         &[][..],
     ] {
         let said = home.said(words, "", &Replies::default());
@@ -673,25 +693,40 @@ fn a_backtest_scores_each_logged_stop_against_the_owner_words_it_quoted() -> Res
         &Replies::quoting(&format!("[{{\"uuid\": \"o1\", \"quote\": \"{OWNER}\"}}]"), "[1]"),
     );
     let tree = home.planted(TREE)?;
-    let session = home.logged(&[LoggedStop::new(QUESTION, &["o1"]), LoggedStop::new(ASKED_NEXT, &["p4"])])?;
+    let session = home.logged(&[
+        Logline::Stop { said: QUESTION, quoted: &["o1"] },
+        Logline::Stop { said: ASKED_NEXT, quoted: &["p4"] },
+    ])?;
+    let pairs = home.paired(&[
+        serde_json::json!({"at": 0_usize, "question": FORCING, "answer_uuid": "p3"}),
+        serde_json::json!({"at": 1_usize, "question": "Where shall we walk today?", "answer_uuid": "zz"}),
+    ])?;
     let replies = Replies::choosing(&[
         Choice::new(RULINGS, "[1]"),
         Choice::new(QUESTION, "[1]"),
         Choice::new(ASKED_NEXT, "[1, 2]"),
+        Choice::new(FORCING, "[1]"),
     ]);
-    let said = home.said(&["backtest", &tree, &session], "", &replies);
+    let said = home.said(&["backtest", &tree, &session, &pairs, &home.rows()], "", &replies);
+    let rows = [
+        "set\tsplit\tindex\tgold\tretrieved\tfound\trecall\tmillis\ttokens\n".to_owned(),
+        format!("stop\ttune\t0\t1\t2\t1\t1.000\t{STEP}\t14\n"),
+        format!("stop\ttest\t1\t1\t3\t1\t1.000\t{STEP}\t14\n"),
+        format!("pair\ttest\t0\t1\t2\t0\t0.000\t{STEP}\t14\n"),
+    ]
+    .concat();
     assert_eq!(said.ended, Ok(Outcome::Backtested));
+    assert_eq!(fs::read_to_string(home.rows())?, rows);
     assert_eq!(
         said.shown,
         [
-            "stop\tsplit\tindex\tgold\tretrieved\tfound\trecall\tmillis\ttokens\n",
-            &format!("stop\ttune\t0\t1\t2\t1\t1.000\t{STEP}\t14\n"),
-            &format!("stop\ttest\t1\t1\t3\t1\t1.000\t{STEP}\t14\n"),
-            "summary\tsplit\tstops\trecall\tfull\tretrieved\tmillis\ttokens\n",
-            &format!("summary\ttune\t1\t1.000\t1.000\t2\t{STEP}\t14\n"),
-            &format!("summary\ttest\t1\t1.000\t1.000\t3\t{STEP}\t14\n"),
-            "brute\tstops\tmillis\ttokens\n",
-            &format!("brute\t1\t{STEP}\t14\n"),
+            rows.as_str(),
+            "summary\tset\tsplit\tcases\trecall\tfull\tretrieved\tmillis\tp90\ttokens\n",
+            &format!("summary\tstop\ttune\t1\t1.000\t1.000\t2\t{STEP}\t{STEP}\t14\n"),
+            &format!("summary\tstop\ttest\t1\t1.000\t1.000\t3\t{STEP}\t{STEP}\t14\n"),
+            &format!("summary\tpair\ttest\t1\t0.000\t0.000\t2\t{STEP}\t{STEP}\t14\n"),
+            "brute\tstops\tmillis\tp90\ttokens\n",
+            &format!("brute\t1\t{STEP}\t{STEP}\t14\n"),
             "extra\tsplit\tindex\tuuid\tstop\tmessage\n",
             &format!("extra\ttest\t1\to1\t\"{ASKED_NEXT}\"\t\"{OWNER}\"\n"),
         ]
@@ -704,23 +739,62 @@ fn a_backtest_scores_each_logged_stop_against_the_owner_words_it_quoted() -> Res
 fn a_backtest_of_one_split_walks_only_its_stops_and_counts_a_missed_quote_against_recall() -> Result<(), Failed> {
     let home = Home::new()?;
     let tree = home.planted(TREE)?;
-    let session = home.logged(&[LoggedStop::new(QUESTION, &["o1", "p3"]), LoggedStop::new(ASKED_NEXT, &["p4"])])?;
+    let session = home.logged(&[
+        Logline::Stop { said: QUESTION, quoted: &["o1", "p3"] },
+        Logline::Stop { said: ASKED_NEXT, quoted: &["p4"] },
+    ])?;
+    let pairs = home.paired(&[])?;
     let replies = Replies::choosing(&[Choice::new(RULINGS, "[1]"), Choice::new(QUESTION, "[1]")]);
-    let said = home.said(&["backtest", &tree, &session, "tune"], "", &replies);
+    let said = home.said(&["backtest", &tree, &session, &pairs, &home.rows(), "tune"], "", &replies);
     assert_eq!(replies.prompts().len(), 2);
     assert_eq!(
         said.shown,
         [
-            "stop\tsplit\tindex\tgold\tretrieved\tfound\trecall\tmillis\ttokens\n",
+            "set\tsplit\tindex\tgold\tretrieved\tfound\trecall\tmillis\ttokens\n",
             &format!("stop\ttune\t0\t2\t2\t1\t0.500\t{STEP}\t14\n"),
-            "summary\tsplit\tstops\trecall\tfull\tretrieved\tmillis\ttokens\n",
-            &format!("summary\ttune\t1\t0.500\t0.000\t2\t{STEP}\t14\n"),
-            "brute\tstops\tmillis\ttokens\n",
-            "brute\t0\t0\t0\n",
+            "summary\tset\tsplit\tcases\trecall\tfull\tretrieved\tmillis\tp90\ttokens\n",
+            &format!("summary\tstop\ttune\t1\t0.500\t0.000\t2\t{STEP}\t{STEP}\t14\n"),
+            "brute\tstops\tmillis\tp90\ttokens\n",
+            "brute\t0\t0\t0\t0\n",
             "extra\tsplit\tindex\tuuid\tstop\tmessage\n",
             &format!("extra\ttune\t0\tp2\t\"{QUESTION}\"\t\"\"\n"),
         ]
         .concat()
     );
+    Ok(())
+}
+
+#[test]
+fn pairs_keeps_only_verbatim_lead_questions_answered_by_a_later_owner_message_in_the_tree() -> Result<(), Failed> {
+    let home = Home::new()?;
+    let tree = home.planted(TREE)?;
+    let session = home.logged(&[
+        Logline::Owner { uuid: "o1", said: OWNER },
+        Logline::Stop { said: FORCED, quoted: &[] },
+        Logline::Owner { uuid: "zz", said: "Unfiled words." },
+        Logline::Owner { uuid: "p3", said: "No, never force-push." },
+    ])?;
+    let written = home.path().join("pairs.jsonl");
+    let replies = Replies::choosing(&[Choice::new(
+        "[lead]",
+        "[{\"question\": \"Should I force-push the branch?\", \"answer_uuid\": \"p3\"}, \
+          {\"question\": \"Should I force-push the branch?\", \"answer_uuid\": \"p3\"}, \
+          {\"question\": \"Should I rebase the branch?\", \"answer_uuid\": \"p3\"}, \
+          {\"question\": \"Should I force-push the branch?\", \"answer_uuid\": \"o1\"}, \
+          {\"question\": \"Should I?\", \"answer_uuid\": \"p3\"}]",
+    )]);
+    let said = home.said(&["pairs", &tree, &session, &written.to_string_lossy()], "", &replies);
+    let text = fs::read_to_string(&written)?;
+    let kept: Vec<Value> = serde_json::Deserializer::from_str(&text).into_iter().collect::<Result<_, _>>()?;
+    assert_eq!((said.shown.as_str(), said.ended), ("excerpts\tpairs\ttokens\n1\t1\t7\n", Ok(Outcome::Paired)));
+    assert_eq!(
+        kept,
+        vec![serde_json::json!({"at": 1_usize, "question": "Should I force-push the branch?", "answer_uuid": "p3"})]
+    );
+    let prompts = replies.prompts();
+    assert!(
+        prompts.first().is_some_and(|prompt| prompt.contains(&format!("\n[owner o1]\n{OWNER}\n\n[lead]\n{FORCED}\n")))
+    );
+    assert!(prompts.first().is_some_and(|prompt| !prompt.contains("zz")));
     Ok(())
 }

@@ -9,7 +9,7 @@ use crate::cli::request::ignored::Ignored;
 #[serde(tag = "type")]
 enum Entry {
     #[serde(rename = "user")]
-    User { message: Message },
+    User { message: Message, uuid: Option<Uuid> },
     #[serde(rename = "assistant")]
     Assistant { message: Message },
     #[serde(other)]
@@ -43,23 +43,67 @@ pub struct Logged {
     injected: String,
 }
 
-#[derive(Debug, Default)]
-struct Reading {
-    last: Option<Body>,
-    logged: Vec<Logged>,
+#[derive(Debug)]
+pub enum Spoken {
+    Lead(Body),
+    Owner { uuid: Uuid, said: Body },
 }
 
-impl Logged {
-    const INJECTED: &'static str = "Earlier owner words bearing on this:\n";
+#[derive(Debug, Default)]
+pub struct Log {
+    last: Option<Body>,
+    stops: Vec<Logged>,
+    spoken: Vec<Spoken>,
+}
 
-    pub fn read(log: &str) -> Vec<Logged> {
+impl Log {
+    pub fn read(log: &str) -> Log {
         let entries = log
             .parse::<Lines>()
             .into_iter()
             .flatten()
             .filter_map(|line| serde_json::from_str::<Entry>(&line).ignoring(Ignored::Unlogged));
-        entries.fold(Reading::default(), Reading::heard).logged
+        entries.fold(Log::default(), Log::heard)
     }
+
+    pub fn stops(&self) -> &[Logged] {
+        &self.stops
+    }
+
+    pub fn spoken(&self) -> &[Spoken] {
+        &self.spoken
+    }
+
+    fn heard(mut self, entry: Entry) -> Log {
+        match entry {
+            Entry::Assistant { message } => {
+                let written = message.content.written();
+                self.spoken.extend(written.iter().cloned().map(Spoken::Lead));
+                Log { last: written.or(self.last), ..self }
+            }
+            Entry::User { message: Message { content: Content::Said(text) }, uuid } => self.said(text, uuid),
+            Entry::User { .. } | Entry::Other => self,
+        }
+    }
+
+    fn said(self, text: String, uuid: Option<Uuid>) -> Log {
+        if text.contains(Logged::INJECTED) { self.injected(text) } else { self.owned(text, uuid) }
+    }
+
+    fn injected(mut self, text: String) -> Log {
+        self.stops.extend(self.last.clone().map(|said| Logged { said, injected: text }));
+        self
+    }
+
+    fn owned(mut self, text: String, uuid: Option<Uuid>) -> Log {
+        let owner = uuid.zip(Body::try_new(text).ignoring(Ignored::Unlogged));
+        self.spoken.extend(owner.map(|(owned, said)| Spoken::Owner { uuid: owned, said }));
+        self
+    }
+}
+
+impl Logged {
+    const INJECTED: &'static str = "Earlier owner words bearing on this:\n";
 
     pub fn said(&self) -> &Body {
         &self.said
@@ -67,21 +111,6 @@ impl Logged {
 
     pub fn quoted<'known>(&self, uuid: &'known Uuid) -> Option<&'known Uuid> {
         self.injected.contains(&format!("\n{uuid} ")).then_some(uuid)
-    }
-}
-
-impl Reading {
-    fn heard(self, entry: Entry) -> Reading {
-        match entry {
-            Entry::Assistant { message } => {
-                Reading { last: message.content.written().or(self.last), logged: self.logged }
-            }
-            Entry::User { message: Message { content: Content::Said(text) } } if text.contains(Logged::INJECTED) => {
-                let stop = self.last.clone().map(|said| Logged { said, injected: text });
-                Reading { last: self.last, logged: self.logged.into_iter().chain(stop).collect() }
-            }
-            Entry::User { .. } | Entry::Other => self,
-        }
     }
 }
 

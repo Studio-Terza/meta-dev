@@ -8,5 +8,6 @@ pub enum Outcome {
     Blocked,
     Trailed,
     Walked,
+    Paired,
     Backtested,
 }
