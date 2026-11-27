@@ -1,0 +1,5 @@
+[
+  [["tests/goldens/statements.txt", "tests/goldens/refusals.txt", "\n", "{\"describe\": {\"columns\": [], \"parameters\": {\"Right\": 2}, \"nullable\": []}}", "1", "2", "3"]],
+  [["r", "body"], ["id", "generated_key"], ["body", "given"], ["at", "generated"]],
+  [["s", "id"], ["id", "generated_key"]]
+]

@@ -30,6 +30,7 @@ timer-ports = { path = "../timer-ports" }
 toml.workspace = true
 
 [dev-dependencies]
+serde_json.workspace = true
 test-failure = { path = "../test-failure" }
 
 [lints]

@@ -12,17 +12,18 @@ use proptest::test_runner::{Config, RngSeed};
 use sqlite_ports::SqliteOpener;
 use store_ports::{Busy, Column, ColumnFailure, Counted, Opens, Store, Written};
 use tempfile::TempDir;
-use test_failure::Failed;
 use transcript_ports::{Authorship, Body, Cursor, Instant, SessionId, Uuid};
-
-const STORE: &str = ".meta/design.sqlite";
 
 proptest! {
     #![proptest_config(Config { failure_persistence: None, rng_seed: RngSeed::Fixed(0), ..Config::default() })]
     #[test]
-    fn a_reopened_store_resumes_each_session_where_it_was_left(session in any::<SessionId>(), cursor in any::<Cursor>()) {
+    fn a_reopened_store_resumes_each_session_where_it_was_left(
+        session in any::<SessionId>(),
+        cursor in any::<Cursor>(),
+        store in "[a-z]{1,8}/[a-z]{1,8}",
+    ) {
         let directory = TempDir::new()?;
-        let path = directory.path().join(STORE);
+        let path = directory.path().join(store);
         let run = Run::root();
         let first = run.port(SqliteOpener.file::<StreamSchema>(path.clone()));
         prop_assert!(path.metadata().is_err());
@@ -124,18 +125,20 @@ fn every_named_column_reads_back_as_its_variant() {
     assert_eq!(authors, [Authorship::Owner, Authorship::Lead].map(Some));
 }
 
-#[test]
-fn a_held_file_lock_refuses_every_other_handle_until_it_ends() -> Result<(), Failed> {
-    let directory = TempDir::new()?;
-    let path: PathBuf = directory.path().join(STORE);
-    let run = Run::root();
-    let (first, second) =
-        (run.port(SqliteOpener.file::<StreamSchema>(path.clone())), run.port(SqliteOpener.file::<StreamSchema>(path)));
-    let held = first.lock()?;
-    assert!(matches!(second.lock(), Err(Busy::Taken(_))));
-    held.end()?;
-    assert!(second.lock().is_ok());
-    Ok(())
+proptest! {
+    #![proptest_config(Config { cases: 4, failure_persistence: None, ..Config::default() })]
+    #[test]
+    fn a_held_file_lock_refuses_every_other_handle_until_it_ends(store in "[a-z]{1,8}/[a-z]{1,8}") {
+        let directory = TempDir::new()?;
+        let path: PathBuf = directory.path().join(store);
+        let run = Run::root();
+        let (first, second) =
+            (run.port(SqliteOpener.file::<StreamSchema>(path.clone())), run.port(SqliteOpener.file::<StreamSchema>(path)));
+        let held = first.lock()?;
+        prop_assert!(matches!(second.lock(), Err(Busy::Taken(_))));
+        held.end()?;
+        prop_assert!(second.lock().is_ok());
+    }
 }
 
 #[test]

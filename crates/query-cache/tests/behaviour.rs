@@ -1,46 +1,62 @@
+use std::io;
 use std::path::Path;
 
 use query_cache::{Entry, Origin, Table};
 use test_failure::Failed;
 
-const STATEMENTS: &str = "tests/goldens/statements.txt";
-const REFUSALS: &str = "tests/goldens/refusals.txt";
-const TWO_PARAMETERS: &str = r#"{"describe": {"columns": [], "parameters": {"Right": 2}, "nullable": []}}"#;
-const BOUND: [usize; 3] = [1, 2, 3];
-const NEWLINE: &str = "\n";
-const TABLES: [&str; 2] = ["r", "s"];
-const COLUMNS: [&[(&str, Origin)]; 2] = [
-    &[("id", Origin::GeneratedKey), ("body", Origin::Given), ("at", Origin::Generated)],
-    &[("id", Origin::GeneratedKey)],
-];
-const OVERWRITTEN: [&str; 2] = ["body", "id"];
-
 #[test]
-fn a_record_table_spells_its_statements() -> Result<(), Failed> {
-    let spelled: Vec<String> = TABLES
+fn a_record_table_spells_its_statements_and_a_query_binds_only_what_it_takes() -> Result<(), Failed> {
+    let source = Path::new(file!());
+    let table = source.with_file_name(source.file_stem().unwrap_or_default());
+    let found = std::env::current_dir()?
+        .ancestors()
+        .map(|directory| directory.join(&table))
+        .find(|candidate| candidate.is_file())
+        .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
+    let sections: Vec<Vec<Vec<String>>> = serde_json::from_slice(&std::fs::read(found)?)?;
+    let [header, shapes @ ..] = sections.as_slice() else {
+        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
+    };
+    let Some([statements, refusals, newline, entry, bound @ ..]) = header.first().map(Vec::as_slice) else {
+        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
+    };
+    let spelled: Vec<String> = shapes
         .iter()
-        .zip(COLUMNS)
-        .zip(OVERWRITTEN)
-        .flat_map(|((name, columns), overwritten)| {
-            let table =
-                columns.iter().fold(Table::named(name), |table, (column, origin)| table.column(column, *origin));
-            table.statements().into_iter().chain([Table::named(name).overwrite(overwritten)])
+        .map(|shape| {
+            let [named, columns @ ..] = shape.as_slice() else {
+                return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
+            };
+            let [name, overwritten] = named.as_slice() else {
+                return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
+            };
+            let built = columns.iter().try_fold(Table::named(name), |growing, row| match row.as_slice() {
+                [column, origin] => Ok(growing.column(column, origin.parse::<Origin>()?)),
+                _ => Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData))),
+            })?;
+            Ok(built
+                .statements()
+                .into_iter()
+                .chain([Table::named(name).overwrite(overwritten)])
+                .collect::<Vec<String>>())
         })
+        .collect::<Result<Vec<Vec<String>>, Failed>>()?
+        .into_iter()
+        .flatten()
         .collect();
-    assert_eq!([spelled.join(NEWLINE), NEWLINE.to_owned()].concat(), std::fs::read_to_string(Path::new(STATEMENTS))?);
-    Ok(())
-}
-
-#[test]
-fn a_cached_query_binds_only_as_many_values_as_it_takes() -> Result<(), Failed> {
-    let entry = serde_json::from_str::<Entry<String>>(TWO_PARAMETERS)?;
-    let refused: Vec<String> = BOUND
+    let described = serde_json::from_str::<Entry<String>>(entry)?;
+    let refused: Vec<String> = bound
         .iter()
-        .filter_map(|count| match entry.bound(*count) {
+        .map(|count| count.parse::<usize>())
+        .collect::<Result<Vec<usize>, _>>()?
+        .into_iter()
+        .filter_map(|count| match described.bound(count) {
             Err(refusal) => Some(refusal.to_string()),
             Ok(()) => None,
         })
         .collect();
-    assert_eq!([refused.join(NEWLINE), NEWLINE.to_owned()].concat(), std::fs::read_to_string(Path::new(REFUSALS))?);
+    assert_eq!(
+        [[spelled.join(newline), newline.clone()].concat(), [refused.join(newline), newline.clone()].concat()],
+        [std::fs::read_to_string(statements)?, std::fs::read_to_string(refusals)?]
+    );
     Ok(())
 }

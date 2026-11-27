@@ -1,9 +1,11 @@
+use std::io;
 use std::panic;
 use std::path::Path;
 use std::sync::Mutex;
 
 use invariants::{Ignoring, Unpoisoned, ignored, invariant, invariants};
 use proptest::prelude::{any, prop_assert_eq, proptest};
+use test_failure::Failed;
 
 invariants! {
     enum Invariant {
@@ -17,10 +19,6 @@ ignored! {
         Wide => "a count too wide for a byte is not a byte count",
     }
 }
-
-const MESSAGES: &str = "tests/goldens/messages.txt";
-const WIDE: u16 = 300;
-const NEWLINE: &str = "\n";
 
 proptest! {
     #[test]
@@ -47,16 +45,28 @@ proptest! {
 }
 
 #[test]
-fn each_broken_invariant_and_reason_says_its_text() -> Result<(), std::io::Error> {
-    let lock = Mutex::new(WIDE);
+fn each_broken_invariant_and_reason_says_its_text() -> Result<(), Failed> {
+    let source = Path::new(file!());
+    let table = source.with_file_name(source.file_stem().unwrap_or_default());
+    let found = std::env::current_dir()?
+        .ancestors()
+        .map(|directory| directory.join(&table))
+        .find(|candidate| candidate.is_file())
+        .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
+    let rows: Vec<Vec<String>> = serde_json::from_slice(&std::fs::read(found)?)?;
+    let Some([messages, wide, newline]) = rows.first().map(Vec::as_slice) else {
+        return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
+    };
+    let width: u16 = wide.parse()?;
+    let lock = Mutex::new(width);
     let poisoning = panic::catch_unwind(|| {
         let _held = lock.lock().unpoisoned();
         invariant!(broken Invariant::Positive)
     });
     let poisoned = panic::catch_unwind(|| *lock.lock().unpoisoned());
     let panics = [
-        panic::catch_unwind(|| invariant!(holding u8::try_from(WIDE), Invariant::Narrow)).map(drop),
-        panic::catch_unwind(|| invariant!(holding u8::try_from(WIDE), Invariant::Narrow, detailed)).map(drop),
+        panic::catch_unwind(|| invariant!(holding u8::try_from(width), Invariant::Narrow)).map(drop),
+        panic::catch_unwind(|| invariant!(holding u8::try_from(width), Invariant::Narrow, detailed)).map(drop),
         poisoning.map(drop),
         poisoned.map(drop),
     ];
@@ -69,6 +79,6 @@ fn each_broken_invariant_and_reason_says_its_text() -> Result<(), std::io::Error
         .filter_map(|payload| payload.downcast::<String>().into_iter().next().map(|text| *text))
         .chain([Ignored::Wide.to_string()])
         .collect();
-    assert_eq!([said.join(NEWLINE), NEWLINE.to_owned()].concat(), std::fs::read_to_string(Path::new(MESSAGES))?);
+    assert_eq!([said.join(newline), newline.clone()].concat(), std::fs::read_to_string(messages)?);
     Ok(())
 }

@@ -1,13 +1,11 @@
 use proptest::prelude::{any, prop_assert, prop_assert_eq, proptest};
 use text_lines::{Lines, LossyText, OneLine};
 
-const NEWLINE: &str = "\n";
-
 proptest! {
     #[test]
-    fn lines_joined_by_their_breaks_give_back_the_text(text in "[a-zé \t\r\n]{0,24}") {
-        let joined = text.parse::<Lines>().into_iter().flatten().collect::<Vec<String>>().join(NEWLINE);
-        let rebuilt = [joined.clone(), [joined, NEWLINE.to_owned()].concat()];
+    fn lines_joined_by_their_breaks_give_back_the_text(text in "[a-zé \t\r\n]{0,24}", newline in "\n") {
+        let joined = text.parse::<Lines>().into_iter().flatten().collect::<Vec<String>>().join(&newline);
+        let rebuilt = [joined.clone(), [joined, newline].concat()];
         prop_assert!(rebuilt.contains(&text));
     }
 

@@ -1,94 +1,52 @@
 use std::ffi::OsString;
-use std::path::PathBuf;
+use std::io;
+use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, Memory};
 use lint::{Cli, Verdict};
 use proptest::collection::vec;
 use proptest::prelude::{Strategy, any, prop_assert_eq, prop_oneof, proptest};
 use proptest::sample::select;
+use proptest::test_runner::TestCaseError;
 use timer_ports::Monotonic;
-
-const MANIFEST: &str = "Cargo.toml";
-const MANIFEST_TEXT: &str = "[package]\nname = \"fuzzed\"\nversion = \"0.1.0\"\nedition = \"2024\"\n";
-const PLACES: [&str; 5] = ["src/lib.rs", "src/main.rs", "tests/fuzzed.rs", "build.rs", "Cargo.toml"];
-const MAX_BYTES: usize = 512;
-const MAX_PARTS: usize = 64;
-const MAX_NESTING: usize = 140;
-const MAX_CHAIN: usize = 30_000;
-const OPEN: [&str; 4] = ["(", "{ ", "[", "-"];
-const CLOSE: [&str; 4] = [")", " }", "]", ""];
-const CHAINED: &str = "x";
-const LINKS: [&str; 6] = [".m()", " + 1", "?", " as u8", ".0", " && x"];
-const FRAGMENTS: [&str; 48] = [
-    "fn ",
-    "pub ",
-    "pub(crate) ",
-    "struct ",
-    "enum ",
-    "impl ",
-    "trait ",
-    "mod ",
-    "use ",
-    "const ",
-    "type ",
-    "let ",
-    "mut ",
-    "for ",
-    "while ",
-    "loop ",
-    "if ",
-    "else ",
-    "match ",
-    "dyn ",
-    "x",
-    "Foo",
-    "T",
-    "'a",
-    "u8",
-    "String",
-    "&str",
-    "bool",
-    "-> bool",
-    "(",
-    ")",
-    "{",
-    "}",
-    "<",
-    ">",
-    ";",
-    ":",
-    "::",
-    ",",
-    "=",
-    "#[test]",
-    "#[cfg(test)]",
-    "// note",
-    "\"text\"",
-    "1",
-    "proptest! {",
-    "macro_rules! m { ($x:expr) => { $x }; }",
-    "std::process::Command::new(\"ls\")",
-];
 
 proptest! {
     #[test]
     fn any_input_ends_in_a_verdict_that_matches_what_was_said(
-        (place, bytes) in prop_oneof![
-            (select(PLACES.to_vec()), vec(any::<u8>(), 0..MAX_BYTES)),
-            (select(PLACES.to_vec()), vec(select(FRAGMENTS.to_vec()), 0..MAX_PARTS)
-                .prop_map(|parts| parts.concat().into_bytes())),
-            (select(PLACES.to_vec()), (0..OPEN.len(), 1..MAX_NESTING)
-                .prop_map(|(shell, depth)| {
-                    let open = OPEN.get(shell).copied().unwrap_or_default().repeat(depth);
-                    let close = CLOSE.get(shell).copied().unwrap_or_default().repeat(depth);
-                    [open, CHAINED.to_owned(), close].concat().into_bytes()
-                })),
-            (select(PLACES.to_vec()), vec(select(LINKS.to_vec()), 0..MAX_CHAIN)
-                .prop_map(|links| [CHAINED].into_iter().chain(links).collect::<String>().into_bytes())),
+        place in select(vec!["src/lib.rs", "src/main.rs", "tests/fuzzed.rs", "build.rs", "Cargo.toml"]),
+        bytes in prop_oneof![
+            vec(any::<u8>(), 0..512),
+            vec(
+                select(vec![
+                    "fn ", "pub ", "pub(crate) ", "struct ", "enum ", "impl ", "trait ", "mod ", "use ", "const ",
+                    "type ", "let ", "mut ", "for ", "while ", "loop ", "if ", "else ", "match ", "dyn ", "x", "Foo",
+                    "T", "'a", "u8", "String", "&str", "bool", "-> bool", "(", ")", "{", "}", "<", ">", ";", ":",
+                    "::", ",", "=", "#[test]", "#[cfg(test)]", "// note", "\"text\"", "1", "proptest! {",
+                    "macro_rules! m { ($x:expr) => { $x }; }", "std::process::Command::new(\"ls\")",
+                ]),
+                0..64,
+            )
+            .prop_map(|parts| parts.concat().into_bytes()),
+            (select(vec![("(", ")"), ("{ ", " }"), ("[", "]"), ("-", "")]), 1..140_usize)
+                .prop_map(|((open, close), depth)| [open.repeat(depth), close.repeat(depth)].join("x").into_bytes()),
+            vec(select(vec![".m()", " + 1", "?", " as u8", ".0", " && x"]), 0..30_000)
+                .prop_map(|links| ["x".to_owned(), links.concat()].concat().into_bytes()),
         ]
     ) {
+        let source = Path::new(file!());
+        let table = source.with_file_name(source.file_stem().unwrap_or_default());
+        let found = std::env::current_dir()?
+            .ancestors()
+            .map(|directory| directory.join(&table))
+            .find(|candidate| candidate.is_file())
+            .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
+        let rows: Vec<Vec<String>> = serde_json::from_slice(&std::fs::read(found)?)
+            .map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+        let Some([manifest_at, manifest_from]) = rows.first().map(Vec::as_slice) else {
+            return Err(TestCaseError::fail(io::Error::from(io::ErrorKind::InvalidData).to_string()));
+        };
         let files: Memory = [
-            (PathBuf::from(MANIFEST), Bytes::new(MANIFEST_TEXT.as_bytes().to_vec())),
+            (PathBuf::from(manifest_at), Bytes::new(std::fs::read(manifest_from)?)),
             (PathBuf::from(place), Bytes::new(bytes)),
         ]
         .into_iter()

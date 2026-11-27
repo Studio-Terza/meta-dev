@@ -1,0 +1,8 @@
+[
+  [["design", "HOME", "--workspace", ".claude/projects", "work", "tests/goldens/scenarios.txt", "--- exit ", "\n--- out\n", "--- err\n"]],
+  [
+    ["tests/fixtures/empty.txt", "frobnicate"],
+    ["tests/fixtures/stop-active.json", "hook", "stop"],
+    ["tests/fixtures/not-json.txt", "hook", "stop"]
+  ]
+]

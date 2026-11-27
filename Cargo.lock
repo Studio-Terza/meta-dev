@@ -178,6 +178,7 @@ dependencies = [
  "dispatch-ports",
  "file-ports",
  "grammar-slug",
+ "serde_json",
  "sqlite-ports",
  "tempfile",
  "test-failure",
@@ -297,6 +298,7 @@ dependencies = [
  "file-ports",
  "lint",
  "proptest",
+ "serde_json",
  "timer-ports",
 ]
 
@@ -308,6 +310,7 @@ dependencies = [
  "file-ports",
  "newtype",
  "serde",
+ "serde_json",
  "strum",
  "test-failure",
  "text-lines",
@@ -514,6 +517,8 @@ name = "invariants"
 version = "0.1.0"
 dependencies = [
  "proptest",
+ "serde_json",
+ "test-failure",
 ]
 
 [[package]]
@@ -551,6 +556,7 @@ dependencies = [
  "quote",
  "ra-ap-rustc_lexer",
  "rayon",
+ "serde_json",
  "syn 2.0.119",
  "test-failure",
  "thiserror",

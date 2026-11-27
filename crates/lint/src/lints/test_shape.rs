@@ -3,8 +3,8 @@ use std::collections::BTreeSet;
 use proc_macro2::{Delimiter, Ident, Punct, Spacing, TokenStream, TokenTree};
 use syn::visit::{self, Visit};
 use syn::{
-    Attribute, Block, Expr, ImplItemFn, ItemConst, ItemEnum, ItemFn, ItemMod, ItemStatic, ItemStruct, ItemTrait, ItemType,
-    ItemUnion, Lit, Macro, TraitItemFn, TypePath,
+    Attribute, Block, Expr, ImplItemFn, ItemConst, ItemEnum, ItemFn, ItemMod, ItemStatic, ItemStruct, ItemTrait,
+    ItemType, ItemUnion, Lit, Macro, TraitItemFn, TypePath,
 };
 
 use crate::finding::{Fix, Found, Rule};

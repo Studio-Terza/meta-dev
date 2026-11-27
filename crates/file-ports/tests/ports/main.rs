@@ -4,13 +4,9 @@ use file_ports::{Absent, Bytes, Cached, Disk, Files, Kind, Memory, Offset};
 use newtype::Wrapping;
 use proptest::prelude::{any, prop_assert_eq, proptest};
 
-const NAME: &str = "[a-z]{1,8}";
-const OTHER: &str = "[A-Z]{1,8}";
-const INNER: &str = "inner";
-
 proptest! {
     #[test]
-    fn disk_and_memory_read_back_what_was_written(name in NAME, bytes in any::<Bytes>()) {
+    fn disk_and_memory_read_back_what_was_written(name in "[a-z]{1,8}", bytes in any::<Bytes>()) {
         let scratch = tempfile::tempdir()?;
         let path = scratch.path().join(&name);
         let memory = Memory::default();
@@ -23,7 +19,7 @@ proptest! {
     }
 
     #[test]
-    fn disk_and_memory_append_after_what_was_there(name in NAME, first in any::<Bytes>(), second in any::<Bytes>()) {
+    fn disk_and_memory_append_after_what_was_there(name in "[a-z]{1,8}", first in any::<Bytes>(), second in any::<Bytes>()) {
         let scratch = tempfile::tempdir()?;
         let path = scratch.path().join(&name);
         let memory = Memory::default();
@@ -36,9 +32,9 @@ proptest! {
     }
 
     #[test]
-    fn disk_and_memory_copy_and_list_alike(name in NAME, copy in OTHER, bytes in any::<Bytes>()) {
+    fn disk_and_memory_copy_and_list_alike(name in "[a-z]{1,8}", copy in "[A-Z]{1,8}", folder in "[0-9]{1,4}", bytes in any::<Bytes>()) {
         let scratch = tempfile::tempdir()?;
-        let inner = scratch.path().join(INNER);
+        let inner = scratch.path().join(&folder);
         let [from, to] = [scratch.path().join(&name), inner.join(&copy)];
         let memory = Memory::default();
         memory.create_directories(&inner)?;
@@ -55,7 +51,7 @@ proptest! {
     }
 
     #[test]
-    fn disk_and_memory_miss_the_same_paths(name in NAME) {
+    fn disk_and_memory_miss_the_same_paths(name in "[a-z]{1,8}") {
         let scratch = tempfile::tempdir()?;
         let path = scratch.path().join(&name);
         let memory = Memory::default();
@@ -67,7 +63,7 @@ proptest! {
     }
 
     #[test]
-    fn reading_from_an_offset_skips_that_many_bytes(name in NAME, bytes in any::<Bytes>(), offset in any::<Offset>()) {
+    fn reading_from_an_offset_skips_that_many_bytes(name in "[a-z]{1,8}", bytes in any::<Bytes>(), offset in any::<Offset>()) {
         let scratch = tempfile::tempdir()?;
         let path = scratch.path().join(&name);
         let memory = Memory::default();
@@ -81,7 +77,7 @@ proptest! {
     }
 
     #[test]
-    fn a_cache_reads_and_writes_through_to_its_files(name in NAME, first in any::<Bytes>(), second in any::<Bytes>()) {
+    fn a_cache_reads_and_writes_through_to_its_files(name in "[a-z]{1,8}", first in any::<Bytes>(), second in any::<Bytes>()) {
         let memory = Memory::default();
         let path = PathBuf::from(&name);
         memory.write(&path, first.clone())?;
@@ -93,7 +89,7 @@ proptest! {
     }
 
     #[test]
-    fn absent_holds_nothing_and_takes_nothing(name in NAME, bytes in any::<Bytes>()) {
+    fn absent_holds_nothing_and_takes_nothing(name in "[a-z]{1,8}", bytes in any::<Bytes>()) {
         let path = PathBuf::from(&name);
         prop_assert_eq!(Absent.write(&path, bytes.clone()).is_err(), Absent.read(&path).is_err());
         prop_assert_eq!(Absent.append(&path, &bytes).is_err(), Absent.entries(&path).is_err());

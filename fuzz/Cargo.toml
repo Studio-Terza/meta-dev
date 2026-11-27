@@ -17,6 +17,7 @@ required-features = ["campaign"]
 file-ports = { path = "../crates/file-ports" }
 lint = { path = "../crates/lint" }
 proptest.workspace = true
+serde_json.workspace = true
 timer-ports = { path = "../crates/timer-ports" }
 
 [lints]

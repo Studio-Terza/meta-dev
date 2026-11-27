@@ -2,7 +2,7 @@
 
 mod ports {
     use std::ffi::OsString;
-    use std::io::Write;
+    use std::io::{self, Write};
     use std::path::Path;
     use std::process::{Command, Stdio};
 
@@ -10,37 +10,44 @@ mod ports {
     use tempfile::TempDir;
     use test_failure::Failed;
 
-    const DESIGN: &str = env!("CARGO_BIN_EXE_design");
-    const HOME: &str = "HOME";
-    const WORK: &str = "work";
-    const PROJECTS: &str = ".claude/projects";
-    const WORKSPACE: &str = "--workspace";
-    const SCENARIOS: &str = "tests/goldens/scenarios.txt";
-    const RECORD: &str = "RECORD_GOLDENS";
-    const EXIT: &str = "--- exit ";
-    const OUT: &str = "\n--- out\n";
-    const ERR: &str = "--- err\n";
-    const STOP: &[&str] = &["hook", "stop"];
-    const CASES: [(&[&str], &str); 3] = [
-        (&["frobnicate"], "tests/fixtures/empty.txt"),
-        (STOP, "tests/fixtures/stop-active.json"),
-        (STOP, "tests/fixtures/not-json.txt"),
-    ];
-
     #[test]
     fn each_scenario_prints_its_golden_output() -> Result<(), Failed> {
+        let source = Path::new(file!());
+        let table = source.with_file_name(source.file_stem().unwrap_or_default());
+        let found = std::env::current_dir()?
+            .ancestors()
+            .map(|directory| directory.join(&table))
+            .find(|candidate| candidate.is_file())
+            .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
+        let sections: Vec<Vec<Vec<String>>> = serde_json::from_slice(&std::fs::read(found)?)?;
+        let [header, cases, ..] = sections.as_slice() else {
+            return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
+        };
+        let Some([binary, home_variable, workspace_flag, projects, work, golden, exit, out, err]) =
+            header.first().map(Vec::as_slice)
+        else {
+            return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
+        };
+        let design = std::env::current_exe()?
+            .ancestors()
+            .map(|directory| directory.join(binary))
+            .find(|candidate| candidate.is_file())
+            .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
         let home = TempDir::new()?;
-        let workspace = home.path().join(WORK);
+        let workspace = home.path().join(work);
         let slug = Letters::slugged(&workspace.to_string_lossy());
-        std::fs::create_dir_all(home.path().join(PROJECTS).join(slug))?;
-        let shown = CASES
+        std::fs::create_dir_all(home.path().join(projects).join(slug))?;
+        let shown = cases
             .iter()
-            .map(|(words, input)| {
-                let arguments = [OsString::from(WORKSPACE), workspace.clone().into_os_string()]
+            .map(|case| {
+                let [input, words @ ..] = case.as_slice() else {
+                    return Err(Failed::from(io::Error::from(io::ErrorKind::InvalidData)));
+                };
+                let arguments = [OsString::from(workspace_flag), workspace.clone().into_os_string()]
                     .into_iter()
                     .chain(words.iter().map(OsString::from));
-                let mut child = Command::new(DESIGN)
-                    .env(HOME, home.path())
+                let mut child = Command::new(&design)
+                    .env(home_variable, home.path())
                     .current_dir(home.path())
                     .args(arguments)
                     .stdin(Stdio::piped())
@@ -52,18 +59,17 @@ mod ports {
                 let output = child.wait_with_output()?;
                 let code = output.status.code().map_or_default(|code| code.to_string());
                 Ok([
-                    EXIT.to_owned(),
+                    exit.clone(),
                     code,
-                    OUT.to_owned(),
+                    out.clone(),
                     String::from_utf8(output.stdout)?,
-                    ERR.to_owned(),
+                    err.clone(),
                     String::from_utf8(output.stderr)?,
                 ]
                 .concat())
             })
             .collect::<Result<String, Failed>>()?;
-        std::env::var_os(RECORD).map_or(Ok(()), |_| std::fs::write(Path::new(SCENARIOS), &shown))?;
-        assert_eq!(shown, std::fs::read_to_string(Path::new(SCENARIOS))?);
+        assert_eq!(shown, std::fs::read_to_string(golden)?);
         Ok(())
     }
 }
