@@ -1,0 +1,50 @@
+(
+    [
+        Ok(
+            255,
+        ),
+        Err(
+            "broken invariant: the count fits a byte: number too large to fit in target type",
+        ),
+    ],
+    [
+        Ok(
+            255,
+        ),
+        Err(
+            "broken invariant: the count fits a byte",
+        ),
+    ],
+    [
+        Ok(
+            255,
+        ),
+        Err(
+            "broken invariant: the count fits a byte: number too large to fit in target type",
+        ),
+    ],
+    [
+        Ok(
+            255,
+        ),
+        Err(
+            "broken invariant: the count is positive",
+        ),
+    ],
+    Err(
+        "broken invariant: the count is positive",
+    ),
+    Err(
+        "broken invariant: no thread panics while it holds a lock, so no lock is poisoned; were one, its state may be half-written",
+    ),
+    [
+        Some(
+            255,
+        ),
+        None,
+    ],
+    [
+        "a count too wide for a byte is not a byte count",
+        "the count is positive",
+    ],
+)
