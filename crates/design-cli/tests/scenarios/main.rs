@@ -1,58 +1,69 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
-mod ports;
+mod ports {
+    use std::ffi::OsString;
+    use std::io::Write;
+    use std::path::Path;
+    use std::process::{Command, Stdio};
 
-use test_failure::Failed;
+    use grammar_slug::Letters;
+    use tempfile::TempDir;
+    use test_failure::Failed;
 
-use design::Failure;
-use grammar_slug::Letters;
-use ports::Design;
-use serde_json::Value;
-use tempfile::TempDir;
+    const DESIGN: &str = env!("CARGO_BIN_EXE_design");
+    const HOME: &str = "HOME";
+    const WORK: &str = "work";
+    const PROJECTS: &str = ".claude/projects";
+    const WORKSPACE: &str = "--workspace";
+    const SCENARIOS: &str = "tests/goldens/scenarios.txt";
+    const RECORD: &str = "RECORD_GOLDENS";
+    const EXIT: &str = "--- exit ";
+    const OUT: &str = "\n--- out\n";
+    const ERR: &str = "--- err\n";
+    const STOP: &[&str] = &["hook", "stop"];
+    const CASES: [(&[&str], &str); 3] = [
+        (&["frobnicate"], "tests/fixtures/empty.txt"),
+        (STOP, "tests/fixtures/stop-active.json"),
+        (STOP, "tests/fixtures/not-json.txt"),
+    ];
 
-#[test]
-fn an_unknown_command_exits_with_failure_and_prints_the_usage() -> Result<(), Failed> {
-    let home = TempDir::new()?;
-    let output = Design::run(home.path(), &["frobnicate"])?;
-    assert_eq!(
-        (output.status.code(), String::from_utf8(output.stdout)?, String::from_utf8(output.stderr)?),
-        (Some(1_i32), String::new(), format!("{}\n", Failure::Usage))
-    );
-    Ok(())
-}
-
-#[test]
-fn the_hook_settings_are_printed_as_json_at_exit_zero() -> Result<(), Failed> {
-    let home = TempDir::new()?;
-    let output = Design::run(home.path(), &["hook", "--settings"])?;
-    let settings: Value = serde_json::from_slice(&output.stdout)?;
-    assert_eq!((output.status.code(), output.stderr), (Some(0_i32), Vec::new()));
-    assert!(settings.pointer("/hooks/Stop/0/hooks/0/command").and_then(Value::as_str).is_some());
-    Ok(())
-}
-
-#[test]
-fn a_stop_hook_reads_its_event_from_standard_input() -> Result<(), Failed> {
-    let home = TempDir::new()?;
-    let workspace = home.path().join("work");
-    let slug = Letters::slugged(&workspace.to_string_lossy());
-    std::fs::create_dir_all(home.path().join(".claude/projects").join(slug))?;
-    let rooted = ["--workspace", &workspace.to_string_lossy(), "hook", "stop"].map(str::to_owned);
-    let words: Vec<&str> = rooted.iter().map(String::as_str).collect();
-    let continuing = Design::fed(home.path(), &words, "{\"stop_hook_active\":true}")?;
-    let unreadable = Design::fed(home.path(), &words, "not json")?;
-    assert_eq!((continuing.status.code(), continuing.stdout, continuing.stderr), (Some(0_i32), Vec::new(), Vec::new()));
-    assert!(String::from_utf8(unreadable.stderr)?.contains("cannot read the hook input: "));
-    Ok(())
-}
-
-#[test]
-fn ingest_of_a_workspace_without_transcripts_fails_naming_the_transcripts() -> Result<(), Failed> {
-    let home = TempDir::new()?;
-    let workspace = home.path().join("work");
-    std::fs::create_dir_all(&workspace)?;
-    let output = Design::run(home.path(), &["--workspace", &workspace.to_string_lossy(), "ingest"])?;
-    assert_eq!((output.status.code(), output.stdout), (Some(1_i32), Vec::new()));
-    assert!(String::from_utf8(output.stderr)?.contains("cannot reach the transcripts: "));
-    Ok(())
+    #[test]
+    fn each_scenario_prints_its_golden_output() -> Result<(), Failed> {
+        let home = TempDir::new()?;
+        let workspace = home.path().join(WORK);
+        let slug = Letters::slugged(&workspace.to_string_lossy());
+        std::fs::create_dir_all(home.path().join(PROJECTS).join(slug))?;
+        let shown = CASES
+            .iter()
+            .map(|(words, input)| {
+                let arguments = [OsString::from(WORKSPACE), workspace.clone().into_os_string()]
+                    .into_iter()
+                    .chain(words.iter().map(OsString::from));
+                let mut child = Command::new(DESIGN)
+                    .env(HOME, home.path())
+                    .current_dir(home.path())
+                    .args(arguments)
+                    .stdin(Stdio::piped())
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
+                    .spawn()?;
+                let fed = std::fs::read(Path::new(input))?;
+                child.stdin.take().into_iter().try_for_each(|mut stdin| stdin.write_all(&fed))?;
+                let output = child.wait_with_output()?;
+                let code = output.status.code().map_or_default(|code| code.to_string());
+                Ok([
+                    EXIT.to_owned(),
+                    code,
+                    OUT.to_owned(),
+                    String::from_utf8(output.stdout)?,
+                    ERR.to_owned(),
+                    String::from_utf8(output.stderr)?,
+                ]
+                .concat())
+            })
+            .collect::<Result<String, Failed>>()?;
+        std::env::var_os(RECORD).map_or(Ok(()), |_| std::fs::write(Path::new(SCENARIOS), &shown))?;
+        assert_eq!(shown, std::fs::read_to_string(Path::new(SCENARIOS))?);
+        Ok(())
+    }
 }

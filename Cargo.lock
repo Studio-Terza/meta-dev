@@ -178,7 +178,6 @@ dependencies = [
  "dispatch-ports",
  "file-ports",
  "grammar-slug",
- "serde_json",
  "sqlite-ports",
  "tempfile",
  "test-failure",
