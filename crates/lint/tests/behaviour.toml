@@ -2100,3 +2100,39 @@ impl Kept {
     pub(crate) fn law() {}
 }
 """
+
+[Lint.dev_only_exports]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.dev_only_exports.files]
+"Cargo.toml" = """
+[workspace]
+members = ["app", "support"]
+"""
+"app/Cargo.toml" = """
+[package]
+name = "app"
+
+[dev-dependencies]
+support = { path = "../support" }
+"""
+"app/src/main.rs" = """
+fn main() {}
+"""
+"app/tests/named.rs" = """
+use support::Named;
+"""
+"support/Cargo.toml" = """
+[package]
+name = "support"
+"""
+"support/src/lib.rs" = """
+mod kept;
+
+pub use kept::{Named, Unnamed};
+"""
+"support/src/kept.rs" = """
+pub struct Named;
+pub struct Unnamed;
+"""

@@ -29,6 +29,7 @@ pub(crate) enum Reached {
 pub(crate) enum Reader {
     Shipped,
     Tests,
+    ForeignTests,
     Neither,
 }
 
@@ -57,7 +58,7 @@ pub(crate) struct PublicSurface<'file> {
 impl Reach {
     fn absorb(&mut self, reached: &Reached, reader: Reader) {
         let used = match (reached, reader) {
-            (_, Reader::Tests | Reader::Neither) => Used::Unused,
+            (_, Reader::Tests | Reader::ForeignTests | Reader::Neither) => Used::Unused,
             (Reached::Named(_), Reader::Shipped) => Used::Named,
             (Reached::Glob, Reader::Shipped) => Used::Globbed,
         };
@@ -150,16 +151,23 @@ impl<'file> Graph<'file> for PublicSurface<'file> {
         let tested = (self.reader == Reader::Tests).then(|| self.source.package().crate_name());
         self.facts
             .into_iter()
-            .filter(|fact| match (fact, &tested) {
-                (SurfaceFact::Sighting { crate_name, .. }, Some(own)) => crate_name == own,
-                _ => true,
+            .map(|fact| match (fact, &tested) {
+                (SurfaceFact::Sighting { crate_name, reached, .. }, Some(own)) if crate_name != *own => {
+                    SurfaceFact::Sighting { crate_name, reached, reader: Reader::ForeignTests }
+                }
+                (kept, _) => kept,
             })
             .collect()
     }
 
-    fn reduce(facts: Vec<SurfaceFact>, _: &[Arc<Package>]) -> Vec<Finding> {
+    fn reduce(facts: Vec<SurfaceFact>, packages: &[Arc<Package>]) -> Vec<Finding> {
+        let dev_only: BTreeSet<Name> =
+            packages.iter().filter(|package| package.shipped().is_none()).map(|package| package.crate_name()).collect();
         let reaches = facts.iter().fold(BTreeMap::new(), |mut reaches: BTreeMap<&Name, Reach>, fact| {
             let sighted = match fact {
+                SurfaceFact::Sighting { crate_name, reached, reader: Reader::ForeignTests } => {
+                    Some(crate_name).filter(|named| dev_only.contains(*named)).zip(Some((reached, Reader::Shipped)))
+                }
                 SurfaceFact::Sighting { crate_name, reached, reader } => Some(crate_name).zip(Some((reached, *reader))),
                 SurfaceFact::Export { .. } => None,
             };

@@ -1,0 +1,6 @@
+a crate exports exactly what another crate uses:
+support/src/lib.rs:3: Unnamed is exported but no other crate names it; export it when a user appears
+every pub item is named by another workspace crate:
+support/src/kept.rs:2: pub Unnamed is named by no other crate; make it private or delete it
+support/src/lib.rs:3: pub Unnamed is named by no other crate; make it private or delete it
+test budget: 6 of 7 lines are tests, at most 18% may be; cut test lines or test through fewer, table-driven cases

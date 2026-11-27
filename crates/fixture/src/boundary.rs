@@ -30,6 +30,12 @@ impl Disagreed {
     }
 }
 
+pub trait Fixture: DeserializeOwned {
+    const FILE: &'static str;
+    const MANIFEST: &'static str;
+    const NAME: &'static str;
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Story {
     file: &'static str,
@@ -131,8 +137,8 @@ impl Story {
     const RECORD: &'static str = "FIXTURE_RECORD";
 
     #[must_use]
-    pub const fn anchored(file: &'static str, manifest: &'static str, name: &'static str) -> Story {
-        Story { file, manifest, name }
+    pub(crate) const fn of<Row: Fixture>() -> Story {
+        Story { file: Row::FILE, manifest: Row::MANIFEST, name: Row::NAME }
     }
 
     fn path(&self) -> Result<PathBuf, Failed> {

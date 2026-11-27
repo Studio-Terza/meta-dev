@@ -20,8 +20,9 @@ impl Story {
         let (implemented, arguments, bounds) = input.generics.split_for_impl();
         quote! {
             impl #implemented ::fixture::Fixture for #ident #arguments #bounds {
-                const STORY: ::fixture::Story =
-                    ::fixture::Story::anchored(::core::file!(), ::core::env!("CARGO_MANIFEST_DIR"), #named);
+                const FILE: &'static str = ::core::file!();
+                const MANIFEST: &'static str = ::core::env!("CARGO_MANIFEST_DIR");
+                const NAME: &'static str = #named;
             }
         }
     }

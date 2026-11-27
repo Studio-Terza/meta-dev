@@ -2,7 +2,8 @@ use std::fmt::Display;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
-use crate::{CaseName, Drift, Failed, Fixture};
+use crate::boundary::{CaseName, Drift, Story};
+use crate::{Failed, Fixture};
 
 #[derive(Debug)]
 pub struct Cases<Row>(PhantomData<Row>);
@@ -18,9 +19,10 @@ impl<Row: Fixture> Cases<Row> {
     pub fn drifted<Printed: Display>(
         printing: impl Fn(Case<Row>) -> Result<Printed, Failed>,
     ) -> Result<Vec<Drift>, Failed> {
-        let rows = Row::STORY.rows::<Row>()?;
-        let mut entries = Row::STORY.entries()?;
-        let cases = Row::STORY.cases()?;
+        let story = Story::of::<Row>();
+        let rows = story.rows::<Row>()?;
+        let mut entries = story.entries()?;
+        let cases = story.cases()?;
         let compared = rows.into_iter().map(|(name, row)| {
             let entry = entries.remove(&name).unwrap_or_default();
             let golden = entry.golden(&name)?;
