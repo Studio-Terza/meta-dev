@@ -2,10 +2,13 @@ mod boundary;
 mod caller;
 mod delegation;
 mod filler;
+#[cfg(feature = "laws")]
 mod laws;
 mod method;
 mod names;
 mod ops;
+#[cfg(not(feature = "laws"))]
+mod unscripted;
 
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -17,10 +20,13 @@ pub(crate) use boundary::{Constant, Spelling};
 use caller::Caller;
 use delegation::Delegation;
 use filler::Filler;
+#[cfg(feature = "laws")]
 use laws::Laws;
 use method::Method;
 use names::{CallerName, FillerName, OpsName};
 use ops::Ops;
+#[cfg(not(feature = "laws"))]
+use unscripted::Laws;
 
 pub(crate) trait Rendered {
     fn rendered(declared: &Declared) -> TokenStream;

@@ -1,10 +1,13 @@
 use invariants::Ignoring;
 use proc_macro2::{TokenStream, TokenTree};
+use std::collections::BTreeSet;
 use syn::parse::Parser;
 use syn::punctuated::Punctuated;
-use syn::{Attribute, ItemImpl, Meta, MetaList, Token};
+
+use syn::{Attribute, Expr, ExprLit, ItemImpl, Lit, Meta, MetaList, MetaNameValue, Token};
 
 use crate::ignored::Ignored;
+use crate::terms::Name;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Gate {
@@ -15,6 +18,21 @@ pub(crate) enum Gate {
 impl Gate {
     pub(crate) fn of(attributes: &[Attribute]) -> Gate {
         attributes.iter().map(Gate::of_attribute).find(|gate| *gate == Gate::Skipped).unwrap_or(Gate::Entered)
+    }
+
+    pub(crate) fn featured(attributes: &[Attribute], tested: &BTreeSet<Name>) -> Gate {
+        let feature = attributes
+            .iter()
+            .filter(|attribute| attribute.path().is_ident("cfg"))
+            .filter_map(|cfg| cfg.parse_args::<MetaNameValue>().ignoring(Ignored::Unparsed))
+            .filter(|condition| condition.path.is_ident("feature"))
+            .find_map(|condition| match condition.value {
+                Expr::Lit(ExprLit { lit: Lit::Str(named), .. }) => {
+                    Some(named.value()).filter(|name| tested.contains(&Name::spelled(name)))
+                }
+                _ => None,
+            });
+        feature.map_or(Gate::Entered, |_| Gate::Skipped)
     }
 
     pub(crate) fn inherent(item: &ItemImpl) -> Gate {

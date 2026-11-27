@@ -30,6 +30,7 @@ migrations = [
     "",
 ]
 bare = ["abc", "_a-9", "msg:1", "a b", "-a", "", "abc\n"]
+features = ["laws", "dep:serde", "port-core/laws", "serde?/derive", "a/b/c", "dep:", "", "a b"]
 shell = [
     'for d in a b; do rm -rf "$d"; done',
     "bash -c 'rm x'",

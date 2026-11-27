@@ -17,7 +17,7 @@ serde = { workspace = true, optional = true }
 thiserror.workspace = true
 
 [features]
-laws = ["dep:serde"]
+laws = ["dep:serde", "port-core/laws"]
 
 [dev-dependencies]
 file-doubles = { path = "../file-doubles" }

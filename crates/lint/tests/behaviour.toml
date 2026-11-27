@@ -2005,3 +2005,49 @@ app = { path = "../app" }
 "tools/src/lib.rs" = """
 struct Tool;
 """
+
+[Lint.feature_only]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.feature_only.files]
+"Cargo.toml" = """
+[workspace]
+members = ["app", "support"]
+"""
+"app/Cargo.toml" = """
+[package]
+name = "app"
+
+[dependencies]
+support = { path = "../support", features = ["shipped"] }
+
+[dev-dependencies]
+support = { path = "../support", features = ["laws"] }
+"""
+"app/src/main.rs" = """
+fn main() {}
+"""
+"support/Cargo.toml" = """
+[package]
+name = "support"
+
+[features]
+shipped = ["sharing"]
+sharing = []
+laws = []
+"""
+"support/src/lib.rs" = """
+#[cfg(feature = "laws")]
+mod laws;
+#[cfg(feature = "sharing")]
+mod sharing;
+"""
+"support/src/laws.rs" = """
+pub(crate) struct Law;
+pub(crate) struct Rule;
+pub(crate) struct Order;
+"""
+"support/src/sharing.rs" = """
+pub(crate) struct Shared;
+"""

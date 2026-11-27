@@ -1,7 +1,7 @@
 mod boundary;
 mod manifest;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsStr;
 use std::iter;
 use std::path::{Path, PathBuf};
@@ -79,11 +79,20 @@ pub(crate) struct Package {
     manifest: Arc<Path>,
     features: Vec<Feature>,
     testing: Option<()>,
+    test_features: BTreeSet<Name>,
 }
 
 impl Package {
-    fn placed(self, testing: &BTreeSet<PathBuf>) -> Package {
-        Package { testing: testing.contains(&self.directory).then_some(()), ..self }
+    fn placed(self, testing: &BTreeSet<PathBuf>, test_features: &BTreeMap<PathBuf, BTreeSet<Name>>) -> Package {
+        Package {
+            testing: testing.contains(&self.directory).then_some(()),
+            test_features: test_features.get(&self.directory).cloned().unwrap_or_default(),
+            ..self
+        }
+    }
+
+    pub(crate) fn test_features(&self) -> &BTreeSet<Name> {
+        &self.test_features
     }
 
     pub(crate) fn shipped(&self) -> Option<()> {
@@ -196,8 +205,11 @@ impl Workspace {
             .map(|root| root.package.directory.clone())
             .collect();
         let testing = Manifest::testing(&read_manifests, &binaries);
-        let packages: Vec<Arc<Package>> =
-            drafts.into_iter().map(|draft| Arc::new(Arc::unwrap_or_clone(draft).placed(&testing))).collect();
+        let test_features = Manifest::test_features(&read_manifests, &testing);
+        let packages: Vec<Arc<Package>> = drafts
+            .into_iter()
+            .map(|draft| Arc::new(Arc::unwrap_or_clone(draft).placed(&testing, &test_features)))
+            .collect();
         let roots: Vec<CrateRoot> = packages.iter().flat_map(|package| Workspace::roots(files, package)).collect();
         match roots.first() {
             Some(_) => Ok(Workspace { packages, roots }),
@@ -243,6 +255,7 @@ impl Workspace {
             manifest: tree.shown(manifest),
             features: Workspace::features(text.as_ref(), &table),
             testing: None,
+            test_features: BTreeSet::new(),
         });
         Ok(Listed { package, manifest: Manifest::new(directory, &table) })
     }

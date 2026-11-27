@@ -4,6 +4,8 @@ use std::path::{Component, Path, PathBuf};
 
 use toml::de::{DeTable, DeValue};
 
+use crate::terms::Name;
+
 mod boundary;
 
 #[derive(Debug, Default)]
@@ -19,6 +21,22 @@ pub(crate) struct Manifest {
     members: Option<Members>,
     depends: Vec<PathBuf>,
     shipping: Vec<PathBuf>,
+    features: BTreeMap<Name, Vec<Enabling>>,
+    requests: Vec<Enabled>,
+    named: BTreeMap<Name, PathBuf>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct Enabled {
+    package: PathBuf,
+    feature: Name,
+}
+
+#[derive(Clone, Debug)]
+enum Enabling {
+    Own(Name),
+    Dependency { dependency: Name, feature: Name },
+    Optional,
 }
 
 impl Members {
@@ -58,13 +76,83 @@ impl Manifest {
         let sections = Manifest::DEPENDENCIES.iter().filter_map(|name| table.get(*name)).chain(shared);
         let depends = Manifest::pathed(&directory, sections);
         let shipping = Manifest::pathed(&directory, Manifest::SHIPPING.iter().filter_map(|name| table.get(*name)));
+        let all = Manifest::DEPENDENCIES.iter().filter_map(|name| table.get(*name));
+        let requests = Manifest::requested(&directory, Manifest::SHIPPING.iter().filter_map(|name| table.get(*name)));
         Manifest {
             packaged: table.get("package").map(|_| ()),
             members: workspace.map(Members::of),
             depends,
             shipping,
+            features: Manifest::declared_features(table.get(Manifest::FEATURES)),
+            requests,
+            named: Manifest::named(&directory, all),
             directory,
         }
+    }
+
+    pub(crate) fn test_features(
+        manifests: &[Manifest],
+        testing: &BTreeSet<PathBuf>,
+    ) -> BTreeMap<PathBuf, BTreeSet<Name>> {
+        let by_directory: BTreeMap<&Path, &Manifest> =
+            manifests.iter().map(|manifest| (manifest.directory.as_path(), manifest)).collect();
+        let shipped =
+            manifests.iter().filter(|manifest| manifest.packaged.is_some() && !testing.contains(&manifest.directory));
+        let seeds: BTreeSet<Enabled> = shipped
+            .flat_map(|manifest| {
+                let own = Enabled { package: manifest.directory.clone(), feature: Name::spelled(Manifest::DEFAULT) };
+                let defaults = manifest.requests.iter().map(|request| Enabled {
+                    package: request.package.clone(),
+                    feature: Name::spelled(Manifest::DEFAULT),
+                });
+                iter::once(own).chain(defaults).chain(manifest.requests.iter().cloned()).collect::<Vec<Enabled>>()
+            })
+            .collect();
+        let enabled = iter::successors(Some(seeds), |known| {
+            let reached: BTreeSet<Enabled> = known
+                .iter()
+                .flat_map(|enabled| Manifest::implied(&by_directory, enabled))
+                .filter(|enabled| !known.contains(enabled))
+                .collect();
+            reached.first().map(|_| known.union(&reached).cloned().collect())
+        })
+        .last()
+        .unwrap_or_default();
+        manifests
+            .iter()
+            .filter(|manifest| manifest.packaged.is_some())
+            .map(|manifest| {
+                let tested = manifest
+                    .features
+                    .keys()
+                    .filter(|feature| {
+                        !enabled.contains(&Enabled { package: manifest.directory.clone(), feature: (*feature).clone() })
+                    })
+                    .cloned()
+                    .collect();
+                (manifest.directory.clone(), tested)
+            })
+            .collect()
+    }
+
+    fn implied(by_directory: &BTreeMap<&Path, &Manifest>, enabled: &Enabled) -> Vec<Enabled> {
+        let manifest = by_directory.get(enabled.package.as_path());
+        let entries = manifest.and_then(|found| found.features.get(&enabled.feature).map(|entries| (found, entries)));
+        entries.map_or_default(|(found, listed)| {
+            listed
+                .iter()
+                .filter_map(|entry| match entry {
+                    Enabling::Own(feature) => {
+                        Some(Enabled { package: found.directory.clone(), feature: feature.clone() })
+                    }
+                    Enabling::Dependency { dependency, feature } => found
+                        .named
+                        .get(dependency)
+                        .map(|package| Enabled { package: package.clone(), feature: feature.clone() }),
+                    Enabling::Optional => None,
+                })
+                .collect()
+        })
     }
 
     fn pathed<'table>(

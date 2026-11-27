@@ -7,7 +7,7 @@ mod unspelled;
 
 pub use boundary::{
     AgentReport, Bare, BranchName, Cited, Construct, Ended, Fields, Flagged, Heading, Inked, JobLink, Lines,
-    MigrationFile, Nested, Prose, Queue, RepositoryName, SpecTrailer, Stamp, Target,
+    MigrationFile, Nested, Prose, Queue, RepositoryName, SpecTrailer, Stamp, Target, Toggled,
 };
 pub use invariants::Ignoring;
 pub use letters::Letters;

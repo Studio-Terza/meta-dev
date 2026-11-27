@@ -14,6 +14,9 @@ invariants = { path = "../invariants" }
 newtype = { path = "../newtype" }
 port-derive = { path = "../port-derive" }
 
+[features]
+laws = ["port-derive/laws"]
+
 [dev-dependencies]
 design-messages = { path = "../design-messages" }
 dispatch-doubles = { path = "../dispatch-doubles" }

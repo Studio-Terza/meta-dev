@@ -133,7 +133,7 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
     }
 
     fn linted(&self, module: &Module, source: &Source, file: &syn::File, mut spent: Spent) -> Read {
-        let declared = Reader::<F, T>::declared(&file.items, &[], module.gate);
+        let declared = Reader::<F, T>::declared(&file.items, &[], module.gate, module.package.test_features());
         let children: Vec<Result<Module, Failure>> =
             declared.iter().map(|declaration| self.child(module, declaration)).collect();
         let gate = module.gate;
@@ -150,19 +150,19 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
         here.joined(below)
     }
 
-    fn declared(items: &[Item], inline: &[Name], gate: Gate) -> Vec<Declared> {
+    fn declared(items: &[Item], inline: &[Name], gate: Gate, tested: &BTreeSet<Name>) -> Vec<Declared> {
         let modules = items.iter().filter_map(|item| match item {
             Item::Mod(module) => Some(module),
             _ => None,
         });
         modules
             .flat_map(|module| {
-                let gated = gate.and(Gate::of(&module.attrs));
+                let gated = gate.and(Gate::of(&module.attrs)).and(Gate::featured(&module.attrs, tested));
                 let name = Name::of(&module.ident);
                 match &module.content {
                     Some((_, inner)) => {
                         let deeper: Vec<Name> = inline.iter().cloned().chain([name]).collect();
-                        Reader::<F, T>::declared(inner, &deeper, gated)
+                        Reader::<F, T>::declared(inner, &deeper, gated, tested)
                     }
                     None => vec![Declared {
                         name,

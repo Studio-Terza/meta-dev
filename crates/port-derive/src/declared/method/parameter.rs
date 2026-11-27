@@ -24,6 +24,7 @@ impl Parameter {
         &self.name
     }
 
+    #[cfg(feature = "laws")]
     pub(crate) fn tree(&self) -> &Type {
         &self.tree
     }

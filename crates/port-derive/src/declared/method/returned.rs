@@ -26,6 +26,7 @@ impl Returned {
         }
     }
 
+    #[cfg(feature = "laws")]
     pub(crate) fn replayable(&self) -> Option<()> {
         match self {
             Returned::Plain => Some(()),
