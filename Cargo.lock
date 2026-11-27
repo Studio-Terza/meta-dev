@@ -705,11 +705,11 @@ name = "query-cache"
 version = "0.1.0"
 dependencies = [
  "hex",
- "invariants",
  "serde",
  "serde_json",
  "sha2",
  "strum",
+ "test-failure",
  "thiserror",
 ]
 

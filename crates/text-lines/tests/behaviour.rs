@@ -1,4 +1,4 @@
-use proptest::prelude::{any, prop_assert_eq, proptest};
+use proptest::prelude::{any, prop_assert, prop_assert_eq, proptest};
 use text_lines::{Lines, LossyText, OneLine};
 
 const NEWLINE: &str = "\n";
@@ -8,7 +8,7 @@ proptest! {
     fn lines_joined_by_their_breaks_give_back_the_text(text in "[a-zé \t\r\n]{0,24}") {
         let joined = text.parse::<Lines>().into_iter().flatten().collect::<Vec<String>>().join(NEWLINE);
         let rebuilt = [joined.clone(), [joined, NEWLINE.to_owned()].concat()];
-        prop_assert_eq!(rebuilt.iter().filter(|candidate| **candidate == text).count(), 1);
+        prop_assert!(rebuilt.contains(&text));
     }
 
     #[test]

@@ -18,8 +18,8 @@ strum.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-invariants = { path = "../invariants" }
 serde_json.workspace = true
+test-failure = { path = "../test-failure" }
 
 [lints]
 workspace = true

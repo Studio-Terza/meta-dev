@@ -1,65 +1,45 @@
-use invariants::{Ignoring, ignored};
+use std::path::Path;
+
 use query_cache::{Entry, Origin, Table};
+use test_failure::Failed;
 
-ignored! {
-    enum Ignored {
-        Unparsed => "an entry that does not parse binds nothing, so no refusal is read and the row reports it",
-    }
-}
-
+const STATEMENTS: &str = "tests/goldens/statements.txt";
+const REFUSALS: &str = "tests/goldens/refusals.txt";
 const TWO_PARAMETERS: &str = r#"{"describe": {"columns": [], "parameters": {"Right": 2}, "nullable": []}}"#;
+const BOUND: [usize; 3] = [1, 2, 3];
+const NEWLINE: &str = "\n";
+const TABLES: [&str; 2] = ["r", "s"];
+const COLUMNS: [&[(&str, Origin)]; 2] = [
+    &[("id", Origin::GeneratedKey), ("body", Origin::Given), ("at", Origin::Generated)],
+    &[("id", Origin::GeneratedKey)],
+];
+const OVERWRITTEN: [&str; 2] = ["body", "id"];
 
-struct Binding(usize);
-
-impl Binding {
-    fn refused(&self) -> Option<String> {
-        match serde_json::from_str::<Entry<String>>(TWO_PARAMETERS)
-            .ignoring(Ignored::Unparsed)
-            .map(|entry| entry.bound(self.0))
-        {
-            Some(Err(refusal)) => Some(refusal.to_string()),
-            Some(Ok(())) | None => None,
-        }
-    }
+#[test]
+fn a_record_table_spells_its_statements() -> Result<(), Failed> {
+    let spelled: Vec<String> = TABLES
+        .iter()
+        .zip(COLUMNS)
+        .zip(OVERWRITTEN)
+        .flat_map(|((name, columns), overwritten)| {
+            let table = columns.iter().fold(Table::named(name), |table, (column, origin)| table.column(column, *origin));
+            table.statements().into_iter().chain([Table::named(name).overwrite(overwritten)])
+        })
+        .collect();
+    assert_eq!([spelled.join(NEWLINE), NEWLINE.to_owned()].concat(), std::fs::read_to_string(Path::new(STATEMENTS))?);
+    Ok(())
 }
 
 #[test]
-fn a_cached_query_binds_only_as_many_values_as_it_takes() {
-    assert_eq!(Binding(2).refused(), None);
-    assert_eq!(Binding(3).refused().as_deref(), Some("the query takes 2 parameters but 3 are bound"));
-    assert_eq!(Binding(1).refused().as_deref(), Some("the query takes 2 parameters but 1 are bound"));
-}
-
-#[test]
-fn a_record_table_spells_its_four_statements() {
-    let full = Table::named("r")
-        .column("id", Origin::GeneratedKey)
-        .column("body", Origin::Given)
-        .column("at", Origin::Generated);
-    assert_eq!(
-        full.statements(),
-        [
-            String::from(r#"INSERT INTO r (body) VALUES (?1) RETURNING id AS "id!", body AS "body!", at AS "at!""#),
-            String::from(r#"SELECT id AS "id!", body AS "body!", at AS "at!" FROM r WHERE id = ?1"#),
-            String::from("UPDATE r SET body = ?1, at = ?2 WHERE id = ?3"),
-            String::from("DELETE FROM r WHERE id = ?1"),
-            String::from(r#"SELECT id AS "id!", body AS "body!", at AS "at!" FROM r"#),
-        ]
-    );
-    assert_eq!(
-        Table::named("s").column("id", Origin::GeneratedKey).statements(),
-        [
-            String::from(r#"INSERT INTO s DEFAULT VALUES RETURNING id AS "id!""#),
-            String::from(r#"SELECT id AS "id!" FROM s WHERE id = ?1"#),
-            String::from("UPDATE s SET id = id WHERE id = ?1"),
-            String::from("DELETE FROM s WHERE id = ?1"),
-            String::from(r#"SELECT id AS "id!" FROM s"#),
-        ]
-    );
-}
-
-#[test]
-fn a_record_table_overwrites_one_column() {
-    assert_eq!(Table::named("r").overwrite("id"), "UPDATE r SET id = ?1");
-    assert_eq!(Table::named("r").overwrite("body"), "UPDATE r SET body = ?1");
+fn a_cached_query_binds_only_as_many_values_as_it_takes() -> Result<(), Failed> {
+    let entry = serde_json::from_str::<Entry<String>>(TWO_PARAMETERS)?;
+    let refused: Vec<String> = BOUND
+        .iter()
+        .filter_map(|count| match entry.bound(*count) {
+            Err(refusal) => Some(refusal.to_string()),
+            Ok(()) => None,
+        })
+        .collect();
+    assert_eq!([refused.join(NEWLINE), NEWLINE.to_owned()].concat(), std::fs::read_to_string(Path::new(REFUSALS))?);
+    Ok(())
 }
