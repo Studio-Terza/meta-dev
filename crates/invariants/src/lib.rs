@@ -4,15 +4,7 @@ pub trait Ignore: Copy + fmt::Display {}
 
 pub trait Ignoring<Value, Failure>: Into<Result<Value, Failure>> {
     fn ignoring(self, _: impl Ignore) -> Option<Value> {
-        match self.into() {
-            Ok(value) => Some(value),
-            Err(failure) => Self::dropped(failure),
-        }
-    }
-
-    fn dropped(failure: Failure) -> Option<Value> {
-        drop(failure);
-        None
+        self.into().into_iter().next()
     }
 }
 

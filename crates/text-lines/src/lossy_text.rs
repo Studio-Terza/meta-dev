@@ -1,5 +1,3 @@
-use std::fmt;
-
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct LossyText(String);
 
@@ -21,11 +19,5 @@ impl From<&[u8]> for LossyText {
 impl AsRef<str> for LossyText {
     fn as_ref(&self) -> &str {
         &self.0
-    }
-}
-
-impl fmt::Display for LossyText {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(&self.0)
     }
 }

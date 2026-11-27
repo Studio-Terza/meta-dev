@@ -49,28 +49,6 @@ jobs:
       - run: $TIMED test-compile cargo test --locked --workspace --no-run
       - run: $TIMED test-run cargo test --locked --workspace
 
-  test-archive:
-    runs-on: ubuntu-latest
-    env:
-      RUSTC_WRAPPER: ""
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/toolchain
-      - uses: rui314/setup-mold@v1
-      - uses: actions/cache@v4
-        id: target
-        with:
-          path: target
-          key: target-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
-      - name: build the dependencies once, when the archive is missing
-        if: steps.target.outputs.cache-hit != 'true'
-        run: |
-          cargo test --locked --workspace --no-run
-          cargo metadata --locked --no-deps --format-version 1 | jq -r '.packages[].name' | sed 's/^/--package=/' | xargs cargo clean
-      - run: cargo build --locked -q --bin ci
-      - run: $TIMED test-compile cargo test --locked --workspace --no-run
-      - run: $TIMED test-run cargo test --locked --workspace
-
   lint:
     runs-on: ubuntu-latest
     steps:

@@ -8,6 +8,7 @@ use test_failure::Failed;
 use std::iter;
 use std::ops::Range;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use proptest::prelude::{Strategy, prop_assert_eq, proptest};
@@ -19,10 +20,16 @@ use dispatch_ports::{
     Finished, Job, Model, Output, Pause, Pid, Prompt, Reply, Stall, Stalled, Started, Stderr, Timeout, Tokens, Told,
     Unreadable, Usage, Wall, Watch, Watched, Woke, clock_ops, dispatch_ops,
 };
-use invariants::{Ignoring, Unpoisoned};
+use invariants::{Ignoring, Unpoisoned, invariant, invariants};
 use port_core::{Calls, Pass, Port, Released, Run, Snapshot};
 
 use ignored::Ignored;
+
+invariants! {
+    enum Invariant {
+        Endless => "a watch over the fake clock ends within ten thousand reads of it",
+    }
+}
 
 #[derive(Debug, PartialEq, Eq)]
 enum Envelope {
@@ -125,18 +132,22 @@ impl Waits {
 #[derive(Debug)]
 struct FakeClock<'waits> {
     now: Mutex<Wall>,
+    reads: AtomicUsize,
     sleep: Sleep,
     waits: &'waits Waits,
 }
 
 impl<'waits> FakeClock<'waits> {
+    const READS: usize = 10_000;
+
     fn new(sleep: Sleep, waits: &'waits Waits) -> FakeClock<'waits> {
-        FakeClock { now: Mutex::new(Watching::START), sleep, waits }
+        FakeClock { now: Mutex::new(Watching::START), reads: AtomicUsize::new(0), sleep, waits }
     }
 }
 
 impl ClockFiller for FakeClock<'_> {
     fn now(&self, _pass: Pass<'_, clock_ops::Now>) -> Wall {
+        invariant!(self.reads.fetch_add(1, Ordering::Relaxed) < FakeClock::READS, Invariant::Endless);
         *self.now.lock().unpoisoned()
     }
 

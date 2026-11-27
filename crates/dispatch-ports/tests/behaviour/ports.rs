@@ -145,7 +145,7 @@ fn a_bell_lapses_until_rung_spends_each_ring_once_and_rings_when_its_agent_finis
         let [rung, after] = [(); 2].map(|()| silent.bell().waited(Duration::ZERO));
         silent.end()?;
         let finished = speaking.dispatch(&job, &Prompt::new("x".to_owned()))?;
-        let spoken = finished.bell().waited(Duration::from_secs(20));
+        let spoken = finished.bell().waited(Duration::from_secs(5));
         finished.end()?;
         (waited, lapsed, [rung, after, spoken])
     };

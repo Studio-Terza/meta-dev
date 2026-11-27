@@ -93,7 +93,7 @@ mutants: 6 of 7 selected, 5 in the diff; 2 reused, 4 to test in 1 shards
 [case.files]
 "workspace.json" = '[{"name":"a.rs:1:1: x","file":"a.rs"},{"name":"b.rs:1:1: y","file":"b.rs"},{"name":"b.rs:2:1: z","file":"b.rs"},{"name":"c.rs:1:1: v","file":"c.rs"},{"name":"d.rs:1:1: n","file":"d.rs"},{"name":"k/src/x.rs:1:1: k","file":"k/src/x.rs"},{"name":"j/src/y.rs:1:1: j","file":"j/src/y.rs"}]'
 "diff.json" = '[{"name":"a.rs:1:1: x","file":"a.rs"},{"name":"b.rs:1:1: y","file":"b.rs"},{"name":"b.rs:2:1: z","file":"b.rs"},{"name":"c.rs:1:1: v","file":"c.rs"},{"name":"d.rs:1:1: n","file":"d.rs"}]'
-"changed" = "2\t0\tk/tests/t.rs\n"
+"changed" = "2\t0\tk/tests/t.rs\n0\t0\tj/src/y.rs\n"
 "numstat" = "1\t1\ta.rs\n3\t0\ttests/t.rs\n"
 "outcomes.json" = '{"outcomes":[{"scenario":"Baseline","summary":"Success"},{"scenario":{"Mutant":{"name":"a.rs:1:1: x","file":"a.rs"}},"summary":"CaughtMutant"},{"scenario":{"Mutant":{"name":"b.rs:1:1: y","file":"b.rs"}},"summary":"CaughtMutant"},{"scenario":{"Mutant":{"name":"b.rs:2:1: z","file":"b.rs"}},"summary":"MissedMutant"},{"scenario":{"Mutant":{"name":"c.rs:1:1: v","file":"c.rs"}},"summary":"Unviable"}]}'
 "output" = "earlier=1\n"
