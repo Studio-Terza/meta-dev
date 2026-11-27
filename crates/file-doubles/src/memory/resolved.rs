@@ -4,7 +4,7 @@ use std::path::{Component, Path, PathBuf};
 pub(crate) struct Resolved(PathBuf);
 
 impl Resolved {
-    pub fn into_inner(self) -> PathBuf {
+    pub(crate) fn into_inner(self) -> PathBuf {
         self.0
     }
 

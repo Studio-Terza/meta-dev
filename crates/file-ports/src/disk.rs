@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -41,7 +42,9 @@ impl FilesFiller for Disk {
     }
 
     fn entries(&self, _pass: Pass<'_, files_ops::Entries>, directory: &Path) -> Result<Vec<PathBuf>, FileFailure> {
-        Ok(fs::read_dir(directory)?.map(|entry| entry.map(|found| found.path())).collect::<Result<_, _>>()?)
+        let listed: BTreeSet<PathBuf> =
+            fs::read_dir(directory)?.map(|entry| entry.map(|found| found.path())).collect::<Result<_, _>>()?;
+        Ok(listed.into_iter().collect())
     }
 
     fn canonical(&self, _pass: Pass<'_, files_ops::Canonical>, path: &Path) -> Result<PathBuf, FileFailure> {

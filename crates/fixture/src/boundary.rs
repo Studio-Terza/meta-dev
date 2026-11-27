@@ -8,6 +8,28 @@ use std::{env, fmt, fs};
 use serde::de::DeserializeOwned;
 use test_failure::Failed;
 
+#[derive(Debug, thiserror::Error)]
+#[error("{call} answered {implemented} where the reference answered {referenced}")]
+pub(crate) struct Disagreed {
+    call: String,
+    implemented: String,
+    referenced: String,
+}
+
+impl Disagreed {
+    pub(crate) fn between(
+        call: &impl fmt::Debug,
+        implemented: &impl fmt::Debug,
+        referenced: &impl fmt::Debug,
+    ) -> Disagreed {
+        Disagreed {
+            call: format!("{call:?}"),
+            implemented: format!("{implemented:?}"),
+            referenced: format!("{referenced:?}"),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Story {
     file: &'static str,

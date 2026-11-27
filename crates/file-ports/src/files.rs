@@ -4,7 +4,7 @@ use port_core::port;
 
 use crate::{Bytes, FileFailure, Kind, Offset, Size, Stamps, Tail, Text};
 
-#[port]
+#[port(laws)]
 pub trait Files {
     fn read(&self, path: &Path) -> Result<Bytes, FileFailure>;
 

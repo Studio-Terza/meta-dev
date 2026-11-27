@@ -1,0 +1,49 @@
+# Each script replays on Disk in a fresh directory and on Memory; every reply must agree, an error only as an error.
+# Bytes are listed as numbers: "written" is [119, 114, 105, 116, 116, 101, 110].
+
+[Script.written_then_read]
+calls = [
+    { Write = ["note.txt", [119, 114, 105, 116, 116, 101, 110]] },
+    { Read = "note.txt" },
+    { ReadText = "note.txt" },
+    { Size = "note.txt" },
+    { Kind = "note.txt" },
+    { ReadFrom = ["note.txt", 3] },
+    { ReadFrom = ["note.txt", 7] },
+    { ReadFrom = ["note.txt", 99] },
+    { Entries = "note.txt" },
+    { Write = ["note.txt", [110, 111, 119]] },
+    { ReadText = "note.txt" },
+]
+canonical = ["note.txt", "./note.txt"]
+
+[Script.appended]
+calls = [
+    { Append = ["log.txt", [111, 110, 101, 32]] },
+    { Append = ["log.txt", [116, 119, 111]] },
+    { ReadText = "log.txt" },
+    { Size = "log.txt" },
+]
+canonical = ["log.txt"]
+
+[Script.missing]
+calls = [
+    { Read = "absent.txt" },
+    { ReadText = "absent.txt" },
+    { ReadFrom = ["absent.txt", 0] },
+    { Entries = "absent.txt" },
+    { Size = "absent.txt" },
+    { Kind = "absent.txt" },
+    { Write = ["absent/inside.txt", [120]] },
+    { Kind = "absent/inside.txt" },
+    { Append = ["absent/log.txt", [120]] },
+]
+canonical = ["absent.txt"]
+
+[Script.not_text]
+calls = [
+    { Write = ["binary", [255, 254]] },
+    { ReadText = "binary" },
+    { Read = "binary" },
+    { Size = "binary" },
+]

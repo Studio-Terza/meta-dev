@@ -2,13 +2,14 @@ mod boundary;
 mod caller;
 mod delegation;
 mod filler;
+mod laws;
 mod method;
 mod names;
 mod ops;
 
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::parse::Nothing;
+use syn::parse::{Parse, ParseStream};
 use syn::{ItemTrait, Token, TraitItem, TraitItemFn, TypeParamBound, Visibility, parse_quote};
 
 pub(crate) use boundary::{Constant, Spelling};
@@ -16,6 +17,7 @@ pub(crate) use boundary::{Constant, Spelling};
 use caller::Caller;
 use delegation::Delegation;
 use filler::Filler;
+use laws::Laws;
 use method::Method;
 use names::{CallerName, FillerName, OpsName};
 use ops::Ops;
@@ -32,12 +34,22 @@ pub(crate) trait Rendered {
     }
 }
 
+mod keyword {
+    syn::custom_keyword!(laws);
+}
+
+enum Scripting {
+    Unscripted,
+    Scripted,
+}
+
 pub(crate) struct Declared {
     item: ItemTrait,
     caller: CallerName,
     filler: FillerName,
     ops: OpsName,
     methods: Vec<Method>,
+    scripting: Scripting,
 }
 
 impl AsRef<[Method]> for Declared {
@@ -48,10 +60,11 @@ impl AsRef<[Method]> for Declared {
 
 impl Declared {
     pub(crate) fn expanded(attributes: TokenStream, item: TokenStream) -> TokenStream {
-        let expansion = syn::parse2::<Nothing>(attributes)
-            .and_then(|Nothing| syn::parse2::<ItemTrait>(item))
-            .map(Declared::parsed)
-            .map(|declared| Self::expansion(&declared));
+        let expansion = syn::parse2::<Scripting>(attributes).and_then(|scripting| {
+            syn::parse2::<ItemTrait>(item)
+                .map(|declared| Declared::parsed(declared, scripting))
+                .map(|declared| declared.expansion())
+        });
         match expansion {
             Ok(expanded) => expanded,
             Err(error) => error.to_compile_error(),
@@ -62,9 +75,26 @@ impl Declared {
         let caller = Caller::rendered(self);
         let filler = Filler::rendered_after(self, &caller);
         let ops = Ops::rendered_after(self, &filler);
-        Delegation::rendered_after(self, &ops)
+        let delegated = Delegation::rendered_after(self, &ops);
+        let scripted = self.scripted();
+        quote! {
+            #delegated
+            #scripted
+        }
     }
+}
 
+impl Parse for Scripting {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Scripting> {
+        if input.is_empty() {
+            Ok(Scripting::Unscripted)
+        } else {
+            input.parse::<keyword::laws>().map(|_| Scripting::Scripted)
+        }
+    }
+}
+
+impl Declared {
     pub(crate) fn sealed_trait(&self) -> &ItemTrait {
         &self.item
     }
@@ -85,7 +115,21 @@ impl Declared {
         &self.ops
     }
 
-    fn parsed(declared: ItemTrait) -> Declared {
+    pub(crate) fn laws(&self) -> TokenStream {
+        match self.scripting {
+            Scripting::Unscripted => TokenStream::new(),
+            Scripting::Scripted => Laws::named(self),
+        }
+    }
+
+    fn scripted(&self) -> TokenStream {
+        match self.scripting {
+            Scripting::Unscripted => TokenStream::new(),
+            Scripting::Scripted => Laws::rendered(self),
+        }
+    }
+
+    fn parsed(declared: ItemTrait, scripting: Scripting) -> Declared {
         let mut item = Self::sealed(declared);
         let methods = item.items.iter_mut().filter_map(Self::required).map(Method::declared).collect();
         Declared {
@@ -94,6 +138,7 @@ impl Declared {
             ops: OpsName::from(&item.ident),
             methods,
             item,
+            scripting,
         }
     }
 

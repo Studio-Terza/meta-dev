@@ -11,7 +11,9 @@ use newtype::Wrapping;
 use newtype::serde::{Deserialize, Deserializer};
 use port_core::Pass;
 
-use crate::{Bytes, FileFailure, FilesFiller, Ignored, Kind, Offset, Size, Stamps, Text, files_ops};
+use file_ports::{Bytes, FileFailure, FilesFiller, Kind, Offset, Size, Stamps, Text, files_ops};
+
+use crate::Ignored;
 use locked::Locked;
 use resolved::Resolved;
 

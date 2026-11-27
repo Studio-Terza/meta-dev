@@ -17,9 +17,12 @@ impl Rendered for Ops {
             .as_ref()
             .iter()
             .filter_map(|method| method.op_struct().map(|op| Self::op_declaration(&op, caller, method)));
+        let laws = declared.laws();
         quote! {
             #visibility mod #module {
                 #(#declarations)*
+
+                #laws
             }
         }
     }

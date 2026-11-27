@@ -13,10 +13,16 @@ doctest = false
 invariants = { path = "../invariants" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
+serde = { workspace = true, optional = true }
 thiserror.workspace = true
 
+[features]
+laws = ["dep:serde"]
+
 [dev-dependencies]
-test-failure = { path = "../test-failure" }
+file-doubles = { path = "../file-doubles" }
+fixture = { path = "../fixture" }
+serde.workspace = true
 tempfile.workspace = true
 
 [lints]

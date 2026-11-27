@@ -7,6 +7,7 @@ use newtype::{Arbitrary, Newtype};
 use crate::Ignored;
 
 #[derive(Newtype, Arbitrary, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "laws", derive(newtype::Deserialize))]
 pub struct Bytes(Vec<u8>);
 
 impl AsRef<[u8]> for Bytes {

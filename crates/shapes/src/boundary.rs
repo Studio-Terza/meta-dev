@@ -3,7 +3,8 @@ use std::fmt::{self, Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use file_ports::{Bytes, Memory};
+use file_doubles::Memory;
+use file_ports::Bytes;
 use newtype::Arbitrary;
 use proptest::sample::Index;
 use proptest::test_runner::Config;

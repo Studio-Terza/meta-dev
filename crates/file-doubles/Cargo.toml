@@ -1,0 +1,19 @@
+[package]
+name = "file-doubles"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+file-ports = { path = "../file-ports", features = ["laws"] }
+invariants = { path = "../invariants" }
+newtype = { path = "../newtype" }
+port-core = { path = "../port-core" }
+
+[lints]
+workspace = true

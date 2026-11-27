@@ -255,14 +255,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 
 [[package]]
-name = "file-ports"
+name = "file-doubles"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "invariants",
  "newtype",
  "port-core",
+]
+
+[[package]]
+name = "file-ports"
+version = "0.1.0"
+dependencies = [
+ "file-doubles",
+ "fixture",
+ "invariants",
+ "newtype",
+ "port-core",
+ "serde",
  "tempfile",
- "test-failure",
  "thiserror",
 ]
 
@@ -443,6 +455,7 @@ name = "lint"
 version = "0.1.0"
 dependencies = [
  "console-ports",
+ "file-doubles",
  "file-ports",
  "fixture",
  "invariants",
@@ -797,6 +810,7 @@ dependencies = [
 name = "shapes"
 version = "0.1.0"
 dependencies = [
+ "file-doubles",
  "file-ports",
  "newtype",
  "proptest",
@@ -974,6 +988,7 @@ checksum = "06bdbd8cfc056b8d2e2e85f29b56a3bdbecb527cef81eb39e3e7b98af4652770"
 name = "transcript-ports"
 version = "0.1.0"
 dependencies = [
+ "file-doubles",
  "file-ports",
  "fixture",
  "grammar",

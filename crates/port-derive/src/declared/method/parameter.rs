@@ -23,4 +23,8 @@ impl Parameter {
     pub(crate) fn name(&self) -> &Ident {
         &self.name
     }
+
+    pub(crate) fn tree(&self) -> &Type {
+        &self.tree
+    }
 }

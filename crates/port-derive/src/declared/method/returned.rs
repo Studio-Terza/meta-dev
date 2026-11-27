@@ -26,6 +26,13 @@ impl Returned {
         }
     }
 
+    pub(crate) fn replayable(&self) -> Option<()> {
+        match self {
+            Returned::Plain => Some(()),
+            Returned::Acquired(_) => None,
+        }
+    }
+
     pub(crate) fn counting(&self) -> Ident {
         match self {
             Returned::Plain => format_ident!("counted_call"),

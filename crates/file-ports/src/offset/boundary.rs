@@ -5,6 +5,7 @@ use crate::Ignored;
 
 #[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[newtype(checked, strategy = 0..=i64::MAX)]
+#[cfg_attr(feature = "laws", derive(newtype::CheckedDeserialize))]
 pub struct Offset(i64);
 
 #[derive(Debug, thiserror::Error)]
