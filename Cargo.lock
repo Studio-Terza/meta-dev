@@ -159,21 +159,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "design-cli"
-version = "0.1.0"
-dependencies = [
- "console-ports",
- "design",
- "dispatch-ports",
- "file-ports",
- "grammar",
- "serde_json",
- "sqlite-ports",
- "tempfile",
- "test-failure",
-]
-
-[[package]]
 name = "design-messages"
 version = "0.1.0"
 dependencies = [
