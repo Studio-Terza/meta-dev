@@ -1,10 +1,10 @@
 "design"
 
-{"HOME": "/private/tmp/design-cli-scenarios", "PWD": "/private/tmp/design-cli-scenarios"}
+{"HOME": "/tmp/design-cli-scenarios", "PWD": "/tmp/design-cli-scenarios"}
 
-"/private/tmp/design-cli-scenarios"
+"/tmp/design-cli-scenarios"
 
-"/private/tmp/design-cli-scenarios/.claude/projects/-private-tmp-design-cli-scenarios-work"
+"/tmp/design-cli-scenarios/.claude/projects/-tmp-design-cli-scenarios-work"
 
 "tests/goldens/scenarios.json"
 
