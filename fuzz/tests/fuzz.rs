@@ -13,11 +13,10 @@ fn no_input_panics_the_runner_or_breaks_its_promises() -> Result<(), Failed> {
     let deadline = Campaign::deadline();
     iter::repeat_with(Instant::now).take_while(|now| *now < deadline).try_for_each(|_| {
         TestRunner::new(Campaign::batch()).run(&any::<Input>(), |input| {
-            let files = input.files();
             let ran = || {
                 let mut err = Vec::new();
                 let verdict = Cli::from_args([Campaign::root().into_os_string()]).verdict(
-                    &files,
+                    input.files(),
                     Stopped::default(),
                     &mut Vec::new(),
                     &mut err,
