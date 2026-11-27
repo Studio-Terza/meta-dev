@@ -4,18 +4,20 @@ use std::ops::Not;
 use std::path::Path;
 
 use design_messages::{CheckName, PullNumber};
-use dispatch_ports::{Call, Clock, Deadline, Dispatch, Due, Pause, Ran, Shell, Timeout};
+use dispatch_ports::{Clock, Deadline, Dispatch, Due, Pause, Ran, Shell, Timeout};
 use file_ports::Files;
 use grammar_spec_line::Attachment;
 use invariants::Ignoring;
 use serde::Deserialize;
+use serde::de::DeserializeOwned;
 use store_ports::Store;
 
 use super::super::super::Ground;
 use super::super::super::crew::Crew;
-use super::boundary::{Branch, Branched, CommitSha, Compared, First, JobId, Opened, Pushed, Repository};
+use super::boundary::{Branch, Branched, CommitSha, Compared, First, JobId, Opened, Pushed};
 use super::{FailedJob, UnreadStep};
 use crate::cli::request::ignored::Ignored;
+use crate::cli::request::{Local, Repository};
 
 #[derive(Debug)]
 pub struct Hub<'crew, D: Dispatch, C: Clock, G: Shell> {
@@ -34,6 +36,21 @@ pub enum Verdict {
 struct Head {
     #[serde(rename = "headRefOid")]
     head: CommitSha,
+}
+
+#[derive(Debug, Deserialize)]
+struct Merging {
+    mergeable: Mergeability,
+}
+
+#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Mergeability {
+    #[serde(rename = "MERGEABLE")]
+    Clean,
+    #[serde(rename = "CONFLICTING")]
+    Conflicting,
+    #[serde(rename = "UNKNOWN")]
+    Unknown,
 }
 
 #[derive(Debug, Deserialize)]
@@ -130,22 +147,27 @@ impl<'crew, D: Dispatch, C: Clock, G: Shell> Hub<'crew, D, C, G> {
     }
 
     fn spoke(&self, arguments: &[&str], timeout: Timeout) -> Option<Ran> {
-        let spoken = arguments.iter().map(|word| (*word).to_owned()).collect();
-        let deadline = Deadline::after(self.crew.now(), timeout);
-        let call = Call::new(Hub::<D, C, G>::PROGRAM, spoken, self.directory.to_path_buf(), deadline);
-        self.crew.ran(&call).ignoring(Ignored::Unrun)
+        self.crew.spoke(Hub::<D, C, G>::PROGRAM, arguments, self.directory, timeout)
+    }
+
+    pub fn viewed<T: DeserializeOwned>(&self, pull: PullNumber, fields: &str) -> Option<T> {
+        let ran = self.ran(&["pr", "view", &pull.to_string(), "--json", fields], Self::QUICK);
+        let printed = ran.as_ref().and_then(Ran::succeeded)?;
+        serde_json::from_str(printed.as_ref()).ignoring(Ignored::Unviewed)
     }
 
     pub fn opened<F: Files, S: Store>(
         &self,
         branched: &Branched,
         ground: &Ground<'_, F, S>,
+        local: &Local,
     ) -> Result<Pushed, Unopened> {
         let held = self.remote(branched.branch())?;
         (held == Some(branched.head())).then_some(()).ok_or(Unopened::Unpushed(held))?;
         let first = self.first(branched.head())?;
         let spec = first.spec().ok_or(UnreadStep::Spec)?;
-        let title = ground.titled(spec).ok_or(UnreadStep::Detail)?.to_string();
+        let specs = local.specs().ok_or(UnreadStep::NoSpecs)?;
+        let title = ground.titled(specs, spec).ok_or(UnreadStep::Detail)?.to_string();
         let branch = branched.branch().to_string();
         let body = Body(spec).to_string();
         let asked =
@@ -178,9 +200,11 @@ impl<'crew, D: Dispatch, C: Clock, G: Shell> Hub<'crew, D, C, G> {
     }
 
     pub fn head(&self, pull: PullNumber) -> Result<CommitSha, UnreadStep> {
-        let ran = self.ran(&["pr", "view", &pull.to_string(), "--json", "headRefOid"], Self::QUICK);
-        let printed = ran.as_ref().and_then(Ran::succeeded).ok_or(UnreadStep::Head)?;
-        serde_json::from_str::<Head>(printed.as_ref()).map(|read| read.head).map_err(|_unread| UnreadStep::Head)
+        self.viewed::<Head>(pull, "headRefOid").map(|read| read.head).ok_or(UnreadStep::Head)
+    }
+
+    pub fn mergeable(&self, pull: PullNumber) -> Result<Mergeability, UnreadStep> {
+        self.viewed::<Merging>(pull, "mergeable").map(|read| read.mergeable).ok_or(UnreadStep::Mergeable)
     }
 
     pub fn registered(&self, pull: PullNumber) -> Result<(), UnreadStep> {

@@ -45,7 +45,13 @@ const AGENT: &str = "/work/agent";
 const SHA: &str = "0123456789abcdef0123456789abcdef01234567";
 const OTHER: &str = "fedcba9876543210fedcba9876543210fedcba98";
 const LOCAL: &str = "project = \"meta-dev\"\nrepository = \"o/r\"\n";
+const PLACED: &str = "placed";
 const HEAD: &str = "pr view 12 --json headRefOid -R o/r";
+const MERGEABLE: &str = "pr view 12 --json mergeable -R o/r";
+const LANDED: &str = "pr view 12 --json state,headRefName,headRefOid -R o/r";
+const WORKTREES: &str = "worktree list --porcelain";
+const STATUS: &str = "status --short";
+const REMOVE: &str = "worktree remove /work/wt-open-pr";
 const WATCH: &str = "pr checks 12 --watch --fail-fast -R o/r";
 const CHECKS: &str = "pr checks 12 --json name,bucket,link -R o/r";
 const LISTED: &str = "pr checks 12 --json name,state -R o/r";
@@ -174,20 +180,31 @@ struct Answer {
 struct Asked {
     spoken: String,
     deadline: Deadline,
+    directory: PathBuf,
 }
 
 impl Answer {
     fn new(asked: &str, ran: Ran) -> Answer {
         Answer { asked: format!("gh {asked}"), ran }
     }
+
+    fn git(asked: &str, ran: Ran) -> Answer {
+        Answer { asked: format!("git {asked}"), ran }
+    }
+
+    fn mergeable(state: &str) -> Answer {
+        Answer::new(MERGEABLE, Ran::Succeeded(Printed::new(format!("{{\"mergeable\":\"{state}\"}}"))))
+    }
 }
 
 impl GitHub {
     fn answering(given: &[Answer]) -> GitHub {
-        let answers = given.iter().fold(BTreeMap::<String, Vec<Ran>>::new(), |mut answers, answer| {
+        let mut answers = given.iter().fold(BTreeMap::<String, Vec<Ran>>::new(), |mut answers, answer| {
             answers.entry(answer.asked.clone()).or_default().push(answer.ran.clone());
             answers
         });
+        let clean = Answer::mergeable("MERGEABLE");
+        answers.entry(clean.asked).or_insert(vec![clean.ran]);
         GitHub { answers, asked: Mutex::default() }
     }
 
@@ -197,6 +214,10 @@ impl GitHub {
 
     fn deadlines(&self) -> Vec<Deadline> {
         self.asked.lock().unpoisoned().iter().map(|asked| asked.deadline).collect()
+    }
+
+    fn directories(&self) -> Vec<PathBuf> {
+        self.asked.lock().unpoisoned().iter().map(|asked| asked.directory.clone()).collect()
     }
 }
 
@@ -209,7 +230,8 @@ impl ShellFiller for Gh<'_> {
     fn ran(&self, _pass: Pass<'_, shell_ops::Ran>, call: &Call) -> Result<Ran, DispatchFailure> {
         let spoken =
             [call.program().to_owned()].into_iter().chain(call.arguments().iter().cloned()).collect::<Vec<_>>();
-        let asked = Asked { spoken: spoken.join(" "), deadline: call.deadline() };
+        let asked =
+            Asked { spoken: spoken.join(" "), deadline: call.deadline(), directory: call.directory().to_path_buf() };
         let mut log = self.github.asked.lock().unpoisoned();
         let earlier = log.iter().filter(|before| before.spoken == asked.spoken).count();
         let answers = self.github.answers.get(&asked.spoken);
@@ -310,17 +332,20 @@ impl Home {
     fn new() -> Result<Home, Failed> {
         let home = Home { directory: TempDir::new()?, at: SystemTime::now() };
         fs::create_dir_all(home.workspace().join(".meta"))?;
-        home.configured(Some(LOCAL))?;
+        home.configured(LOCAL)?;
         Ok(home)
     }
 
-    fn configured(&self, local: Option<&str>) -> Result<(), Failed> {
-        let path = self.workspace().join(".meta/local.toml");
-        match local {
-            Some(text) => fs::write(path, text)?,
-            None => fs::remove_file(path)?,
-        }
-        Ok(())
+    fn configured(&self, local: &str) -> Result<(), Failed> {
+        self.unplaced(&format!("queue = {}\nspecs = {}\n{local}", self.placed("queue.md"), self.placed("specs")))
+    }
+
+    fn placed(&self, kept: &str) -> Value {
+        Value::from(self.path().join(PLACED).join(kept).to_string_lossy())
+    }
+
+    fn unplaced(&self, local: &str) -> Result<(), Failed> {
+        Ok(fs::write(self.workspace().join(".meta/local.toml"), local)?)
     }
 
     fn holding(lines: &[String]) -> Result<Home, Failed> {
@@ -420,14 +445,14 @@ impl Home {
     }
 
     fn queued(&self, text: &str) -> Result<(), Failed> {
-        let folder = self.path().join("studio-meta-dev/transcripts");
+        let folder = self.path().join(PLACED);
         fs::create_dir_all(&folder)?;
         fs::write(folder.join("queue.md"), text)?;
         Ok(())
     }
 
     fn specified(&self, text: &str) -> Result<(), Failed> {
-        let folder = self.path().join("studio-meta-dev/transcripts/specs");
+        let folder = self.path().join(PLACED).join("specs");
         fs::create_dir_all(&folder)?;
         fs::write(folder.join("tools-retirement.md"), text)?;
         Ok(())
@@ -496,13 +521,21 @@ fn the_hook_settings_name_a_command_running_each_hook_in_the_project() -> Result
         Some("design --workspace \"$CLAUDE_PROJECT_DIR\" hook stop")
     );
     assert_eq!(handler.get("timeout").and_then(Value::as_u64), Some(3600));
-    assert_eq!(settings.get("hooks").and_then(Value::as_object).map(serde_json::Map::len), Some(2));
+    assert_eq!(settings.get("hooks").and_then(Value::as_object).map(serde_json::Map::len), Some(3));
     let subagent = settings.pointer("/hooks/SubagentStop/0/hooks/0").cloned().unwrap_or_default();
     assert_eq!(
         subagent.get("command").and_then(Value::as_str),
         Some("design --workspace \"$CLAUDE_PROJECT_DIR\" hook subagent-stop")
     );
     assert_eq!(subagent.get("timeout").and_then(Value::as_u64), Some(1500));
+    assert_eq!(settings.pointer("/hooks/Stop/0/matcher"), None);
+    assert_eq!(settings.pointer("/hooks/PostToolUse/0/matcher").and_then(Value::as_str), Some("Bash"));
+    let used = settings.pointer("/hooks/PostToolUse/0/hooks/0").cloned().unwrap_or_default();
+    assert_eq!(
+        used.get("command").and_then(Value::as_str),
+        Some("design --workspace \"$CLAUDE_PROJECT_DIR\" hook post-tool-use")
+    );
+    assert_eq!(used.get("timeout").and_then(Value::as_u64), Some(300));
     Ok(())
 }
 
@@ -594,7 +627,7 @@ impl GitHub {
 
 impl Home {
     fn queue(&self) -> Result<String, Failed> {
-        Ok(fs::read_to_string(self.path().join("studio-meta-dev/transcripts/queue.md"))?)
+        Ok(fs::read_to_string(self.path().join(PLACED).join("queue.md"))?)
     }
 }
 
@@ -645,14 +678,58 @@ fn a_done_on_a_sha_the_pull_request_does_not_hold_is_sent_back_to_push() -> Resu
 }
 
 #[test]
+fn a_done_on_a_conflicting_pull_request_is_sent_back_to_merge_main_without_waiting_on_ci() -> Result<(), Failed> {
+    let github = GitHub::answering(&[GitHub::head(SHA), Answer::mergeable("CONFLICTING")]);
+    let said = Home::new()?.finished(&format!("DONE #12 {SHA}"), true, &github);
+    assert_eq!(said.ended, Ok(Outcome::Blocked));
+    assert_eq!(
+        said.reason()?,
+        Some(format!(
+            "Pull request #12 at {SHA} conflicts with main. Merge origin/main, resolve the conflicts, push, then end \
+             with DONE #12 <full sha of the pushed head>."
+        ))
+    );
+    assert_eq!(github.asked(), [HEAD, MERGEABLE].map(|asked| format!("gh {asked}")));
+    Ok(())
+}
+
+#[test]
+fn the_queue_and_specs_come_from_local_config_and_a_missing_or_relative_one_is_never_guessed() -> Result<(), Failed> {
+    let home = Home::new()?;
+    home.queued("")?;
+    home.specified(SPEC)?;
+    let queue = home.placed("queue.md");
+    let cited = || GitHub::answering(&[GitHub::pushed(SHA), GitHub::first("Spec: tools-retirement#D2")]);
+    let unspecified = [format!("queue = {queue}\n"), format!("queue = {queue}\nspecs = \"x\"\n")]
+        .iter()
+        .map(|local| {
+            home.unplaced(&[local, "repository = \"o/r\"\n"].concat())?;
+            Ok(home.finished(&format!("DONE {BRANCH} {SHA}"), false, &cited()).ended)
+        })
+        .collect::<Result<Vec<_>, Failed>>()?;
+    let unqueued = ["repository = \"o/r\"\n", "queue = \"queue.md\"\n"]
+        .iter()
+        .map(|local| {
+            home.unplaced(local)?;
+            Ok(home.finished(&format!("BLOCKED #12 {SHA}"), false, &GitHub::default()).ended)
+        })
+        .collect::<Result<Vec<_>, Failed>>()?;
+    assert_eq!(unspecified, [Ok(Outcome::Escalated), Ok(Outcome::Escalated)]);
+    assert_eq!(home.queue()?, format!("- [agent outcome] unread no-specs on {BRANCH} {SHA}, from {AGENT}\n").repeat(2));
+    let unplaced = Failure::Unplaced.to_string();
+    assert_eq!(unqueued, [Err(Refusal(unplaced.clone())), Err(Refusal(unplaced))]);
+    Ok(())
+}
+
+#[test]
 fn a_done_on_green_checks_waits_on_ci_for_up_to_twenty_minutes_and_lets_the_agent_stop() -> Result<(), Failed> {
     let home = Home::new()?;
     let github = GitHub::green();
     let said = home.finished("\nDONE #12 0123456789ABCDEF0123456789ABCDEF01234567\n", false, &github);
     let wall = Wall::from(home.at);
     assert_eq!((said.shown.as_str(), said.ended), ("", Ok(Outcome::Hooked(HookEvent::SubagentStop))));
-    assert_eq!(github.asked(), [HEAD, LISTED, WATCH, CHECKS].map(|asked| format!("gh {asked}")));
-    assert_eq!(github.deadlines(), [60, 60, 1200, 60].map(|seconds| Deadline::after(wall, Timeout::new(seconds))));
+    assert_eq!(github.asked(), [HEAD, MERGEABLE, LISTED, WATCH, CHECKS].map(|asked| format!("gh {asked}")));
+    assert_eq!(github.deadlines(), [60, 60, 60, 1200, 60].map(|seconds| Deadline::after(wall, Timeout::new(seconds))));
     Ok(())
 }
 
@@ -663,7 +740,7 @@ fn a_done_on_red_checks_is_sent_back_with_each_failed_jobs_log_tail() -> Result<
     assert_eq!(said.ended, Ok(Outcome::Blocked));
     assert_eq!(said.reason()?, Some(Home::golden("subagent-failing.txt")?));
     assert_eq!(
-        github.asked().get(4..).map(<[String]>::to_vec),
+        github.asked().get(5..).map(<[String]>::to_vec),
         Some(vec![format!("gh {LOG}"), "gh run view --job 458 --log-failed -R o/r".to_owned()])
     );
     Ok(())
@@ -702,6 +779,7 @@ fn a_blocked_agent_and_every_unread_step_are_escalated_to_the_queue_and_the_agen
             GitHub::answering(&[Answer::new(HEAD, Ran::Failed(Printed::new(format!("{{\"headRefOid\":\"{SHA}\"}}"))))]),
         ),
         (&done, GitHub::answering(&[Answer::new(HEAD, Ran::Succeeded(Printed::new("{}".to_owned())))])),
+        (&done, GitHub::answering(&[GitHub::head(SHA), Answer::mergeable("DIVERGED")])),
         (&done, GitHub::answering(&[GitHub::head(SHA), listed.clone()])),
         (&done, GitHub::answering(&[GitHub::head(SHA), listed.clone(), Answer::new(WATCH, Ran::Overdue)])),
         (&done, GitHub::answering(&[GitHub::head(SHA), listed, GitHub::watched()])),
@@ -771,7 +849,7 @@ fn a_done_on_a_pushed_branch_opens_its_pull_request_from_the_first_commit_and_wa
     let said = home.finished(&format!("DONE {BRANCH} {SHA}"), false, &github);
     assert_eq!((said.shown.as_str(), said.ended), ("", Ok(Outcome::Hooked(HookEvent::SubagentStop))));
     let asked = [format!("gh {REMOTE}"), format!("gh {FIRST}"), format!("gh {CREATE}"), format!("gh {VIEW}")];
-    let checked = [HEAD, LISTED, WATCH, CHECKS].map(|step| format!("gh {step}"));
+    let checked = [HEAD, MERGEABLE, LISTED, WATCH, CHECKS].map(|step| format!("gh {step}"));
     assert_eq!(github.asked(), [&asked[..], &checked[..]].concat());
     Ok(())
 }
@@ -851,11 +929,11 @@ fn a_done_in_a_workspace_that_names_no_repository_is_escalated_without_calling_g
     home.queued("")?;
     let github = GitHub::green();
     let dones = [format!("DONE #12 {SHA}"), format!("DONE {BRANCH} {SHA}")];
-    let configs = [None, Some("project = \"meta-dev\"\n"), Some("repository = \"Studio-Terza\"\n")];
+    let configs = ["", "project = \"meta-dev\"\n", "repository = \"Studio-Terza\"\n"];
     let ended = configs
         .iter()
         .map(|config| {
-            home.configured(*config)?;
+            home.configured(config)?;
             Ok(dones.iter().map(|done| home.finished(done, false, &github).ended == Ok(Outcome::Escalated)).collect())
         })
         .collect::<Result<Vec<Vec<bool>>, Failed>>()?;
@@ -1088,5 +1166,71 @@ fn words_the_cli_does_not_know_are_refused_with_the_usage() -> Result<(), Failed
 fn a_stop_hook_that_cannot_read_its_input_fails() -> Result<(), Failed> {
     let said = Home::answered()?.said(&["hook", "stop"], "not json", &Replies::default());
     assert!(said.ended.is_err_and(|failure| failure.0.contains("cannot read the hook input: ")));
+    Ok(())
+}
+
+impl Home {
+    fn used(&self, command: &str, github: &GitHub) -> Said {
+        let input = serde_json::json!({
+            "session_id": "s",
+            "hook_event_name": "PostToolUse",
+            "cwd": AGENT,
+            "tool_name": "Bash",
+            "tool_input": {"command": command},
+            "tool_response": {"stdout": ""},
+        });
+        self.heard(&["hook", "post-tool-use"], &input.to_string(), &Replies::default(), github)
+    }
+}
+
+impl GitHub {
+    fn landed(state: &str, branch: &str, head: &str) -> Answer {
+        let landed = serde_json::json!({"state": state, "headRefName": branch, "headRefOid": head});
+        Answer::new(LANDED, Ran::Succeeded(Printed::new(landed.to_string())))
+    }
+
+    fn releasing(landed: Answer, after: &[Answer]) -> GitHub {
+        let listed = format!(
+            "worktree /work/main\nHEAD {OTHER}\nbranch refs/heads/main\n\nworktree /work/wt-open-pr\nHEAD {SHA}\nbranch \
+             refs/heads/{BRANCH}\n\nworktree /work/detached\nHEAD {SHA}\ndetached\n"
+        );
+        let worktrees = Answer::git(WORKTREES, Ran::Succeeded(Printed::new(listed)));
+        GitHub::answering(&[&[landed, worktrees][..], after].concat())
+    }
+}
+
+#[test]
+fn a_merged_pull_requests_clean_pushed_worktree_is_removed_and_any_other_is_kept_and_queued() -> Result<(), Failed> {
+    let home = Home::new()?;
+    home.queued("")?;
+    let merge = "cd /work && gh pr merge 12 --merge -R o/r";
+    let clean = Answer::git(STATUS, Ran::Succeeded(Printed::default()));
+    let merged = || GitHub::landed("MERGED", BRANCH, SHA);
+    let released =
+        GitHub::releasing(merged(), &[clean.clone(), Answer::git(REMOVE, Ran::Succeeded(Printed::default()))]);
+    assert_eq!(home.used(merge, &released).ended, Ok(Outcome::Released));
+    let asked = [format!("gh {LANDED}"), format!("git {WORKTREES}"), format!("git {STATUS}"), format!("git {REMOVE}")];
+    assert_eq!(released.asked(), asked);
+    assert_eq!(released.directories(), [AGENT, AGENT, "/work/wt-open-pr", AGENT].map(PathBuf::from));
+    let untouched = [
+        ("gh pr view 12 && echo merge 12", GitHub::default()),
+        (merge, GitHub::answering(&[GitHub::landed("OPEN", BRANCH, SHA)])),
+        (merge, GitHub::releasing(GitHub::landed("MERGED", "design/other", SHA), &[])),
+    ];
+    let kept = [
+        GitHub::default(),
+        GitHub::answering(&[merged()]),
+        GitHub::releasing(merged(), &[]),
+        GitHub::releasing(merged(), &[Answer::git(STATUS, Ran::Succeeded(Printed::new(" M src/lib.rs\n".to_owned())))]),
+        GitHub::releasing(GitHub::landed("MERGED", BRANCH, OTHER), std::slice::from_ref(&clean)),
+        GitHub::releasing(merged(), &[clean, Answer::git(REMOVE, Ran::Failed(Printed::default()))]),
+    ];
+    let hooked = Ok(Outcome::Hooked(HookEvent::PostToolUse));
+    let quiet = untouched.iter().map(|(command, github)| home.used(command, github).ended == hooked);
+    let queued = kept.iter().map(|github| home.used(merge, github).ended == Ok(Outcome::Escalated));
+    assert_eq!(quiet.chain(queued).collect::<Vec<_>>(), [true; 9]);
+    assert_eq!(untouched.first().map(|(_command, github)| github.asked()), Some(Vec::new()));
+    assert!(kept.iter().take(5).all(|github| !github.asked().contains(&format!("git {REMOVE}"))));
+    assert_eq!(home.queue()?, Home::golden("released-queue.md")?);
     Ok(())
 }

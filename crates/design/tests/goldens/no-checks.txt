@@ -1,4 +1,5 @@
 +60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable -R o/r
 +60 gh pr checks 12 --json name,state -R o/r
 +70 gh pr checks 12 --json name,state -R o/r
 +80 gh pr checks 12 --json name,state -R o/r

@@ -17,6 +17,7 @@ dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports" }
 grammar-lines = { path = "../grammar-lines" }
 grammar = { path = "../grammar" }
+grammar-git = { path = "../grammar-git" }
 grammar-slug = { path = "../grammar-slug" }
 grammar-spec-line = { path = "../grammar-spec-line" }
 hex.workspace = true

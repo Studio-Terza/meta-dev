@@ -151,6 +151,7 @@ dependencies = [
  "dispatch-ports",
  "file-ports",
  "grammar",
+ "grammar-git",
  "grammar-lines",
  "grammar-slug",
  "grammar-spec-line",
@@ -364,6 +365,13 @@ version = "0.1.0"
 dependencies = [
  "grammar",
  "grammar-unspelled",
+]
+
+[[package]]
+name = "grammar-git"
+version = "0.1.0"
+dependencies = [
+ "grammar",
 ]
 
 [[package]]

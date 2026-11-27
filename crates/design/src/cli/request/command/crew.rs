@@ -1,11 +1,15 @@
+use std::path::Path;
+
 use design_messages::Tally;
 use dispatch_ports::{
-    Bell, Call, Clock, Deadline, Dispatch, DispatchFailure, Finished, Job, Model, Moment, Pause, Prompt, Ran, Reply,
-    Shell, Stall, Timeout, Usage, Wall, Watch, Watching,
+    Bell, Call, Clock, Deadline, Dispatch, Finished, Job, Model, Moment, Pause, Prompt, Ran, Reply, Shell, Stall,
+    Timeout, Usage, Wall, Watch, Watching,
 };
+use invariants::Ignoring;
 use newtype::Wrapping;
 
 use crate::cli::failure::Failure;
+use crate::cli::request::ignored::Ignored;
 
 #[derive(Debug)]
 pub struct Crew<'ports, D: Dispatch, C: Clock, G: Shell> {
@@ -32,8 +36,11 @@ impl<'ports, D: Dispatch, C: Clock, G: Shell> Crew<'ports, D, C, G> {
         self.clock.now()
     }
 
-    pub fn ran(&self, call: &Call) -> Result<Ran, DispatchFailure> {
-        self.shell.ran(call)
+    pub fn spoke(&self, program: &'static str, arguments: &[&str], directory: &Path, timeout: Timeout) -> Option<Ran> {
+        let spoken = arguments.iter().map(|word| (*word).to_owned()).collect();
+        let deadline = Deadline::after(self.clock.now(), timeout);
+        let call = Call::new(program, spoken, directory.to_path_buf(), deadline);
+        self.shell.ran(&call).ignoring(Ignored::Unrun)
     }
 
     pub fn moment(&self) -> Moment {
