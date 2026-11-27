@@ -12,6 +12,7 @@ use syn::{
     ItemTrait, ItemType, ItemUnion, ItemUse, Lit, Type, Visibility,
 };
 
+use crate::at::At;
 use crate::finding::{Finding, Fix, Found, Line, Rule};
 use crate::gate::Gate;
 use crate::graph::Graph;
@@ -87,9 +88,6 @@ struct Graphed {
     attachments: Vec<Attachment>,
     read: Read,
 }
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-struct At(usize);
 
 impl DeadCode<'_> {
     const ENTRY_POINTS: [&'static str; 3] = ["proc_macro", "proc_macro_derive", "proc_macro_attribute"];

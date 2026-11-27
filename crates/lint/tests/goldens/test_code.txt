@@ -54,6 +54,7 @@ tests/.fixtures/test_code/src/lib.rs:12: u8 in a field; take and return a newtyp
 tests/.fixtures/test_code/src/lib.rs:13: u8 in a field; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/test_code/src/lib.rs:70: u8 in a type alias; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/test_code/src/lib.rs:73: u8 in a field; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/.fixtures/test_code/src/lib.rs:89: u8 in an associated type; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/test_code/src/lib.rs:91: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests run production code paths: no literals in a test body and no test helpers beyond a test table:
 tests/.fixtures/test_code/src/lib.rs:44: test helper fn inside; test through the production code path; a test file holds tests and their table

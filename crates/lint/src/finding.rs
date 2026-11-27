@@ -3,8 +3,12 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::sync::Arc;
 
-use newtype::{Display, Newtype};
+mod boundary;
+
 use proc_macro2::Span;
+
+use boundary::Problem;
+pub(crate) use boundary::{Fix, Line};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Rule {
@@ -25,12 +29,6 @@ pub(crate) enum Rule {
     TestShape,
     DeadCode,
 }
-
-#[derive(Newtype, Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct Line(usize);
-
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct Fix(pub &'static str);
 
 impl fmt::Display for Rule {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -83,9 +81,6 @@ pub(crate) struct Found {
     problem: Problem,
     fix: Fix,
 }
-
-#[derive(Debug)]
-struct Problem(String);
 
 impl Found {
     pub(crate) fn at(line: Line, problem: impl fmt::Display, fix: Fix) -> Found {

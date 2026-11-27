@@ -1,9 +1,9 @@
+mod boundary;
 mod package;
 mod unit;
 
 use std::collections::BTreeSet;
 use std::ffi::OsString;
-use std::str::FromStr;
 
 use serde::Deserialize;
 
@@ -31,13 +31,5 @@ impl Workspace {
             .collect::<BTreeSet<Unit<'_>>>();
         units.first().ok_or(Failure::NothingToCheck)?;
         Ok(units.into_iter().flat_map(Unit::flags).chain([OsString::from(Self::TESTS)]).collect())
-    }
-}
-
-impl FromStr for Workspace {
-    type Err = Failure<'static>;
-
-    fn from_str(text: &str) -> Result<Workspace, Failure<'static>> {
-        serde_json::from_str(text).map_err(Failure::Metadata)
     }
 }

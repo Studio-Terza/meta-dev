@@ -7,6 +7,7 @@ tests go through public APIs:
 tests/.fixtures/test_shape/src/lib.rs:8: test code in src; move it to the package's tests directory and call the public API from there
 primitives stay at the boundary: outside a module named boundary, signatures, fields and variants carry types with meaning:
 tests/.fixtures/test_shape/src/lib.rs:3: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/.fixtures/test_shape/tests/table.rs:7: str in a field; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests run production code paths: no literals in a test body and no test helpers beyond a test table:
 tests/.fixtures/test_shape/src/lib.rs:9: test helper type Fake; test through the production code path; a test file holds tests and their table
 tests/.fixtures/test_shape/src/lib.rs:10: test helper fn helper; test through the production code path; a test file holds tests and their table

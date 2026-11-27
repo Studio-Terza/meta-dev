@@ -17,7 +17,7 @@ impl<Value: Clone> Recall<Value> {
         }
     }
 
-    pub fn replayed(&self, again: impl FnOnce() -> Result<Value, FileFailure>) -> Result<Value, FileFailure> {
+    pub(crate) fn replayed(&self, again: impl FnOnce() -> Result<Value, FileFailure>) -> Result<Value, FileFailure> {
         match self {
             Recall::Found(found) => Ok(found.clone()),
             Recall::Failed(code) => Err(FileFailure::from(io::Error::from_raw_os_error(*code))),

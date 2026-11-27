@@ -1,6 +1,17 @@
 use std::path::{Path, PathBuf};
 
+use newtype::{Display, Newtype};
+
 use crate::Deadline;
+
+#[derive(Newtype, Display, Clone, Debug, Default, PartialEq, Eq)]
+pub struct Printed(String);
+
+impl AsRef<str> for Printed {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Call {

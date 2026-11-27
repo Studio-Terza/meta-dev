@@ -12,7 +12,14 @@ impl Port {
     fn unit(&self) {}
 }
 pub trait Named {
+    type Spelled = String;
     fn name(&self) -> char;
+}
+impl Iterator for Port {
+    type Item = u8;
+    fn next(&mut self) -> Option<Port> {
+        None
+    }
 }
 pub fn counted(items: std::vec::Vec<i64>) -> usize {
     items.len()

@@ -1,9 +1,10 @@
-use newtype::{Counter, Newtype, Wrapping};
+use newtype::{Counter, Wrapping};
 use proc_macro2::{TokenStream, TokenTree};
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{ItemMod, ItemUse, Macro, Path};
 
+use crate::at::At;
 use crate::budget::Count;
 use crate::finding::{Fix, Found, Line, Rule};
 use crate::name::Name;
@@ -15,11 +16,8 @@ use crate::use_leaf::UseLeaf;
 pub(crate) struct ProcessStarters {
     scope: Scope,
     modules: Vec<Module>,
-    open: Vec<Slot>,
+    open: Vec<At>,
 }
-
-#[derive(Newtype, Clone, Copy, Debug)]
-struct Slot(usize);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Scope {
@@ -69,7 +67,7 @@ impl ProcessStarters {
     }
 
     fn scanning(scope: Scope, ported: Option<()>) -> ProcessStarters {
-        ProcessStarters { scope, modules: vec![Module { ported, ..Module::default() }], open: vec![Slot::new(0)] }
+        ProcessStarters { scope, modules: vec![Module { ported, ..Module::default() }], open: vec![At::new(0)] }
     }
 
     fn current(&mut self) -> Option<&mut Module> {
@@ -179,7 +177,7 @@ impl<'ast> Visit<'ast> for ProcessStarters {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         let named = (module.ident == ProcessStarters::PORTS).then_some(());
         let ported = named.or(self.current().and_then(|enclosing| enclosing.ported));
-        self.open.push(Slot::new(self.modules.len()));
+        self.open.push(At::new(self.modules.len()));
         self.modules.push(Module { ported, ..Module::default() });
         visit::visit_item_mod(self, module);
         self.open.pop();

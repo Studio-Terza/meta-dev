@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use invariants::Ignoring;
-use newtype::{Newtype, Wrapping};
+use newtype::Wrapping;
 use proc_macro2::{Group, TokenStream, TokenTree};
 use syn::parse::discouraged::Speculative;
 use syn::parse::{ParseStream, Parser};
@@ -9,13 +9,11 @@ use syn::punctuated::Punctuated;
 use syn::visit::Visit;
 use syn::{Block, Expr, Macro, Stmt, Token};
 
+use crate::at::At;
 use crate::ignored::Ignored;
 
 #[derive(Debug)]
 pub(crate) struct Expansion(Vec<Stmt>);
-
-#[derive(Newtype, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct At(usize);
 
 impl Expansion {
     const DOLLAR: char = '$';

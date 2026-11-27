@@ -1,5 +1,16 @@
 use std::ffi::OsString;
 
+use super::{Argument, Utf8};
+use crate::cli::command::failure::Failure;
+
+impl Argument for Utf8 {
+    type Value = String;
+
+    fn read(word: OsString) -> Result<String, Failure<'static>> {
+        word.into_string().map_err(|_unreadable| Failure::Usage)
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Flag(&'static str);
 

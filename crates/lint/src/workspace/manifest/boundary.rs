@@ -1,6 +1,9 @@
 #[derive(Debug)]
 pub(super) struct Glob;
 
+#[derive(Debug)]
+pub(super) struct Pattern(pub String);
+
 impl Glob {
     const ANY: char = '*';
 

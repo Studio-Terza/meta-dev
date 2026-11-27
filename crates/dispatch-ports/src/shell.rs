@@ -1,18 +1,14 @@
 mod boundary;
 
-use newtype::{Display, Newtype};
 use port_core::port;
 
 use crate::DispatchFailure;
-pub use boundary::Call;
+pub use boundary::{Call, Printed};
 
 #[port]
 pub trait Shell {
     fn ran(&self, call: &Call) -> Result<Ran, DispatchFailure>;
 }
-
-#[derive(Newtype, Display, Clone, Debug, Default, PartialEq, Eq)]
-pub struct Printed(String);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ran {
@@ -36,11 +32,5 @@ impl Ran {
             Ran::Succeeded(printed) => Some(printed),
             Ran::Failed(_) | Ran::Overdue => None,
         }
-    }
-}
-
-impl AsRef<str> for Printed {
-    fn as_ref(&self) -> &str {
-        &self.0
     }
 }

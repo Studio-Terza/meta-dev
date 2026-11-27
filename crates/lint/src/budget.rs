@@ -1,9 +1,11 @@
+mod boundary;
+
 use std::collections::BTreeMap;
 use std::fmt;
 use std::io::{self, Write};
 use std::ops::Add;
 
-use newtype::{Counter, Display, Newtype};
+use newtype::Counter;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{ItemFn, ItemMod, Macro};
@@ -13,8 +15,7 @@ use crate::lints::ProcessStarters;
 use crate::name::Name;
 use crate::source::{Place, Source};
 
-#[derive(Newtype, Display, Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) struct Count(usize);
+pub(crate) use boundary::Count;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct Budget {

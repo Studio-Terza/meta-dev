@@ -1,8 +1,25 @@
 use grammar_reply::Inked;
-use newtype::Checked;
+use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype};
 use serde::Deserialize;
 
-use super::{Finished, Reply, Told, Usage};
+use super::{Finished, Usage};
+
+#[derive(Newtype, Arbitrary, Display, CheckedDeserialize, Clone, Debug, PartialEq, Eq)]
+#[newtype(checked)]
+pub struct Told(String);
+
+#[derive(Newtype, Arbitrary, Display, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(transparent)]
+pub struct Tokens(u32);
+
+#[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
+pub struct Reply(String);
+
+impl From<Told> for Reply {
+    fn from(told: Told) -> Reply {
+        Reply(told.0)
+    }
+}
 use crate::{Stall, Stderr, Watched};
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]

@@ -6,8 +6,9 @@ tests/.fixtures/primitive_boundary/src/boundary.rs:4: fn parsed; make it an asso
 tests/.fixtures/primitive_boundary/src/inline.rs:15: fn read; make it an associated function or a method
 tests/.fixtures/primitive_boundary/src/inline.rs:20: fn read; make it an associated function or a method
 tests/.fixtures/primitive_boundary/src/inline.rs:26: fn made; make it an associated function or a method
-tests/.fixtures/primitive_boundary/src/signatures.rs:17: fn counted; make it an associated function or a method
+tests/.fixtures/primitive_boundary/src/signatures.rs:24: fn counted; make it an associated function or a method
 primitives stay at the boundary: outside a module named boundary, signatures, fields and variants carry types with meaning:
+tests/.fixtures/primitive_boundary/src/fields.rs:1: String in a field; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/primitive_boundary/src/fields.rs:2: u32 in a field; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/primitive_boundary/src/fields.rs:2: u32 in a field; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/primitive_boundary/src/fields.rs:4: usize in a field; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
@@ -16,6 +17,9 @@ tests/.fixtures/primitive_boundary/src/fields.rs:9: i32 in a variant; take and r
 tests/.fixtures/primitive_boundary/src/fields.rs:12: u16 in a type parameter; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/primitive_boundary/src/fields.rs:15: u64 in a type alias; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/primitive_boundary/src/fields.rs:17: u128 in a field; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/.fixtures/primitive_boundary/src/inline.rs:9: str in an implemented trait or type; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/.fixtures/primitive_boundary/src/inline.rs:10: str in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/.fixtures/primitive_boundary/src/inline.rs:10: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/primitive_boundary/src/inline.rs:20: str in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/primitive_boundary/src/inline.rs:20: usize in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/primitive_boundary/src/inline.rs:26: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
@@ -25,9 +29,12 @@ tests/.fixtures/primitive_boundary/src/signatures.rs:6: u8 in a signature; take 
 tests/.fixtures/primitive_boundary/src/signatures.rs:6: f64 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/primitive_boundary/src/signatures.rs:7: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/primitive_boundary/src/signatures.rs:8: str in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/primitive_boundary/src/signatures.rs:15: char in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/primitive_boundary/src/signatures.rs:17: i64 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
-tests/.fixtures/primitive_boundary/src/signatures.rs:17: usize in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/.fixtures/primitive_boundary/src/signatures.rs:15: String in an associated type; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/.fixtures/primitive_boundary/src/signatures.rs:16: char in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/.fixtures/primitive_boundary/src/signatures.rs:19: u8 in an associated type; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/.fixtures/primitive_boundary/src/signatures.rs:24: i64 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/.fixtures/primitive_boundary/src/signatures.rs:24: usize in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/.fixtures/primitive_boundary/tests/read.rs:2: str in a field; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 every pub item is named by another workspace crate:
 tests/.fixtures/primitive_boundary/src/boundary.rs:1: pub Raw is named by no other crate; make it private or delete it
 tests/.fixtures/primitive_boundary/src/boundary.rs:4: pub parsed is named by no other crate; make it private or delete it
@@ -44,4 +51,4 @@ tests/.fixtures/primitive_boundary/src/inline.rs:20: pub read is named by no oth
 tests/.fixtures/primitive_boundary/src/signatures.rs:1: pub Port is named by no other crate; make it private or delete it
 tests/.fixtures/primitive_boundary/src/signatures.rs:3: pub open is named by no other crate; make it private or delete it
 tests/.fixtures/primitive_boundary/src/signatures.rs:14: pub Named is named by no other crate; make it private or delete it
-tests/.fixtures/primitive_boundary/src/signatures.rs:17: pub counted is named by no other crate; make it private or delete it
+tests/.fixtures/primitive_boundary/src/signatures.rs:24: pub counted is named by no other crate; make it private or delete it

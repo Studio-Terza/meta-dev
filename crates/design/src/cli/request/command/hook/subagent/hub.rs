@@ -126,9 +126,3 @@ impl Bucket {
         }
     }
 }
-
-impl From<String> for Link {
-    fn from(link: String) -> Link {
-        Link(JobId::linked(&link))
-    }
-}

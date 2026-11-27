@@ -23,9 +23,11 @@ tests/.fixtures/bool_methods/src/lib.rs:4: bool in a signature; take and return 
 tests/.fixtures/bool_methods/src/lib.rs:5: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/bool_methods/src/lib.rs:6: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/bool_methods/src/lib.rs:7: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/.fixtures/bool_methods/src/lib.rs:14: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/bool_methods/src/lib.rs:17: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/bool_methods/src/lib.rs:20: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/bool_methods/src/lib.rs:24: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/.fixtures/bool_methods/tests/probe.rs:7: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests run production code paths: no literals in a test body and no test helpers beyond a test table:
 tests/.fixtures/bool_methods/src/lib.rs:24: test helper fn gated; test through the production code path; a test file holds tests and their table
 tests/.fixtures/bool_methods/tests/probe.rs:5: test helper type Probing; test through the production code path; a test file holds tests and their table

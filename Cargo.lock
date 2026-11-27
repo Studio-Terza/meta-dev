@@ -295,10 +295,8 @@ name = "fuzz"
 version = "0.1.0"
 dependencies = [
  "file-ports",
- "invariants",
  "lint",
  "proptest",
- "strum",
  "timer-ports",
 ]
 

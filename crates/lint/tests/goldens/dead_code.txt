@@ -14,6 +14,7 @@ tests/.fixtures/dead_code/library/src/lib.rs:48: test code in src; move it to th
 shipped code has no test-only API:
 tests/.fixtures/dead_code/library/src/lib.rs:48: visible item gated on test; remove the gate and test through the real public API
 primitives stay at the boundary: outside a module named boundary, signatures, fields and variants carry types with meaning:
+tests/.fixtures/dead_code/library/src/lib.rs:43: str in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/dead_code/user/src/lib.rs:5: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 every pub item is named by another workspace crate:
 tests/.fixtures/dead_code/binary/src/lib.rs:2: pub Unreached is named by no other crate; make it private or delete it

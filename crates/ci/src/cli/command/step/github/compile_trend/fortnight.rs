@@ -1,16 +1,13 @@
+mod boundary;
+
 use std::fmt;
 use std::path::{Path, PathBuf};
-
-use newtype::{Arbitrary, Display, Newtype};
-use serde::Deserialize;
 
 use super::build::Build;
 use crate::cli::command::failure::Failure;
 use crate::cli::ports::{Invocation, Ports, Text};
 
-#[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, Deserialize)]
-#[serde(transparent)]
-struct RunId(u64);
+use boundary::RunId;
 
 #[derive(Clone, Copy, Debug)]
 enum Stamp {

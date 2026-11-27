@@ -23,6 +23,7 @@ tests/.fixtures/vec_out_params/src/in_macro.rs:1: u8 in a signature; take and re
 tests/.fixtures/vec_out_params/src/optional.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/vec_out_params/src/out.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/vec_out_params/src/out.rs:4: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/.fixtures/vec_out_params/src/trait_impl.rs:2: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests run production code paths: no literals in a test body and no test helpers beyond a test table:
 tests/.fixtures/vec_out_params/src/fine.rs:5: test helper fn fill; test through the production code path; a test file holds tests and their table
 every pub item is named by another workspace crate:

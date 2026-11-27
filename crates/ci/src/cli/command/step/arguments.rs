@@ -76,14 +76,6 @@ impl Argument for Location {
     }
 }
 
-impl Argument for Utf8 {
-    type Value = String;
-
-    fn read(word: OsString) -> Result<String, Failure<'static>> {
-        word.into_string().map_err(|_unreadable| Failure::Usage)
-    }
-}
-
 impl<Read: FromStr> Argument for Parsing<Read>
 where
     Failure<'static>: From<Read::Err>,

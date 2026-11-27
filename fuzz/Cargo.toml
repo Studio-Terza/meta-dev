@@ -5,10 +5,6 @@ edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
-[lib]
-test = false
-doctest = false
-
 [features]
 campaign = []
 
@@ -17,14 +13,10 @@ name = "fuzz"
 path = "tests/fuzz/main.rs"
 required-features = ["campaign"]
 
-[dependencies]
-invariants = { path = "../crates/invariants" }
-file-ports = { path = "../crates/file-ports" }
-
 [dev-dependencies]
+file-ports = { path = "../crates/file-ports" }
 lint = { path = "../crates/lint" }
 proptest.workspace = true
-strum.workspace = true
 timer-ports = { path = "../crates/timer-ports" }
 
 [lints]

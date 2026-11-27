@@ -6,16 +6,13 @@ use std::path::{Component, Path, PathBuf};
 
 use toml::de::{DeTable, DeValue};
 
-use boundary::Glob;
+use boundary::{Glob, Pattern};
 
 #[derive(Debug, Default)]
 struct Members {
     listed: Vec<Pattern>,
     excluded: Vec<Pattern>,
 }
-
-#[derive(Debug)]
-struct Pattern(String);
 
 #[derive(Debug)]
 pub(crate) struct Manifest {

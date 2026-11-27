@@ -2,7 +2,13 @@ use dispatch_ports::{Call, Clock, Deadline, Dispatch, Ran, Shell, Timeout};
 use invariants::Ignoring;
 
 use super::super::boundary::JobId;
-use super::Hub;
+use super::{Hub, Link};
+
+impl From<String> for Link {
+    fn from(link: String) -> Link {
+        Link(JobId::linked(&link))
+    }
+}
 use crate::cli::request::ignored::Ignored;
 
 impl<D: Dispatch, C: Clock, G: Shell> Hub<'_, D, C, G> {

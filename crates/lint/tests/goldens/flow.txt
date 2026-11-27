@@ -65,6 +65,9 @@ tests/.fixtures/flow/src/lib.rs:48: u8 in a signature; take and return a newtype
 tests/.fixtures/flow/src/lib.rs:78: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/flow/src/lib.rs:101: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/flow/src/lib.rs:101: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/.fixtures/flow/src/lib.rs:106: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/.fixtures/flow/src/lib.rs:109: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/.fixtures/flow/src/lib.rs:109: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/flow/src/lib.rs:115: bool in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/flow/src/lib.rs:119: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests/.fixtures/flow/src/lib.rs:123: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
