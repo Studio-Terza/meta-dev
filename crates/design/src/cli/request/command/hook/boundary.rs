@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 use console_ports::{Heard, Shown};
 use design_messages::{Fate, Halt, LastSaid, Overran, Overruns, StopRow, Stopped, Tally};
-use dispatch_ports::{Clock, Dispatch, Moment, Wall};
+use dispatch_ports::{Clock, Dispatch, Moment, Shell, Wall};
 use file_ports::{Epoch, Files};
 use grammar::Queue;
 use newtype::Wrapping;
@@ -88,7 +88,6 @@ pub enum Verdict {
 
 impl Settings {
     const KIND: &'static str = "command";
-    const SECONDS: u32 = 3600;
 
     pub fn listed(events: &[HookEvent]) -> Settings {
         Settings {
@@ -100,7 +99,14 @@ impl Settings {
         Handler {
             kind: Settings::KIND,
             command: format!("design --workspace \"$CLAUDE_PROJECT_DIR\" hook {event}"),
-            timeout: Settings::SECONDS,
+            timeout: Settings::seconds(event),
+        }
+    }
+
+    const fn seconds(event: HookEvent) -> u32 {
+        match event {
+            HookEvent::Stop => 3600,
+            HookEvent::SubagentStop => 1500,
         }
     }
 
@@ -125,9 +131,9 @@ impl Stopping {
         self.transcript.as_deref().map(|transcript| harness.tasks(transcript))
     }
 
-    pub fn decided<S: Store, D: Dispatch, C: Clock>(
+    pub fn decided<S: Store, D: Dispatch, C: Clock, G: Shell>(
         &self,
-        crew: &Crew<'_, D, C>,
+        crew: &Crew<'_, D, C, G>,
         observed: &Observed<'_, S>,
     ) -> Result<Uttered, Failure> {
         match self.continuation.0 {
@@ -164,7 +170,7 @@ impl<'store, S: Store> Observed<'store, S> {
         idle.and(self.queue.as_ref()).filter(|queue| queue.items().is_empty().not()).map(Queued)
     }
 
-    fn blocking<D: Dispatch, C: Clock>(&self, crew: &Crew<'_, D, C>, stopping: &Stopping) -> Vec<String> {
+    fn blocking<D: Dispatch, C: Clock, G: Shell>(&self, crew: &Crew<'_, D, C, G>, stopping: &Stopping) -> Vec<String> {
         let store = self.store;
         let last = stopping.said.clone().or_else(|| stopping.stored(store));
         let search =
@@ -211,9 +217,12 @@ impl From<bool> for Continuation {
 impl Decision {
     fn told(stopped: &[String]) -> Result<Uttered, Failure> {
         stopped.first().map_or(Ok(Uttered::silent(Ok(Outcome::Hooked(HookEvent::Stop)))), |_first| {
-            let decision = Decision { decision: Verdict::Block, reason: stopped.join("\n") };
-            let json = serde_json::to_string(&decision).map_err(Failure::Render)?;
-            Ok(Uttered::new(Shown::said(format_args!("{json}\n")), Ok(Outcome::Blocked)))
+            Decision::blocked(stopped.join("\n"))
         })
+    }
+
+    pub fn blocked(reason: String) -> Result<Uttered, Failure> {
+        let json = serde_json::to_string(&Decision { decision: Verdict::Block, reason }).map_err(Failure::Render)?;
+        Ok(Uttered::new(Shown::said(format_args!("{json}\n")), Ok(Outcome::Blocked)))
     }
 }

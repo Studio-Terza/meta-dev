@@ -11,9 +11,11 @@ mod headless_claude;
 mod job;
 mod pid;
 mod prompt;
+mod shell;
 mod started;
 mod stderr;
 mod system_clock;
+mod system_shell;
 mod wall;
 mod watch;
 
@@ -28,9 +30,11 @@ pub use headless_claude::HeadlessClaude;
 pub use job::{Job, Model};
 pub use pid::{Ended, Pid};
 pub use prompt::Prompt;
+pub use shell::{Call, Printed, Ran, Shell, ShellFiller, shell_ops};
 pub use started::Started;
 pub use stderr::Stderr;
 pub use system_clock::SystemClock;
+pub use system_shell::SystemShell;
 pub use wall::{Deadline, Due, Moment, Pause, Timeout, Wall};
 pub use watch::{Stall, Stalled, Watch, Watched, Watching};
 

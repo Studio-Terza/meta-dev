@@ -43,6 +43,17 @@ $ hook --settings < Nothing
           }
         ]
       }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "design --workspace \"$CLAUDE_PROJECT_DIR\" hook subagent-stop",
+            "timeout": 1500
+          }
+        ]
+      }
     ]
   }
 }
@@ -135,15 +146,15 @@ written 0
 Ok(Ingested) false
 ## words the cli does not know
 $ frobnicate < Nothing
-Err(Refusal("usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | --settings))")) false
+Err(Refusal("usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | subagent-stop | --settings))")) false
 $ hook < Nothing
-Err(Refusal("usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | --settings))")) false
+Err(Refusal("usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | subagent-stop | --settings))")) false
 $ hook stop --settings < Nothing
-Err(Refusal("usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | --settings))")) false
+Err(Refusal("usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | subagent-stop | --settings))")) false
 $ ingest --wet < Nothing
-Err(Refusal("usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | --settings))")) false
+Err(Refusal("usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | subagent-stop | --settings))")) false
 $  < Nothing
-Err(Refusal("usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | --settings))")) false
+Err(Refusal("usage: design [--workspace <dir>] (ingest [--dry-run] | stops | hook (stop | subagent-stop | --settings))")) false
 ## an unreadable hook input
 $ hook stop < Text("not json")
 Err(Refusal("cannot read the hook input: expected ident at line 1 column 2")) false

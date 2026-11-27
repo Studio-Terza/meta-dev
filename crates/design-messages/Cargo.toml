@@ -19,6 +19,7 @@ newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 store-ports = { path = "../store-ports" }
 strum.workspace = true
+thiserror.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 
 [build-dependencies]

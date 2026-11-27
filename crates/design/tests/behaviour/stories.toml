@@ -1,0 +1,703 @@
+
+[[story]]
+name = "untyped endings are sent back with the two lines, then escalated"
+queue = ""
+
+[[story.finish]]
+said = "I finished the work; CI should be green."
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567 and more"
+
+[[story.finish]]
+said = "done #12 0123456789abcdef0123456789abcdef01234567"
+
+[[story.finish]]
+said = "DONE #0 0123456789abcdef0123456789abcdef01234567"
+
+[[story.finish]]
+said = "DONE 12 0123456789abcdef0123456789abcdef01234567"
+
+[[story.finish]]
+said = "DONE #12 0123456"
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef012345670"
+
+[[story.finish]]
+said = "DONE main 0123456789abcdef0123456789abcdef01234567"
+
+[[story.finish]]
+said = "DONE Design/open-pr 0123456789abcdef0123456789abcdef01234567"
+
+[[story.finish]]
+said = "DONE design/open-pr/ 0123456789abcdef0123456789abcdef01234567"
+
+[[story.finish]]
+said = ""
+
+[[story.finish]]
+said = "Still prose."
+turn = "Reminded"
+
+[[story]]
+name = "a done on a sha the pull request does not hold"
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+turn = "Reminded"
+answers = [
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"fedcba9876543210fedcba9876543210fedcba98"}' },
+]
+
+[[story]]
+name = "a done on green checks waits on ci and lets the agent stop"
+
+[[story.finish]]
+said = """
+
+DONE #12 0123456789ABCDEF0123456789ABCDEF01234567
+"""
+answers = [
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"},{"bucket":"skipping","link":"https://github.com/o/r/actions/runs/9/job/459","name":"mutants"}]' },
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = '[{"name":"test","state":"IN_PROGRESS"}]' },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Succeeded", printed = "" },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+]
+
+[[story]]
+name = "a done on red checks is sent back with each failed job's log tail"
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"fail","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"},{"bucket":"cancel","link":"https://github.com/o/r/actions/runs/9/job/458?pr=12","name":"build"},{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/457","name":"lint"}]' },
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = '[{"name":"test","state":"IN_PROGRESS"}]' },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Failed", printed = "" },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+  { asked = "run view --job 456 --log-failed -R o/r", ran = "Succeeded", printed = """
+test step line 1
+test step line 2
+test step line 3
+test step line 4
+test step line 5
+test step line 6
+test step line 7
+test step line 8
+test step line 9
+test step line 10
+test step line 11
+test step line 12
+test step line 13
+test step line 14
+test step line 15
+test step line 16
+test step line 17
+test step line 18
+test step line 19
+test step line 20
+test step line 21
+test step line 22
+test step line 23
+test step line 24
+test step line 25
+test step line 26
+test step line 27
+test step line 28
+test step line 29
+test step line 30
+test step line 31
+test step line 32
+test step line 33
+test step line 34
+test step line 35
+test step line 36
+test step line 37
+test step line 38
+test step line 39
+test step line 40
+test step line 41
+test step line 42""" },
+]
+
+[[story]]
+name = "a check failing on two dones in a row is escalated"
+queue = ""
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"fail","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"},{"bucket":"cancel","link":"https://github.com/o/r/actions/runs/9/job/458?pr=12","name":"build"},{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/457","name":"lint"}]' },
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = '[{"name":"test","state":"IN_PROGRESS"}]' },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Failed", printed = "" },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+  { asked = "run view --job 456 --log-failed -R o/r", ran = "Succeeded", printed = """
+test step line 1
+test step line 2
+test step line 3
+test step line 4
+test step line 5
+test step line 6
+test step line 7
+test step line 8
+test step line 9
+test step line 10
+test step line 11
+test step line 12
+test step line 13
+test step line 14
+test step line 15
+test step line 16
+test step line 17
+test step line 18
+test step line 19
+test step line 20
+test step line 21
+test step line 22
+test step line 23
+test step line 24
+test step line 25
+test step line 26
+test step line 27
+test step line 28
+test step line 29
+test step line 30
+test step line 31
+test step line 32
+test step line 33
+test step line 34
+test step line 35
+test step line 36
+test step line 37
+test step line 38
+test step line 39
+test step line 40
+test step line 41
+test step line 42""" },
+]
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+turn = "Reminded"
+answers = [
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"fail","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"},{"bucket":"cancel","link":"https://github.com/o/r/actions/runs/9/job/458?pr=12","name":"build"},{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/457","name":"lint"}]' },
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = '[{"name":"test","state":"IN_PROGRESS"}]' },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Failed", printed = "" },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+  { asked = "run view --job 456 --log-failed -R o/r", ran = "Succeeded", printed = """
+test step line 1
+test step line 2
+test step line 3
+test step line 4
+test step line 5
+test step line 6
+test step line 7
+test step line 8
+test step line 9
+test step line 10
+test step line 11
+test step line 12
+test step line 13
+test step line 14
+test step line 15
+test step line 16
+test step line 17
+test step line 18
+test step line 19
+test step line 20
+test step line 21
+test step line 22
+test step line 23
+test step line 24
+test step line 25
+test step line 26
+test step line 27
+test step line 28
+test step line 29
+test step line 30
+test step line 31
+test step line 32
+test step line 33
+test step line 34
+test step line 35
+test step line 36
+test step line 37
+test step line 38
+test step line 39
+test step line 40
+test step line 41
+test step line 42""" },
+]
+
+[[story]]
+name = "a green done between two red ones clears the repeat"
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+turn = "Reminded"
+answers = [
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"fail","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"},{"bucket":"cancel","link":"https://github.com/o/r/actions/runs/9/job/458?pr=12","name":"build"},{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/457","name":"lint"}]' },
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = '[{"name":"test","state":"IN_PROGRESS"}]' },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Failed", printed = "" },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+  { asked = "run view --job 456 --log-failed -R o/r", ran = "Succeeded", printed = """
+test step line 1
+test step line 2
+test step line 3
+test step line 4
+test step line 5
+test step line 6
+test step line 7
+test step line 8
+test step line 9
+test step line 10
+test step line 11
+test step line 12
+test step line 13
+test step line 14
+test step line 15
+test step line 16
+test step line 17
+test step line 18
+test step line 19
+test step line 20
+test step line 21
+test step line 22
+test step line 23
+test step line 24
+test step line 25
+test step line 26
+test step line 27
+test step line 28
+test step line 29
+test step line 30
+test step line 31
+test step line 32
+test step line 33
+test step line 34
+test step line 35
+test step line 36
+test step line 37
+test step line 38
+test step line 39
+test step line 40
+test step line 41
+test step line 42""" },
+]
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+turn = "Reminded"
+answers = [
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"},{"bucket":"skipping","link":"https://github.com/o/r/actions/runs/9/job/459","name":"mutants"}]' },
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = '[{"name":"test","state":"IN_PROGRESS"}]' },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Succeeded", printed = "" },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+]
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+turn = "Reminded"
+answers = [
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"fail","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"},{"bucket":"cancel","link":"https://github.com/o/r/actions/runs/9/job/458?pr=12","name":"build"},{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/457","name":"lint"}]' },
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = '[{"name":"test","state":"IN_PROGRESS"}]' },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Failed", printed = "" },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+  { asked = "run view --job 456 --log-failed -R o/r", ran = "Succeeded", printed = """
+test step line 1
+test step line 2
+test step line 3
+test step line 4
+test step line 5
+test step line 6
+test step line 7
+test step line 8
+test step line 9
+test step line 10
+test step line 11
+test step line 12
+test step line 13
+test step line 14
+test step line 15
+test step line 16
+test step line 17
+test step line 18
+test step line 19
+test step line 20
+test step line 21
+test step line 22
+test step line 23
+test step line 24
+test step line 25
+test step line 26
+test step line 27
+test step line 28
+test step line 29
+test step line 30
+test step line 31
+test step line 32
+test step line 33
+test step line 34
+test step line 35
+test step line 36
+test step line 37
+test step line 38
+test step line 39
+test step line 40
+test step line 41
+test step line 42""" },
+]
+
+[[story]]
+name = "a blocked agent and every unread step are escalated"
+queue = ""
+
+[[story.finish]]
+said = "BLOCKED #12 0123456789abcdef0123456789abcdef01234567"
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Failed", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+]
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = "{}" },
+]
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = '[{"name":"test","state":"IN_PROGRESS"}]' },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+]
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = '[{"name":"test","state":"IN_PROGRESS"}]' },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Overdue", printed = "" },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+]
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = '[{"name":"test","state":"IN_PROGRESS"}]' },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Succeeded", printed = "" },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+]
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Overdue", printed = "" },
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = '[{"name":"test","state":"IN_PROGRESS"}]' },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Succeeded", printed = "" },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+]
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = "[]" },
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = '[{"name":"test","state":"IN_PROGRESS"}]' },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Succeeded", printed = "" },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+]
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Succeeded", printed = "[{" },
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = '[{"name":"test","state":"IN_PROGRESS"}]' },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Succeeded", printed = "" },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+]
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"pending","link":"","name":"test"},{"bucket":"pass","link":"","name":"lint"}]' },
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = '[{"name":"test","state":"IN_PROGRESS"}]' },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Succeeded", printed = "" },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+]
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"fail","link":"https://ci.example/9","name":"status"}]' },
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = '[{"name":"test","state":"IN_PROGRESS"}]' },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Succeeded", printed = "" },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+]
+
+[[story]]
+name = "a done before any check is listed polls until checks appear"
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"pass","link":"","name":"test"},{"bucket":"pass","link":"","name":"lint"}]' },
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = "" },
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = "[]" },
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = '[{"name":"test","state":"IN_PROGRESS"},{"name":"lint","state":"IN_PROGRESS"}]' },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Succeeded", printed = "" },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+]
+
+[[story]]
+name = "a done whose checks never appear is escalated after five minutes"
+queue = ""
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = "" },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+]
+
+[[story]]
+name = "a done on a pushed branch opens its pull request and waits on ci"
+spec = """
+# Tools retirement
+
+D1 Dropped until missed (D2 later): waits.
+
+D2 Typed agent outcomes (owner de7a042f): the hook refuses (with D3) other endings.
+D20 Later work (owner 1).
+"""
+
+[[story.finish]]
+said = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}", ran = "Succeeded", printed = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
+  { asked = "api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567", ran = "Succeeded", printed = '{"commits":[{"commit":{"message":"Open it\n\nSpec: none here\n\nWhy.\n\nSpec: tools-retirement#D2\nCo-Authored-By: A"}},{"commit":{"message":"Spec: other#D9"}}]}' },
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"}]' },
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = '[{"name":"test","state":"IN_PROGRESS"}]' },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Succeeded", printed = "" },
+  { asked = """
+pr create --head design/open-pr --base main --title D2 Typed agent outcomes --body spec: tools-retirement#D2
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code) -R o/r""", ran = "Succeeded", printed = """
+https://github.com/o/r/pull/12
+""" },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+  { asked = "pr view design/open-pr --json number -R o/r", ran = "Succeeded", printed = '{"number":12}' },
+]
+
+[[story]]
+name = "a done on a branch whose remote head differs is sent back to push"
+
+[[story.finish]]
+said = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+turn = "Reminded"
+answers = [
+  { asked = "api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}", ran = "Succeeded", printed = '{"data":{"repository":{"ref":{"target":{"oid":"fedcba9876543210fedcba9876543210fedcba98"}}}}}' },
+]
+
+[[story.finish]]
+said = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+turn = "Reminded"
+answers = [
+  { asked = "api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}", ran = "Succeeded", printed = '{"data":{"repository":{"ref":null}}}' },
+]
+
+[[story]]
+name = "a branch that cannot be read or opened is escalated on the branch"
+queue = ""
+spec = """
+# Tools retirement
+
+D1 Dropped until missed (D2 later): waits.
+
+D2 Typed agent outcomes (owner de7a042f): the hook refuses (with D3) other endings.
+D20 Later work (owner 1).
+"""
+
+[[story.finish]]
+said = "BLOCKED design/open-pr 0123456789abcdef0123456789abcdef01234567"
+
+[[story.finish]]
+said = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+
+[[story.finish]]
+said = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}", ran = "Succeeded", printed = '{"data":{"repository":{"ref":{}}}}' },
+]
+
+[[story.finish]]
+said = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}", ran = "Succeeded", printed = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
+]
+
+[[story.finish]]
+said = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}", ran = "Succeeded", printed = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
+  { asked = "api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567", ran = "Succeeded", printed = '{"commits":[]}' },
+]
+
+[[story.finish]]
+said = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}", ran = "Succeeded", printed = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
+  { asked = "api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567", ran = "Succeeded", printed = '{"commits":[{"commit":{"message":"Open it\n\nSpec: none here\n\nWhy.\n\n\nCo-Authored-By: A"}},{"commit":{"message":"Spec: other#D9"}}]}' },
+]
+
+[[story.finish]]
+said = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}", ran = "Succeeded", printed = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
+  { asked = "api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567", ran = "Succeeded", printed = '{"commits":[{"commit":{"message":"Open it\n\nSpec: none here\n\nWhy.\n\nSpec: tools-retirement#D2\nCo-Authored-By: A"}},{"commit":{"message":"Spec: other#D9"}}]}' },
+]
+
+[[story.finish]]
+said = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}", ran = "Succeeded", printed = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
+  { asked = "api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567", ran = "Succeeded", printed = '{"commits":[{"commit":{"message":"Open it\n\nSpec: none here\n\nWhy.\n\nSpec: tools-retirement#D2\nCo-Authored-By: A"}},{"commit":{"message":"Spec: other#D9"}}]}' },
+  { asked = """
+pr create --head design/open-pr --base main --title D2 Typed agent outcomes --body spec: tools-retirement#D2
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code) -R o/r""", ran = "Succeeded", printed = """
+https://github.com/o/r/pull/12
+""" },
+]
+
+[[story.finish]]
+said = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}", ran = "Succeeded", printed = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
+  { asked = "api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567", ran = "Succeeded", printed = '{"commits":[{"commit":{"message":"Open it\n\nSpec: none here\n\nWhy.\n\nSpec: tools-retirement#D2\nCo-Authored-By: A"}},{"commit":{"message":"Spec: other#D9"}}]}' },
+  { asked = """
+pr create --head design/open-pr --base main --title D2 Typed agent outcomes --body spec: tools-retirement#D2
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code) -R o/r""", ran = "Succeeded", printed = """
+https://github.com/o/r/pull/12
+""" },
+  { asked = "pr view design/open-pr --json number -R o/r", ran = "Succeeded", printed = "{}" },
+]
+
+[[story]]
+name = "a branch citing a spec file that is missing is escalated"
+queue = ""
+
+[[story.finish]]
+said = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}", ran = "Succeeded", printed = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
+  { asked = "api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567", ran = "Succeeded", printed = '{"commits":[{"commit":{"message":"Open it\n\nSpec: none here\n\nWhy.\n\nSpec: tools-retirement#D2\nCo-Authored-By: A"}},{"commit":{"message":"Spec: other#D9"}}]}' },
+]
+
+[[story]]
+name = "a branch whose spec detail has no heading is escalated and never opened"
+queue = ""
+spec = """
+D1 Dropped (D2 later).
+D20 Later work (owner 1).
+D2
+ D2 Indented (owner 2).
+"""
+
+[[story.finish]]
+said = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}", ran = "Succeeded", printed = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
+  { asked = "api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567", ran = "Succeeded", printed = '{"commits":[{"commit":{"message":"Open it\n\nSpec: none here\n\nWhy.\n\nSpec: tools-retirement#D2\nCo-Authored-By: A"}},{"commit":{"message":"Spec: other#D9"}}]}' },
+]
+
+[[story.finish]]
+said = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}", ran = "Succeeded", printed = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
+  { asked = "api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567", ran = "Succeeded", printed = '{"commits":[{"commit":{"message":"Open it\n\nSpec: none here\n\nWhy.\n\nSpec: tools-retirement#D2, other#D3\nCo-Authored-By: A"}},{"commit":{"message":"Spec: other#D9"}}]}' },
+]
+
+[[story.finish]]
+said = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}", ran = "Succeeded", printed = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
+  { asked = "api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567", ran = "Succeeded", printed = '{"commits":[{"commit":{"message":"Open it\n\nSpec: none here\n\nWhy.\n\nSpec: owner 3c84f560\nCo-Authored-By: A"}},{"commit":{"message":"Spec: other#D9"}}]}' },
+]
+
+[[story]]
+name = "a workspace naming a project but no repository is escalated without gh"
+queue = ""
+local = { Written = """
+project = "meta-dev"
+""" }
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"},{"bucket":"skipping","link":"https://github.com/o/r/actions/runs/9/job/459","name":"mutants"}]' },
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = '[{"name":"test","state":"IN_PROGRESS"}]' },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Succeeded", printed = "" },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+]
+
+[[story.finish]]
+said = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"},{"bucket":"skipping","link":"https://github.com/o/r/actions/runs/9/job/459","name":"mutants"}]' },
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = '[{"name":"test","state":"IN_PROGRESS"}]' },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Succeeded", printed = "" },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+]
+
+[[story]]
+name = "a workspace without local settings is escalated without gh"
+queue = ""
+local = "Removed"
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"},{"bucket":"skipping","link":"https://github.com/o/r/actions/runs/9/job/459","name":"mutants"}]' },
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = '[{"name":"test","state":"IN_PROGRESS"}]' },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Succeeded", printed = "" },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+]
+
+[[story.finish]]
+said = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"},{"bucket":"skipping","link":"https://github.com/o/r/actions/runs/9/job/459","name":"mutants"}]' },
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = '[{"name":"test","state":"IN_PROGRESS"}]' },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Succeeded", printed = "" },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+]
+
+[[story]]
+name = "a workspace naming a bare owner as its repository is escalated without gh"
+queue = ""
+local = { Written = """
+repository = "Studio-Terza"
+""" }
+
+[[story.finish]]
+said = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"},{"bucket":"skipping","link":"https://github.com/o/r/actions/runs/9/job/459","name":"mutants"}]' },
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = '[{"name":"test","state":"IN_PROGRESS"}]' },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Succeeded", printed = "" },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+]
+
+[[story.finish]]
+said = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"},{"bucket":"skipping","link":"https://github.com/o/r/actions/runs/9/job/459","name":"mutants"}]' },
+  { asked = "pr checks 12 --json name,state -R o/r", ran = "Failed", printed = '[{"name":"test","state":"IN_PROGRESS"}]' },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Succeeded", printed = "" },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+]

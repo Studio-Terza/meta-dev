@@ -16,6 +16,8 @@ design-messages = { path = "../design-messages" }
 dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports" }
 grammar = { path = "../grammar" }
+grammar-spec-line = { path = "../grammar-spec-line" }
+hex.workspace = true
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 serde.workspace = true
@@ -23,6 +25,7 @@ serde_json.workspace = true
 store-ports = { path = "../store-ports" }
 strum.workspace = true
 thiserror.workspace = true
+toml.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 
 [dev-dependencies]

@@ -140,6 +140,8 @@ dependencies = [
  "dispatch-ports",
  "file-ports",
  "grammar",
+ "grammar-spec-line",
+ "hex",
  "invariants",
  "newtype",
  "port-core",
@@ -151,6 +153,7 @@ dependencies = [
  "tempfile",
  "test-failure",
  "thiserror",
+ "toml",
  "transcript-ports",
 ]
 
@@ -181,6 +184,7 @@ dependencies = [
  "port-core",
  "store-ports",
  "strum",
+ "thiserror",
  "transcript-ports",
 ]
 
@@ -316,6 +320,16 @@ dependencies = [
  "test-failure",
  "thiserror",
  "toml",
+]
+
+[[package]]
+name = "grammar-spec-line"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "newtype",
+ "proptest",
+ "thiserror",
 ]
 
 [[package]]

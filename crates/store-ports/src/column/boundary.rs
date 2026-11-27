@@ -1,6 +1,6 @@
 use std::error::Error;
 use std::fmt::Display;
-use std::num::TryFromIntError;
+use std::num::{NonZeroU32, TryFromIntError};
 use std::str::FromStr;
 
 use newtype::{Guarded, Inner, Listed, Newtype, Optional, Spelled, Stored, Validated};
@@ -134,6 +134,18 @@ impl Primitive for u32 {
 
     fn from_raw(raw: i64) -> Result<u32, ColumnFailure> {
         u32::try_from(raw).map_err(ColumnFailure::Unfit)
+    }
+}
+
+impl Primitive for NonZeroU32 {
+    type Raw = i64;
+
+    fn into_raw(self) -> i64 {
+        i64::from(self.get())
+    }
+
+    fn from_raw(raw: i64) -> Result<NonZeroU32, ColumnFailure> {
+        u32::try_from(raw).and_then(NonZeroU32::try_from).map_err(ColumnFailure::Unfit)
     }
 }
 

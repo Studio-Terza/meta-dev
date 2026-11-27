@@ -5,11 +5,12 @@ use std::time::{Duration, Instant};
 use test_failure::Failed;
 
 use dispatch_ports::{
-    Agent, Clock, Deadline, Dispatch, Ended, Finished, HeadlessClaude, Job, Model, Pause, Pid, Prompt, Reply, Stall,
-    Started, SystemClock, Timeout, Tokens, Usage, Watch, Watched, Woke,
+    Agent, Call, Clock, Deadline, Dispatch, Ended, Finished, HeadlessClaude, Job, Model, Pause, Pid, Printed, Prompt,
+    Ran, Reply, Shell, Stall, Started, SystemClock, SystemShell, Timeout, Tokens, Usage, Watch, Watched, Woke,
+    shell_ops,
 };
 use invariants::Ignoring;
-use port_core::Run;
+use port_core::{Calls, Run};
 
 use super::{FakeClock, Ignored, Sleep, Wait, Waits, Watching};
 
@@ -152,5 +153,37 @@ fn a_bell_lapses_until_rung_spends_each_ring_once_and_rings_when_its_agent_finis
     run.finish().settled()?;
     assert_eq!(woke, (Watching::START.after(pause), (Woke::Lapsed, true), [Woke::Rung, Woke::Lapsed, Woke::Rung]));
     assert_eq!(waits.recorded(), vec![Wait { pause, woke: Woke::Lapsed }]);
+    Ok(())
+}
+
+#[test]
+fn a_shell_call_returns_its_printing_and_whether_it_succeeded_failed_or_ran_past_its_deadline() -> Result<(), Failed> {
+    let directory = env!("CARGO_MANIFEST_DIR");
+    let run = Run::root();
+    let ran = {
+        let shell = run.port(SystemShell);
+        let clock = run.port(SystemClock);
+        let call = |script: &str, seconds: u32| {
+            let spoken = vec!["-c".to_owned(), script.to_owned()];
+            Call::new("sh", spoken, PathBuf::from(directory), Deadline::after(clock.now(), Timeout::new(seconds)))
+        };
+        [
+            shell.ran(&call("pwd", 5))?,
+            shell.ran(&call("printf refused; exit 3", 5))?,
+            shell.ran(&call("exec sleep 30", 0))?,
+        ]
+    };
+    let calls = run.finish().settled()?.calls::<shell_ops::Ran>();
+    assert_eq!(
+        ran,
+        [
+            Ran::Succeeded(Printed::new(format!("{directory}\n"))),
+            Ran::Failed(Printed::new("refused".to_owned())),
+            Ran::Overdue
+        ]
+    );
+    assert_eq!(calls, Calls::new(3));
+    assert_eq!(ran.iter().filter_map(Ran::succeeded).count(), 1);
+    assert_eq!(ran.iter().filter_map(Ran::printed).count(), 2);
     Ok(())
 }

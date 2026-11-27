@@ -1,10 +1,11 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
+use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, SystemTime};
 use test_failure::Failed;
@@ -12,13 +13,16 @@ use test_failure::Failed;
 use console_ports::{Heard, Shown, Variables};
 use design::{Agents, Cli, Failure, HookEvent, Outcome};
 use dispatch_ports::{
-    AgentRun, Bell, ClockFiller, DispatchFailure, DispatchFiller, Ended, Errored, Finished, Job, Moment, Output, Pause,
-    Pid, Prompt, Reply, Started, Tokens, Told, Usage, Wall, clock_ops, dispatch_ops,
+    AgentRun, Bell, Call, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Ended, Errored, Finished, Job,
+    Moment, Output, Pause, Pid, Printed, Prompt, Ran, Reply, ShellFiller, Started, Tokens, Told, Usage, Wall,
+    clock_ops, dispatch_ops, shell_ops,
 };
 use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Offset, Size, Stamps, Text};
 use grammar::Letters;
 use invariants::{Unpoisoned, invariant, invariants};
+use newtype::Wrapping;
 use port_core::Pass;
+use serde::Deserialize;
 use serde_json::Value;
 use sqlite_ports::SqliteOpener;
 use tempfile::TempDir;
@@ -30,7 +34,10 @@ const QUIET: Duration = Duration::from_mins(20);
 const BUSY: Duration = Duration::from_mins(19);
 const ASKED: &str = "{\"type\":\"user\"}\n";
 const STOPPED: &str = "{\"type\":\"user\"}\n{\"type\":\"api-request\"}\n";
-const QUEUE: &str = "tests/goldens/queue.md";
+const GOLDENS: &str = "tests/goldens";
+const AGENT: &str = "/work/agent";
+const SHA: &str = "0123456789abcdef0123456789abcdef01234567";
+const LOCAL: &str = "project = \"meta-dev\"\nrepository = \"o/r\"\n";
 const SHORT_REPLY: [[&str; 3]; 8] = [
     ["assistant", "a1", "I checked CI\\nShall I merge #12 now?"],
     ["user", "a2", "yes"],
@@ -58,7 +65,18 @@ static MIGRATED: LazyLock<Result<Vec<u8>, Failed>> = LazyLock::new(|| {
 struct Stepping {
     now: SystemTime,
     moments: AtomicI64,
+    slept: AtomicU64,
     reads: AtomicI64,
+}
+
+impl Stepping {
+    fn at(now: SystemTime) -> Stepping {
+        Stepping { now, moments: AtomicI64::default(), slept: AtomicU64::default(), reads: AtomicI64::default() }
+    }
+
+    fn wall(&self) -> Wall {
+        Wall::from(self.now + Duration::from_secs(self.slept.load(Ordering::Relaxed)))
+    }
 }
 
 invariants! {
@@ -70,15 +88,16 @@ invariants! {
 impl ClockFiller for Stepping {
     fn now(&self, _pass: Pass<'_, clock_ops::Now>) -> Wall {
         invariant!(self.reads.fetch_add(1, Ordering::Relaxed) < READS, Invariant::Endless);
-        Wall::from(self.now)
+        self.wall()
     }
 
     fn moment(&self, _pass: Pass<'_, clock_ops::Moment>) -> Moment {
         Moment::new(self.moments.fetch_add(STEP, Ordering::Relaxed))
     }
 
-    fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, _pause: Pause, _bell: &Bell) -> Wall {
-        Wall::from(SystemTime::now())
+    fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause, _bell: &Bell) -> Wall {
+        self.slept.fetch_add(u64::from(pause.into_inner()), Ordering::Relaxed);
+        self.wall()
     }
 }
 
@@ -141,6 +160,72 @@ impl DispatchFiller for Agent<'_> {
 
     fn kill(&self, _pass: Pass<'_, dispatch_ops::Kill>, _pid: Pid) -> Result<Ended, DispatchFailure> {
         Ok(Ended::Absent)
+    }
+}
+
+#[derive(Debug, Default)]
+struct GitHub {
+    answers: BTreeMap<String, Vec<Ran>>,
+    asked: Mutex<Vec<Asked>>,
+}
+
+#[derive(Clone, Debug)]
+struct Answer {
+    asked: String,
+    ran: Ran,
+}
+
+#[derive(Debug)]
+struct Asked {
+    spoken: String,
+    deadline: Deadline,
+}
+
+impl Answer {
+    fn new(asked: &str, ran: Ran) -> Answer {
+        Answer { asked: format!("gh {asked}"), ran }
+    }
+}
+
+impl GitHub {
+    fn answering(given: &[Answer]) -> GitHub {
+        let answers = given.iter().fold(BTreeMap::<String, Vec<Ran>>::new(), |mut answers, answer| {
+            answers.entry(answer.asked.clone()).or_default().push(answer.ran.clone());
+            answers
+        });
+        GitHub { answers, asked: Mutex::default() }
+    }
+}
+
+#[derive(Debug)]
+struct Gh<'answers> {
+    github: &'answers GitHub,
+}
+
+impl ShellFiller for Gh<'_> {
+    fn ran(&self, _pass: Pass<'_, shell_ops::Ran>, call: &Call) -> Result<Ran, DispatchFailure> {
+        let spoken =
+            [call.program().to_owned()].into_iter().chain(call.arguments().iter().cloned()).collect::<Vec<_>>();
+        let asked = Asked { spoken: spoken.join(" "), deadline: call.deadline() };
+        let mut log = self.github.asked.lock().unpoisoned();
+        let earlier = log.iter().filter(|before| before.spoken == asked.spoken).count();
+        let answers = self.github.answers.get(&asked.spoken);
+        let answer =
+            answers.and_then(|rans| rans.get(earlier).or(rans.last())).cloned().ok_or(DispatchFailure::Unjoined);
+        log.push(asked);
+        answer
+    }
+}
+
+impl GitHub {
+    fn timeline(&self, at: SystemTime) -> String {
+        let start = Wall::from(at).into_inner();
+        let log = self.asked.lock().unpoisoned();
+        let lines: Vec<String> = log
+            .iter()
+            .map(|asked| format!("+{} {}\n", asked.deadline.into_inner().into_inner() - start, asked.spoken))
+            .collect();
+        lines.concat()
     }
 }
 
@@ -226,8 +311,18 @@ struct Home {
 impl Home {
     fn new() -> Result<Home, Failed> {
         let home = Home { directory: TempDir::new()?, at: SystemTime::now() };
-        fs::create_dir_all(home.workspace())?;
+        fs::create_dir_all(home.workspace().join(".meta"))?;
+        home.configured(Some(LOCAL))?;
         Ok(home)
+    }
+
+    fn configured(&self, local: Option<&str>) -> Result<(), Failed> {
+        let path = self.workspace().join(".meta/local.toml");
+        match local {
+            Some(text) => fs::write(path, text)?,
+            None => fs::remove_file(path)?,
+        }
+        Ok(())
     }
 
     fn holding(lines: &[String]) -> Result<Home, Failed> {
@@ -270,6 +365,21 @@ impl Home {
     }
 
     fn said(&self, arguments: &[&str], input: &str, replies: &Replies) -> Said {
+        self.heard(arguments, input, replies, &GitHub::default())
+    }
+
+    fn finished(&self, said: &str, reminded: bool, github: &GitHub) -> Said {
+        let input = serde_json::json!({
+            "session_id": "s",
+            "hook_event_name": "SubagentStop",
+            "stop_hook_active": reminded,
+            "cwd": AGENT,
+            "last_assistant_message": said,
+        });
+        self.heard(&["hook", "subagent-stop"], &input.to_string(), &Replies::default(), github)
+    }
+
+    fn heard(&self, arguments: &[&str], input: &str, replies: &Replies, github: &GitHub) -> Said {
         let environment: Variables = [
             (OsString::from("HOME"), self.path().as_os_str().to_owned()),
             (OsString::from("PWD"), self.path().as_os_str().to_owned()),
@@ -279,10 +389,9 @@ impl Home {
         .hearing(Heard::new(input.to_owned()));
         let words = ["--workspace", "work"].iter().chain(arguments).map(OsString::from);
         let files = Rerooted { temporary: self.path().join("tmp") };
-        let clock = Stepping { now: self.at, moments: AtomicI64::default(), reads: AtomicI64::default() };
-        let uttered =
-            Cli::new(&environment, files, SqliteOpener, Agents::new(|_kept: PathBuf| Agent { replies }, clock))
-                .rooted(words);
+        let clock = Stepping::at(self.at);
+        let agents = Agents::new(|_kept: PathBuf| Agent { replies }, clock, Gh { github });
+        let uttered = Cli::new(&environment, files, SqliteOpener, agents).rooted(words);
         let shown = AsRef::<Shown>::as_ref(&uttered).to_string();
         Said { shown, ended: uttered.ended().map_err(|failure: Failure| Refusal(failure.to_string())) }
     }
@@ -364,7 +473,7 @@ impl Scenario {
             &[STOP, STOPS],
         ),
         Scenario::of("a shell still running", |home| home.shell_task("b1.output", "building\n"), &[STOP, STOPS]),
-        Scenario::of("finished tasks and files that are not tasks", Home::finished, &[STOP]),
+        Scenario::of("finished tasks and files that are not tasks", Home::ended_tasks, &[STOP]),
         Scenario::of("no transcript", NONE, &[Step(&["hook", "stop"], Input::Text("{\"stop_hook_active\":false}"))]),
         Scenario::of(
             "an agent quiet for twenty minutes",
@@ -393,7 +502,7 @@ impl Scenario {
         Scenario::of("an unreadable hook input", NONE, &[Step(&["hook", "stop"], Input::Text("not json"))]),
         Scenario::of(
             "the open queue, stalled and then live",
-            Home::queued,
+            |home| home.queued(&Home::golden("queue.md")?),
             &[STOP, Step(&["hook", "stop"], Input::Live)],
         ),
         Scenario {
@@ -464,7 +573,7 @@ impl Home {
         self.appended(line)
     }
 
-    fn finished(&self) -> Result<(), Failed> {
+    fn ended_tasks(&self) -> Result<(), Failed> {
         let ended = "{\"type\":\"assistant\",\"message\":{\"stop_reason\":\"end_turn\"}}\n";
         self.shell_task("b1.output", &["x".repeat(1024), "\n[exited with code 0]\n".to_owned()].concat())?;
         self.shell_task("b2.log", "building\n")?;
@@ -473,11 +582,26 @@ impl Home {
         self.agent_task("agent-done.meta.json", "{}\n", QUIET)
     }
 
-    fn queued(&self) -> Result<(), Failed> {
+    fn queued(&self, text: &str) -> Result<(), Failed> {
         let folder = self.path().join("studio-meta-dev/transcripts");
         fs::create_dir_all(&folder)?;
-        fs::write(folder.join("queue.md"), fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(QUEUE))?)?;
+        fs::write(folder.join("queue.md"), text)?;
         Ok(())
+    }
+
+    fn queue(&self) -> Result<String, Failed> {
+        Ok(fs::read_to_string(self.path().join("studio-meta-dev/transcripts/queue.md"))?)
+    }
+
+    fn specified(&self, text: &str) -> Result<(), Failed> {
+        let folder = self.path().join("studio-meta-dev/transcripts/specs");
+        fs::create_dir_all(&folder)?;
+        fs::write(folder.join("tools-retirement.md"), text)?;
+        Ok(())
+    }
+
+    fn golden(name: &str) -> Result<String, Failed> {
+        Ok(fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(GOLDENS).join(name))?)
     }
 
     fn short_replies(&self) -> Result<(), Failed> {
@@ -493,8 +617,121 @@ const KEPT: fn() -> Result<Replies, Failed> =
 #[test]
 fn every_scenario_says_what_its_golden_says() -> Result<(), Failed> {
     let shown: String = Scenario::ALL.iter().map(Scenario::shown).collect::<Result<_, Failed>>()?;
-    let golden = Path::new(env!("CARGO_MANIFEST_DIR")).join(GOLDEN);
-    std::env::var_os("RECORD_GOLDENS").map_or(Ok(()), |_| fs::write(&golden, &shown))?;
-    assert_eq!(shown, fs::read_to_string(golden)?);
+    let stories: String = Story::all()?.iter().map(Story::shown).collect::<Result<_, Failed>>()?;
+    [(GOLDEN, shown), (STORIES, stories)].into_iter().try_for_each(|(name, said)| {
+        let golden = Path::new(env!("CARGO_MANIFEST_DIR")).join(name);
+        std::env::var_os("RECORD_GOLDENS").map_or(Ok(()), |_| fs::write(&golden, &said))?;
+        assert_eq!(said, fs::read_to_string(golden)?, "{name}");
+        Ok(())
+    })
+}
+
+#[test]
+fn a_subagent_stop_hook_that_cannot_read_its_input_or_write_the_queue_fails() -> Result<(), Failed> {
+    let home = Home::new()?;
+    let unheard = home.heard(&["hook", "subagent-stop"], "not json", &Replies::default(), &GitHub::default());
+    let unqueued = home.finished(&format!("BLOCKED #12 {SHA}"), false, &GitHub::default());
+    assert!(unheard.ended.is_err_and(|failure| failure.0.contains("cannot read the hook input: ")));
+    assert!(
+        unqueued.ended.is_err_and(|failure| failure.0.contains("cannot add the escalation to the discussion queue"))
+    );
     Ok(())
+}
+
+const STORIES: &str = "tests/behaviour/subagent-stops.txt";
+const SCRIPTS: &str = "tests/behaviour/stories.toml";
+
+#[derive(Debug, Deserialize)]
+struct Stories {
+    story: Vec<Story>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Story {
+    name: String,
+    queue: Option<String>,
+    spec: Option<String>,
+    local: Option<Local>,
+    finish: Vec<Finish>,
+}
+
+#[derive(Debug, Deserialize)]
+enum Local {
+    Written(String),
+    Removed,
+}
+
+#[derive(Debug, Deserialize)]
+struct Finish {
+    said: String,
+    #[serde(default)]
+    turn: Turn,
+    #[serde(default)]
+    answers: Vec<Scripted>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+enum Turn {
+    #[default]
+    First,
+    Reminded,
+}
+
+#[derive(Debug, Deserialize)]
+struct Scripted {
+    asked: String,
+    ran: Answered,
+    printed: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+enum Answered {
+    Succeeded,
+    Failed,
+    Overdue,
+}
+
+impl Scripted {
+    fn answer(&self) -> Answer {
+        let printed = Printed::new(self.printed.clone());
+        let ran = match self.ran {
+            Answered::Succeeded => Ran::Succeeded(printed),
+            Answered::Failed => Ran::Failed(printed),
+            Answered::Overdue => Ran::Overdue,
+        };
+        Answer::new(&self.asked, ran)
+    }
+}
+
+impl Story {
+    fn all() -> Result<Vec<Story>, Failed> {
+        let scripts: Stories =
+            toml::from_str(&fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(SCRIPTS))?)?;
+        Ok(scripts.story)
+    }
+
+    fn shown(&self) -> Result<String, Failed> {
+        let home = Home::new()?;
+        self.queue.as_deref().map_or(Ok(()), |queued| home.queued(queued))?;
+        self.spec.as_deref().map_or(Ok(()), |spec| home.specified(spec))?;
+        self.local.as_ref().map_or(Ok(()), |local| match local {
+            Local::Written(text) => home.configured(Some(text)),
+            Local::Removed => home.configured(None),
+        })?;
+        let finished: Vec<String> = self
+            .finish
+            .iter()
+            .map(|finish| {
+                let github = GitHub::answering(&finish.answers.iter().map(Scripted::answer).collect::<Vec<_>>());
+                let said = home.finished(&finish.said, finish.turn == Turn::Reminded, &github);
+                let timeline = github.timeline(home.at);
+                format!("> {:?} {:?}\n{:?} {}\n{timeline}", finish.said, finish.turn, said.ended, said.shown)
+            })
+            .collect();
+        let queue = match home.queue() {
+            Ok(queued) => format!("queue:\n{queued}"),
+            Err(_absent) => String::new(),
+        };
+        Ok(format!("## {}\n{}{queue}", self.name, finished.concat()))
+    }
 }

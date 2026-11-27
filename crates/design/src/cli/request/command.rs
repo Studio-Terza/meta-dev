@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use console_ports::{Environment, Shown};
 use design_messages::StopTrail;
-use dispatch_ports::{Clock, Dispatch};
+use dispatch_ports::{Clock, Dispatch, Shell};
 use file_ports::Files;
 use store_ports::{Opens, Store};
 use strum::VariantArray;
@@ -54,11 +54,11 @@ impl Command {
         }
     }
 
-    pub fn written<F: Files, S: Store, D: Dispatch, C: Clock>(
+    pub fn written<F: Files, S: Store, D: Dispatch, C: Clock, G: Shell>(
         self,
         environment: &impl Environment,
         ground: Ground<'_, F, S>,
-        crew: &Crew<'_, D, C>,
+        crew: &Crew<'_, D, C, G>,
     ) -> Result<Uttered, Failure> {
         match self {
             Command::Ingest(_) => Ingest::read(ground.store(), &ground.transcripts())

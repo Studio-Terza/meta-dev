@@ -29,7 +29,8 @@ pub enum Woke {
 }
 
 impl Bell {
-    pub(crate) fn hung() -> Bell {
+    #[must_use]
+    pub fn hung() -> Bell {
         Bell(Arc::default())
     }
 
