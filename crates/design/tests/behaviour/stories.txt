@@ -985,3 +985,30 @@ path = "/work/wt-open-pr"
 held = "unremoved"
 merged = 12
 
+## in-place edits anywhere, shell writes under a repository, and moves out of one are refused toward the edit tools
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"sed -i 's/a/b/' /tmp/x"},"tool_name":"Bash"}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `sed -i` edits a file in place. Edit files only with the Edit or Write tools."}}
+Ok(Blocked) ExitCode(unix_exit_status(0)) ""
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"for f in a; do perl -pi -e 's/a/b/' $f; done"},"tool_name":"Bash"}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `perl -pi` inside a loop edits a file in place. Edit files only with the Edit or Write tools."}}
+Ok(Blocked) ExitCode(unix_exit_status(0)) ""
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"echo a > /home/repo/src/x.rs"},"tool_name":"Bash"}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: a shell write into /home/repo/src/x.rs, under the repository at /home/repo. Write files there only with the Edit or Write tools."}}
+Ok(Blocked) ExitCode(unix_exit_status(0)) ""
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cargo test 2>/dev/null | tee /home/repo/log.txt"},"tool_name":"Bash"}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: a shell write into /home/repo/log.txt, under the repository at /home/repo. Write files there only with the Edit or Write tools."}}
+Ok(Blocked) ExitCode(unix_exit_status(0)) ""
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"mv /home/repo/a.rs /tmp/a.rs"},"tool_name":"Bash"}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `mv` takes /home/repo/a.rs out of the repository at /home/repo, and a move out of a repository is a delete. Use `git mv` to move it within the repository, or `git rm` to delete it."}}
+Ok(Blocked) ExitCode(unix_exit_status(0)) ""
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"echo a > /tmp/out.txt"},"tool_name":"Bash"}
+Ok(Hooked(PreToolUse)) ExitCode(unix_exit_status(0)) ""
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"sed -n 's/i/b/p' /home/repo/x.rs"},"tool_name":"Bash"}
+Ok(Hooked(PreToolUse)) ExitCode(unix_exit_status(0)) ""
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"mv /home/repo/a.rs /home/repo/b.rs"},"tool_name":"Bash"}
+Ok(Hooked(PreToolUse)) ExitCode(unix_exit_status(0)) ""
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"mv /tmp/a /home/repo/a"},"tool_name":"Bash"}
+Ok(Hooked(PreToolUse)) ExitCode(unix_exit_status(0)) ""
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"git mv /home/repo/a.rs /tmp/a.rs"},"tool_name":"Bash"}
+Ok(Hooked(PreToolUse)) ExitCode(unix_exit_status(0)) ""
+

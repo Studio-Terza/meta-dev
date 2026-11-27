@@ -44,10 +44,12 @@ pub(super) enum Lexeme<'text> {
     Heredoc,
     #[regex(r"[0-9]*<<-")]
     Stripped,
-    #[regex(r"[0-9]*(<|>|>>|>\||<>|<<<)")]
+    #[regex(r"[0-9]*(<|<<<)")]
+    Input,
+    #[regex(r"[0-9]*(>|>>|>\||<>)")]
     #[token("&>")]
     #[token("&>>")]
-    Redirect,
+    Output,
     #[regex(r"[0-9]*[<>]&([0-9]+-?|-)")]
     Duplicate,
     #[token("\"")]
@@ -142,6 +144,32 @@ pub(super) enum Spelling {
     Xargs,
     #[regex(r"([^/\x00]*/)*find", allow_greedy = true)]
     Find,
+    #[regex(r"([^/\x00]*/)*g?sed", allow_greedy = true)]
+    Sed,
+    #[regex(r"([^/\x00]*/)*perl", allow_greedy = true)]
+    Perl,
+    #[regex(r"([^/\x00]*/)*tee", allow_greedy = true)]
+    Tee,
+    #[regex(r"([^/\x00]*/)*mv", allow_greedy = true)]
+    Mv,
+}
+
+#[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
+#[logos(crate = logos)]
+pub(super) enum SedFlag {
+    #[regex(r"-[A-Za-z]*i[^\x00]*|--in-place[^\x00]*", allow_greedy = true)]
+    InPlace,
+    #[regex(r"-[^\x00]*", allow_greedy = true, priority = 1)]
+    Other,
+}
+
+#[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
+#[logos(crate = logos)]
+pub(super) enum PerlFlag {
+    #[regex(r"-[a-hj-z]*i[^\x00]*", allow_greedy = true)]
+    InPlace,
+    #[regex(r"-[^\x00]*", allow_greedy = true, priority = 1)]
+    Other,
 }
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]

@@ -288,6 +288,8 @@ struct Story {
     #[serde(default)]
     agents: Vec<Task>,
     #[serde(default)]
+    repositories: Vec<PathBuf>,
+    #[serde(default)]
     answers: Vec<Scripted>,
     step: Vec<Step>,
 }
@@ -417,6 +419,7 @@ impl Home {
         let said: Vec<String> = story.transcript.iter().map(Home::line).collect();
         let records: Vec<String> = story.records.iter().map(|record| format!("{record}\n")).collect();
         self.appended(&[said, records].concat())?;
+        story.repositories.iter().try_for_each(|repository| fs::create_dir_all(self.real(&repository.join(".git"))))?;
         story.agents.iter().try_for_each(|agent| self.agent_task(agent))?;
         story.shells.iter().try_for_each(|shell| self.shell_task(shell))
     }

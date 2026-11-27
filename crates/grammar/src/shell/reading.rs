@@ -3,8 +3,8 @@ use std::ops::ControlFlow;
 
 use logos::{Lexer, Logos};
 
-use super::lexeme::{Argued, Lexeme, Line, Quoted, Spelling, Whole};
-use super::{Construct, Flagged, Occurrence};
+use super::lexeme::{Argued, Lexeme, Line, PerlFlag, Quoted, SedFlag, Spelling, Whole};
+use super::{Construct, Edit, Editor, Flagged, Occurrence, Spotted};
 use crate::{Ignoring, Unlexed};
 
 enum Lexing<'text> {
@@ -75,6 +75,7 @@ struct Simple {
     position: Position,
     prefixes: Vec<Construct>,
     redirect: Option<Redirect>,
+    moved: Option<Vec<String>>,
 }
 
 #[derive(Debug, Default)]
@@ -92,7 +93,8 @@ enum Quoting {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Redirect {
-    Target,
+    Input,
+    Output,
     Delimiter(Strip),
 }
 
@@ -118,6 +120,10 @@ enum Head {
     Xargs(Expecting),
     Find,
     Case,
+    Sed,
+    Perl,
+    Tee,
+    Mv,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -183,7 +189,7 @@ impl State {
     }
 
     fn ended(self) -> Vec<Occurrence> {
-        self.worded().found
+        self.worded().flushed().found
     }
 
     fn commanded<'text>(self, lexeme: Lexeme<'text>, lexer: Lexer<'text, Lexeme<'text>>) -> Reading<'text> {
@@ -206,7 +212,8 @@ impl State {
             Lexeme::Closes => self.worded().closes(lexer),
             Lexeme::Heredoc => self.worded().redirected(Redirect::Delimiter(Strip::Kept)).commanding(lexer),
             Lexeme::Stripped => self.worded().redirected(Redirect::Delimiter(Strip::Tabs)).commanding(lexer),
-            Lexeme::Redirect => self.worded().redirected(Redirect::Target).commanding(lexer),
+            Lexeme::Input => self.worded().redirected(Redirect::Input).commanding(lexer),
+            Lexeme::Output => self.worded().redirected(Redirect::Output).commanding(lexer),
         }
     }
 
@@ -261,7 +268,7 @@ impl State {
     }
 
     fn unwound(self) -> State {
-        let State { top, mut outer, heredocs, found } = self;
+        let State { top, mut outer, heredocs, found } = self.flushed();
         match outer.pop() {
             Some(parent) => State { top: parent, outer, heredocs, found },
             None => State { top, outer, heredocs, found },
@@ -346,7 +353,38 @@ impl State {
     }
 
     fn separated(self) -> State {
-        self.simpled(Simple::separated)
+        self.flushed().simpled(Simple::separated)
+    }
+
+    fn flushed(self) -> State {
+        let State { top, outer, heredocs, found } = self;
+        let Frame { construct, closer, resume, simple } = top;
+        let Simple { word, position, prefixes, redirect, moved } = simple;
+        let state = State {
+            top: Frame {
+                construct,
+                closer,
+                resume,
+                simple: Simple { word, position, prefixes, redirect, moved: None },
+            },
+            outer,
+            heredocs,
+            found,
+        };
+        let spoken = moved.as_deref().and_then(<[String]>::split_last);
+        let edit = spoken
+            .filter(|(_destination, sources)| !sources.is_empty())
+            .map(|(destination, sources)| Edit::Moved { sources: sources.to_vec(), destination: destination.clone() });
+        match edit {
+            Some(relocation) => state.spotted(relocation),
+            None => state,
+        }
+    }
+
+    fn spotted(self, edit: Edit) -> State {
+        let within = self.within();
+        let occurrence = Occurrence { spotted: Spotted::Edit(edit), within };
+        State { found: self.found.into_iter().chain(iter::once(occurrence)).collect(), ..self }
     }
 
     fn case_ended(self) -> State {
@@ -365,8 +403,8 @@ impl State {
     fn worded(self) -> State {
         let State { top, outer, heredocs, found } = self;
         let Frame { construct, closer, resume, simple: building } = top;
-        let Simple { word: taken, position, prefixes, redirect } = building;
-        let simple = Simple { word: None, position, prefixes, redirect };
+        let Simple { word: taken, position, prefixes, redirect, moved } = building;
+        let simple = Simple { word: None, position, prefixes, redirect, moved };
         let state = State { top: Frame { construct, closer, resume, simple }, outer, heredocs, found };
         match taken {
             Some(word) => state.word(word),
@@ -376,7 +414,8 @@ impl State {
 
     fn word(self, word: Word) -> State {
         match self.top.simple.redirect {
-            Some(Redirect::Target) => self.simpled(Simple::redirected),
+            Some(Redirect::Input) => self.simpled(Simple::redirected),
+            Some(Redirect::Output) => self.spotted(Edit::Wrote(word.text)).simpled(Simple::redirected),
             Some(Redirect::Delimiter(strip)) => {
                 let fed = self.fed();
                 self.simpled(Simple::redirected).awaiting(Pending { delimiter: word.text, strip, fed })
@@ -389,7 +428,9 @@ impl State {
         match self.top.simple.position {
             Position::Argument(Head::Shell(_)) => Some(self.within()),
             Position::Command
-            | Position::Argument(Head::Plain | Head::Xargs(_) | Head::Find | Head::Case)
+            | Position::Argument(
+                Head::Plain | Head::Xargs(_) | Head::Find | Head::Case | Head::Sed | Head::Perl | Head::Tee | Head::Mv,
+            )
             | Position::Pattern
             | Position::Named
             | Position::Body => None,
@@ -448,6 +489,12 @@ impl State {
             (Some(Spelling::Shell), _) => self.positioned(argument(Head::Shell(Script::Options))),
             (Some(Spelling::Xargs), _) => self.positioned(argument(Head::Xargs(Expecting::Utility))),
             (Some(Spelling::Find), _) => self.positioned(argument(Head::Find)),
+            (Some(Spelling::Sed), _) => self.positioned(argument(Head::Sed)),
+            (Some(Spelling::Perl), _) => self.positioned(argument(Head::Perl)),
+            (Some(Spelling::Tee), _) => self.positioned(argument(Head::Tee)),
+            (Some(Spelling::Mv), _) => {
+                self.simpled(|simple| Simple { moved: Some(Vec::new()), ..simple }).positioned(argument(Head::Mv))
+            }
             (
                 Some(
                     Spelling::For
@@ -471,10 +518,37 @@ impl State {
     }
 
     fn argued(self, head: Head, word: &Word) -> State {
+        match head {
+            Head::Sed => match Whole::read::<SedFlag>(&word.text) {
+                Some(SedFlag::InPlace) => self.spotted(Edit::InPlace(Editor::Sed)),
+                Some(SedFlag::Other) | None => self,
+            },
+            Head::Perl => match Whole::read::<PerlFlag>(&word.text) {
+                Some(PerlFlag::InPlace) => self.spotted(Edit::InPlace(Editor::Perl)),
+                Some(PerlFlag::Other) | None => self,
+            },
+            Head::Tee => match Whole::read::<PerlFlag>(&word.text) {
+                Some(PerlFlag::InPlace | PerlFlag::Other) => self,
+                None => self.spotted(Edit::Wrote(word.text.clone())),
+            },
+            Head::Mv => match Whole::read::<PerlFlag>(&word.text) {
+                Some(PerlFlag::InPlace | PerlFlag::Other) => self,
+                None => self.simpled(|simple| Simple {
+                    moved: simple.moved.map(|moved| moved.into_iter().chain(iter::once(word.text.clone())).collect()),
+                    ..simple
+                }),
+            },
+            Head::Plain | Head::Shell(_) | Head::Xargs(_) | Head::Find | Head::Case => {
+                self.scanned_argument(head, word)
+            }
+        }
+    }
+
+    fn scanned_argument(self, head: Head, word: &Word) -> State {
         let argued = Whole::read::<Argued>(&word.text);
         let shell = |script| Position::Argument(Head::Shell(script));
         match (head, argued) {
-            (Head::Plain | Head::Shell(Script::Given), _)
+            (Head::Plain | Head::Shell(Script::Given) | Head::Sed | Head::Perl | Head::Tee | Head::Mv, _)
             | (
                 Head::Case,
                 Some(
@@ -517,7 +591,8 @@ impl State {
 
     fn flagged(self, flagged: Flagged, construct: Option<Construct>) -> State {
         let within = self.within().into_iter().chain(construct).collect();
-        State { found: self.found.into_iter().chain(iter::once(Occurrence { flagged, within })).collect(), ..self }
+        let occurrence = Occurrence { spotted: Spotted::Flagged(flagged), within };
+        State { found: self.found.into_iter().chain(iter::once(occurrence)).collect(), ..self }
     }
 
     fn scripted(self, script: &str) -> State {
@@ -611,7 +686,7 @@ impl Frame {
             construct,
             closer,
             resume,
-            simple: Simple { word: None, position, prefixes: Vec::new(), redirect: None },
+            simple: Simple { word: None, position, prefixes: Vec::new(), redirect: None, moved: None },
         }
     }
 }
@@ -622,7 +697,7 @@ impl Simple {
             Position::Pattern => Position::Pattern,
             Position::Command | Position::Argument(_) | Position::Named | Position::Body => Position::Command,
         };
-        Simple { word: None, position, prefixes: Vec::new(), redirect: None }
+        Simple { word: None, position, prefixes: Vec::new(), redirect: None, moved: None }
     }
 
     fn redirected(self) -> Simple {
@@ -630,13 +705,14 @@ impl Simple {
     }
 
     fn unprefixed(self) -> Simple {
-        let Simple { word, prefixes, redirect, .. } = self;
+        let Simple { word, prefixes, redirect, moved, .. } = self;
         let kept = prefixes.len().saturating_sub(1);
         Simple {
             word,
             position: Position::Argument(Head::Find),
             prefixes: prefixes.into_iter().take(kept).collect(),
             redirect,
+            moved,
         }
     }
 }

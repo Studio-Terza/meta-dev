@@ -22,6 +22,6 @@ pub use notice::{TaskFile, TaskNotice};
 pub use prose::Prose;
 pub use report::{AgentReport, BranchName, Ended, JobLink, Target};
 pub use repository::{RepositoryName, SpecTrailer};
-pub use shell::{Construct, Flagged, Nested};
+pub use shell::{Construct, Edit, Edited, Editor, Flagged, Nested};
 pub use unlexed::Unlexed;
 pub use unspelled::Unspelled;

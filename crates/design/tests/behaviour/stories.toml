@@ -750,3 +750,37 @@ used = "cd /work && gh pr merge 12 --merge -R o/r"
 answers = [
   { tool = "git", asked = "worktree remove /work/wt-open-pr", ran = "Failed", printed = "" },
 ]
+
+[[story]]
+name = "in-place edits anywhere, shell writes under a repository, and moves out of one are refused toward the edit tools"
+repositories = ["/home/repo"]
+
+[[story.step]]
+ran = "sed -i 's/a/b/' /tmp/x"
+
+[[story.step]]
+ran = "for f in a; do perl -pi -e 's/a/b/' $f; done"
+
+[[story.step]]
+ran = "echo a > /home/repo/src/x.rs"
+
+[[story.step]]
+ran = "cargo test 2>/dev/null | tee /home/repo/log.txt"
+
+[[story.step]]
+ran = "mv /home/repo/a.rs /tmp/a.rs"
+
+[[story.step]]
+ran = "echo a > /tmp/out.txt"
+
+[[story.step]]
+ran = "sed -n 's/i/b/p' /home/repo/x.rs"
+
+[[story.step]]
+ran = "mv /home/repo/a.rs /home/repo/b.rs"
+
+[[story.step]]
+ran = "mv /tmp/a /home/repo/a"
+
+[[story.step]]
+ran = "git mv /home/repo/a.rs /tmp/a.rs"
