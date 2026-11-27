@@ -1,9 +1,9 @@
 use std::str::FromStr;
 
-use crate::{Ignoring, Unlexed};
+use invariants::Ignoring;
 use logos::Logos;
 
-use crate::Unspelled;
+use crate::{Unlexed, Unspelled};
 
 #[derive(Logos, Clone, Debug, PartialEq, Eq)]
 #[logos(crate = logos)]

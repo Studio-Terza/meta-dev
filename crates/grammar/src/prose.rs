@@ -1,11 +1,11 @@
 use std::ops::Range;
 
-use logos::Logos;
+use grammar_core::logos::Logos;
 
 use crate::{Ignoring, Unlexed};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-#[logos(crate = logos)]
+#[logos(crate = grammar_core::logos)]
 enum Piece {
     #[regex(r"[^\p{White_Space}]+", allow_greedy = true)]
     Word,

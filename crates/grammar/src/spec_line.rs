@@ -5,7 +5,7 @@ use std::fmt;
 use std::iter;
 use std::str::FromStr;
 
-use logos::{Lexer, Logos};
+use grammar_core::logos::{Lexer, Logos};
 use newtype::{Arbitrary, Checked, Newtype};
 
 use crate::{Ignoring, Unlexed, Unspelled};

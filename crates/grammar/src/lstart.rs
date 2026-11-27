@@ -1,8 +1,8 @@
 use crate::{Ignoring, Unlexed};
-use logos::Logos;
+use grammar_core::logos::Logos;
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-#[logos(crate = logos)]
+#[logos(crate = grammar_core::logos)]
 #[logos(skip r"[ \t\r\n]+")]
 enum Piece<'text> {
     #[regex("[A-Z][a-z][a-z]", |lexer| lexer.slice())]

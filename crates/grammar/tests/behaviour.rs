@@ -1,9 +1,8 @@
 use std::fs;
 use std::path::Path;
 
-use grammar::{
-    Attachment, Bare, Fields, Ignoring, Inked, KeptLines, Letters, Line, Lines, MigrationFile, Stamp, Unlexed,
-};
+use grammar::{Attachment, Bare, Fields, Ignoring, Inked, KeptLines, Letters, Line, Lines, Stamp, Unlexed};
+use grammar_core::MigrationFile;
 use proptest::prelude::{Just, Strategy, any, prop_assert_eq, prop_oneof, proptest};
 use proptest::test_runner::{Config, RngSeed};
 use serde::Deserialize;

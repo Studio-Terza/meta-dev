@@ -298,14 +298,23 @@ dependencies = [
 name = "grammar"
 version = "0.1.0"
 dependencies = [
+ "grammar-core",
  "invariants",
- "logos",
  "newtype",
  "proptest",
  "serde",
  "test-failure",
  "thiserror",
  "toml",
+]
+
+[[package]]
+name = "grammar-core"
+version = "0.1.0"
+dependencies = [
+ "invariants",
+ "logos",
+ "thiserror",
 ]
 
 [[package]]
@@ -761,7 +770,7 @@ dependencies = [
 name = "store-ports-macros"
 version = "0.1.0"
 dependencies = [
- "grammar",
+ "grammar-core",
  "invariants",
  "proc-macro2",
  "query-cache",

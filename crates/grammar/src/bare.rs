@@ -1,7 +1,7 @@
-use logos::Logos;
+use grammar_core::logos::Logos;
 
 #[derive(Logos, Clone, Debug, PartialEq, Eq)]
-#[logos(crate = logos)]
+#[logos(crate = grammar_core::logos)]
 enum Lexeme {
     #[regex(r"[A-Za-z0-9_][A-Za-z0-9_-]*")]
     Bare,
