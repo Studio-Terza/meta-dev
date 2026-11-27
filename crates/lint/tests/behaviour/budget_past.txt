@@ -1,0 +1,1 @@
+test budget: 10 of 50 lines are tests, at most 18% may be; cut test lines or test through fewer, table-driven cases

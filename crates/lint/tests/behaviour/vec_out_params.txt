@@ -1,0 +1,33 @@
+free functions are not allowed; make them associated functions or methods:
+src/fine.rs:1: fn read; make it an associated function or a method
+src/fine.rs:2: fn take; make it an associated function or a method
+src/fine.rs:5: fn fill; make it an associated function or a method
+src/in_macro.rs:1: fn free; make it an associated function or a method
+src/optional.rs:1: fn g; make it an associated function or a method
+src/out.rs:1: fn fill; make it an associated function or a method
+a &mut Vec parameter lets any caller push without the checks; give the collection a type that owns its rules:
+src/in_macro.rs:1: fn free; give the collection a type that owns its rules
+src/optional.rs:1: fn g; give the collection a type that owns its rules
+src/out.rs:1: fn fill; give the collection a type that owns its rules
+src/out.rs:4: fn push; give the collection a type that owns its rules
+tests go through public APIs:
+src/fine.rs:4: test code in src; move it to the package's tests directory and call the public API from there
+primitives stay at the boundary: outside a module named boundary, signatures, fields and variants carry types with meaning:
+src/fine.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/fine.rs:2: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/fine.rs:5: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/in_macro.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/optional.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/out.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/out.rs:4: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/trait_impl.rs:2: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests run production code paths: no literals in a test body and no test helpers beyond a test table:
+src/fine.rs:5: test helper fn fill; test through the production code path; a test file holds tests and their table
+every pub item is named by another workspace crate:
+src/lib.rs:1: pub out is named by no other crate; make it private or delete it
+src/lib.rs:2: pub fine is named by no other crate; make it private or delete it
+src/lib.rs:3: pub trait_impl is named by no other crate; make it private or delete it
+src/lib.rs:4: pub optional is named by no other crate; make it private or delete it
+src/lib.rs:5: pub in_macro is named by no other crate; make it private or delete it
+src/optional.rs:1: pub g is named by no other crate; make it private or delete it
+test budget: 4 of 21 lines are tests, at most 18% may be; cut test lines or test through fewer, table-driven cases

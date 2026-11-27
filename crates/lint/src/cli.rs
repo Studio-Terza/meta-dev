@@ -28,7 +28,7 @@ enum Mode {
     Timings,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Verdict {
     Clean,
     Violations,

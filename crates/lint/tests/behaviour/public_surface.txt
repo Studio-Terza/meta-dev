@@ -1,0 +1,6 @@
+test budget: 0 of 5 lines are tests, at most 18% may be
+a crate exports exactly what another crate uses:
+exporter/src/lib.rs:2: Unused is exported but no other crate names it; export it when a user appears
+every pub item is named by another workspace crate:
+exporter/src/inner.rs:2: pub Unused is named by no other crate; make it private or delete it
+exporter/src/lib.rs:2: pub Unused is named by no other crate; make it private or delete it

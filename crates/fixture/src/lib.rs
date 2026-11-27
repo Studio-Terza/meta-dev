@@ -4,7 +4,7 @@ mod rows;
 
 use serde::de::DeserializeOwned;
 
-pub use boundary::{CaseName, Drift, Golden, Story};
+pub use boundary::{CaseName, Drift, Story};
 pub use cases::{Case, Cases};
 pub use fixture_derive::Fixture;
 pub use rows::Rows;

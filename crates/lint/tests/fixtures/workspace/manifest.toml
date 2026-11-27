@@ -1,3 +1,0 @@
-[workspace]
-members = ["app", "store-*", "scratch/*/*"]
-exclude = ["scratch/target/dropped"]

@@ -23,13 +23,14 @@ proc-macro2.workspace = true
 quote.workspace = true
 rayon = "1.12.0"
 rustc_lexer.workspace = true
+serde.workspace = true
 syn.workspace = true
 thiserror.workspace = true
 timer-ports = { path = "../timer-ports" }
 toml.workspace = true
 
 [dev-dependencies]
-test-failure = { path = "../test-failure" }
+fixture = { path = "../fixture" }
 
 [lints]
 workspace = true

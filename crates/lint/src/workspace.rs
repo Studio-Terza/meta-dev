@@ -56,7 +56,7 @@ pub(crate) enum CrateKind {
     Benches,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct Feature {
     name: Name,
     line: Line,
@@ -72,7 +72,7 @@ impl Feature {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct Package {
     directory: PathBuf,
     name: Name,
@@ -185,14 +185,19 @@ impl Workspace {
         });
         let (found, listed): (Vec<Option<Package>>, Vec<Manifest>) =
             read.into_iter().map(|entry| (entry.package, entry.manifest)).unzip();
-        let testing = Manifest::testing(&listed);
-        let admitted = Manifest::admitted(&listed.into_iter().chain(above).collect::<Vec<Manifest>>());
-        let packages: Vec<Arc<Package>> = found
-            .into_iter()
-            .flatten()
-            .filter(|package| admitted.contains(&package.directory))
-            .map(|package| Arc::new(package.placed(&testing)))
+        let read_manifests: Vec<Manifest> = listed.into_iter().chain(above).collect();
+        let admitted = Manifest::admitted(&read_manifests);
+        let drafts: Vec<Arc<Package>> =
+            found.into_iter().flatten().filter(|package| admitted.contains(&package.directory)).map(Arc::new).collect();
+        let binaries: BTreeSet<PathBuf> = drafts
+            .iter()
+            .flat_map(|package| Workspace::roots(files, package))
+            .filter(|root| root.kind == CrateKind::Binary)
+            .map(|root| root.package.directory.clone())
             .collect();
+        let testing = Manifest::testing(&read_manifests, &binaries);
+        let packages: Vec<Arc<Package>> =
+            drafts.into_iter().map(|draft| Arc::new(Arc::unwrap_or_clone(draft).placed(&testing))).collect();
         let roots: Vec<CrateRoot> = packages.iter().flat_map(|package| Workspace::roots(files, package)).collect();
         match roots.first() {
             Some(_) => Ok(Workspace { packages, roots }),

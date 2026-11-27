@@ -80,13 +80,15 @@ impl Manifest {
             .collect()
     }
 
-    pub(crate) fn testing(manifests: &[Manifest]) -> BTreeSet<PathBuf> {
+    pub(crate) fn testing(manifests: &[Manifest], binaries: &BTreeSet<PathBuf>) -> BTreeSet<PathBuf> {
         let packaged: Vec<&Manifest> = manifests.iter().filter(|manifest| manifest.packaged.is_some()).collect();
         let depended: BTreeSet<&PathBuf> = packaged.iter().flat_map(|manifest| &manifest.depends).collect();
         let roots: BTreeSet<PathBuf> = packaged
             .iter()
-            .filter(|manifest| !depended.contains(&manifest.directory))
-            .map(|manifest| manifest.directory.clone())
+            .map(|manifest| &manifest.directory)
+            .filter(|directory| !depended.contains(directory))
+            .chain(binaries)
+            .cloned()
             .collect();
         let shipped = iter::successors(Some(roots), |known| {
             let reached: BTreeSet<PathBuf> = packaged

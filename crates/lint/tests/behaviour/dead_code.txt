@@ -1,0 +1,9 @@
+test budget: 0 of 15 lines are tests, at most 18% may be
+free functions are not allowed; make them associated functions or methods:
+provider/src/lib.rs:5: fn spoken; make it an associated function or a method
+provider/src/lib.rs:9: fn kept; make it an associated function or a method
+tests go through public APIs:
+provider/src/lib.rs:12: test code in src; move it to the package's tests directory and call the public API from there
+every pub item is named by another workspace crate:
+provider/src/lib.rs:3: pub Unused is named by no other crate; make it private or delete it
+provider/src/lib.rs:12: pub tested is named by no other crate; make it private or delete it

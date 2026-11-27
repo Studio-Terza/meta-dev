@@ -40,8 +40,7 @@ impl<Row> Case<Row> {
         self.directory.as_deref()
     }
 
-    #[must_use]
-    pub fn row(&self) -> Option<&Row> {
-        self.row.as_ref()
+    pub fn row(&self) -> Result<&Row, Failed> {
+        self.row.as_ref().ok_or_else(|| self.name.unrowed())
     }
 }

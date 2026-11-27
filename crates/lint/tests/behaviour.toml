@@ -1,0 +1,2007 @@
+[Lint.bad_manifest]
+arguments = ["."]
+verdict = "Refused"
+
+[Lint.bad_manifest.files]
+"Cargo.toml" = """
+not toml [[
+"""
+"notes/readme.txt" = """
+no Rust here
+"""
+
+[Lint.bool_methods]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.bool_methods.files]
+"Cargo.toml" = """
+[package]
+name = "corpus"
+"""
+"src/lib.rs" = """
+pub struct Switch;
+impl Switch {
+    pub fn is_on(&self) -> bool { true }
+    pub fn has_power(&self) -> bool { true }
+    fn is_off(&self) -> bool { false }
+}
+"""
+
+[Lint.broken]
+arguments = ["."]
+verdict = "Refused"
+
+[Lint.broken.files]
+"Cargo.toml" = """
+[package]
+name = "broken"
+"""
+"src/bad.rs" = """
+fn (
+"""
+"src/lib.rs" = """
+mod missing;
+mod bad;
+fn kept() {}
+"""
+
+[Lint.expression_flow]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.expression_flow.files]
+"Cargo.toml" = """
+[package]
+name = "corpus"
+"""
+"src/dropped.rs" = """
+fn f(x: u8) {
+    match x {
+        1 => g(),
+        _ => h(),
+    };
+}
+"""
+"src/early.rs" = """
+fn f(x: u8) -> u8 {
+    if x > 1 {
+        return 2;
+    }
+    3
+}
+"""
+"src/lib.rs" = """
+pub mod early;
+pub mod loops;
+pub mod dropped;
+pub mod lonely;
+pub mod reassigned;
+pub mod tail;
+pub mod mutated;
+"""
+"src/lonely.rs" = """
+fn f(x: bool) {
+    if x {
+        g();
+    }
+    h();
+}
+"""
+"src/loops.rs" = """
+fn f() {
+    for _ in [1, 2] {}
+    while true {}
+    loop {}
+}
+fn g() {
+    for _ in [1] {
+        if h() {
+            break;
+        } else {
+            continue;
+        }
+    }
+}
+"""
+"src/mutated.rs" = """
+fn f() -> Vec<u8> {
+    let mut items = Vec::new();
+    items.push(1);
+    items
+}
+"""
+"src/reassigned.rs" = """
+fn f() -> u8 {
+    let mut total = 1;
+    total = 2;
+    total
+}
+fn g() -> u8 {
+    let mut total = 1;
+    total += 2;
+    total
+}
+"""
+"src/tail.rs" = """
+fn f(x: bool) -> u8 {
+    if x { 1 } else { 2 }
+}
+"""
+
+[Lint.flow]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.flow.files]
+"Cargo.toml" = """
+[package]
+name = "flow"
+"""
+"src/lib.rs" = """
+pub struct Flow {
+    items: Vec<u8>,
+    count: u8,
+}
+impl Flow {
+    pub fn touched(&mut self, out: &mut String) {
+        let mut written = String::new();
+        write!(written, "{}", 1);
+        let mut borrowed = 0;
+        let held = &mut borrowed;
+        let mut called = || 1;
+        called();
+        let mut kept = 0;
+        kept = 1;
+        let mut typed: u8 = 0;
+        typed = 1;
+        let mut pair = (0, 0);
+        pair.0 = 1;
+        (pair) = (1, 1);
+        let mut list = [0];
+        list[0] += 1;
+        self.count += 1;
+        *held = 2;
+        if self.count > 0 {
+            self.count = 0;
+        } else if self.count > 1 {
+            self.count = 1;
+        }
+        match self.count {
+            _ => {}
+        };
+    }
+    pub const fn constant() -> u8 {
+        loop {}
+    }
+    #[cfg(test)]
+    fn gated() {
+        loop {}
+    }
+    pub fn outer(&self) {
+        let mut shadowed = 0;
+        fn inner() {
+            let mut shadowed = 0;
+            shadowed.clone();
+        }
+        shadowed = 1;
+    }
+    pub fn accumulating(&mut self, given: Vec<u8>) {
+        for item in given.iter() {
+            self.items.push(*item);
+        }
+        for item in given.iter() {
+            if *item > 0 {
+                self.items.extend([*item]);
+            } else {
+                self.items.clear();
+            }
+        }
+        let mut walk = vec![given.len()].into_iter().map(|length| length + 1);
+        let mut spelled = format!("{}", given.iter().count());
+        let still = given.iter();
+        let mut plain = given.len();
+        walk.next();
+        spelled.clear();
+        plain.clone();
+        still.count();
+    }
+}
+pub const SKIPPED: u8 = {
+    loop {}
+};
+impl Flow {
+    const ALSO: u8 = {
+        loop {}
+    };
+}
+pub trait Shaped {
+    fn shaped(&self) -> u8 {
+        loop {}
+    }
+    fn declared(&self);
+}
+#[cfg(test)]
+impl Flow {
+    fn hidden() {
+        loop {}
+    }
+}
+#[cfg(test)]
+pub trait Hidden {
+    fn hidden() {
+        loop {}
+    }
+}
+macro_rules! flows {
+    () => {
+        while true {}
+    };
+}
+impl Flow {
+    fn borrowed<'ab>(&self, given: &'ab u8) -> &'ab u8 {
+        given
+    }
+}
+impl PartialEq for Flow {
+    fn eq(&self, other: &Flow) -> bool {
+        true
+    }
+    fn ne(&self, other: &Flow) -> (bool, bool) {
+        (true, true)
+    }
+}
+#[cfg(test)]
+impl Flow {
+    pub fn probe() -> bool {
+        true
+    }
+}
+pub fn boxed() -> Vec<u8> {
+    vec![Box::new(1) as Box<dyn Fn()>, (dyn_named)]
+}
+mod inner {
+    pub fn inner_flag(out: &mut Vec<u8>) -> bool {
+        loop {}
+    }
+    pub struct Paired;
+    impl Paired {
+        pub fn paired(&self) -> (u8, u8) {
+            (1, 2)
+        }
+    }
+    pub fn gathered(given: Vec<u8>, out: Vec<u8>) {
+        for item in given.iter() {
+            out.push(*item);
+        }
+        for item in given.iter() {
+            out.clear();
+        }
+    }
+    macro_rules! looped {
+        () => {
+            fn short<'q>() {}
+            for item in given {
+                out.push(item);
+            }
+        };
+    }
+}
+pub trait Probe {
+    fn probe(&self) -> bool;
+    fn gather(&self, out: Vec<u8>) {
+        for item in [1] {
+            out.push(item);
+        }
+    }
+}
+"""
+
+[Lint.manual_iteration]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.manual_iteration.files]
+"Cargo.toml" = """
+[package]
+name = "corpus"
+"""
+"src/accumulating.rs" = """
+fn f(items: Vec<u8>, out: &mut Vec<u8>) {
+    for item in items {
+        out.push(item);
+    }
+}
+"""
+"src/counter.rs" = """
+fn f() -> u8 {
+    let mut total = 0;
+    total
+}
+"""
+"src/filtered.rs" = """
+fn f(items: Vec<u8>, out: &mut Vec<u8>) {
+    for item in items {
+        if item > 1 {
+            out.push(item);
+        }
+    }
+}
+"""
+"src/lib.rs" = """
+pub mod mutable;
+pub mod accumulating;
+pub mod filtered;
+pub mod counter;
+pub mod working;
+"""
+"src/mutable.rs" = """
+fn f(items: Vec<u8>) {
+    let mut walk = items.iter();
+    walk.next();
+}
+"""
+"src/working.rs" = """
+fn f(items: Vec<u8>) {
+    for item in items {
+        g(item);
+    }
+}
+"""
+
+[Lint.named_lifetimes]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.named_lifetimes.files]
+"Cargo.toml" = """
+[package]
+name = "corpus"
+"""
+"src/accented.rs" = """
+struct A<'é>(&'é str);
+"""
+"src/lib.rs" = """
+pub mod short;
+pub mod named;
+pub mod accented;
+"""
+"src/named.rs" = """
+struct A<'text>(&'text str);
+fn f(x: &'static str) {}
+"""
+"src/short.rs" = """
+struct A<'a>(&'a str);
+fn f<'b>(x: &'b str) {}
+"""
+
+[Lint.no_comments]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.no_comments.files]
+"Cargo.toml" = """
+[package]
+name = "corpus"
+"""
+"src/commented.rs" = """
+fn a() {}
+// line
+fn b() {} /* block */
+"""
+"src/lib.rs" = """
+pub mod commented;
+pub mod strings;
+"""
+"src/strings.rs" = """
+const TEXT: &str = "// not a comment";
+"""
+
+[Lint.no_dyn]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.no_dyn.files]
+"Cargo.toml" = """
+[package]
+name = "corpus"
+"""
+"src/lib.rs" = """
+pub mod shapes;
+"""
+"src/shapes.rs" = """
+pub trait Shape {}
+
+pub struct Shapes {
+    pub held: Vec<Box<dyn Shape>>,
+}
+
+pub const NAMED: &str = "dyn Shape";
+"""
+
+[Lint.no_free_fns]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.no_free_fns.files]
+"Cargo.toml" = """
+[package]
+name = "corpus"
+"""
+"src/allowed.rs" = """
+fn main() {}
+#[test]
+fn check() {}
+struct A;
+impl A {
+    fn method() {}
+}
+"""
+"src/free.rs" = """
+fn helper() {}
+mod inner {
+    pub fn nested() {}
+}
+"""
+"src/lib.rs" = """
+pub mod free;
+pub mod allowed;
+pub mod nested;
+pub mod required;
+"""
+"src/nested.rs" = """
+pub struct A;
+impl A {
+    pub fn run() {
+        fn helper() {}
+        helper()
+    }
+}
+const _: () = {
+    fn hidden() {}
+};
+"""
+"src/required.rs" = """
+#[proc_macro_derive(Foo)]
+pub fn foo(input: TokenStream) -> TokenStream { input }
+#[cfg(test)]
+mod tests {
+    #[tokio::test]
+    async fn t() {}
+}
+"""
+
+[Lint.no_test_only_api]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.no_test_only_api.files]
+"Cargo.toml" = """
+[package]
+name = "corpus"
+[features]
+test-utils = []
+fast = []
+"""
+"src/feature.rs" = """
+#[cfg(feature = "test-utils")]
+fn f() {}
+"""
+"src/gated.rs" = """
+#[cfg(test)]
+pub fn f() {}
+#[cfg(test)]
+fn g() {}
+"""
+"src/hidden.rs" = """
+#[doc(hidden)]
+pub fn f() {}
+"""
+"src/lib.rs" = """
+pub mod gated;
+pub mod hidden;
+pub mod plain;
+pub mod feature;
+pub mod staged;
+"""
+"src/plain.rs" = """
+pub fn f() {}
+"""
+"src/staged.rs" = """
+pub struct A;
+impl A {
+    pub fn staged() -> A {
+        A
+    }
+}
+"""
+"tests/t.rs" = """
+use corpus::staged::A;
+fn t() {
+    A::staged();
+}
+"""
+
+[Lint.process_starters]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.process_starters.files]
+"Cargo.toml" = """
+[package]
+name = "corpus"
+"""
+"src/built_only.rs" = """
+use std::process::Command;
+fn f() -> Command {
+    Command::new("ls")
+}
+"""
+"src/imported.rs" = """
+use std::process::Command;
+fn f() {
+    Command::new("ls").status();
+}
+"""
+"src/lib.rs" = """
+pub mod imported;
+pub mod qualified;
+pub mod renamed;
+pub mod built_only;
+pub mod other_command;
+pub mod ports;
+"""
+"src/other_command.rs" = """
+use clap::Command;
+fn f() {
+    Command::new("ls").status();
+}
+"""
+"src/ports.rs" = """
+use std::process::Command;
+fn f() {
+    Command::new("ls").status();
+}
+"""
+"src/qualified.rs" = """
+fn f() {
+    std::process::Command::new("ls").spawn();
+}
+"""
+"src/renamed.rs" = """
+use std::process::Command as Run;
+fn f() {
+    Run::new("ls").output();
+}
+"""
+"tests/spawns.rs" = """
+use std::process::Command;
+fn f() {
+    Command::new("ls").status();
+}
+"""
+
+[Lint.public_api_tests]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.public_api_tests.files]
+"Cargo.toml" = """
+[package]
+name = "corpus"
+"""
+"src/lib.rs" = """
+pub struct A;
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn t() {}
+}
+"""
+"tests/behaviour.rs" = """
+#[test]
+fn t() {}
+"""
+"tests/peek.rs" = """
+#[path = "../src/lib.rs"]
+mod internal;
+"""
+
+[Lint.public_surface]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.public_surface.files]
+"exporter/Cargo.toml" = """
+[package]
+name = "exporter"
+"""
+"exporter/src/inner.rs" = """
+pub struct Used;
+pub struct Unused;
+"""
+"exporter/src/lib.rs" = """
+mod inner;
+pub use inner::{Used, Unused};
+"""
+"Cargo.toml" = """
+[workspace]
+members = ["exporter", "user"]
+"""
+"user/Cargo.toml" = """
+[package]
+name = "user"
+"""
+"user/src/lib.rs" = """
+use exporter::Used;
+"""
+
+[Lint.starters]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.starters.files]
+"Cargo.toml" = """
+[package]
+name = "starters"
+"""
+"src/lib.rs" = """
+use std::process;
+use std::process::{self as spawning};
+use std::process as launcher;
+use std::fmt as other;
+use core::process as alt;
+fn aliased() {
+    launcher::Command::new("ls");
+    other::Command::new("ls");
+    alt::Command::new("ls");
+}
+mod globbed {
+    use std::process::*;
+    fn globbed() {
+        Command::new("ls");
+        run!(Command::new("ls"));
+        run!(Command::new::<u8>("ls"));
+    }
+}
+mod ports {
+    fn ported() {
+        std::process::Command::new("ls");
+    }
+    mod deeper {
+        fn deeper() {
+            std::process::Command::new("ls");
+        }
+    }
+}
+mod unimported {
+    fn unimported() {
+        Command::new("ls");
+        Other::new("ls");
+        process::Command::spawn("ls");
+    }
+}
+fn module() {
+    process::Command::new("ls");
+}
+fn renamed() {
+    spawning::Command::new("ls");
+}
+fn spoken() {
+    run!(std::process::Command::new("ls"), process::Command::new, std::process::Command::);
+}
+fn typed(command: Vec<std::process::Command>) {}
+"""
+
+[Lint.surface]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.surface.files]
+"consumer/Cargo.toml" = """
+[package]
+name = "consumer"
+"""
+"consumer/src/extras.rs" = """
+pub struct Extra;
+"""
+"consumer/src/lib.rs" = """
+use provider::{Imported, Renamed as Local};
+use globbed::*;
+pub struct Unseen;
+pub mod extras;
+macro_rules! made {
+    ($name:ident) => {
+        let $name = 1;
+    };
+    ($($item:expr),*) => {
+        $( provider::Transcribed::from($item) ),*
+    };
+}
+"""
+"consumer/src/main.rs" = """
+fn main() {
+    let shaped = vec![provider::Pathed, consumer::Unseen];
+}
+"""
+"globbed/Cargo.toml" = """
+[package]
+name = "globbed"
+"""
+"globbed/src/lib.rs" = """
+pub struct Anything;
+"""
+"Cargo.toml" = """
+[workspace]
+members = ["provider", "consumer", "globbed", "unused"]
+"""
+"provider/examples/shown.rs" = """
+use provider::Unnamed;
+"""
+"provider/Cargo.toml" = """
+[package]
+name = "provider"
+"""
+"provider/src/front.rs" = """
+use provider::shapes;
+"""
+"provider/src/inner.rs" = """
+pub struct Imported;
+pub struct Pathed;
+pub struct Renamed;
+pub struct Tested;
+pub struct Transcribed;
+pub struct Unnamed;
+pub struct Private;
+pub struct Crated;
+pub fn own() -> provider::Unnamed {
+    provider::Unnamed
+}
+"""
+"provider/src/internal.rs" = """
+pub struct Internal;
+"""
+"provider/src/lib.rs" = """
+mod inner;
+mod shared;
+pub mod shapes;
+pub(crate) mod internal;
+pub use inner::{Imported, Pathed, Renamed as Alias, Tested, Transcribed, Unnamed};
+pub use inner::*;
+use inner::Private;
+pub(crate) use inner::Crated;
+"""
+"provider/src/main.rs" = """
+mod front;
+mod shared;
+pub use std::fmt;
+fn main() {}
+"""
+"provider/src/shapes.rs" = """
+pub struct Shape;
+pub mod deeper {}
+"""
+"provider/src/shared.rs" = """
+use provider::Unnamed;
+"""
+"provider/tests/names.rs" = """
+use provider::Tested;
+use consumer::Unseen;
+use consumer::extras;
+"""
+"unused/Cargo.toml" = """
+[package]
+name = "unused"
+"""
+"unused/src/lib.rs" = """
+pub struct Nobody;
+"""
+
+[Lint.test_code]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.test_code.files]
+"Cargo.toml" = """
+[package]
+name = "test-code"
+
+[features]
+testing = []
+mocks_extra = []
+"""
+"src/lib.rs" = """
+macro_rules! cases {
+    () => {
+        #[test]
+        fn generated() {}
+    };
+}
+cases!();
+pub struct Shown {
+    #[cfg(test)]
+    pub probe: u8,
+    #[doc(hidden)]
+    pub(crate) hidden: u8,
+    kept: u8,
+}
+#[cfg(test)]
+impl Shown {
+    fn helper() {}
+}
+#[cfg(test)]
+impl Shown {
+    pub fn gated_member() {}
+    #[doc(hidden)]
+    pub fn hidden_member() {}
+}
+impl Shown {
+    #[cfg(test)]
+    pub fn gated() {}
+    #[doc = "shown"]
+    pub fn real() {}
+    pub const LIMIT: u8 = 1;
+    pub fn wrapped() {
+        quick! {
+            #[test]
+            fn listed() {}
+        }
+        hidden!();
+        crate::cases!();
+    }
+}
+#[cfg(test)]
+fn gated_free() {}
+#[cfg(test)]
+pub mod tests {
+    pub fn inside() {}
+    #[doc(hidden)]
+    pub fn hidden_inside() {}
+    macro_rules! hidden {
+        () => {
+            #[rstest]
+            fn emitted() {}
+        };
+    }
+}
+#[cfg_attr(feature = "mock", derive(Debug))]
+#[cfg(any(feature = "testing", test))]
+pub struct Featured;
+#[cfg(all(unix, feature = "fast"))]
+pub struct Fast;
+#[cfg(all(test, unix))]
+pub struct AllGated;
+#[cfg(any(test))]
+pub struct AnyGated;
+#[cfg(test)]
+pub const GATED_CONST: u8 = 1;
+#[cfg(test)]
+pub enum GatedEnum {}
+#[cfg(test)]
+pub static GATED_STATIC: u8 = 1;
+#[cfg(test)]
+pub type GatedType = u8;
+#[cfg(test)]
+pub union GatedUnion {
+    field: u8,
+}
+#[cfg(test)]
+pub use std::fmt;
+pub mod open {
+    #[cfg(test)]
+    pub struct Inner;
+}
+#[serde(hidden)]
+pub struct NotHidden;
+#[cfg(target = "test")]
+pub struct Targeted;
+impl Shown {
+    #[cfg(test)]
+    pub const GATED: u8 = 1;
+    #[cfg(test)]
+    pub type Gated = u8;
+}
+pub fn probe() -> bool {
+    cfg!(feature = "test-utils") || cfg!(not(feature = "speed"))
+}
+"""
+"tests/helpers/common.rs" = """
+#[cfg(feature = "mock")]
+pub struct Mocked;
+#[cfg(test)]
+pub struct InTests;
+"""
+"tests/reach.rs" = """
+mod outer {
+    #[path = "../../src/lib.rs"]
+    mod inner;
+}
+#[path = "helpers/common.rs"]
+mod common;
+#[path = "./../src/lib.rs"]
+mod direct;
+macro_rules! listed {
+    () => {
+        #[test_case]
+        fn listed() {}
+    };
+}
+"""
+
+[Lint.type_shape]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.type_shape.files]
+"Cargo.toml" = """
+[package]
+name = "corpus"
+"""
+"src/errors.rs" = """
+fn f() -> Result<u8, String> { Ok(1) }
+"""
+"src/fields.rs" = """
+struct A {
+    #[allow(unused)]
+    #[allow(dead_code)]
+    pub on: bool,
+}
+"""
+"src/fine.rs" = """
+struct A { count: u8 }
+fn f() -> Result<u8, std::fmt::Error> { Ok(1) }
+fn g() {}
+#[cfg(test)]
+mod tests {
+    struct B { on: bool }
+}
+"""
+"src/lib.rs" = """
+pub mod fields;
+pub mod tuples;
+pub mod errors;
+pub mod fine;
+pub mod variants;
+pub mod spellings;
+pub mod macros;
+pub mod real;
+"""
+"src/macros.rs" = """
+macro_rules! m { () => { fn f() -> (u8, u8) { (1, 2) } } }
+"""
+"src/real.rs" = """
+#[cfg(not(test))]
+mod real {
+    pub struct S { pub on: bool }
+}
+"""
+"src/spellings.rs" = """
+pub fn f() -> Result<u8, std::string::String> { Ok(1) }
+pub struct A { on: std::primitive::bool }
+pub type R = Result<u8, String>;
+pub type P = (u8, u8);
+"""
+"src/tuples.rs" = """
+fn f(pair: (u8, u8)) {}
+fn g() -> (u8, u8) { (1, 2) }
+"""
+"src/variants.rs" = """
+pub enum Cmd {
+    Set { on: bool },
+    Pair((u8, u8)),
+    Bad(Result<u8, String>),
+}
+"""
+
+[Lint.vec_out_params]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.vec_out_params.files]
+"Cargo.toml" = """
+[package]
+name = "corpus"
+"""
+"src/fine.rs" = """
+fn read(items: &Vec<u8>) {}
+fn take(items: Vec<u8>) {}
+#[cfg(test)]
+mod tests {
+    fn fill(out: &mut Vec<u8>) {}
+}
+"""
+"src/in_macro.rs" = """
+macro_rules! m { () => { fn free(x: &mut Vec<u8>) { } } }
+"""
+"src/lib.rs" = """
+pub mod out;
+pub mod fine;
+pub mod trait_impl;
+pub mod optional;
+pub mod in_macro;
+"""
+"src/optional.rs" = """
+pub fn g(out: Option<&mut Vec<u8>>) {}
+"""
+"src/out.rs" = """
+fn fill(out: &mut Vec<u8>) {}
+struct A;
+impl A {
+    fn push(&mut self, out: &mut Vec<u8>) {}
+}
+"""
+"src/trait_impl.rs" = """
+impl Read for R {
+    fn read_to_end(&mut self, buf: &mut Vec<u8>) {}
+}
+"""
+
+[Lint.workspace]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.workspace.files]
+".hidden/Cargo.toml" = """
+[package]
+name = "hidden"
+"""
+".hidden/src/lib.rs" = """
+fn hidden() {}
+"""
+"app/benches/timed.rs" = """
+fn timed() {
+    loop {}
+}
+"""
+"app/build.rs" = """
+fn main() {}
+fn helper() {}
+"""
+"app/examples/shown.rs" = """
+fn shown() {
+    loop {}
+}
+"""
+"app/Cargo.toml" = """
+[package]
+name = "app"
+
+[features]
+mock-data = []
+fast = []
+
+[dependencies]
+linked = { path = "../linked" }
+
+[[bin]]
+name = "tool"
+path = "tools/run.rs"
+"""
+"app/src/again.rs" = """
+fn again() {}
+"""
+"app/src/bin/multi/main.rs" = """
+fn main() {
+    loop {}
+}
+"""
+"app/src/bin/single.rs" = """
+fn single() {
+    loop {}
+}
+"""
+"app/src/checks.rs" = """
+fn gated() {}
+#[test]
+fn check() {}
+"""
+"app/src/elsewhere/placed.rs" = """
+fn placed() {}
+"""
+"app/src/flat.rs" = """
+mod below;
+#[path = "sibling.rs"]
+mod sibling;
+"""
+"app/src/flat/below.rs" = """
+fn below() {}
+"""
+"app/src/inline/beside.rs" = """
+fn beside() {}
+"""
+"app/src/inline/deep.rs" = """
+fn deep() {}
+"""
+"app/src/lib.rs" = """
+pub mod nested;
+mod flat;
+mod inline {
+    mod deep;
+    #[path = "beside.rs"]
+    mod beside;
+}
+#[path = "elsewhere/placed.rs"]
+mod placed;
+#[cfg(test)]
+mod checks;
+mod again;
+#[cfg(test)]
+mod inline_tests {
+    #[test]
+    fn inline() {}
+}
+"""
+"app/src/main.rs" = """
+mod again;
+fn main() {
+    loop {}
+}
+"""
+"app/src/nested/child.rs" = """
+fn child() {}
+"""
+"app/src/nested/mod.rs" = """
+mod child;
+"""
+"app/src/sibling.rs" = """
+fn sibling() {}
+"""
+"app/target/built/Cargo.toml" = """
+[package]
+name = "built"
+"""
+"app/target/built/src/lib.rs" = """
+fn built() {}
+"""
+"app/tests/flows.rs" = """
+fn helper() {
+    loop {}
+}
+#[test]
+fn checked() {}
+#[rstest]
+fn cased() {}
+#[test_case]
+fn listed() {}
+proptest! {
+    #[test]
+    fn property(value in 0..1) {}
+    #[test]
+    fn another(value in 0..1) {}
+}
+"""
+"app/tests/suite/main.rs" = """
+mod ports;
+fn suite() {}
+"""
+"app/tests/suite/ports.rs" = """
+fn spawn() {
+    std::process::Command::new("ls");
+}
+"""
+"app/tools/run.rs" = """
+fn main() {
+    while true {}
+}
+"""
+"linked/Cargo.toml" = """
+[package]
+name = "linked"
+"""
+"linked/src/lib.rs" = """
+fn linked() {}
+"""
+"Cargo.toml" = """
+[workspace]
+members = ["app", "store-*", "scratch/*/*"]
+exclude = ["scratch/target/dropped"]
+"""
+"outsider/Cargo.toml" = """
+[package]
+name = "outsider"
+"""
+"outsider/src/lib.rs" = """
+fn outsider() {}
+"""
+"scratch/target/dropped/Cargo.toml" = """
+[package]
+name = "dropped"
+"""
+"scratch/target/dropped/src/lib.rs" = """
+fn dropped() {}
+"""
+"scratch/target/kept/Cargo.toml" = """
+[package]
+name = "kept"
+"""
+"scratch/target/kept/src/lib.rs" = """
+fn kept() {}
+"""
+"store-ports/Cargo.toml" = """
+[package]
+name = "store-ports"
+"""
+"store-ports/src/lib.rs" = """
+pub struct Store;
+impl Store {
+    pub fn run() {
+        std::process::Command::new("ls");
+    }
+}
+"""
+
+[Lint.workspace_timings]
+arguments = ["--timings", "."]
+verdict = "Violations"
+
+[Lint.workspace_timings.files]
+".hidden/Cargo.toml" = """
+[package]
+name = "hidden"
+"""
+".hidden/src/lib.rs" = """
+fn hidden() {}
+"""
+"app/benches/timed.rs" = """
+fn timed() {
+    loop {}
+}
+"""
+"app/build.rs" = """
+fn main() {}
+fn helper() {}
+"""
+"app/examples/shown.rs" = """
+fn shown() {
+    loop {}
+}
+"""
+"app/Cargo.toml" = """
+[package]
+name = "app"
+
+[features]
+mock-data = []
+fast = []
+
+[dependencies]
+linked = { path = "../linked" }
+
+[[bin]]
+name = "tool"
+path = "tools/run.rs"
+"""
+"app/src/again.rs" = """
+fn again() {}
+"""
+"app/src/bin/multi/main.rs" = """
+fn main() {
+    loop {}
+}
+"""
+"app/src/bin/single.rs" = """
+fn single() {
+    loop {}
+}
+"""
+"app/src/checks.rs" = """
+fn gated() {}
+#[test]
+fn check() {}
+"""
+"app/src/elsewhere/placed.rs" = """
+fn placed() {}
+"""
+"app/src/flat.rs" = """
+mod below;
+#[path = "sibling.rs"]
+mod sibling;
+"""
+"app/src/flat/below.rs" = """
+fn below() {}
+"""
+"app/src/inline/beside.rs" = """
+fn beside() {}
+"""
+"app/src/inline/deep.rs" = """
+fn deep() {}
+"""
+"app/src/lib.rs" = """
+pub mod nested;
+mod flat;
+mod inline {
+    mod deep;
+    #[path = "beside.rs"]
+    mod beside;
+}
+#[path = "elsewhere/placed.rs"]
+mod placed;
+#[cfg(test)]
+mod checks;
+mod again;
+#[cfg(test)]
+mod inline_tests {
+    #[test]
+    fn inline() {}
+}
+"""
+"app/src/main.rs" = """
+mod again;
+fn main() {
+    loop {}
+}
+"""
+"app/src/nested/child.rs" = """
+fn child() {}
+"""
+"app/src/nested/mod.rs" = """
+mod child;
+"""
+"app/src/sibling.rs" = """
+fn sibling() {}
+"""
+"app/target/built/Cargo.toml" = """
+[package]
+name = "built"
+"""
+"app/target/built/src/lib.rs" = """
+fn built() {}
+"""
+"app/tests/flows.rs" = """
+fn helper() {
+    loop {}
+}
+#[test]
+fn checked() {}
+#[rstest]
+fn cased() {}
+#[test_case]
+fn listed() {}
+proptest! {
+    #[test]
+    fn property(value in 0..1) {}
+    #[test]
+    fn another(value in 0..1) {}
+}
+"""
+"app/tests/suite/main.rs" = """
+mod ports;
+fn suite() {}
+"""
+"app/tests/suite/ports.rs" = """
+fn spawn() {
+    std::process::Command::new("ls");
+}
+"""
+"app/tools/run.rs" = """
+fn main() {
+    while true {}
+}
+"""
+"linked/Cargo.toml" = """
+[package]
+name = "linked"
+"""
+"linked/src/lib.rs" = """
+fn linked() {}
+"""
+"Cargo.toml" = """
+[workspace]
+members = ["app", "store-*", "scratch/*/*"]
+exclude = ["scratch/target/dropped"]
+"""
+"outsider/Cargo.toml" = """
+[package]
+name = "outsider"
+"""
+"outsider/src/lib.rs" = """
+fn outsider() {}
+"""
+"scratch/target/dropped/Cargo.toml" = """
+[package]
+name = "dropped"
+"""
+"scratch/target/dropped/src/lib.rs" = """
+fn dropped() {}
+"""
+"scratch/target/kept/Cargo.toml" = """
+[package]
+name = "kept"
+"""
+"scratch/target/kept/src/lib.rs" = """
+fn kept() {}
+"""
+"store-ports/Cargo.toml" = """
+[package]
+name = "store-ports"
+"""
+"store-ports/src/lib.rs" = """
+pub struct Store;
+impl Store {
+    pub fn run() {
+        std::process::Command::new("ls");
+    }
+}
+"""
+
+[Lint.two_roots]
+arguments = ["app", "store-ports"]
+verdict = "Violations"
+
+[Lint.two_roots.files]
+".hidden/Cargo.toml" = """
+[package]
+name = "hidden"
+"""
+".hidden/src/lib.rs" = """
+fn hidden() {}
+"""
+"app/benches/timed.rs" = """
+fn timed() {
+    loop {}
+}
+"""
+"app/build.rs" = """
+fn main() {}
+fn helper() {}
+"""
+"app/examples/shown.rs" = """
+fn shown() {
+    loop {}
+}
+"""
+"app/Cargo.toml" = """
+[package]
+name = "app"
+
+[features]
+mock-data = []
+fast = []
+
+[dependencies]
+linked = { path = "../linked" }
+
+[[bin]]
+name = "tool"
+path = "tools/run.rs"
+"""
+"app/src/again.rs" = """
+fn again() {}
+"""
+"app/src/bin/multi/main.rs" = """
+fn main() {
+    loop {}
+}
+"""
+"app/src/bin/single.rs" = """
+fn single() {
+    loop {}
+}
+"""
+"app/src/checks.rs" = """
+fn gated() {}
+#[test]
+fn check() {}
+"""
+"app/src/elsewhere/placed.rs" = """
+fn placed() {}
+"""
+"app/src/flat.rs" = """
+mod below;
+#[path = "sibling.rs"]
+mod sibling;
+"""
+"app/src/flat/below.rs" = """
+fn below() {}
+"""
+"app/src/inline/beside.rs" = """
+fn beside() {}
+"""
+"app/src/inline/deep.rs" = """
+fn deep() {}
+"""
+"app/src/lib.rs" = """
+pub mod nested;
+mod flat;
+mod inline {
+    mod deep;
+    #[path = "beside.rs"]
+    mod beside;
+}
+#[path = "elsewhere/placed.rs"]
+mod placed;
+#[cfg(test)]
+mod checks;
+mod again;
+#[cfg(test)]
+mod inline_tests {
+    #[test]
+    fn inline() {}
+}
+"""
+"app/src/main.rs" = """
+mod again;
+fn main() {
+    loop {}
+}
+"""
+"app/src/nested/child.rs" = """
+fn child() {}
+"""
+"app/src/nested/mod.rs" = """
+mod child;
+"""
+"app/src/sibling.rs" = """
+fn sibling() {}
+"""
+"app/target/built/Cargo.toml" = """
+[package]
+name = "built"
+"""
+"app/target/built/src/lib.rs" = """
+fn built() {}
+"""
+"app/tests/flows.rs" = """
+fn helper() {
+    loop {}
+}
+#[test]
+fn checked() {}
+#[rstest]
+fn cased() {}
+#[test_case]
+fn listed() {}
+proptest! {
+    #[test]
+    fn property(value in 0..1) {}
+    #[test]
+    fn another(value in 0..1) {}
+}
+"""
+"app/tests/suite/main.rs" = """
+mod ports;
+fn suite() {}
+"""
+"app/tests/suite/ports.rs" = """
+fn spawn() {
+    std::process::Command::new("ls");
+}
+"""
+"app/tools/run.rs" = """
+fn main() {
+    while true {}
+}
+"""
+"linked/Cargo.toml" = """
+[package]
+name = "linked"
+"""
+"linked/src/lib.rs" = """
+fn linked() {}
+"""
+"Cargo.toml" = """
+[workspace]
+members = ["app", "store-*", "scratch/*/*"]
+exclude = ["scratch/target/dropped"]
+"""
+"outsider/Cargo.toml" = """
+[package]
+name = "outsider"
+"""
+"outsider/src/lib.rs" = """
+fn outsider() {}
+"""
+"scratch/target/dropped/Cargo.toml" = """
+[package]
+name = "dropped"
+"""
+"scratch/target/dropped/src/lib.rs" = """
+fn dropped() {}
+"""
+"scratch/target/kept/Cargo.toml" = """
+[package]
+name = "kept"
+"""
+"scratch/target/kept/src/lib.rs" = """
+fn kept() {}
+"""
+"store-ports/Cargo.toml" = """
+[package]
+name = "store-ports"
+"""
+"store-ports/src/lib.rs" = """
+pub struct Store;
+impl Store {
+    pub fn run() {
+        std::process::Command::new("ls");
+    }
+}
+"""
+
+[Lint.mounted]
+arguments = ["/corpus"]
+verdict = "Violations"
+
+[Lint.mounted.files]
+"/corpus/Cargo.toml" = """
+[package]
+name = "corpus"
+"""
+"/corpus/src/lib.rs" = """
+pub mod shapes;
+"""
+"/corpus/src/shapes.rs" = """
+pub trait Shape {}
+
+pub struct Shapes {
+    pub held: Vec<Box<dyn Shape>>,
+}
+
+pub const NAMED: &str = "dyn Shape";
+"""
+
+[Lint.unreadable]
+arguments = ["/nowhere", "/corpus/notes"]
+verdict = "Refused"
+
+[Lint.unreadable.files]
+"/corpus/Cargo.toml" = """
+not toml [[
+"""
+"/corpus/notes/readme.txt" = """
+no Rust here
+"""
+
+[Lint.unpackaged]
+arguments = []
+verdict = "Refused"
+
+[Lint.unpackaged.files]
+"src/lib.rs" = """
+fn free() {}
+"""
+
+[Lint.packaged]
+arguments = []
+verdict = "Violations"
+
+[Lint.packaged.files]
+"Cargo.toml" = """
+[package]
+name = "p"
+"""
+"src/lib.rs" = """
+fn free() {}
+"""
+
+[Lint.deep]
+arguments = []
+verdict = "Clean"
+
+[Lint.deep.files]
+"Cargo.toml" = """
+[package]
+name = "deep"
+"""
+"src/lib.rs" = """
+struct Deep;
+impl Deep {
+    fn deep() -> Option<()> {
+        (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((( Some(()) ))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+    }
+}
+"""
+
+[Lint.budget_met]
+arguments = []
+verdict = "Clean"
+
+[Lint.budget_met.files]
+"Cargo.toml" = """
+[package]
+name = "p"
+"""
+"src/lib.rs" = """
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"""
+"tests/t.rs" = """
+
+
+
+
+
+
+
+
+
+"""
+
+[Lint.budget_past]
+arguments = []
+verdict = "Violations"
+
+[Lint.budget_past.files]
+"Cargo.toml" = """
+[package]
+name = "p"
+"""
+"src/lib.rs" = """
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"""
+"tests/t.rs" = """
+
+
+
+
+
+
+
+
+
+
+"""
+
+[Lint.primitive_boundary]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.primitive_boundary.files]
+"Cargo.toml" = """
+[package]
+name = "corpus"
+"""
+"src/lib.rs" = """
+mod boundary;
+mod meaning;
+"""
+"src/boundary.rs" = """
+pub(crate) struct Seconds(u64);
+
+impl Seconds {
+    pub(crate) fn of(count: u64) -> Seconds {
+        Seconds(count)
+    }
+}
+"""
+"src/meaning.rs" = """
+use crate::boundary::Seconds;
+
+pub(crate) struct Count(usize);
+
+pub(crate) enum Spoken {
+    Word(String),
+    Silent,
+}
+
+pub(crate) trait Measured {
+    type Unit;
+
+    fn measured(&self) -> u32;
+}
+
+impl Count {
+    pub(crate) fn named(&self, text: &str) -> Option<Seconds> {
+        Some(Seconds::of(0)).filter(|_| text.is_empty())
+    }
+}
+
+impl Measured for Count {
+    type Unit = u8;
+
+    fn measured(&self) -> u32 {
+        0
+    }
+}
+"""
+
+[Lint.test_shape]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.test_shape.files]
+"Cargo.toml" = """
+[package]
+name = "corpus"
+"""
+"src/lib.rs" = """
+pub struct Shown;
+"""
+"tests/story.rs" = """
+use fixture::{Fixture, Rows};
+
+#[derive(Fixture)]
+struct Row {
+    shown: Shown,
+}
+
+struct Shown;
+
+struct Helper;
+
+const LIMIT: usize = 3;
+
+fn helper() -> Helper {
+    Helper
+}
+
+#[test]
+fn every_row_reads() {
+    let rows = Rows::<Row>::read();
+    assert_eq!(rows.len(), LIMIT);
+}
+
+#[test]
+fn spelled_out() {
+    assert_eq!(helper(), Helper);
+    assert!(true);
+}
+"""
+
+[Lint.dead_code]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.dead_code.files]
+"Cargo.toml" = """
+[workspace]
+members = ["provider", "consumer"]
+"""
+"provider/Cargo.toml" = """
+[package]
+name = "provider"
+"""
+"provider/src/lib.rs" = """
+pub struct Used;
+
+pub struct Unused;
+
+pub fn spoken() -> Used {
+    Used
+}
+
+pub(crate) fn kept() {}
+
+#[test]
+pub fn tested() {}
+"""
+"consumer/Cargo.toml" = """
+[package]
+name = "consumer"
+"""
+"consumer/src/main.rs" = """
+fn main() {
+    let _ = provider::spoken();
+}
+"""
+[Lint.unwritable]
+arguments = []
+verdict = "Refused"
+out = "Full"
+
+[Lint.unwritable.files]
+"Cargo.toml" = """
+[package]
+name = "p"
+"""
+"src/lib.rs" = """
+"""
+
+
+[Lint.dev_only]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.dev_only.files]
+"Cargo.toml" = """
+[workspace]
+members = ["app", "support", "tools"]
+"""
+"app/Cargo.toml" = """
+[package]
+name = "app"
+
+[dev-dependencies]
+support = { path = "../support" }
+"""
+"app/src/main.rs" = """
+fn main() {}
+"""
+"support/Cargo.toml" = """
+[package]
+name = "support"
+"""
+"support/src/lib.rs" = """
+struct Held;
+impl Held {
+    fn held() {}
+}
+"""
+"tools/Cargo.toml" = """
+[package]
+name = "tools"
+
+[dev-dependencies]
+app = { path = "../app" }
+"""
+"tools/src/lib.rs" = """
+struct Tool;
+"""

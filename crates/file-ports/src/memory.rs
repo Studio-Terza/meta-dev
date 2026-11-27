@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 
 use invariants::Ignoring;
 use newtype::Wrapping;
+use newtype::serde::{Deserialize, Deserializer};
 
 use crate::{Bytes, FileFailure, Files, Ignored, Kind, Size, Stamps, Text};
 use locked::Locked;
@@ -49,6 +50,13 @@ impl Memory {
             .filter(|held| *held != path)
             .find(|held| held.starts_with(path))
             .map(|_| Kind::Directory)
+    }
+}
+
+impl<'de> Deserialize<'de> for Memory {
+    fn deserialize<Reader: Deserializer<'de>>(reader: Reader) -> Result<Memory, Reader::Error> {
+        let texts = BTreeMap::<PathBuf, Text>::deserialize(reader)?;
+        Ok(texts.into_iter().map(|(path, text)| (path, Bytes::from(&text))).collect())
     }
 }
 

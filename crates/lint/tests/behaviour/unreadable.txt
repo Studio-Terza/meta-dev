@@ -1,0 +1,3 @@
+test budget: 0 of 0 lines are tests, at most 18% may be
+cannot read /nowhere: entity not found
+no Rust sources found under /corpus/notes

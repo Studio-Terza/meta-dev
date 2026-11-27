@@ -1,0 +1,18 @@
+test budget: 0 of 8 lines are tests, at most 18% may be
+free functions are not allowed; make them associated functions or methods:
+src/named.rs:2: fn f; make it an associated function or a method
+src/short.rs:2: fn f; make it an associated function or a method
+lifetimes are named with a word, never a letter:
+src/accented.rs:1: 'é; name the lifetime with a word that says what it borrows from
+src/short.rs:1: 'a; name the lifetime with a word that says what it borrows from
+src/short.rs:2: 'b; name the lifetime with a word that says what it borrows from
+primitives stay at the boundary: outside a module named boundary, signatures, fields and variants carry types with meaning:
+src/accented.rs:1: str in a field; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/named.rs:1: str in a field; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/named.rs:2: str in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/short.rs:1: str in a field; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/short.rs:2: str in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+every pub item is named by another workspace crate:
+src/lib.rs:1: pub short is named by no other crate; make it private or delete it
+src/lib.rs:2: pub named is named by no other crate; make it private or delete it
+src/lib.rs:3: pub accented is named by no other crate; make it private or delete it

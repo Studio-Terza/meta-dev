@@ -1,3 +1,0 @@
-fn shown() {
-    loop {}
-}

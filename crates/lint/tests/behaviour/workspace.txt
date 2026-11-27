@@ -1,0 +1,38 @@
+free functions are not allowed; make them associated functions or methods:
+app/benches/timed.rs:1: fn timed; make it an associated function or a method
+app/build.rs:2: fn helper; make it an associated function or a method
+app/examples/shown.rs:1: fn shown; make it an associated function or a method
+app/src/again.rs:1: fn again; make it an associated function or a method
+app/src/bin/single.rs:1: fn single; make it an associated function or a method
+app/src/elsewhere/placed.rs:1: fn placed; make it an associated function or a method
+app/src/flat/below.rs:1: fn below; make it an associated function or a method
+app/src/inline/beside.rs:1: fn beside; make it an associated function or a method
+app/src/inline/deep.rs:1: fn deep; make it an associated function or a method
+app/src/nested/child.rs:1: fn child; make it an associated function or a method
+app/src/sibling.rs:1: fn sibling; make it an associated function or a method
+app/tests/flows.rs:1: fn helper; make it an associated function or a method
+app/tests/flows.rs:7: fn cased; make it an associated function or a method
+app/tests/flows.rs:9: fn listed; make it an associated function or a method
+app/tests/suite/main.rs:2: fn suite; make it an associated function or a method
+app/tests/suite/ports.rs:1: fn spawn; make it an associated function or a method
+linked/src/lib.rs:1: fn linked; make it an associated function or a method
+scratch/target/kept/src/lib.rs:1: fn kept; make it an associated function or a method
+control flow is an expression; every branch yields the value the function returns:
+app/src/bin/multi/main.rs:2: loop; drive an iterator with combinators, const fns excepted
+app/src/bin/single.rs:2: loop; drive an iterator with combinators, const fns excepted
+app/src/main.rs:3: loop; drive an iterator with combinators, const fns excepted
+app/tools/run.rs:2: while loop; drive an iterator with combinators, const fns excepted
+tests go through public APIs:
+app/src/lib.rs:11: test code in src; move it to the package's tests directory and call the public API from there
+app/src/lib.rs:14: test code in src; move it to the package's tests directory and call the public API from there
+shipped code has no test-only API:
+app/Cargo.toml:5: test feature mock-data; remove the feature and test through the API every build has
+tests run production code paths: no literals in a test body and no test helpers beyond a test table:
+app/tests/flows.rs:1: test helper fn helper; test through the production code path; a test file holds tests and their table
+app/tests/suite/main.rs:2: test helper fn suite; test through the production code path; a test file holds tests and their table
+app/tests/suite/ports.rs:1: test helper fn spawn; test through the production code path; a test file holds tests and their table
+every pub item is named by another workspace crate:
+app/src/lib.rs:1: pub nested is named by no other crate; make it private or delete it
+store-ports/src/lib.rs:1: pub Store is named by no other crate; make it private or delete it
+store-ports/src/lib.rs:3: pub run is named by no other crate; make it private or delete it
+test budget: 36 of 80 lines are tests, at most 18% may be; cut test lines or test through fewer, table-driven cases

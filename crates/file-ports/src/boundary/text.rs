@@ -1,10 +1,10 @@
 use std::io;
 
-use newtype::{Arbitrary, Display, Newtype};
+use newtype::{Arbitrary, Deserialize, Display, Newtype};
 
 use crate::{Bytes, FileFailure};
 
-#[derive(Newtype, Arbitrary, Display, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Newtype, Arbitrary, Display, Deserialize, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Text(String);
 
 impl AsRef<str> for Text {

@@ -1,0 +1,8 @@
+test budget: 0 of 37 lines are tests, at most 18% may be
+primitives stay at the boundary: outside a module named boundary, signatures, fields and variants carry types with meaning:
+src/meaning.rs:3: usize in a field; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/meaning.rs:6: String in a variant; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/meaning.rs:13: u32 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/meaning.rs:17: str in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/meaning.rs:23: u8 in an associated type; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+src/meaning.rs:25: u32 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary

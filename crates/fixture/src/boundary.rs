@@ -25,7 +25,7 @@ pub struct Story {
 pub struct CaseName(String);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Golden {
+pub(crate) struct Golden {
     path: PathBuf,
     text: String,
 }
@@ -48,6 +48,14 @@ enum Unread {
     Unanchored { story: &'static str, manifest: &'static str },
     #[error("case {0} has no golden file beside it")]
     Unpaired(CaseName),
+    #[error("case {0} has no row in the story's table")]
+    Unrowed(CaseName),
+}
+
+impl CaseName {
+    pub(crate) fn unrowed(&self) -> Failed {
+        Failed::from(Unread::Unrowed(self.clone()))
+    }
 }
 
 impl Story {
