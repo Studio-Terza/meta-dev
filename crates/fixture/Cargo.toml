@@ -12,6 +12,7 @@ doctest = false
 [dependencies]
 fixture-derive = { path = "../fixture-derive" }
 invariants = { path = "../invariants" }
+proptest.workspace = true
 serde.workspace = true
 test-failure = { path = "../test-failure" }
 thiserror.workspace = true

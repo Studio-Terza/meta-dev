@@ -1,5 +1,6 @@
 mod boundary;
 mod cases;
+mod properties;
 mod rows;
 
 use serde::de::DeserializeOwned;
@@ -7,6 +8,7 @@ use serde::de::DeserializeOwned;
 pub use boundary::{CaseName, Drift, Story};
 pub use cases::{Case, Cases};
 pub use fixture_derive::Fixture;
+pub use properties::Properties;
 pub use rows::Rows;
 pub use test_failure::Failed;
 

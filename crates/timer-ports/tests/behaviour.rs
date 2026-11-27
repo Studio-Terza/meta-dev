@@ -1,10 +1,13 @@
 use std::time::Duration;
 
+use fixture::Properties;
 use port_core::Run;
 use proptest::prelude::{Strategy, any, prop_assert_eq, proptest};
 use timer_ports::{Elapsed, Moment, Monotonic, Stopped, Timer};
 
 proptest! {
+    #![proptest_config(Properties::settled())]
+
     #[test]
     fn moments_measure_saturating_spans_that_add_and_show_whole_milliseconds(
         early in any::<u32>().prop_map(|millis| Duration::from_millis(u64::from(millis))),

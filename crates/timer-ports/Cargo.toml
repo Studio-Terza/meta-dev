@@ -13,6 +13,7 @@ doctest = false
 port-core = { path = "../port-core" }
 
 [dev-dependencies]
+fixture = { path = "../fixture" }
 proptest.workspace = true
 
 [lints]
