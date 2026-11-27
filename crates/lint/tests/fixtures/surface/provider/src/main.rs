@@ -1,0 +1,2 @@
+mod front;
+fn main() {}

@@ -33,6 +33,7 @@ pub(crate) struct Source {
     text: String,
     package: Arc<Package>,
     location: Location,
+    reached: CrateKind,
 }
 
 impl Location {
@@ -98,11 +99,11 @@ impl Source {
         package: Arc<Package>,
         real: Arc<Path>,
         shown: Arc<Path>,
-        fallback: CrateKind,
+        reached: CrateKind,
         text: String,
     ) -> Source {
-        let location = Location::of(&package, &real, fallback);
-        Source { real, shown, text, package, location }
+        let location = Location::of(&package, &real, reached);
+        Source { real, shown, text, package, location, reached }
     }
 
     pub(crate) fn real(&self) -> &Path {
@@ -134,8 +135,7 @@ impl Source {
     }
 
     pub(crate) fn own_crate(&self) -> Option<String> {
-        let binary = self.location.kind == CrateKind::Binary && self.location.rooted == Rooted::CrateRoot;
-        (self.place() == Place::Shipped && !binary).then(|| self.package.crate_name())
+        (self.place() == Place::Shipped && self.reached != CrateKind::Binary).then(|| self.package.crate_name())
     }
 
     pub(crate) fn ported(&self) -> Option<()> {

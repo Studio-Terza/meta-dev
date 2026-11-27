@@ -85,7 +85,7 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
     }
 
     pub(crate) fn read(&self, roots: Vec<CrateRoot>) -> Read {
-        let modules: Vec<Module> = roots
+        let (binaries, others): (Vec<Module>, Vec<Module>) = roots
             .into_iter()
             .map(|root| Module {
                 real: Arc::from(root.path()),
@@ -94,7 +94,12 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
                 gate: Gate::Entered,
                 nesting: Nesting::Beside,
             })
-            .collect();
+            .partition(|module| module.kind == CrateKind::Binary);
+        let libraries = self.claimed_all(others);
+        libraries.joined(self.claimed_all(binaries))
+    }
+
+    fn claimed_all(&self, modules: Vec<Module>) -> Read {
         modules.into_par_iter().map(|module| self.claimed(&module)).reduce(Read::default, Read::joined)
     }
 
