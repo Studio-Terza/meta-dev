@@ -1,5 +1,5 @@
 use file_ports::Files;
-use grammar_queue::Queue;
+use grammar::Queue;
 use invariants::Ignoring;
 use port_core::{Port, Run};
 use store_ports::Store;

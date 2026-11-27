@@ -10,7 +10,7 @@ use console_ports::{Heard, Shown};
 use design_messages::{Fate, Halt, LastSaid, Overran, Overruns, StopRow, Stopped, Tally};
 use dispatch_ports::{Clock, Dispatch, Moment, Wall};
 use file_ports::{Epoch, Files};
-use grammar_queue::Queue;
+use grammar::Queue;
 use newtype::Wrapping;
 use serde::{Deserialize, Serialize};
 use store_ports::Store;

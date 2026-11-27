@@ -1,6 +1,6 @@
 use std::fmt;
 
-use grammar_prose::Prose;
+use grammar::Prose;
 use invariants::Ignoring;
 use store_ports::{Execute, Query, StoreFailure};
 use transcript_ports::{Authorship, Body, Instant, Uuid};

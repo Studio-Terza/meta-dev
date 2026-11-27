@@ -7,8 +7,11 @@ Local and gitignored. Quotes outrank this file.
   - a nested note is not an item
 -not an item either
 
-## Plan
+### Initiative 1
 1. Transcript database. Done.
 
 ## Deferred
-- [next] Port the hook - with its dash kept
+- [next] Port the hook, deferred so not waiting work
+
+## Waiting on the owner, holding nothing
+- Basho maps - with its dash kept

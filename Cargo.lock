@@ -150,8 +150,8 @@ dependencies = [
  "design-messages",
  "dispatch-ports",
  "file-ports",
+ "grammar",
  "grammar-lines",
- "grammar-queue",
  "grammar-slug",
  "invariants",
  "newtype",
@@ -188,7 +188,7 @@ version = "0.1.0"
 dependencies = [
  "console-ports",
  "file-ports",
- "grammar-prose",
+ "grammar",
  "invariants",
  "newtype",
  "port-core",
@@ -409,20 +409,6 @@ dependencies = [
  "proptest",
  "record-derive",
  "thiserror",
-]
-
-[[package]]
-name = "grammar-prose"
-version = "0.1.0"
-dependencies = [
- "grammar",
-]
-
-[[package]]
-name = "grammar-queue"
-version = "0.1.0"
-dependencies = [
- "grammar",
 ]
 
 [[package]]
