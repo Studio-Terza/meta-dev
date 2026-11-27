@@ -1,0 +1,14 @@
+[Exact.written]
+shape = "repair: main|spec: ( ?[!-~]{1,8})( [!-~]{1,8}){0,3}"
+
+[Exact.printable]
+shape = "spec: [!-~]([ -~]{0,20}[!-~])?"
+
+[Exact.attached]
+shape = "spec: (none|owner [0-9a-f]{8}[0-9a-f-]{0,8}|[a-z0-9-]{1,8}#[DL][0-9]{1,3}(, ?[a-z0-9-]{1,8}#[DL][0-9]{1,3}){0,2})"
+
+[Steady.lexed]
+shape = "(spec: |repair: main)?[a-z0-9#, \t\r\n-]{0,12}"
+
+[Steady.attached]
+shape = "spec: (none|owner [0-9a-f]{8}[0-9a-f-]{0,8}|[a-z0-9-]{1,8}#[DL][0-9]{1,3}(, ?[a-z0-9-]{1,8}#[DL][0-9]{1,3}){0,2})"
