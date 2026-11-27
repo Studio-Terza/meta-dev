@@ -18,10 +18,10 @@ path = "tests/fuzz.rs"
 required-features = ["campaign"]
 
 [dev-dependencies]
-file-ports = { path = "../crates/file-ports" }
-invariants = { path = "../crates/invariants" }
+fixture = { path = "../crates/fixture" }
 lint = { path = "../crates/lint" }
 proptest.workspace = true
+shapes = { path = "../crates/shapes" }
 timer-ports = { path = "../crates/timer-ports" }
 
 [lints]
