@@ -16,6 +16,7 @@ design-messages = { path = "../design-messages" }
 dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports" }
 grammar-lines = { path = "../grammar-lines" }
+grammar-queue = { path = "../grammar-queue" }
 grammar-slug = { path = "../grammar-slug" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }

@@ -14,6 +14,7 @@ doctest = false
 [dependencies]
 invariants = { path = "../invariants" }
 file-ports = { path = "../file-ports" }
+grammar-prose = { path = "../grammar-prose" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 store-ports = { path = "../store-ports" }

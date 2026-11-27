@@ -23,15 +23,21 @@ pub enum Kept {
 pub struct Located {
     transcripts: PathBuf,
     workspace: PathBuf,
+    queue: PathBuf,
 }
 
 impl Located {
     const META: &'static str = ".meta";
     const STORE: &'static str = "design.sqlite";
     const AGENTS: &'static str = "agents";
+    const QUEUE: &'static str = "studio-meta-dev/transcripts/queue.md";
 
     pub fn transcripts<F: Files>(&self, files: F) -> ClaudeCodeDir<F> {
         ClaudeCodeDir::new(files, self.transcripts.clone())
+    }
+
+    pub fn queue(&self) -> &Path {
+        &self.queue
     }
 
     pub fn kept(&self, kept: Kept) -> PathBuf {
@@ -50,7 +56,10 @@ impl Kept {
 
 impl Projects {
     pub fn located(environment: &impl Environment, workspace: Option<&Path>) -> Result<Located, Failure> {
-        let home = environment.variable(OsStr::new("HOME")).ok_or(Failure::Unset(OsString::from("HOME")))?;
+        let home = environment
+            .variable(OsStr::new("HOME"))
+            .map(PathBuf::from)
+            .ok_or(Failure::Unset(OsString::from("HOME")))?;
         let current = environment.variable(OsStr::new("PWD")).map(PathBuf::from);
         let chosen = workspace
             .map(|named| current.clone().unwrap_or_default().join(named))
@@ -59,8 +68,9 @@ impl Projects {
         let root = Self::resolved(&chosen);
         let slug = Slug::try_from(root.as_path())?;
         Ok(Located {
-            transcripts: PathBuf::from(home).join(".claude").join("projects").join(PathBuf::from(slug)),
+            transcripts: home.join(".claude").join("projects").join(PathBuf::from(slug)),
             workspace: root,
+            queue: home.join(Located::QUEUE),
         })
     }
 

@@ -1,8 +1,11 @@
 use file_ports::Files;
+use grammar_queue::Queue;
+use invariants::Ignoring;
 use port_core::{Port, Run};
 use store_ports::Store;
 use transcript_ports::ClaudeCodeDir;
 
+use super::ignored::Ignored;
 use super::projects::Located;
 
 #[derive(Debug)]
@@ -24,6 +27,11 @@ impl<'run, F: Files, S: Store> Ground<'run, F, S> {
 
     pub fn files(&self) -> &F {
         &self.files
+    }
+
+    pub fn queue(&self) -> Option<Queue> {
+        let text = self.files.read_text(self.located.queue()).ignoring(Ignored::Unqueued)?;
+        Some(Queue::read(text.as_ref()))
     }
 
     pub fn transcripts(self) -> Port<'run, ClaudeCodeDir<F>> {

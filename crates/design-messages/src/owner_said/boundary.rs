@@ -1,16 +1,20 @@
 use std::fmt;
 
+use grammar_prose::Prose;
+use invariants::Ignoring;
 use store_ports::{Execute, Query, StoreFailure};
 use transcript_ports::{Authorship, Body, Instant, Uuid};
 
 use super::{LastSaid, OwnerHistory};
 use crate::boundary::SaidRow;
+use crate::boundary::ignored::Ignored;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Said {
     uuid: Uuid,
     at: Instant,
     body: Body,
+    asked: Option<Asked>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -18,7 +22,11 @@ pub struct Quote {
     uuid: Uuid,
     at: Instant,
     excerpt: Body,
+    asked: Option<Asked>,
 }
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Asked(Body);
 
 #[derive(Clone, Copy, Debug)]
 pub struct Unabridged<'said>(&'said Said);
@@ -46,6 +54,18 @@ impl Query for LastSaid {
     }
 }
 
+impl Asked {
+    const SHORT: usize = 8;
+
+    fn answered(lead: Option<&Body>, reply: &Body) -> Option<Asked> {
+        let replied: &str = reply.as_ref();
+        lead.filter(|_said| Prose::read(replied).words() < Asked::SHORT)
+            .and_then(|said| Prose::read(said.as_ref()).last_sentence().map(str::to_owned))
+            .and_then(|sentence| Body::try_new(sentence).ignoring(Ignored::Unasked))
+            .map(Asked)
+    }
+}
+
 impl Said {
     #[must_use]
     pub fn quoted(&self, uuid: &Uuid, quote: &Body) -> Option<Quote> {
@@ -55,11 +75,17 @@ impl Said {
             .then_some(excerpt)
             .and_then(|text| text.chars().next())
             .filter(|_| body.contains(excerpt))
-            .map(|_| Quote { uuid: self.uuid.clone(), at: self.at.clone(), excerpt: quote.clone() })
+            .map(|_| Quote {
+                uuid: self.uuid.clone(),
+                at: self.at.clone(),
+                excerpt: quote.clone(),
+                asked: self.asked.clone(),
+            })
     }
 
-    pub(crate) fn new(uuid: Uuid, at: Instant, body: Body) -> Said {
-        Said { uuid, at, body }
+    pub(crate) fn new(uuid: Uuid, at: Instant, body: Body, lead: Option<&Body>) -> Said {
+        let asked = Asked::answered(lead, &body);
+        Said { uuid, at, body, asked }
     }
 }
 
@@ -95,6 +121,13 @@ impl fmt::Display for Unabridged<'_> {
 
 impl fmt::Display for Quote {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{} {}: \"{}\"", self.uuid, self.at, self.excerpt)
+        match &self.asked {
+            None => write!(formatter, "{} {}: \"{}\"", self.uuid, self.at, self.excerpt),
+            Some(Asked(asked)) => write!(
+                formatter,
+                "{} {}: the lead said \"{}\" and the owner replied \"{}\"",
+                self.uuid, self.at, asked, self.excerpt
+            ),
+        }
     }
 }
