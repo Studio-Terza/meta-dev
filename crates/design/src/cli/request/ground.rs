@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, Files, Kind};
 use grammar_detail::{Cited, Heading};
@@ -65,6 +65,14 @@ impl<'run, F: Files, S: Store> Ground<'run, F, S> {
             Err(unsplit) => match unsplit {},
         };
         lines.into_iter().filter_map(|line| Heading::read(&line)).find(|heading| heading.detail() == cited.detail())
+    }
+
+    pub fn workspace(&self) -> &Path {
+        self.located.workspace()
+    }
+
+    pub fn settings(&self) -> PathBuf {
+        self.located.settings()
     }
 
     pub fn local(&self) -> Local {

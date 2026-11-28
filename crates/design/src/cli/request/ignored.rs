@@ -17,5 +17,9 @@ invariants::ignored! {
         Untitled => "a spec file that cannot be read gives no detail heading, so the pull request is unopened and that is escalated",
         Unremembered =>"a failed-check record that cannot be read or written counts no repeat failure",
         Unanswered =>"a failed transcript lookup or model call never blocks a stop; the stop proceeds as before",
+        Unattempted => "a run list or run attempt that does not parse as the asked fields leaves its step unread, and that is escalated",
+        Unlacked => "a comparison with main that cannot be read names no lacking merges; the agent is still sent back to merge main",
+        Unhooked => "a workspace settings file that cannot be read, parsed or written keeps its old hooks, and the install is escalated",
+        Structured => "a message sent to an agent that is not plain text is a protocol reply with no brief to read, so it passes unchanged",
     }
 }

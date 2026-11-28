@@ -1,5 +1,6 @@
 use std::fmt;
 use std::iter;
+use std::num::{NonZeroU32, NonZeroU64};
 use std::path::Path;
 
 use design_messages::{CheckName, PullNumber};
@@ -40,16 +41,33 @@ struct Head {
 #[derive(Debug, Deserialize)]
 struct Merging {
     mergeable: Mergeability,
+    #[serde(rename = "mergeStateStatus")]
+    state: MergeState,
 }
 
 #[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Mergeability {
+enum Mergeability {
     #[serde(rename = "MERGEABLE")]
     Clean,
     #[serde(rename = "CONFLICTING")]
     Conflicting,
     #[serde(rename = "UNKNOWN")]
     Unknown,
+}
+
+#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum MergeState {
+    Behind,
+    Dirty,
+    #[serde(other)]
+    Other,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Merge {
+    Current,
+    Stale,
 }
 
 #[derive(Debug, Deserialize)]
@@ -79,6 +97,44 @@ enum State {
 #[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(from = "String")]
 struct Link(Option<JobId>);
+
+#[derive(Debug, Deserialize)]
+struct Run {
+    #[serde(rename = "databaseId")]
+    id: NonZeroU64,
+    attempt: NonZeroU32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Attempt {
+    run: NonZeroU64,
+    number: u32,
+}
+
+#[derive(Debug, Deserialize)]
+struct Attempted {
+    jobs: Vec<Job>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Job {
+    name: CheckName,
+    conclusion: Conclusion,
+}
+
+#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum Conclusion {
+    Success,
+    Failure,
+    TimedOut,
+    Cancelled,
+    Skipped,
+    Neutral,
+    StartupFailure,
+    #[serde(other)]
+    Unfinished,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Unopened {
@@ -204,8 +260,17 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
         self.viewed::<Head>(pull, "headRefOid").map(|read| read.head).ok_or(UnreadStep::Head)
     }
 
-    pub fn mergeable(&self, pull: PullNumber) -> Result<Mergeability, UnreadStep> {
-        self.viewed::<Merging>(pull, "mergeable").map(|read| read.mergeable).ok_or(UnreadStep::Mergeable)
+    pub fn mergeable(&self, pull: PullNumber) -> Result<Merge, UnreadStep> {
+        self.viewed::<Merging>(pull, "mergeable,mergeStateStatus").map(Merging::merge).ok_or(UnreadStep::Mergeable)
+    }
+
+    pub fn lacking(&self, head: CommitSha) -> Vec<String> {
+        let compare = format!("repos/{}/compare/{head}...{}", self.repository, Hub::<C, G>::BASE);
+        let ran = self.spoke(&["api", &compare], Self::QUICK);
+        let printed = ran.as_ref().and_then(Ran::succeeded);
+        let compared: Option<Compared> =
+            printed.and_then(|read| serde_json::from_str(read.as_ref()).ignoring(Ignored::Unlacked));
+        compared.map_or_default(Compared::titles)
     }
 
     pub fn settled(&self, pull: PullNumber) -> Result<Verdict, UnreadStep> {
@@ -244,6 +309,30 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
         self.listed(pull).map_or(Ok(None), |checks| Verdict::read(&checks))
     }
 
+    pub fn gated(&self, head: CommitSha) -> Result<Option<CheckName>, UnreadStep> {
+        let sha = head.to_string();
+        let runs: Vec<Run> =
+            self.read(&["run", "list", "--commit", &sha, "--json", "databaseId,attempt"]).ok_or(UnreadStep::Runs)?;
+        runs.iter()
+            .flat_map(Run::earlier)
+            .map(|attempt| self.attempted(attempt))
+            .find_map(Result::transpose)
+            .transpose()
+    }
+
+    fn attempted(&self, attempt: Attempt) -> Result<Option<CheckName>, UnreadStep> {
+        let asked =
+            ["run", "view", &attempt.run.to_string(), "--attempt", &attempt.number.to_string(), "--json", "jobs"];
+        let attempted: Attempted = self.read(&asked).ok_or(UnreadStep::Attempt)?;
+        Ok(attempted.jobs.into_iter().find_map(Job::gated))
+    }
+
+    fn read<T: DeserializeOwned>(&self, arguments: &[&str]) -> Option<T> {
+        let ran = self.ran(arguments, Self::QUICK);
+        let printed = ran.as_ref().and_then(Ran::succeeded)?;
+        serde_json::from_str(printed.as_ref()).ignoring(Ignored::Unattempted)
+    }
+
     pub fn log(&self, job: JobId) -> String {
         let ran = self.ran(&["run", "view", "--job", &job.to_string(), "--log-failed"], Self::QUICK);
         ran.as_ref().and_then(Ran::succeeded).map_or_else(|| Hub::<C, G>::UNLOGGED.to_owned(), ToString::to_string)
@@ -269,6 +358,36 @@ impl Verdict {
         match self {
             Verdict::Green => Vec::new(),
             Verdict::Red(jobs) => jobs,
+        }
+    }
+}
+
+impl Merging {
+    fn merge(self) -> Merge {
+        match (self.mergeable, self.state) {
+            (Mergeability::Conflicting, MergeState::Behind | MergeState::Dirty | MergeState::Other)
+            | (Mergeability::Clean | Mergeability::Unknown, MergeState::Behind | MergeState::Dirty) => Merge::Stale,
+            (Mergeability::Clean | Mergeability::Unknown, MergeState::Other) => Merge::Current,
+        }
+    }
+}
+
+impl Run {
+    fn earlier(&self) -> impl Iterator<Item = Attempt> + use<'_> {
+        (1..self.attempt.get()).map(|number| Attempt { run: self.id, number })
+    }
+}
+
+impl Job {
+    fn gated(self) -> Option<CheckName> {
+        match self.conclusion {
+            Conclusion::Failure | Conclusion::TimedOut => Some(self.name),
+            Conclusion::Success
+            | Conclusion::Cancelled
+            | Conclusion::Skipped
+            | Conclusion::Neutral
+            | Conclusion::StartupFailure
+            | Conclusion::Unfinished => None,
         }
     }
 }

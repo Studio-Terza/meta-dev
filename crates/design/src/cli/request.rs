@@ -19,7 +19,7 @@ pub use ground::Ground;
 pub use local::{Local, Repository, Rooted};
 use projects::Projects;
 pub use projects::{Kept, Located};
-pub use queue::{Cause, Held, Item, Landed, Named, Queue, Target, UnreadStep};
+pub use queue::{Cause, Held, InstallStep, Item, Landed, Named, Queue, Target, UnreadStep};
 
 #[derive(Debug)]
 pub struct Request {

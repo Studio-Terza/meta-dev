@@ -31,6 +31,8 @@ impl Located {
     const STORE: &'static str = "design.sqlite";
     const AGENTS: &'static str = "agents";
     const LOCAL: &'static str = "local.toml";
+    const CLAUDE: &'static str = ".claude";
+    const SETTINGS: &'static str = "settings.local.json";
 
     pub fn transcripts<F: Files>(&self, files: F) -> ClaudeCodeDir<F> {
         ClaudeCodeDir::new(files, self.transcripts.clone())
@@ -38,6 +40,14 @@ impl Located {
 
     pub fn kept(&self, kept: Kept) -> PathBuf {
         self.workspace.join(Self::META).join(kept.name())
+    }
+
+    pub fn workspace(&self) -> &Path {
+        &self.workspace
+    }
+
+    pub fn settings(&self) -> PathBuf {
+        self.workspace.join(Self::CLAUDE).join(Self::SETTINGS)
     }
 }
 
