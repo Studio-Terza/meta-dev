@@ -2,3 +2,8 @@
 name = "starters"
 
 [workspace]
+
+[lib]
+test = false
+doctest = false
+bench = false

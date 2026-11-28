@@ -1,0 +1,13 @@
+[package]
+name = "binned"
+
+[lib]
+test = false
+doctest = false
+bench = false
+
+[[bin]]
+name = "binned"
+test = true
+doctest = false
+bench = false
