@@ -10,7 +10,7 @@ use crate::budget::TestScan;
 use crate::expansion::Expansion;
 use crate::lints::{
     BoolMethods, Emitters, ExpressionFlow, ManualIteration, NamedLifetimes, NoDyn, NoFreeFns, NoTestOnlyApi,
-    ProcessStarters, PublicApiTests, PublicSurface, TypeShape, VecOutParams,
+    ProcessStarters, PublicApiTests, PublicSurface, RealAdapters, TypeShape, VecOutParams,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -243,6 +243,7 @@ walker! {
         public_api_tests: PublicApiTests<'file>,
         emitters: Emitters,
         no_test_only_api: NoTestOnlyApi<'file>,
+        real_adapters: RealAdapters<'file>,
         test_scan: TestScan,
     ]
     nodes [

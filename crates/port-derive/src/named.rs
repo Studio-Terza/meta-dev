@@ -8,6 +8,7 @@ use super::declared::{Constant, Spelling};
 pub enum Derived {
     Op,
     Resource,
+    Real,
 }
 
 pub struct Named {
@@ -22,6 +23,7 @@ impl Derived {
         match self {
             Derived::Op => quote!(::port_core::Op),
             Derived::Resource => quote!(::port_core::Resource),
+            Derived::Real => quote!(::port_core::Real),
         }
     }
 
@@ -29,6 +31,7 @@ impl Derived {
         match self {
             Derived::Op => &Self::OP,
             Derived::Resource => <Constant as strum::VariantArray>::VARIANTS,
+            Derived::Real => &[],
         }
     }
 }

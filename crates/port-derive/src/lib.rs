@@ -20,3 +20,8 @@ pub fn derive_resource(input: TokenStream) -> TokenStream {
 pub fn derive_op(input: TokenStream) -> TokenStream {
     Named::expanded(input.into(), Derived::Op).into()
 }
+
+#[proc_macro_derive(Real)]
+pub fn derive_real(input: TokenStream) -> TokenStream {
+    Named::expanded(input.into(), Derived::Real).into()
+}

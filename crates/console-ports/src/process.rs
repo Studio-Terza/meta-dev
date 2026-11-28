@@ -8,8 +8,9 @@ use std::process::ExitCode;
 use crate::process::ignored::Ignored;
 use crate::{Answer, Complaint, Environment, Heard, Shown};
 use invariants::Ignoring;
+use port_core::Real;
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Real, Clone, Copy, Debug, Default)]
 pub struct Process;
 
 impl Process {

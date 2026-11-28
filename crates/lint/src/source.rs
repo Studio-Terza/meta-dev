@@ -70,6 +70,7 @@ impl Location {
 
 impl Source {
     const PORTS: &'static str = "ports";
+    const MAIN: &'static str = "main.rs";
 
     pub(crate) fn new(
         package: Arc<Package>,
@@ -108,6 +109,11 @@ impl Source {
 
     pub(crate) fn library_root(&self) -> Option<()> {
         self.location.library
+    }
+
+    pub(crate) fn binary_root(&self) -> Option<()> {
+        let main = self.real.file_name().filter(|name| *name == Source::MAIN);
+        main.filter(|_main| self.reached == CrateKind::Binary).map(|_main| ())
     }
 
     pub(crate) fn own_crate(&self) -> Option<String> {
