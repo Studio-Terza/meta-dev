@@ -1,2 +1,0 @@
-# Texts the bare lexer reads; tests/lexed.txt holds what it reads them as.
-bare = ["abc", "_a-9", "msg:1", "a b", "-a", "", "abc\n"]

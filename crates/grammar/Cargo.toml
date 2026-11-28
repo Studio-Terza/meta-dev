@@ -17,7 +17,13 @@ bench = false
 [dependencies]
 invariants = { path = "../invariants" }
 logos.workspace = true
+newtype = { path = "../newtype" }
 thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+serde.workspace = true
+test-failure = { path = "../test-failure" }
 
 [lints]
 workspace = true

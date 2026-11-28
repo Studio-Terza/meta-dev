@@ -3,10 +3,11 @@ use std::num::{NonZeroU32, NonZeroU64};
 use std::path::{Path, PathBuf};
 
 use design_messages::{CheckName, CommitSha, PullNumber};
-use grammar_lines::Lines;
-use grammar_report::{AgentReport, BranchName, Ended, JobLink, Target};
-use grammar_repository::SpecTrailer;
-use grammar_spec_line::Attachment;
+use grammar::Grammar;
+use grammar::lines::Lines;
+use grammar::report::{AgentReport, BranchName, Ended, JobLink, Target};
+use grammar::repository::SpecTrailer;
+use grammar::spec_line::Attachment;
 use invariants::Ignoring;
 use newtype::{Display, Newtype};
 use serde::Deserialize;
@@ -179,13 +180,9 @@ impl First {
 impl From<String> for First {
     fn from(message: String) -> First {
         let trailer = SpecTrailer::read(&message).map(|trailer| trailer.value().to_owned());
-        let lines = match message.parse::<Lines>() {
-            Ok(lines) => lines,
-            Err(unsplit) => match unsplit {},
-        };
         First {
             spec: trailer.and_then(|value| Attachment::try_new(value).ignoring(Ignored::Unspecified)),
-            title: lines.into_iter().next().unwrap_or_default(),
+            title: Lines::from(message.as_str()).into_iter().next().unwrap_or_default(),
         }
     }
 }

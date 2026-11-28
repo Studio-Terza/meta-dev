@@ -4,8 +4,9 @@ use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, Epoch, Offset, Size, Stamp, Stamps, Tail};
-use grammar_lines::Lines;
-use grammar_notice::TaskFile;
+use grammar::Grammar;
+use grammar::lines::Lines;
+use grammar::notice::TaskFile;
 use invariants::Ignoring;
 use newtype::Wrapping;
 use pipeline::Measure;
@@ -219,8 +220,7 @@ impl From<Runner> for Stamp {
 
 impl Line {
     fn last(text: &str) -> Option<Ended> {
-        let lines = text.parse::<Lines>().ignoring(Ignored::Untasked)?;
-        let read = lines
+        let read = Lines::from(text)
             .into_iter()
             .rev()
             .map(|line| serde_json::from_str::<Line>(&line).ignoring(Ignored::Untasked).map_or(Turn::Open, Line::read))

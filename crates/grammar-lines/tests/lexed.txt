@@ -1,3 +1,0 @@
-lines "": [] [] []
-lines "a\tb\n\nc\r\nd": ["a\tb", "", "c\r", "d"] ["a\tb\n", "\n", "c\r\n", "d"] [["a", "b"], [], ["c\r"], ["d"]]
-lines "\t\tx\t\n": ["\t\tx\t"] ["\t\tx\t\n"] [["x"]]
