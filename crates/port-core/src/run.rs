@@ -1,13 +1,13 @@
 mod boundary;
 
-use std::collections::BTreeMap;
 use std::error::Error;
+use std::fmt;
+use std::mem;
 use std::sync::Mutex;
 
 use invariants::Unpoisoned;
-use newtype::Counter;
+use pipeline::Measure;
 
-use super::calls::Calls;
 use super::op::OpName;
 use super::snapshot::Snapshot;
 use boundary::Told;
@@ -19,40 +19,35 @@ pub struct ReleaseFailure {
     failure: Told,
 }
 
-#[derive(Debug, thiserror::Error)]
-#[error("{first} ({} further release failures)", .rest.len())]
-pub struct ReleaseFailures {
-    first: ReleaseFailure,
-    rest: Vec<ReleaseFailure>,
-}
-
-impl ReleaseFailures {
-    fn joined(
-        settled: Result<Snapshot, ReleaseFailures>,
-        failure: ReleaseFailure,
-    ) -> Result<Snapshot, ReleaseFailures> {
-        match settled {
-            Ok(_snapshot) => Err(ReleaseFailures { first: failure, rest: Vec::new() }),
-            Err(failures) => Err(failures.appended(failure)),
-        }
-    }
-
-    fn appended(mut self, failure: ReleaseFailure) -> ReleaseFailures {
-        self.rest.push(failure);
-        self
-    }
-}
+#[derive(Debug, Default, Measure)]
+pub struct ReleaseFailures(Vec<ReleaseFailure>);
 
 #[derive(Debug, Default)]
 struct Ledger {
-    calls: Mutex<BTreeMap<OpName, Calls>>,
-    failures: Mutex<Vec<ReleaseFailure>>,
+    calls: Mutex<Snapshot>,
+    failures: Mutex<ReleaseFailures>,
 }
 
 #[derive(Debug)]
 pub struct Measured {
     snapshot: Snapshot,
-    failures: Vec<ReleaseFailure>,
+    failures: ReleaseFailures,
+}
+
+impl ReleaseFailures {
+    fn failed(&mut self, failure: ReleaseFailure) {
+        *self = mem::take(self).joined(ReleaseFailures(vec![failure]));
+    }
+}
+
+impl Error for ReleaseFailures {}
+
+impl fmt::Display for ReleaseFailures {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0
+            .split_first()
+            .map_or(Ok(()), |(first, rest)| write!(formatter, "{first} ({} further release failures)", rest.len()))
+    }
 }
 
 impl Measured {
@@ -63,7 +58,10 @@ impl Measured {
 
     pub fn settled(self) -> Result<Snapshot, ReleaseFailures> {
         let Measured { snapshot, failures } = self;
-        failures.into_iter().fold(Ok(snapshot), ReleaseFailures::joined)
+        match failures.0.first() {
+            None => Ok(snapshot),
+            Some(_first) => Err(failures),
+        }
     }
 }
 
@@ -81,16 +79,14 @@ impl Run {
     pub fn finish(self) -> Measured {
         let calls = self.ledger.calls.into_inner().unpoisoned();
         let failures = self.ledger.failures.into_inner().unpoisoned();
-        Measured { snapshot: Snapshot::counted(calls), failures }
+        Measured { snapshot: calls, failures }
     }
 
     pub(crate) fn count(&self, name: OpName) {
-        let mut calls = self.ledger.calls.lock().unpoisoned();
-        let entry = calls.entry(name).or_default();
-        *entry = entry.incremented();
+        self.ledger.calls.lock().unpoisoned().count(name);
     }
 
     pub(crate) fn fail(&self, resource: OpName, failure: &impl Error) {
-        self.ledger.failures.lock().unpoisoned().push(ReleaseFailure { resource, failure: Told::from(failure) });
+        self.ledger.failures.lock().unpoisoned().failed(ReleaseFailure { resource, failure: Told::from(failure) });
     }
 }

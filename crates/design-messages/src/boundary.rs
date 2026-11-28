@@ -98,7 +98,7 @@ FROM
     fn revising<D: Done>(&self, found: &CursorRow, statements: &mut impl Execute) -> Result<D, StoreFailure> {
         Some(found)
             .filter(|stored| *stored != self)
-            .map_or_else(|| Ok(D::unchanged()), |_changed| statements.done(self.updated()))
+            .map_or_else(|| Ok(D::default()), |_changed| statements.done(self.updated()))
     }
 }
 

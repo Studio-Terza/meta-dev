@@ -11,6 +11,7 @@ doctest = false
 bench = false
 
 [dependencies]
+pipeline = { path = "../pipeline" }
 port-core = { path = "../port-core" }
 
 [lints]

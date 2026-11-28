@@ -16,6 +16,8 @@ mod vec_out_params;
 
 use std::sync::Arc;
 
+use pipeline::Measure;
+
 use crate::budget::{Budget, TestScan};
 use crate::finding::Finding;
 use crate::gate::Gate;
@@ -40,7 +42,7 @@ pub(crate) use real_adapters::{AdapterFact, RealAdapters};
 pub(crate) use type_shape::TypeShape;
 pub(crate) use vec_out_params::VecOutParams;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Measure)]
 pub(crate) struct Facts {
     surface: Vec<SurfaceFact>,
     api: Vec<ApiFact>,
@@ -146,16 +148,6 @@ impl<'run> Lints<'run> {
 }
 
 impl Facts {
-    pub(crate) fn joined(self, later: Facts) -> Facts {
-        Facts {
-            surface: self.surface.into_iter().chain(later.surface).collect(),
-            api: self.api.into_iter().chain(later.api).collect(),
-            test_only: self.test_only.into_iter().chain(later.test_only).collect(),
-            adapters: self.adapters.into_iter().chain(later.adapters).collect(),
-            modules: self.modules.into_iter().chain(later.modules).collect(),
-        }
-    }
-
     pub(crate) fn reduced(self, packages: &[Arc<Package>]) -> Vec<Finding> {
         let surface = PublicSurface::reduce(self.surface, packages);
         let api = PublicApiTests::reduce(self.api, packages);

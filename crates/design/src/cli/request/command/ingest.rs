@@ -3,7 +3,8 @@ mod count;
 use std::fmt;
 
 use design_messages::{Cursors, SessionCursors, SessionRecords};
-use newtype::Counter;
+use newtype::Wrapping;
+use pipeline::Measure;
 use store_ports::{Counted, Store, Written};
 use transcript_ports::{Authorship, Cursor, Kind, Line, Session, SessionId, Transcripts};
 
@@ -25,7 +26,7 @@ struct Ingested {
     written: Written,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default, Measure)]
 pub struct Tally {
     ends: Vec<ReadTo>,
     authorship: Counts<Authorship>,
@@ -53,7 +54,7 @@ impl<'ports, T: Transcripts, S: Store> Ingest<'ports, T, S> {
             .map(|(session, cursor)| ingest.session(session, cursor))
             .collect::<Result<Vec<_>, Failure>>()?;
         lock.end()?;
-        Ok(Tally::counted(ingested))
+        Ok(Tally::total(ingested.into_iter().map(Tally::from)))
     }
 
     fn session(&self, session: &Session, cursor: Cursor) -> Result<Ingested, Failure> {
@@ -68,12 +69,15 @@ impl<'ports, T: Transcripts, S: Store> Ingest<'ports, T, S> {
     }
 }
 
-impl Tally {
-    fn counted(ingested: Vec<Ingested>) -> Tally {
-        let written = <Written as Counter>::total(ingested.iter().map(|session| session.written));
-        let authorship = ingested.iter().flat_map(|session| session.authors.iter().copied()).collect();
-        let unrecognised = ingested.iter().flat_map(|session| session.unrecognised.iter().cloned()).collect();
-        Tally { ends: ingested.into_iter().map(|session| session.end).collect(), authorship, unrecognised, written }
+impl From<Ingested> for Tally {
+    fn from(session: Ingested) -> Tally {
+        let Ingested { end, authors, unrecognised, written } = session;
+        Tally {
+            ends: vec![end],
+            authorship: authors.into_iter().collect(),
+            unrecognised: unrecognised.into_iter().collect(),
+            written,
+        }
     }
 }
 
@@ -82,6 +86,6 @@ impl fmt::Display for Tally {
         self.ends.iter().try_for_each(|end| writeln!(formatter, "session {} read to {}", end.session, end.cursor))?;
         self.authorship.listed(formatter, "authorship")?;
         self.unrecognised.listed(formatter, "unrecognised")?;
-        writeln!(formatter, "written {}", Count::new(self.written.count()))
+        writeln!(formatter, "written {}", Count::new(self.written.into_inner()))
     }
 }

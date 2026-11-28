@@ -5,6 +5,7 @@ use std::process::ExitCode;
 
 use file_ports::Files;
 use invariants::Ignoring;
+use pipeline::Measure;
 use port_core::Run;
 use rayon::ThreadPoolBuilder;
 use timer_ports::{Timer, TimerFiller};

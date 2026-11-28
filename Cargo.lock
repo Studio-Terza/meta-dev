@@ -153,6 +153,7 @@ dependencies = [
  "grammar-spec-line",
  "invariants",
  "newtype",
+ "pipeline",
  "port-core",
  "serde",
  "serde_json",
@@ -251,6 +252,7 @@ version = "0.1.0"
 dependencies = [
  "invariants",
  "newtype",
+ "pipeline",
  "tempfile",
  "test-failure",
  "thiserror",
@@ -499,6 +501,7 @@ dependencies = [
  "console-ports",
  "file-ports",
  "invariants",
+ "pipeline",
  "port-core",
  "proc-macro2",
  "ra-ap-rustc_lexer",
@@ -592,6 +595,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
+name = "pipeline"
+version = "0.1.0"
+dependencies = [
+ "file-ports",
+ "newtype-derive",
+ "port-core",
+ "proptest",
+ "store-ports",
+]
+
+[[package]]
 name = "pkg-config"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -603,6 +617,7 @@ version = "0.1.0"
 dependencies = [
  "invariants",
  "newtype",
+ "pipeline",
  "port-derive",
  "thiserror",
 ]
@@ -861,6 +876,7 @@ dependencies = [
  "file-ports",
  "invariants",
  "newtype",
+ "pipeline",
  "port-core",
  "proptest",
  "sqlite-ports",
@@ -957,6 +973,7 @@ dependencies = [
 name = "timer-ports"
 version = "0.1.0"
 dependencies = [
+ "pipeline",
  "port-core",
 ]
 

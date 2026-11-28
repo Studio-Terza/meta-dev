@@ -1,9 +1,12 @@
 use std::collections::BTreeMap;
+use std::mem;
+
+use pipeline::Measure;
 
 use super::calls::Calls;
 use super::op::{Op, OpName};
 
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, Measure)]
 pub struct Snapshot(BTreeMap<OpName, Calls>);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -39,7 +42,8 @@ impl Snapshot {
         self.0.iter().map(|(name, calls)| Counted { name: *name, calls: *calls })
     }
 
-    pub(crate) fn counted(ledger: BTreeMap<OpName, Calls>) -> Snapshot {
-        Snapshot(ledger)
+    pub(crate) fn count(&mut self, name: OpName) {
+        let called = Snapshot(BTreeMap::from([(name, Calls::new(1))]));
+        *self = mem::take(self).joined(called);
     }
 }

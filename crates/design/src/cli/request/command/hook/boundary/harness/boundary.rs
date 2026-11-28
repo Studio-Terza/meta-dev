@@ -8,6 +8,7 @@ use grammar_lines::Lines;
 use grammar_notice::TaskFile;
 use invariants::Ignoring;
 use newtype::Wrapping;
+use pipeline::Measure;
 use serde::Deserialize;
 use transcript_ports::{Body, TaskId};
 
@@ -55,7 +56,7 @@ pub struct Task {
 #[derive(Debug, Default)]
 pub struct Stopped(BTreeSet<TaskId>);
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Measure)]
 pub struct Tasks {
     shells: usize,
     agents: usize,
@@ -298,30 +299,22 @@ impl From<&Tasks> for Halt {
 
 impl FromIterator<Task> for Tasks {
     fn from_iter<Read: IntoIterator<Item = Task>>(tasks: Read) -> Tasks {
-        tasks.into_iter().fold(Tasks::default(), Tasks::counted)
+        Tasks::total(tasks.into_iter().map(Tasks::from))
+    }
+}
+
+impl From<Task> for Tasks {
+    fn from(task: Task) -> Tasks {
+        match (task.status, task.runner) {
+            (Status::Live, Runner::Shell) => Tasks { shells: 1, ..Tasks::default() },
+            (Status::Live, Runner::Agent) => Tasks { agents: 1, ..Tasks::default() },
+            (Status::Hung, _) => Tasks { hung: BTreeSet::from([task.name]), ..Tasks::default() },
+            (Status::Finished | Status::Attended | Status::Gone, _) => Tasks::default(),
+        }
     }
 }
 
 impl Tasks {
-    fn counted(self, task: Task) -> Tasks {
-        match task.status {
-            Status::Live => self.running_by(task.runner),
-            Status::Hung => self.hung_on(task.name),
-            Status::Finished | Status::Attended | Status::Gone => self,
-        }
-    }
-
-    fn running_by(self, runner: Runner) -> Tasks {
-        match runner {
-            Runner::Shell => Tasks { shells: self.shells + 1, ..self },
-            Runner::Agent => Tasks { agents: self.agents + 1, ..self },
-        }
-    }
-
-    fn hung_on(self, name: Body) -> Tasks {
-        Tasks { hung: self.hung.into_iter().chain([name]).collect(), ..self }
-    }
-
     #[must_use]
     pub fn unstopped(self, stopped: &Stopped) -> Tasks {
         Tasks { hung: self.hung.into_iter().filter(|name| stopped.holding(name).is_none()).collect(), ..self }
