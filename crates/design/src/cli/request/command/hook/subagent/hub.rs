@@ -41,16 +41,33 @@ struct Head {
 #[derive(Debug, Deserialize)]
 struct Merging {
     mergeable: Mergeability,
+    #[serde(rename = "mergeStateStatus")]
+    state: MergeState,
 }
 
 #[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Mergeability {
+enum Mergeability {
     #[serde(rename = "MERGEABLE")]
     Clean,
     #[serde(rename = "CONFLICTING")]
     Conflicting,
     #[serde(rename = "UNKNOWN")]
     Unknown,
+}
+
+#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum MergeState {
+    Behind,
+    Dirty,
+    #[serde(other)]
+    Other,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Merge {
+    Current,
+    Stale,
 }
 
 #[derive(Debug, Deserialize)]
@@ -243,8 +260,17 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
         self.viewed::<Head>(pull, "headRefOid").map(|read| read.head).ok_or(UnreadStep::Head)
     }
 
-    pub fn mergeable(&self, pull: PullNumber) -> Result<Mergeability, UnreadStep> {
-        self.viewed::<Merging>(pull, "mergeable").map(|read| read.mergeable).ok_or(UnreadStep::Mergeable)
+    pub fn mergeable(&self, pull: PullNumber) -> Result<Merge, UnreadStep> {
+        self.viewed::<Merging>(pull, "mergeable,mergeStateStatus").map(Merging::merge).ok_or(UnreadStep::Mergeable)
+    }
+
+    pub fn lacking(&self, head: CommitSha) -> Vec<String> {
+        let compare = format!("repos/{}/compare/{head}...{}", self.repository, Hub::<C, G>::BASE);
+        let ran = self.spoke(&["api", &compare], Self::QUICK);
+        let printed = ran.as_ref().and_then(Ran::succeeded);
+        let compared: Option<Compared> =
+            printed.and_then(|read| serde_json::from_str(read.as_ref()).ignoring(Ignored::Unlacked));
+        compared.map_or_default(Compared::titles)
     }
 
     pub fn settled(&self, pull: PullNumber) -> Result<Verdict, UnreadStep> {
@@ -332,6 +358,16 @@ impl Verdict {
         match self {
             Verdict::Green => Vec::new(),
             Verdict::Red(jobs) => jobs,
+        }
+    }
+}
+
+impl Merging {
+    fn merge(self) -> Merge {
+        match (self.mergeable, self.state) {
+            (Mergeability::Conflicting, MergeState::Behind | MergeState::Dirty | MergeState::Other)
+            | (Mergeability::Clean | Mergeability::Unknown, MergeState::Behind | MergeState::Dirty) => Merge::Stale,
+            (Mergeability::Clean | Mergeability::Unknown, MergeState::Other) => Merge::Current,
         }
     }
 }

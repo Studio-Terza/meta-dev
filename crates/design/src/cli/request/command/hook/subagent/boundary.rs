@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use design_messages::PullNumber;
+use grammar_lines::Lines;
 use grammar_report::{AgentReport, BranchName, Ended, JobLink, Target};
 use grammar_repository::SpecTrailer;
 use grammar_spec_line::Attachment;
@@ -75,6 +76,7 @@ pub struct Unbranched;
 #[serde(from = "String")]
 pub struct First {
     spec: Option<Attachment>,
+    title: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -181,13 +183,24 @@ impl First {
 impl From<String> for First {
     fn from(message: String) -> First {
         let trailer = SpecTrailer::read(&message).map(|trailer| trailer.value().to_owned());
-        First { spec: trailer.and_then(|value| Attachment::try_new(value).ignoring(Ignored::Unspecified)) }
+        let lines = match message.parse::<Lines>() {
+            Ok(lines) => lines,
+            Err(unsplit) => match unsplit {},
+        };
+        First {
+            spec: trailer.and_then(|value| Attachment::try_new(value).ignoring(Ignored::Unspecified)),
+            title: lines.into_iter().next().unwrap_or_default(),
+        }
     }
 }
 
 impl Compared {
     pub fn first(self) -> Option<First> {
         self.commits.into_iter().next().map(|committed| committed.commit.message)
+    }
+
+    pub fn titles(self) -> Vec<String> {
+        self.commits.into_iter().map(|committed| committed.commit.message.title).collect()
     }
 }
 

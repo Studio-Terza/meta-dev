@@ -393,7 +393,7 @@ finish = "Still prose."
 reminded = "Yes"
 
 [[story]]
-name = "a done on a sha the pull request does not hold, or on a conflicting one, is sent back without waiting on ci"
+name = "a done on a sha the pull request does not hold, or on one behind or conflicting with main, is sent back at once to merge main naming the merges it lacks"
 
 [[story.step]]
 finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
@@ -407,7 +407,16 @@ finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
 reminded = "Yes"
 answers = [
   { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
-  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"CONFLICTING"}' },
+  { asked = "pr view 12 --json mergeable,mergeStateStatus -R o/r", ran = "Succeeded", printed = '{"mergeStateStatus":"DIRTY","mergeable":"CONFLICTING"}' },
+  { asked = "api repos/o/r/compare/0123456789abcdef0123456789abcdef01234567...main", ran = "Succeeded", printed = '{"commits":[{"commit":{"message":"Merge pull request #717 from o/ci/mutants-label\n\nMutants on label"}},{"commit":{"message":"Merge pull request #719 from o/ci/logos-chain"}}]}' },
+]
+
+[[story.step]]
+finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+  { asked = "pr view 12 --json mergeable,mergeStateStatus -R o/r", ran = "Succeeded", printed = '{"mergeStateStatus":"BEHIND","mergeable":"MERGEABLE"}' },
+  { asked = "api repos/o/r/compare/0123456789abcdef0123456789abcdef01234567...main", ran = "Failed", printed = "" },
 ]
 
 [[story]]
@@ -424,7 +433,7 @@ pull = 12
 '''
 answers = [
   { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
-  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"UNKNOWN"}' },
+  { asked = "pr view 12 --json mergeable,mergeStateStatus -R o/r", ran = "Succeeded", printed = '{"mergeStateStatus":"UNKNOWN","mergeable":"UNKNOWN"}' },
   { asked = "run list --commit 0123456789abcdef0123456789abcdef01234567 --json databaseId,attempt -R o/r", ran = "Succeeded", printed = '[{"attempt":1,"databaseId":9}]' },
   { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = "" },
   { asked = "pr edit 12 --remove-label mutants -R o/r", ran = "Failed", printed = "" },
@@ -449,7 +458,7 @@ name = "a red done is sent back with each failed job's log tail, a repeat failur
 queue = ""
 answers = [
   { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
-  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"MERGEABLE"}' },
+  { asked = "pr view 12 --json mergeable,mergeStateStatus -R o/r", ran = "Succeeded", printed = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
   { asked = "run list --commit 0123456789abcdef0123456789abcdef01234567 --json databaseId,attempt -R o/r", ran = "Succeeded", printed = '[{"attempt":1,"databaseId":9}]' },
   { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"fail","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"},{"bucket":"cancel","link":"https://github.com/o/r/actions/runs/9/job/458?pr=12","name":"build"},{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/457","name":"lint"},{"bucket":"pass","link":"https://github.com/o/r/actions/runs/10/job/460","name":"mutants"}]' },
   { asked = "run view --job 456 --log-failed -R o/r", ran = "Succeeded", printed = """
@@ -519,7 +528,7 @@ name = "a green that came on a rerun after a gate failed on the same head is esc
 queue = ""
 answers = [
   { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
-  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"MERGEABLE"}' },
+  { asked = "pr view 12 --json mergeable,mergeStateStatus -R o/r", ran = "Succeeded", printed = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
   { asked = "pr edit 12 --remove-label mutants -R o/r", ran = "Succeeded", printed = "https://github.com/o/r/pull/12" },
   { asked = "pr edit 12 --add-label mutants -R o/r", ran = "Succeeded", printed = "https://github.com/o/r/pull/12" },
   { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Succeeded", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"clippy"},{"bucket":"pass","link":"https://github.com/o/r/actions/runs/10/job/460","name":"mutants"}]' },
@@ -586,14 +595,14 @@ answers = [
 finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
 answers = [
   { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
-  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"DIVERGED"}' },
+  { asked = "pr view 12 --json mergeable,mergeStateStatus -R o/r", ran = "Succeeded", printed = '{"mergeStateStatus":"CLEAN","mergeable":"DIVERGED"}' },
 ]
 
 [[story.step]]
 finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
 answers = [
   { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
-  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"MERGEABLE"}' },
+  { asked = "pr view 12 --json mergeable,mergeStateStatus -R o/r", ran = "Succeeded", printed = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
   { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"}]' },
   { asked = "pr edit 12 --remove-label mutants -R o/r", ran = "Succeeded", printed = "https://github.com/o/r/pull/12" },
   { asked = "pr edit 12 --add-label mutants -R o/r", ran = "Failed", printed = "could not add label: 'mutants' not found" },
@@ -603,7 +612,7 @@ answers = [
 finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
 answers = [
   { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
-  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"MERGEABLE"}' },
+  { asked = "pr view 12 --json mergeable,mergeStateStatus -R o/r", ran = "Succeeded", printed = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
   { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"fail","link":"https://ci.example/9","name":"status"},{"bucket":"pending","link":"","name":"mutants"}]' },
 ]
 
@@ -611,7 +620,7 @@ answers = [
 finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
 answers = [
   { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
-  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"MERGEABLE"}' },
+  { asked = "pr view 12 --json mergeable,mergeStateStatus -R o/r", ran = "Succeeded", printed = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
   { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"pending","link":"","name":"test"},{"bucket":"pending","link":"","name":"mutants"}]' },
   { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Overdue", printed = "" },
 ]
@@ -644,7 +653,7 @@ https://github.com/o/r/pull/12
 """ },
   { asked = "pr view design/open-pr --json number -R o/r", ran = "Succeeded", printed = '{"number":12}' },
   { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
-  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"MERGEABLE"}' },
+  { asked = "pr view 12 --json mergeable,mergeStateStatus -R o/r", ran = "Succeeded", printed = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
   { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Succeeded", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"}]' },
   { asked = "run list --commit 0123456789abcdef0123456789abcdef01234567 --json databaseId,attempt -R o/r", ran = "Succeeded", printed = '[{"attempt":1,"databaseId":9}]' },
   { asked = "pr edit 12 --remove-label mutants -R o/r", ran = "Succeeded", printed = "https://github.com/o/r/pull/12" },
