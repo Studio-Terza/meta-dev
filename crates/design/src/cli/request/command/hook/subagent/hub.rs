@@ -270,21 +270,25 @@ impl<'hook> Hub<'hook> {
         let deadline = Deadline::after(tape.now(), Self::WATCH);
         iter::repeat_with(|| tape.now())
             .take_while(|now| deadline.due(*now) == Due::Pending)
-            .find_map(|_now| self.polled(tape, pull).transpose())
+            .find_map(|_now| {
+                let polled = self.polled(tape, pull);
+                let waited = polled.and_then(|verdict| {
+                    verdict.map_or_else(|| self.waited(tape, pull).map(|()| None), |found| Ok(Some(found)))
+                });
+                waited.transpose()
+            })
             .unwrap_or(Err(Cut::Failed(UnreadStep::Overdue)))
     }
 
     fn polled(&self, tape: &Tape<'_>, pull: PullNumber) -> Result<Option<Verdict>, Cut<UnreadStep>> {
         let listed = self.listed(tape, pull)?;
-        let verdict = listed.map_or(Ok(None), |checks| Verdict::read(&checks)).map_err(Cut::Failed)?;
-        verdict.map_or_else(
-            || {
-                self.ran(tape, &["pr", "checks", &pull.to_string(), "--watch", "--fail-fast"], Self::WATCH)?;
-                tape.paused(Self::POLL)?;
-                Ok(None)
-            },
-            |found| Ok(Some(found)),
-        )
+        listed.map_or(Ok(None), |checks| Verdict::read(&checks)).map_err(Cut::Failed)
+    }
+
+    fn waited(&self, tape: &Tape<'_>, pull: PullNumber) -> Result<(), Cut<UnreadStep>> {
+        self.ran(tape, &["pr", "checks", &pull.to_string(), "--watch", "--fail-fast"], Self::WATCH)?;
+        tape.paused(Self::POLL)?;
+        Ok(())
     }
 
     pub fn requested(&self, tape: &Tape<'_>, pull: PullNumber) -> Result<(), Cut<UnreadStep>> {
