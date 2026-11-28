@@ -29,7 +29,7 @@ pub enum Input {
     Manifest(Vec<u8>),
     Damaged(Placed, Few<Item>, Index, u8, Damage),
     Deep(Placed, Shell, u8, Expression),
-    Long(Placed, Link, u16),
+    Long(Placed, Link, u8),
 }
 
 #[derive(Arbitrary, Clone, Copy, Debug)]

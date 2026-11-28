@@ -1,0 +1,482 @@
+[
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/tests/fuzzed.rs",
+            "\\xdc\\xb1\\xcb\\x87\\xb3`\\xd4.\\x9bP\\xc74\\x03^\\x81t\\xc5\\x80]\\xf7\\x13`\\xe0\\xb6=Zr\\xcfl\\xe5\\xbfB$\\xc6P\\xf5\\x87\\xa1r\\xed\\x1c\\xe5R\\xb4 \\xaekv1a\\x0e\\x81\\x0fsy\\x14\\xe6\\x99{heX\\xfdq\\x08\\x9d\\xddF;NT\\x83\\x8f\\x0b",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/main.rs",
+            "mod \\\"text\\\" { pub trait from_str: Sized { impl std::process::Command::new(\\\"ls\\\") for is_ready { mod \\\"text\\\" { mod is_ready { pub trait ports: Sized { union U { a: u8, b: u16 } } } } } } }\\nmod () { pub trait 0: Sized { #[cfg(test)] mod tests { use super::*; impl std::fs::remove_dir_all(\\\"p\\\") for \\\"text\\\" { pub trait std::fs::remove_dir_all(\\\"p\\\"): Sized { #[cfg(test)] pub struct ()<\\'a> { pub field: Option<Foo> } } } } } }\\nmod \\\"text\\\" {| pub trait from_str: Sized { impl None for is_ready { pub trait \\'c\\': Sized { mod \\'c\\' { #[cfg(test)] mod tests { use super::*; #[derive(Debug)] pub fn x<\\'a>(a: Box<dyn Bar>) -> Vec<Vec<&mut Vec<u8>>> { match x { Some(v) if v => for i in x { vec![for i in x { for i in x { unsafe { \\'c\\'? }; }.None(); }]; }, _ => 0 }; x.None(); let std::fs::remove_dir_all(\\\"p\\\") = |v: u8| { let y = match x { Some(v) if v => unsafe { vec![unsafe { unsafe { true? }? }]? }, _ => 0 }; y }; let \\'c\\' = std::process::Command::new(\\\"ls\\\")(unsafe { match x { Some(v) if v => Self::new(), _ => 0 }? }); vec![|v: u8| { let y = if x { Self::new()(\\\"text\\\") } else { 0 }; y }]; let () = match x { Some(v) if v => if x { vec![for i in x { vec![unsafe { ()? }]; }] } else { 0 }, _ => 0 }; } } } } } } }\\n",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/tests/fuzzed.rs",
+            "fn deep() { &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&match x { Some(v) if v => if x { vec![match x { Some(v) if v => unsafe { is_ready? }, _ => 0 }.\\\"text\\\"()] } else { 0 }, _ => 0 } }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/main.rs",
+            "\\xe0>Q\\xaet\\x0e\\xdeX\\xb5Ss\\xf0Ow\\xd0*!\\xbd\\xa1E\\x80\\x12\\x8b\\x8f\\xc9\\xde\\xe9\\x9f\\xbb\\xc3\\xc8\\xaezz<v\\xae\\x04\\x87\\xf4\\x12c\\xa3\\xb4\\x1f\\x04",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/main.rs",
+            "A\\x98\\x86:r\\xa30`0\\xc82\\xf7\\'&\\xa4]\\xd2\\'\\x9b\\xa6\\xefZ\\x13\\xa3VuF\\xa8f\\xb83\\xf1\\xbb9\\x9bL\\xbb\\x999A9H\\x93\\x85\\xbb*y\\xae\\xb8(6\\xd4J\\x03\\xdb\\xf1h\\xa0+\\xd2#w\\xe0ig#p\\x10\\xf1\\xd6\\xa6\\xe90\\x15a\\x9f\\xc6W\\xb4\\xf4",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/tests/fuzzed.rs",
+            "fn deep() { [[[[[[[[[[|v: u8| { let y = if x { \\\"text\\\".x() } else { 0 }; y }]]]]]]]]]] }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/tests/fuzzed.rs",
+            "fn long() { x + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/tests/fuzzed.rs",
+            "\\x0f}\\xf8\\x05\\x9f\\xa0\\xc63\\xc9DP\\xe7[\\x96a\\x0c~\\xae\\x07\\x12\\xaaK)7C\\x14\\t\\x94U\\xb5 \\x95lpw:\\xda\\x1a\\x8d\\xf3\\xa8\\xbb\\xbaU\\xc4\\x0c\\xbaw(\\xd4\\xc8N\\x19\\x90\\xd22\\x7f2",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/lib.rs",
+            "fn deep() { [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[if x { std::process::Command::new(\\\"ls\\\") } else { 0 }]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]] }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/lib.rs",
+            "fn long() { x as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/lib.rs",
+            "fn long() { x + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/main.rs",
+            "fn deep() { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { unsafe { \\\"text\\\"(vec![unsafe { vec![std::process::Command::new(\\\"ls\\\")]? }.0()])? } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/lib.rs",
+            "fn long() { x as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/lib.rs",
+            "fn long() { x.0.0.0.0.0.0.0.0.0 }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/lib.rs",
+            "fn deep() { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { unsafe { for i in x { Self::new(); }? } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "\\xc8\\xf0F\\xc5\\xc7\\xce\\x06\\xca\\xc5\\x1c\\x1f\\xe9\\xe6E\\x99\\xa8\\x1b\\xb1Q\\x0e\\x94f?\\x1dmM\\x0f4]\\xa3\\x15\\xee\\x9c\\xc5@\\xc1\\xe2\\x17\\xd8\\xfc\\x1f\\x9aj\\x8bK\\x16\\x12u",
+        ),
+        (
+            "/fuzzed/src/lib.rs",
+            "",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/tests/fuzzed.rs",
+            "a\\xe6a\\x89\\xea2\\xd0J\\xdcD\\xd1\\xb6\\xe7N\\x0f\\xd8",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "z\\x10\\xb5\\x0bO\\xf5Ra\\xca~s1Fx.\\xc9o\\x8a\\x85\\xba\\'\\xbc\\xe7\\xad\\x8a\\xd9\\x90\\xf9\\xdb\\xa1s\\x1e\\x9a\\x84\\xc4\\nP\\x87\\x02\\x1a\\xe7\\xcd\\xd9\\xb5\\xcc6b\\xea\\xc6g>`j6\\xc3\\xad\\xc5",
+        ),
+        (
+            "/fuzzed/src/lib.rs",
+            "",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/tests/fuzzed.rs",
+            "fn long() { x as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/main.rs",
+            "fn deep() { match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => x(if x { for i in x { |v: u8| { let y = for i in x { if x { std::fs::remove_dir_all(\\\"p\\\") } else { 0 }; }; y }; } } else { 0 }.is_ready()) } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/lib.rs",
+            "fn long() { x????????????????????????????????????????????????????????????????????????? }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/tests/fuzzed.rs",
+            "fn long() { x.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0 }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/lib.rs",
+            "fn long() { x.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0 }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/tests/fuzzed.rs",
+            "\\xb9\\x7f\\x17\\xc7\\x99\\xffa\\x06\\xcbs\\x838\\xcb\\x86\\xb5\\xc6\\xbc\\xec\\x8a\\x1a\\x04\\n\\xc7\\x12\\xac\\x03^\\x04\\xe7\\xb0\\xb96c\\x0ceD\\xe0\\x90\\xf5\\x12\\xb1\\x0e4\\x88\\x93\\xc4\\xden\\xb7u\\x03\\\\P\\xbf\\xaa:V",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/tests/fuzzed.rs",
+            "mod from_str { pub trait ports: Sized { impl 0 for \\\"text\\\" { pub trait Self::new(): Sized { impl std::process::Command::new(\\\"ls\\\") for \\\"text\\\" { #[cfg(test)] mod tests { use super::*; impl x for std::fs::remove_dir_all(\\\"p\\\") { enum \\'c\\' { from_str(Vec<&mut Vec<&mut &mut (Option<Foo>, u8)>>), Other { a: u8 }, Unit } } } } } } } }\\n#[cfg(test)] mod tests { use super::*; #[cfg(test)] mod tests { use super::*; mod 0 { #[cfg(test)] mod tests { use super::*; //! inner } } } }\\nimpl \\'c\\' for x { pub trait std::fs::remove_dir_all(\\\"p\\\"): Sized { #[test] struct x<\\'a> { field: Vec<u8> } } }\\n#[cfg(test)] mod tests { use super::*; impl \\'c\\' for () { pub trait \\\"text\\\": Sized { pub trait ports: Sized { pub trait 0: Sized { #[cfg(test)] mod tests { use super::*; #[must_use] fn true<\\'a>(a: ((&mut &\\'a str, u8), u8)) -> &mut Vec<((Vec<([u8; 4], u8)>, u8), u8)> { vec![match x { Some(v) if v => if x { vec![if x { vec![for i in x { Self::new(); }] } else { 0 }] } else { 0 }, _ => 0 }]; let std::process::Command::new(\\\"ls\\\") = for i in x { match x { Some(v) if v => if x { if x { vec![unsafe { None? }] } else { 0 } } else { 0 }, _ => 0 }; }; let () = |v: u8| { let y = match x { Some(v) if v => unsafe { if x { \\'c\\' } else { 0 }? }, _ => 0 }; y }; let None = unsafe { match x { Some(v) if v => |v: u8| { let y = |v: u8| { let y = if x { for i in x { std::process::Command::new(\\\"ls\\\"); } } else { 0 }; y }; y }, _ => 0 }? }; for i in x { for i in x { unsafe { \\\"text\\\"? }; }; }; let std::fs::remove_dir_all(\\\"p\\\") = ports; unsafe { vec![match x { Some(v) if v => std::process::Command::new(\\\"ls\\\"), _ => 0 }]? }; } } } } } } }\\n",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/lib.rs",
+            "fn long() { x as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "\\xf9\\xc8\\x02\\x01\\xf2\\x0cG\\xc4\\xbc\\x83\\xa6\\xec[\\xd5\\xc5\\x00\\x0e\\x19\\x90\\x9a\\xd9\\x94,\\xdb\\xf6~&\\x85Z<\\\"\\xccz\\x91\\'/\\x02\\xcb\\xb4\\x15\\xb4-\\x8d\\x02\\x17\\x0e\\xf4U\\x88m6\\xd5H\\x91X\\x1dr\\xb9\\xeb\\xdd\\xbc\\x11",
+        ),
+        (
+            "/fuzzed/src/lib.rs",
+            "",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/tests/fuzzed.rs",
+            "fn deep() { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { |v: u8| { let y = match x { Some(v) if v => std::fs::remove_dir_all(\\\"p\\\"), _ => 0 }; y } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/main.rs",
+            "fn long() { x.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0 }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/main.rs",
+            "l\\xa5\\x9ej\\x0b\\x9a\\x08\\x15\\\"\\xf8\\xca^y\\x12x\\xa7B\\xec\\xea\\xd1\\xeb\\x01\\x01p\\x80\\x1cZ\\x1d\\xfcYM\\xcdm?\\xdf\\x8d\\x1a!=\\xa2\\xea\\x12",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/tests/fuzzed.rs",
+            "\\xbc\\xe7?\\x05\\xa4\\xf3\\x10\\xe2\\x08&\\x1c\\x90\\xa6\\xbeRf\\xab\\x06\\x95\\x9c\\xda\\x0fz\\xd9\\xb1\\x95b\\xfd\\xbc\\xb8\\xaa\\x08\\x17>qd\\t\\x97h\\tA\\xe0s\\'E\\xc2\\xeb6\\xf3fU\\x0e\\xbd\\x98\\xb5\\xe5qa\\x8f",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/tests/fuzzed.rs",
+            "\\xabk\\xe9G\\xe4\\x043\\x9bE\\xfb\\xe5\\x81~aL\\x8a\\xae,\\x81I\\xc8\\x17\\xb0\\x0e%\\r\\x19\\xb9s\\xfe[?\\xae\\xda\\xfc\\xcd\\xcd\\xdfm\\x98\\xcb\\xce\\xec\\xbb\\xc6\\xd7 s\\x9b\\xa1U\\xd9\\xa5\\x03\\xbbw:ec_n\\xfaY\\xba\\xc0E?\\x1f\\xc20\\xba\\xd1\\x92\\xbfV]\\xe9&\\xbf\\xf6\\xbc\\xa9\\'\\xcd",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/tests/fuzzed.rs",
+            "fn deep() { [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[if x { vec![vec![None]] } else { 0 }.std::fs::remove_dir_all(\\\"p\\\")()]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]] }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/tests/fuzzed.rs",
+            "fn long() { x?????????????????????????????????????????????????????????????????????????????????? }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/lib.rs",
+            "\\xe0\\x1e\\xc5\\xccV:tk\\xc8\\\\J03\\x82H\\xf0\\xfeZ\\x18\\xe3\\xc8\\xd4\\xfdRr^e\\xd1.\\x90\\x15\\xb8*/\\x9cv\\x05\\xcc\\xf8w\\x0f\\x0e^\\x00\\xcaju\\xbfB\\xbc?\\xc9\\x1a`\\n\\n\\xfe\\xae\\x94l\\xcc\\xc82\\xe5$\\x9d#c\\x9e\\xed\\xf0\\x84:\\x05\\xca\\xa9\\xa8\\xdc",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/main.rs",
+            "\\xf3\\x99\\xf8\\x9e\\xc5\\xba\\xd1:3\\x11\\xfd\\x08\\xb0\\x15\\x97\\x14\\xc5_\\xad^x\\x11J\\x9a\\xe2\\xff$\\xbfP\\x07\\x1bu\\x15\\xa6x\\x11\\xb7\\x19\\\\E\\x1aS\\x9e\\xf2\\x0c\\x0bEJ\\x0cQ\\x96\\t^5",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/tests/fuzzed.rs",
+            "{\\x90\\x9d\\x1d\\x1aE\\x08K~/\\x17\\xa7\\x83\\xf8E\\xec\\x054\\xce\\xa7,x\\x86\\xe5|1\\xf8X\\xd0\\xb9p<\\x17\\x08\\xd1\\xf4\\rZ\\x05\\xa7\\x94}x\\x03\\xc2/`N\\x15R#\\xb6\\xa2\\xa3\\xbd\\xf8\\x96\\xe5\\xfeE\\xdd\\x07\\x93\\xbe\\xf5\\xd8\\xa7\\x18\\xf2\\x93\\xf38\\xe7V",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/lib.rs",
+            "fn long() { x as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/lib.rs",
+            "fn long() { x as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 as u8 }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/main.rs",
+            "fn long() { x???????????????????????? }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/lib.rs",
+            "fn deep() { --------------------------------------------------------------------------------------------for i in x { \\\"text\\\"(vec![|v: u8| { let y = (); y }.0()]); } }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/tests/fuzzed.rs",
+            "fn deep() { [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[for i in x { 0; }.\\'c\\'()]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]] }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/main.rs",
+            "#[cfg(te",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/tests/fuzzed.rs",
+            "\\xcf\\xcf\\x04;sE\\xf7\\xe6\\x15\\x03O~\\x9a\\xc1S+T\\xbfzc\\x17\\xac\\xcb\\xa1:\\xcb\\x13\\x1f=\\x99s8\\xc5\\rg\\xd0.\\xe2\\x04\\xff\\x80\\xae@\\xb9\\tM\\xd5\\xaa\\xd2\\xe8I",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "a\\x94V\\xad;V\\xc6*\\xe4\\t\\xba\\xe4\\x1e\\xef\\xdaq\\n\\x99\\x9c\\x1d\\xa3\\xea\\x109\\xcd\\xff\\x03\\x8e\\x84\\xa0\\xcc2v\\x8e\\xc9\\xf4\\xd9\\xfc\\xf8\\xa6n\\xe8\\x1d7#\\xdf\\xce[y\\x95ln\\xe1\\x80\\x9f.=\\x9e/dx\\x8c\\x812\\xcbU\\xb4=\\x9bh\\xfb.\\x88\\x94.\\xa11\\x15\\x97\\x91\\xe2\\x9d\\x85\\xd5\\xdaon\\xa8\\xd2\\x08\\xd2\\'",
+        ),
+        (
+            "/fuzzed/src/lib.rs",
+            "",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/lib.rs",
+            "fn long() { x???????????????????????????????????????????? }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/tests/fuzzed.rs",
+            "fn deep() { match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => match x { _ => for i in x { unsafe { vec![vec![vec![x].x()]]? }.Self::new()(); } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } }",
+        ),
+    ],
+    [
+        (
+            "/fuzzed/Cargo.toml",
+            "[package]\\nname = \\\"fuzzed\\\"\\nversion = \\\"0.1.0\\\"\\nedition = \\\"2024\\\"\\n",
+        ),
+        (
+            "/fuzzed/src/lib.rs",
+            "$m\\xd0\\xac\\x95\\x19\\xbf\\xa2\\x84\\x15\\xaf\\xef\\x19\\xe4\\xf0\\xef\\xe2ne\\xdevqW\\xab\\xc2\\xa7\\xcf\\x98\\xa9\\x13\\x92 a\\xf2\\x8f\\x02\\x0f6\\x11\\xf5\\xd0\\x83x\\r0N\\x81\\x1c4\\xd5\\x1d\\x94\\xf5{\\xad\\x16\\xbc5L\\x9b\\xc3\\xdd\\xee\\xdd\\t\\xc7\\xf30\\x15\\xbb%}\\xe3\\xb4\\xb3<\\x894\\xb7\\x04\\xb3\\xed\\x11Ct\\xf6Z",
+        ),
+    ],
+]

@@ -35,6 +35,8 @@ toml.workspace = true
 dispatch-ports = { path = "../dispatch-ports" }
 file-doubles = { path = "../file-doubles" }
 fixture = { path = "../fixture" }
+proptest.workspace = true
+shapes = { path = "../shapes" }
 tempfile.workspace = true
 
 [lints]

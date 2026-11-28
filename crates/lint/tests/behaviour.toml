@@ -1,3 +1,6 @@
+[Sampled.sampled]
+drawn = 48
+
 [[Binary]]
 program = "CARGO_BIN_EXE_lint"
 arguments = []
