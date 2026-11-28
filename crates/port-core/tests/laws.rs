@@ -2,7 +2,7 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use invariants::{Ignoring, Unpoisoned, ignored};
-use newtype::Counter;
+use newtype::Wrapping;
 use port_core::{
     Calls, Counted, Held, Measured, Metered, Op, Pass, Port, Release, ReleaseReceipt, Released, Resource, Run, port,
 };
@@ -201,14 +201,14 @@ impl Scenario {
         let counted: Vec<String> = measured
             .snapshot()
             .iter()
-            .map(|counted: Counted| format!("{} {}", counted.name(), counted.calls().count()))
+            .map(|counted: Counted| format!("{} {}", counted.name(), counted.calls().into_inner()))
             .collect();
         let sessions: Calls = measured.snapshot().calls::<transcripts_ops::Sessions>();
         let settled = match measured.settled() {
             Ok(_snapshot) => "settled".to_owned(),
             Err(failures) => failures.to_string(),
         };
-        format!("{}: {said}; {} sessions in [{}]; {settled}\n", self.0, sessions.count(), counted.join(", "))
+        format!("{}: {said}; {} sessions in [{}]; {settled}\n", self.0, sessions.into_inner(), counted.join(", "))
     }
 }
 

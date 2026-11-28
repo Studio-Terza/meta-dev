@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 
 use file_ports::{FileFailure, Files, Kind};
 use invariants::{Ignoring, Unpoisoned};
+use pipeline::Measure;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use syn::{Expr, ExprLit, Item, ItemMod, Lit, Meta};
 use timer_ports::Timer;
@@ -20,7 +21,7 @@ use crate::source::{ModulePath, Source};
 use crate::spent::{Spent, Stage};
 use crate::workspace::{CrateKind, CrateRoot, Package, Tree};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Measure)]
 pub(crate) struct Read {
     pub failures: Vec<Failure>,
     pub findings: Vec<Finding>,
@@ -32,16 +33,6 @@ pub(crate) struct Read {
 impl Read {
     pub(crate) fn failed(failure: Failure) -> Read {
         Read { failures: vec![failure], ..Read::default() }
-    }
-
-    pub(crate) fn joined(self, later: Read) -> Read {
-        Read {
-            failures: self.failures.into_iter().chain(later.failures).collect(),
-            findings: self.findings.into_iter().chain(later.findings).collect(),
-            facts: self.facts.joined(later.facts),
-            budget: self.budget + later.budget,
-            spent: self.spent.joined(later.spent),
-        }
     }
 }
 

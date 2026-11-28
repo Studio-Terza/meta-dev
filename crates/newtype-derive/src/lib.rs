@@ -1,9 +1,11 @@
 mod generated;
+mod joined;
 mod marked;
 mod settings;
 mod wrapped;
 
 use generated::Generated;
+use joined::Joined;
 use marked::{Mark, Marked};
 use proc_macro::TokenStream;
 use wrapped::{CheckedDeserializing, Constructors, Deserializing, Formatting, Serializing, Wrapped};
@@ -36,6 +38,11 @@ pub fn derive_checked_deserialize(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(Serialize, attributes(newtype))]
 pub fn derive_serialize(input: TokenStream) -> TokenStream {
     Wrapped::expanded::<Serializing>(input.into()).into()
+}
+
+#[proc_macro_derive(Measure)]
+pub fn derive_measure(input: TokenStream) -> TokenStream {
+    Joined::expanded(input.into()).into()
 }
 
 #[proc_macro_derive(Spelled)]

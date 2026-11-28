@@ -1,15 +1,14 @@
-mod count;
-
+use std::collections::BTreeMap;
 use std::fmt;
 
 use design_messages::{Cursors, SessionCursors, SessionRecords};
-use newtype::Counter;
+use newtype::Wrapping;
+use pipeline::Measure;
 use store_ports::{Counted, Store, Written};
 use transcript_ports::{Authorship, Cursor, Kind, Line, Session, SessionId, Transcripts};
 
 use crate::cli::Count;
 use crate::cli::failure::Failure;
-use count::Counts;
 
 #[derive(Debug)]
 struct ReadTo {
@@ -25,11 +24,11 @@ struct Ingested {
     written: Written,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default, Measure)]
 pub struct Tally {
     ends: Vec<ReadTo>,
-    authorship: Counts<Authorship>,
-    unrecognised: Counts<Kind>,
+    authorship: BTreeMap<Authorship, Count>,
+    unrecognised: BTreeMap<Kind, Count>,
     written: Written,
 }
 
@@ -53,7 +52,7 @@ impl<'ports, T: Transcripts, S: Store> Ingest<'ports, T, S> {
             .map(|(session, cursor)| ingest.session(session, cursor))
             .collect::<Result<Vec<_>, Failure>>()?;
         lock.end()?;
-        Ok(Tally::counted(ingested))
+        Ok(Tally::total(ingested.into_iter().map(Tally::from)))
     }
 
     fn session(&self, session: &Session, cursor: Cursor) -> Result<Ingested, Failure> {
@@ -68,20 +67,23 @@ impl<'ports, T: Transcripts, S: Store> Ingest<'ports, T, S> {
     }
 }
 
-impl Tally {
-    fn counted(ingested: Vec<Ingested>) -> Tally {
-        let written = <Written as Counter>::total(ingested.iter().map(|session| session.written));
-        let authorship = ingested.iter().flat_map(|session| session.authors.iter().copied()).collect();
-        let unrecognised = ingested.iter().flat_map(|session| session.unrecognised.iter().cloned()).collect();
-        Tally { ends: ingested.into_iter().map(|session| session.end).collect(), authorship, unrecognised, written }
+impl From<Ingested> for Tally {
+    fn from(session: Ingested) -> Tally {
+        let Ingested { end, authors, unrecognised, written } = session;
+        Tally {
+            ends: vec![end],
+            authorship: BTreeMap::total(authors.into_iter().map(|author| BTreeMap::from([(author, Count::new(1))]))),
+            unrecognised: BTreeMap::total(unrecognised.into_iter().map(|kind| BTreeMap::from([(kind, Count::new(1))]))),
+            written,
+        }
     }
 }
 
 impl fmt::Display for Tally {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.ends.iter().try_for_each(|end| writeln!(formatter, "session {} read to {}", end.session, end.cursor))?;
-        self.authorship.listed(formatter, "authorship")?;
-        self.unrecognised.listed(formatter, "unrecognised")?;
-        writeln!(formatter, "written {}", Count::new(self.written.count()))
+        self.authorship.iter().try_for_each(|(author, count)| writeln!(formatter, "authorship {author} {count}"))?;
+        self.unrecognised.iter().try_for_each(|(kind, count)| writeln!(formatter, "unrecognised {kind} {count}"))?;
+        writeln!(formatter, "written {}", Count::new(self.written.into_inner()))
     }
 }

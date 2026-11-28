@@ -1,5 +1,6 @@
 mod bool_methods;
 mod expression_flow;
+mod hand_measures;
 mod manual_iteration;
 mod module_cycles;
 mod named_lifetimes;
@@ -16,6 +17,8 @@ mod vec_out_params;
 
 use std::sync::Arc;
 
+use pipeline::Measure;
+
 use crate::budget::{Budget, TestScan};
 use crate::finding::Finding;
 use crate::gate::Gate;
@@ -26,6 +29,7 @@ use crate::walk::{Lineup, Pausable, Walker};
 use crate::workspace::Package;
 pub(crate) use bool_methods::BoolMethods;
 pub(crate) use expression_flow::ExpressionFlow;
+pub(crate) use hand_measures::HandMeasures;
 pub(crate) use manual_iteration::ManualIteration;
 pub(crate) use module_cycles::{ModuleCycles, ModuleFact};
 pub(crate) use named_lifetimes::NamedLifetimes;
@@ -40,7 +44,7 @@ pub(crate) use real_adapters::{AdapterFact, RealAdapters};
 pub(crate) use type_shape::TypeShape;
 pub(crate) use vec_out_params::VecOutParams;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Measure)]
 pub(crate) struct Facts {
     surface: Vec<SurfaceFact>,
     api: Vec<ApiFact>,
@@ -75,6 +79,7 @@ impl<'run> Lints<'run> {
             process_starters: lints.style(),
             bool_methods: lints.style(),
             no_dyn: lints.style(),
+            hand_measures: lints.style(),
             public_surface: lints.graph(),
             public_api_tests: lints.graph(),
             emitters: Pausable::admitted(Emitters::default(), lints.entered),
@@ -93,6 +98,7 @@ impl<'run> Lints<'run> {
             process_starters,
             bool_methods,
             no_dyn,
+            hand_measures,
             public_surface,
             public_api_tests,
             emitters,
@@ -112,6 +118,7 @@ impl<'run> Lints<'run> {
             lints.found(process_starters),
             lints.found(bool_methods),
             lints.found(no_dyn),
+            lints.found(hand_measures),
         ];
         let api = Lints::facts(public_api_tests).into_iter().chain(emitters.woken().map_or_default(Emitters::facts));
         let facts = Facts {
@@ -146,16 +153,6 @@ impl<'run> Lints<'run> {
 }
 
 impl Facts {
-    pub(crate) fn joined(self, later: Facts) -> Facts {
-        Facts {
-            surface: self.surface.into_iter().chain(later.surface).collect(),
-            api: self.api.into_iter().chain(later.api).collect(),
-            test_only: self.test_only.into_iter().chain(later.test_only).collect(),
-            adapters: self.adapters.into_iter().chain(later.adapters).collect(),
-            modules: self.modules.into_iter().chain(later.modules).collect(),
-        }
-    }
-
     pub(crate) fn reduced(self, packages: &[Arc<Package>]) -> Vec<Finding> {
         let surface = PublicSurface::reduce(self.surface, packages);
         let api = PublicApiTests::reduce(self.api, packages);

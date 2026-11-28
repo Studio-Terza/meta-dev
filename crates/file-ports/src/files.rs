@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use invariants::Ignoring;
+use pipeline::Measure;
 
 use crate::ignored::Ignored;
 use crate::{Bytes, FileFailure, Kind, Offset, Size, Stamps, Tail, Text};
@@ -81,7 +82,7 @@ pub trait Files {
     }
 
     fn bytes_below(&self, root: &Path) -> Result<Size, FileFailure> {
-        self.entries(root)?.iter().map(|path| self.counted(path)).sum()
+        self.entries(root)?.iter().map(|path| self.counted(path)).collect::<Result<Vec<Size>, _>>().map(Size::total)
     }
 
     fn counted(&self, path: &Path) -> Result<Size, FileFailure> {

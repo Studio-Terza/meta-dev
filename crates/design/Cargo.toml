@@ -33,6 +33,7 @@ grammar-repository = { path = "../grammar-repository" }
 grammar-shell = { path = "../grammar-shell" }
 grammar-spec-line = { path = "../grammar-spec-line" }
 newtype = { path = "../newtype" }
+pipeline = { path = "../pipeline" }
 port-core = { path = "../port-core" }
 serde.workspace = true
 serde_json.workspace = true

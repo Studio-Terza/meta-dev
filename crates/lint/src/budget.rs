@@ -1,6 +1,6 @@
 use std::fmt;
-use std::ops::Add;
 
+use pipeline::Measure;
 use syn::spanned::Spanned;
 use syn::{ItemMod, Macro};
 
@@ -8,7 +8,7 @@ use crate::gate::Gate;
 use crate::hooks::{Descent, Expanded, Hooks};
 use crate::source::{Place, Source};
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Measure)]
 pub(crate) struct Budget {
     lines: usize,
     test_lines: usize,
@@ -56,14 +56,6 @@ impl Hooks for TestScan {
 
     fn macro_called(&mut self, _: &Macro) -> Expanded {
         Expanded::Nothing
-    }
-}
-
-impl Add for Budget {
-    type Output = Budget;
-
-    fn add(self, other: Budget) -> Budget {
-        Budget { lines: self.lines + other.lines, test_lines: self.test_lines + other.test_lines }
     }
 }
 

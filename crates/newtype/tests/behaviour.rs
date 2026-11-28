@@ -1,9 +1,8 @@
 use std::collections::BTreeSet;
 
 use invariants::{Ignoring, ignored};
-use newtype::{Checked, CheckedDeserialize, Counter, Deserialize, Display, Newtype, Serialize, Wrapping};
+use newtype::{Checked, CheckedDeserialize, Deserialize, Display, Newtype, Serialize, Wrapping};
 use newtype_derive::Arbitrary;
-use proptest::collection::vec;
 use proptest::prelude::{any, prop_assert, prop_assert_eq, proptest};
 use proptest::strategy::{Strategy, ValueTree};
 use proptest::test_runner::{Config, RngSeed, TestError, TestRunner};
@@ -188,19 +187,14 @@ impl Json {
 }
 
 impl Pairs {
-    const LARGEST: Rounds = Rounds(usize::MAX);
     const THREE: Rounds = Rounds::new(3);
     const NONE: Rounds = Rounds::new(0);
-
-    fn counts(rounds: &[Rounds]) -> Vec<usize> {
-        rounds.iter().copied().map(Counter::count).collect()
-    }
 }
 
 proptest! {
     #![proptest_config(Config { failure_persistence: None, rng_seed: RngSeed::Fixed(0), ..Config::default() })]
     #[test]
-    fn newtypes_keep_write_count_and_generate_what_they_hold(number in any::<usize>(), text in any::<String>(), byte in any::<u8>(), rounds in any::<Rounds>(), other in any::<Rounds>(), numbers in vec(0usize..4096, 0..8), word in any::<Word>(), wrapper in any::<Wrapper<u16>>(), small in any::<Small>(), digest in any::<Digest>(), even in any::<Even>(), many in any::<Many<u8>>()) {
+    fn newtypes_keep_write_count_and_generate_what_they_hold(number in any::<usize>(), text in any::<String>(), byte in any::<u8>(), rounds in any::<Rounds>(), word in any::<Word>(), wrapper in any::<Wrapper<u16>>(), small in any::<Small>(), digest in any::<Digest>(), even in any::<Even>(), many in any::<Many<u8>>()) {
         prop_assert_eq!((Rounds::new(number).into_inner(), Label::new(text.clone()).into_inner(), Wrapper::new(byte).into_inner()), (number, text.clone(), byte));
         prop_assert_eq!(Json::read::<Rounds>(Json::written(&rounds).as_deref()), Some(rounds));
         prop_assert_eq!(Json::read::<Wrapper<u16>>(Json::written(&wrapper).as_deref()), Some(wrapper));
@@ -210,10 +204,6 @@ proptest! {
         let read = built.as_ref().and_then(|made| Json::read::<Word>(Json::written(made).as_deref()));
         prop_assert_eq!([Json::word(&text), read], [built.clone(), built]);
         prop_assert_eq!(Json::written(&Rounds::new(number)), Json::written(&number));
-        prop_assert_eq!(rounds.count(), rounds.into_inner());
-        prop_assert_eq!(rounds.incremented().count(), rounds.count().saturating_add(1));
-        prop_assert_eq!(rounds.plus(other).count(), rounds.count().saturating_add(other.count()));
-        prop_assert_eq!(Rounds::total(numbers.iter().copied().map(Rounds::new)).count(), numbers.iter().sum::<usize>());
         prop_assert!(Small::checked(&small.into_inner()).is_ok());
         prop_assert!(Digest::checked(&digest.into_inner()).is_ok());
         prop_assert!(even.into_inner().is_multiple_of(2));
@@ -237,18 +227,6 @@ fn a_check_decides_what_is_built() {
 }
 
 #[test]
-fn counters_saturate_at_the_largest() {
-    let largest = Pairs::LARGEST;
-    assert_eq!(Pairs::counts(&[largest.incremented(), largest.plus(largest)]), [usize::MAX, usize::MAX]);
-}
-
-#[test]
-fn nothing_counted_is_zero() {
-    assert_eq!(Rounds::zero(), Rounds::new(0));
-    assert_eq!(Rounds::total(std::iter::empty()), Rounds::zero());
-}
-
-#[test]
 fn derived_checked_generators_stay_under_the_rejection_bound() {
     let bounded = || {
         let config = Config { failure_persistence: None, rng_seed: RngSeed::Fixed(0), ..Config::default() };
@@ -261,7 +239,7 @@ fn derived_checked_generators_stay_under_the_rejection_bound() {
 
 #[test]
 fn derived_constructors_build_constants() {
-    assert_eq!((Pairs::THREE.count(), Pairs::NONE.count()), (3, 0));
+    assert_eq!((Pairs::THREE.into_inner(), Pairs::NONE.into_inner()), (3, 0));
 }
 
 #[test]

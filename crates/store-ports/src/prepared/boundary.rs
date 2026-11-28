@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 use std::vec;
 
+use pipeline::Measure;
 use port_core::{Op, OpName};
 
 use crate::{Argument, ColumnFailure, Columns, Done, StoreFailure, Value, Written};
@@ -53,7 +54,7 @@ pub trait Execute: Debug {
     {
         let done =
             batches.into_iter().map(|batch| batch.written(self)).collect::<Result<Vec<B::Done>, B::Failure>>()?;
-        Ok(Done::total(done.into_iter()))
+        Ok(B::Done::total(done))
     }
 
     fn counted_all<B: Counts, D: Done>(&mut self, batches: impl IntoIterator<Item = B>) -> Result<D, B::Failure>
@@ -61,7 +62,7 @@ pub trait Execute: Debug {
         Self: Sized,
     {
         let done = batches.into_iter().map(|batch| batch.counted(self)).collect::<Result<Vec<D>, B::Failure>>()?;
-        Ok(D::total(done.into_iter()))
+        Ok(D::total(done))
     }
 }
 

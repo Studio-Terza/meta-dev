@@ -56,6 +56,6 @@ impl Counts for SessionRecords {
     fn counted<D: Done>(self, statements: &mut impl Execute) -> Result<D, StoreFailure> {
         let messages = statements.counted_all(self.messages.iter().map(MessageRow::inserted))?;
         let ended = statements.counted_all(self.ended.iter().map(EndedRow::inserted))?;
-        Ok(D::total([messages, ended, self.cursor.written(statements)?].into_iter()))
+        Ok(D::total([messages, ended, self.cursor.written(statements)?]))
     }
 }

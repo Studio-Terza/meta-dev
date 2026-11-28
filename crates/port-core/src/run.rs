@@ -1,13 +1,10 @@
 mod boundary;
 
-use std::collections::BTreeMap;
 use std::error::Error;
 use std::sync::Mutex;
 
 use invariants::Unpoisoned;
-use newtype::Counter;
 
-use super::calls::Calls;
 use super::op::OpName;
 use super::snapshot::Snapshot;
 use boundary::Told;
@@ -26,26 +23,9 @@ pub struct ReleaseFailures {
     rest: Vec<ReleaseFailure>,
 }
 
-impl ReleaseFailures {
-    fn joined(
-        settled: Result<Snapshot, ReleaseFailures>,
-        failure: ReleaseFailure,
-    ) -> Result<Snapshot, ReleaseFailures> {
-        match settled {
-            Ok(_snapshot) => Err(ReleaseFailures { first: failure, rest: Vec::new() }),
-            Err(failures) => Err(failures.appended(failure)),
-        }
-    }
-
-    fn appended(mut self, failure: ReleaseFailure) -> ReleaseFailures {
-        self.rest.push(failure);
-        self
-    }
-}
-
 #[derive(Debug, Default)]
 struct Ledger {
-    calls: Mutex<BTreeMap<OpName, Calls>>,
+    calls: Mutex<Snapshot>,
     failures: Mutex<Vec<ReleaseFailure>>,
 }
 
@@ -62,8 +42,11 @@ impl Measured {
     }
 
     pub fn settled(self) -> Result<Snapshot, ReleaseFailures> {
-        let Measured { snapshot, failures } = self;
-        failures.into_iter().fold(Ok(snapshot), ReleaseFailures::joined)
+        let Measured { snapshot, mut failures } = self;
+        match failures.first().map(|_first| ()) {
+            None => Ok(snapshot),
+            Some(()) => Err(ReleaseFailures { first: failures.remove(0), rest: failures }),
+        }
     }
 }
 
@@ -81,13 +64,11 @@ impl Run {
     pub fn finish(self) -> Measured {
         let calls = self.ledger.calls.into_inner().unpoisoned();
         let failures = self.ledger.failures.into_inner().unpoisoned();
-        Measured { snapshot: Snapshot::counted(calls), failures }
+        Measured { snapshot: calls, failures }
     }
 
     pub(crate) fn count(&self, name: OpName) {
-        let mut calls = self.ledger.calls.lock().unpoisoned();
-        let entry = calls.entry(name).or_default();
-        *entry = entry.incremented();
+        self.ledger.calls.lock().unpoisoned().count(name);
     }
 
     pub(crate) fn fail(&self, resource: OpName, failure: &impl Error) {
