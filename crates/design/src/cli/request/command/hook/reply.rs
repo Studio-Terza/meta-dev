@@ -1,4 +1,4 @@
-use console_ports::{Environment, Heard, Shown};
+use console_ports::{Heard, Shown};
 use file_ports::Files;
 use newtype::Wrapping;
 use serde::Serialize;
@@ -19,7 +19,6 @@ pub trait Hook: DeserializeOwned {
 
     fn answered<F: Files + Clone, S: Store>(
         &self,
-        environment: &impl Environment,
         ground: &Ground<'_, F, S>,
         tape: &Tape<'_>,
     ) -> Result<Reply<'_>, Failure>;

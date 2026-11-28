@@ -23,16 +23,11 @@ pub struct Repository {
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(try_from = "PathBuf")]
 pub struct Rooted(PathBuf);
 
 #[derive(Debug, thiserror::Error)]
-pub enum Unconfigured {
-    #[error("not a repository of the form owner/name")]
-    Unrepositoried,
-    #[error("not an absolute path")]
-    Unrooted,
-}
+#[error("not a repository of the form owner/name")]
+pub struct Unrepositoried;
 
 impl Local {
     pub fn written(text: &str) -> Local {
@@ -63,10 +58,10 @@ impl Repository {
 }
 
 impl TryFrom<String> for Repository {
-    type Error = Unconfigured;
+    type Error = Unrepositoried;
 
-    fn try_from(text: String) -> Result<Repository, Unconfigured> {
-        let read = RepositoryName::read(&text).ok_or(Unconfigured::Unrepositoried)?;
+    fn try_from(text: String) -> Result<Repository, Unrepositoried> {
+        let read = RepositoryName::read(&text).ok_or(Unrepositoried)?;
         Ok(Repository { owner: read.owner().to_owned(), name: read.name().to_owned() })
     }
 }
@@ -74,14 +69,6 @@ impl TryFrom<String> for Repository {
 impl fmt::Display for Repository {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{}/{}", self.owner, self.name)
-    }
-}
-
-impl TryFrom<PathBuf> for Rooted {
-    type Error = Unconfigured;
-
-    fn try_from(path: PathBuf) -> Result<Rooted, Unconfigured> {
-        path.is_absolute().then_some(Rooted(path)).ok_or(Unconfigured::Unrooted)
     }
 }
 

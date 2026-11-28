@@ -13,7 +13,7 @@ use crate::Outcome;
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
     #[error(
-        "usage: design [--workspace <dir>] (ingest [--dry-run] | hook (stop | subagent-stop | pre-tool-use | post-tool-use | --settings))"
+        "usage: design [--workspace <dir>] [--harness <dir>] (ingest [--dry-run] | hook (stop | subagent-stop | pre-tool-use | post-tool-use | --settings))"
     )]
     Usage,
     #[error("the environment does not name {0:?}")]
@@ -36,12 +36,14 @@ pub enum Failure {
     Unheard(#[source] serde_json::Error),
     #[error("cannot write the queue: {0}")]
     Unqueued(#[source] FileFailure),
-    #[error("cannot write the queue: the workspace local.toml names no absolute queue path")]
+    #[error("cannot write the queue: the workspace local.toml names no queue path")]
     Unplaced,
     #[error("the queue does not read as its typed TOML, so it is left as it is: {0}")]
     Unparsed(#[source] toml::de::Error),
     #[error("cannot render the queue as TOML: {0}")]
     Unwritten(#[source] toml::ser::Error),
+    #[error("cannot read the user id that names the harness folder")]
+    Unidentified,
     #[error("cannot render the hook settings: {0}")]
     Render(#[source] serde_json::Error),
     #[error("no answer is recorded for the call it made next")]

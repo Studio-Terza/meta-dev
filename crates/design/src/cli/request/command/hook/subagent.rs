@@ -4,7 +4,6 @@ mod hub;
 use std::fmt;
 use std::path::Path;
 
-use console_ports::Environment;
 use design_messages::{CheckName, CommitSha, FailedBefore, Failing};
 use file_ports::Files;
 use grammar::Grammar;
@@ -85,16 +84,16 @@ struct Excerpt {
 impl Hook for Finishing {
     fn answered<F: Files + Clone, S: Store>(
         &self,
-        _environment: &impl Environment,
         ground: &Ground<'_, F, S>,
         tape: &Tape<'_>,
     ) -> Result<Reply<'_>, Failure> {
         let local = ground.local();
-        let desk = Desk { ground, local: &local, directory: self.directory() };
+        let directory = ground.resolved(self.directory());
+        let desk = Desk { ground, local: &local, directory: &directory };
         match (self.said(), self.reminder()) {
             (Said::Typed(Report::Blocked(at)), _reminder) => desk.escalated(Some(at), Escalation::Blocked),
             (Said::Typed(Report::Done(at)), _reminder) => match local.repository() {
-                Some(repository) => desk.landed(at, Hub::new(self.directory(), repository), tape),
+                Some(repository) => desk.landed(at, Hub::new(&directory, repository), tape),
                 None => desk.escalated(Some(at), Escalation::Unread(UnreadStep::NoRepository)),
             },
             (Said::Untyped, Reminder::First) => Ok(Reply::Block { reason: Untyped.to_string() }),
@@ -174,7 +173,7 @@ impl<F: Files, S: Store> Desk<'_, '_, F, S> {
 
     fn escalated(&self, at: Option<&At>, escalation: Escalation) -> Result<Reply<'static>, Failure> {
         let file = self.local.queue().ok_or(Failure::Unplaced)?;
-        let item = Item::escalated(at.map(Target::from), escalation, self.directory);
+        let item = Item::escalated(at.map(Target::from), escalation, self.ground.rendered(self.directory));
         let queue = self.ground.queue(file)?.with(item);
         self.ground.queued(file, &queue)?;
         Ok(Reply::Pass(Outcome::Escalated))

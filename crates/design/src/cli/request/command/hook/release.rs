@@ -3,7 +3,6 @@ mod install;
 
 use std::path::{Path, PathBuf};
 
-use console_ports::Environment;
 use design_messages::PullNumber;
 use dispatch_ports::{Ran, Timeout};
 use file_ports::Files;
@@ -22,10 +21,11 @@ pub use boundary::Used;
 use boundary::{Checkout, Landed, State};
 use install::Installing;
 
-#[derive(Clone, Copy, Debug)]
-struct Releasing<'used> {
+#[derive(Debug)]
+struct Releasing<'used, 'run, F: Files, S: Store> {
     directory: &'used Path,
     pull: PullNumber,
+    ground: &'used Ground<'run, F, S>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -50,7 +50,6 @@ struct Holding {
 impl Hook for Used {
     fn answered<F: Files + Clone, S: Store>(
         &self,
-        _environment: &impl Environment,
         ground: &Ground<'_, F, S>,
         tape: &Tape<'_>,
     ) -> Result<Reply<'_>, Failure> {
@@ -67,18 +66,19 @@ impl Used {
         tape: &Tape<'_>,
     ) -> Result<Reply<'static>, Failure> {
         let local = ground.local();
-        let releasing = Releasing { directory: self.directory(), pull };
+        let directory = ground.resolved(self.directory());
+        let releasing = Releasing { directory: &directory, pull, ground };
         let landing = match Cut::settled(releasing.landed(tape, &local))? {
             Ok(landed) => match landed.state() {
                 State::Merged => Landing::Merged {
                     released: Cut::settled(releasing.released(tape, &landed))?,
-                    installed: Installing::new(self.directory(), pull, ground.workspace()).installed(ground, tape)?,
+                    installed: Installing::new(pull).installed(ground, tape)?,
                 },
                 State::Open | State::Closed => Landing::Unmerged,
             },
             Err(holding) => Landing::Unviewed(holding),
         };
-        let escalated = landing.escalated(self.directory(), pull);
+        let escalated = landing.escalated(ground.rendered(&directory), pull);
         match local.queue() {
             Some(file) => {
                 let read = ground.queue(file)?;
@@ -134,9 +134,10 @@ impl Landing {
     }
 }
 
-impl Releasing<'_> {
+impl<F: Files, S: Store> Releasing<'_, '_, F, S> {
     const PROGRAM: &'static str = "git";
     const QUICK: Timeout = Timeout::new(60);
+    const HERE: &'static str = ".";
 
     fn landed(&self, tape: &Tape<'_>, local: &Local) -> Result<Landed, Cut<Holding>> {
         let repository = local.repository().ok_or(Cut::from(Held::NoRepository))?;
@@ -152,17 +153,17 @@ impl Releasing<'_> {
         let ran = Self::git(tape, &["worktree", "list", "--porcelain"], self.directory)?;
         let printed = ran.as_ref().and_then(Ran::succeeded).ok_or(Cut::from(Held::Unlisted))?;
         let listed = Worktrees::from(printed.as_ref());
-        Ok(landed.found(listed.listed().iter().map(Checkout::from)))
+        Ok(landed.found(listed.listed().iter().map(|worktree| Checkout::new(worktree, self.ground))))
     }
 
     fn freed(&self, tape: &Tape<'_>, landed: &Landed, checkout: &Checkout) -> Result<Released, Cut<Holding>> {
-        let held = |held: Held| Cut::Failed(Holding { held, worktree: Some(checkout.as_ref().to_path_buf()) });
+        let worktree = self.ground.rendered(checkout.as_ref());
+        let held = |held: Held| Cut::Failed(Holding { held, worktree: Some(worktree.to_path_buf()) });
         let status = Self::git(tape, &["status", "--short"], checkout.as_ref())?;
         let printed = status.as_ref().and_then(Ran::succeeded).ok_or_else(|| held(Held::Unstatused))?;
         printed.as_ref().is_empty().then_some(()).ok_or_else(|| held(Held::Dirty))?;
         let pushed = landed.pushed(checkout).ok_or_else(|| held(Held::Unpushed))?;
-        let path = pushed.as_ref().to_string_lossy();
-        let removed = Self::git(tape, &["worktree", "remove", &path], self.directory)?;
+        let removed = Self::git(tape, &["worktree", "remove", Self::HERE], pushed.as_ref())?;
         removed.as_ref().and_then(Ran::succeeded).map(|_removed| Released::Removed).ok_or_else(|| held(Held::Unremoved))
     }
 

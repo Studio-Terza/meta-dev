@@ -56,7 +56,6 @@ impl Command {
 
     pub fn written<F: Files + Clone, S: Store>(
         self,
-        environment: &impl Environment,
         heard: Option<&Heard>,
         ground: &Ground<'_, F, S>,
         tape: &Tape<'_>,
@@ -64,7 +63,7 @@ impl Command {
         match self {
             Command::Ingest(_) => Ingest::read(ground.store(), &ground.transcripts())
                 .map(|tally| Uttered::new(Shown::said(tally), Ok(Outcome::Ingested))),
-            Command::Hook(hook) => hook.answered(environment, heard, ground, tape),
+            Command::Hook(hook) => hook.answered(heard, ground, tape),
         }
     }
 }

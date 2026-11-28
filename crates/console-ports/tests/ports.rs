@@ -23,6 +23,7 @@ fn an_answer_gathers_what_it_shows_and_keeps_its_complaint() {
 #[test]
 fn the_process_reads_its_variables() {
     assert!(Process.variable(OsStr::new("PATH")).is_some());
+    assert_eq!(Process.variables().variable(OsStr::new("PATH")), Process.variable(OsStr::new("PATH")));
     assert_eq!(Process.variable(OsStr::new("CONSOLE_PORTS_SURELY_UNSET")), None);
 }
 
@@ -31,4 +32,5 @@ fn fake_variables_answer_from_their_pairs() {
     let variables: Variables = [(OsString::from("CI"), OsString::from("true"))].into_iter().collect();
     assert_eq!(variables.variable(OsStr::new("CI")), Some(OsString::from("true")));
     assert_eq!(variables.variable(OsStr::new("HOME")), None);
+    assert_eq!(variables.variables().variable(OsStr::new("CI")), Some(OsString::from("true")));
 }

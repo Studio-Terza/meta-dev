@@ -1,11 +1,16 @@
-# Each story runs design's commands and hooks against a fresh home with a real file store;
-# each step's heard lists the world's answers in the order design asks; stories.txt holds what
-# each step shows, every call and pause it asked for, and the queue it leaves.
+# Each story runs design's commands and hooks against a fresh temporary home with the real file
+# and store ports; every path is relative to that home. Each step's input is the raw hook JSON
+# Claude Code sends, records are raw transcript lines, and heard lists the world's answers in
+# the order design asks; stories.txt holds what each step shows, every call and pause it asked
+# for, and the queue it leaves.
 
 [[story]]
 name = "ingest reads each session once, a dry run writes nothing, and a grown transcript resumes"
-transcript = [["user", "o1", "Merge only when CI is green."], ["assistant", "p1", "Understood."]]
-records = ['{"type":"brand-new-kind","uuid":"x1","parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z"}']
+records = [
+  '{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}',
+  '{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}',
+  '{"type":"brand-new-kind","uuid":"x1","parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z"}',
+]
 
 [[story.step]]
 words = ["ingest", "--dry-run"]
@@ -18,7 +23,7 @@ words = ["ingest"]
 
 [[story.step]]
 words = ["ingest"]
-append = [["user", "o2", "Ship it."]]
+append = ['{"message":{"content":"Ship it.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o2"}']
 
 [[story]]
 name = "words the cli does not know are refused with the usage, and the hook settings print"
@@ -49,43 +54,60 @@ input = "not json"
 name = "a continuing stop passes at once"
 
 [[story.step]]
-stop = { active = "Yes" }
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":true}'
 
 [[story]]
-name = "a stop with nothing running stalls, and one without a transcript passes"
-transcript = [["user", "o1", "Merge only when CI is green."], ["assistant", "p1", "Understood."]]
+name = "a stop with nothing running stalls, and one without a session passes"
+records = [
+  '{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}',
+  '{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}',
+]
 
 [[story.step]]
-stop = {}
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false}'
 heard = ["Unrun"]
 
 [[story.step]]
-stop = { untranscribed = "Yes" }
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"stop_hook_active":false}'
 heard = ["Unrun"]
 
 [[story]]
 name = "a shell still running passes"
-transcript = [["user", "o1", "Merge only when CI is green."], ["assistant", "p1", "Understood."]]
+records = [
+  '{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}',
+  '{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}',
+]
 shells = [{ file = "b1.output", text = "building\n" }]
 
 [[story.step]]
-stop = {}
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false}'
 heard = ["Unrun"]
 
 [[story]]
 name = "an agent quiet under twenty minutes passes"
-transcript = [["user", "o1", "Merge only when CI is green."], ["assistant", "p1", "Understood."]]
+records = [
+  '{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}',
+  '{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}',
+]
 agents = [{ file = "agent-busy.jsonl", text = "{\"type\":\"user\"}\n", quiet = 19 }]
 
 [[story.step]]
-stop = {}
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false}'
 heard = ["Unrun"]
 
 [[story]]
 name = "finished tasks and files that are not tasks stall"
-transcript = [["user", "o1", "Merge only when CI is green."], ["assistant", "p1", "Understood."]]
+records = [
+  '{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}',
+  '{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}',
+]
 shells = [
-  { file = "b1.output", text = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n[exited with code 0]\n" },
+  { file = "b1.output", text = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n[exited with code 0]\n" },
   { file = "b2.log", text = "building\n" },
   { file = "b3.output", text = "building\n\n[killed]" },
 ]
@@ -95,13 +117,15 @@ agents = [
 ]
 
 [[story.step]]
-stop = {}
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false}'
 heard = ["Unrun"]
 
 [[story]]
 name = "an agent quiet for twenty minutes overruns once, and agents the lead stopped or the harness reported ended do not"
-transcript = [["user", "o1", "Merge only when CI is green."], ["assistant", "p1", "Understood."]]
 records = [
+  '{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}',
+  '{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}',
   '{"type":"assistant","uuid":"t1","parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:01Z","message":{"model":"claude","content":[{"type":"tool_use","id":"toolu_1","name":"TaskStop","input":{"task_id":"noskip"}}]}}',
   '{"type":"user","uuid":"t2","parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:02Z","origin":{"kind":"task-notification"},"message":{"content":"<task-notification>\n<task-id>a26ca09f4c3ef4cfd</task-id>\n<status>killed</status>\n</task-notification>"}}',
 ]
@@ -112,16 +136,21 @@ agents = [
 ]
 
 [[story.step]]
-stop = {}
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false}'
 heard = ["Unrun"]
 
 [[story.step]]
-stop = {}
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false}'
 heard = ["Unrun"]
 
 [[story]]
 name = "agents that stopped on a stop sequence, were let stop by SubagentStop or went silent an hour ago do not overrun, and agents told to go on do"
-transcript = [["user", "o1", "Merge only when CI is green."], ["assistant", "p1", "Understood."]]
+records = [
+  '{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}',
+  '{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}',
+]
 agents = [
   { file = "agent-sequenced.jsonl", text = "{\"type\":\"user\",\"message\":{\"role\":\"user\"}}\n{\"type\":\"api-request\"}\n{\"type\":\"assistant\",\"uuid\":\"a1\",\"parentUuid\":null,\"sessionId\":\"t\",\"timestamp\":\"2026-01-01T00:00:01Z\",\"message\":{\"model\":\"claude\",\"role\":\"assistant\",\"content\":[],\"stop_reason\":\"stop_sequence\"}}\n", quiet = 20 },
   { file = "agent-let.jsonl", text = "{\"type\":\"api-request\"}\n{\"type\":\"assistant\",\"uuid\":\"a1\",\"parentUuid\":null,\"sessionId\":\"t\",\"timestamp\":\"2026-01-01T00:00:01Z\",\"message\":{\"model\":\"claude\",\"role\":\"assistant\",\"content\":[],\"stop_reason\":\"end_turn\"}}\n{\"type\":\"attachment\",\"uuid\":\"a2\",\"parentUuid\":\"a1\",\"sessionId\":\"t\",\"timestamp\":\"2026-01-01T00:00:02Z\",\"attachment\":{\"type\":\"prompt_snapshot\",\"tools\":[]}}\n{\"type\":\"attachment\",\"uuid\":\"a3\",\"parentUuid\":\"a2\",\"sessionId\":\"t\",\"timestamp\":\"2026-01-01T00:00:03Z\",\"attachment\":{\"type\":\"hook_success\",\"hookEvent\":\"SubagentStop\",\"hookName\":\"SubagentStop\",\"exitCode\":0}}\n", quiet = 20 },
@@ -132,15 +161,20 @@ agents = [
 ]
 
 [[story.step]]
-stop = {}
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false}'
 heard = ["Unrun"]
 
 [[story]]
 name = "owner words bearing on a question are quoted and block once"
-transcript = [["user", "o1", "Merge only when CI is green."], ["assistant", "p1", "Understood."]]
+records = [
+  '{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}',
+  '{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}',
+]
 
 [[story.step]]
-stop = { said = "Shall I merge the branch now?" }
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":"Shall I merge the branch now?","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"subtype":"success","result":"[{\"uuid\": \"o1\", \"quote\": \"Merge only when CI is green.\"}]"}' },
   { Succeeded = '{"subtype":"success","result":"Keep: [1]"}' },
@@ -148,55 +182,73 @@ heard = [
 
 [[story]]
 name = "a quote the owner never wrote, a refused reading and an unparsed reply quote nothing"
-transcript = [["user", "o1", "Merge only when CI is green."], ["assistant", "p1", "Understood."]]
+records = [
+  '{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}',
+  '{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}',
+]
 
 [[story.step]]
-stop = { said = "Shall I merge the branch now?" }
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":"Shall I merge the branch now?","session_id":"s","stop_hook_active":false}'
 heard = [{ Succeeded = '{"subtype":"success","result":"[{\"uuid\": \"o1\", \"quote\": \"Never said this.\"}]"}' }]
 
 [[story.step]]
-stop = { said = "Shall I merge the branch now?" }
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":"Shall I merge the branch now?","session_id":"s","stop_hook_active":false}'
 heard = [{ Failed = '{"subtype":"error_during_execution","is_error":true,"result":"refused"}' }]
 
 [[story.step]]
-stop = { said = "Shall I merge the branch now?" }
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":"Shall I merge the branch now?","session_id":"s","stop_hook_active":false}'
 heard = [{ Succeeded = "not json" }]
 
 [[story]]
 name = "owner words bearing on a brief or a plain message are appended to it with their ids, and a structured message, a brief nothing bears on and a failed reading pass unchanged"
-transcript = [["user", "o1", "Merge only when CI is green."], ["assistant", "p1", "Understood."]]
+records = [
+  '{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}',
+  '{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}',
+]
 
 [[story.step]]
-brief = "Land #12 once its checks finish."
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"description":"d","prompt":"Land #12 once its checks finish.","subagent_type":"worker"},"tool_name":"Agent"}'
 heard = [
   { Succeeded = '{"subtype":"success","result":"[{\"uuid\": \"o1\", \"quote\": \"Merge only when CI is green.\"}]"}' },
   { Succeeded = '{"subtype":"success","result":"[1]"}' },
 ]
 
 [[story.step]]
-sent = "Merge #12 now."
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"message":"Merge #12 now.","summary":"s","to":"worker"},"tool_name":"SendMessage"}'
 heard = [
   { Succeeded = '{"subtype":"success","result":"[{\"uuid\": \"o1\", \"quote\": \"Merge only when CI is green.\"}]"}' },
   { Succeeded = '{"subtype":"success","result":"[1]"}' },
 ]
 
 [[story.step]]
-sent = { type = "shutdown_request", reason = "done" }
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"message":{"reason":"done","type":"shutdown_request"},"summary":"s","to":"worker"},"tool_name":"SendMessage"}'
 
 [[story.step]]
-brief = "Rename the crate."
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"description":"d","prompt":"Rename the crate.","subagent_type":"worker"},"tool_name":"Agent"}'
 heard = [{ Succeeded = '{"subtype":"success","result":"[]"}' }]
 
 [[story.step]]
-brief = "Land #12 once its checks finish."
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"description":"d","prompt":"Land #12 once its checks finish.","subagent_type":"worker"},"tool_name":"Agent"}'
 heard = [{ Failed = '{"subtype":"error_during_execution","is_error":true,"result":"refused"}' }]
 
 [[story]]
 name = "a stop without its last message asks about the lead's last stored words"
-transcript = [["user", "o1", "Merge only when CI is green."], ["assistant", "p1", "Understood."]]
+records = [
+  '{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}',
+  '{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}',
+]
 
 [[story.step]]
-stop = {}
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"subtype":"success","result":"[{\"uuid\": \"o1\", \"quote\": \"Merge only when CI is green.\"}]"}' },
   { Succeeded = '{"subtype":"success","result":"[1]"}' },
@@ -204,21 +256,22 @@ heard = [
 
 [[story]]
 name = "short owner replies carry the lead question they answered"
-transcript = [
-  ["assistant", "a1", "I checked CI\nShall I merge #12 now? Nothing else is waiting on this answer."],
-  ["user", "a2", "yes"],
-  ["assistant", "a3", "Merged."],
-  ["user", "a4", "Next, port the hook and keep every quote it reads exactly as it is today."],
-  ["assistant", "a5", "Done. Ship it?"],
-  ["user", "a6", "sure"],
-  ["assistant", "a7", "Anything else"],
-  ["user", "a8", "no"],
-  ["assistant", "a9", "What next?"],
-  ["user", "a10", "yes, merge it and then port the hook"],
+records = [
+  '{"message":{"content":[{"text":"I checked CI\nShall I merge #12 now? Nothing else is waiting on this answer.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"a1"}',
+  '{"message":{"content":"yes","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"a2"}',
+  '{"message":{"content":[{"text":"Merged.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"a3"}',
+  '{"message":{"content":"Next, port the hook and keep every quote it reads exactly as it is today.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"a4"}',
+  '{"message":{"content":[{"text":"Done. Ship it?","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"a5"}',
+  '{"message":{"content":"sure","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"a6"}',
+  '{"message":{"content":[{"text":"Anything else","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"a7"}',
+  '{"message":{"content":"no","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"a8"}',
+  '{"message":{"content":[{"text":"What next?","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"a9"}',
+  '{"message":{"content":"yes, merge it and then port the hook","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"a10"}',
 ]
 
 [[story.step]]
-stop = { said = "Shall I port the hook?" }
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":"Shall I port the hook?","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"subtype":"success","result":"[{\"uuid\": \"a2\", \"quote\": \"yes\"}, {\"uuid\": \"a4\", \"quote\": \"Next, port the hook\"}, {\"uuid\": \"a6\", \"quote\": \"sure\"}, {\"uuid\": \"a8\", \"quote\": \"no\"}, {\"uuid\": \"a10\", \"quote\": \"merge it\"}]"}' },
   { Succeeded = '{"subtype":"success","result":"[1, 2, 3, 4, 5]"}' },
@@ -226,10 +279,10 @@ heard = [
 
 [[story]]
 name = "a stalled stop drains the queue in code and shows only what stays open"
-transcript = [
-  ["user", "4c371128-0000-4000-8000-000000000000", "what clears the queue?\nSome things need a ruling."],
-  ["user", "f6484f7e-0000-4000-8000-000000000000", "Defer the merge queue."],
-  ["assistant", "p1", "Understood."],
+records = [
+  '{"message":{"content":"what clears the queue?\nSome things need a ruling.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"4c371128-0000-4000-8000-000000000000"}',
+  '{"message":{"content":"Defer the merge queue.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"f6484f7e-0000-4000-8000-000000000000"}',
+  '{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}',
 ]
 spec = """
 # Tools retirement
@@ -254,22 +307,22 @@ pull = 43
 pull = 99
 
 [[item]]
-escalation = { at = { pull = 42 }, cause = { repeat-failure = "test" }, from = "/home/agent" }
+escalation = { at = { pull = 42 }, cause = { repeat-failure = "test" }, from = "agent" }
 
 [[item]]
-escalation = { at = { branch = "design/x" }, cause = { unread = "open" }, from = "/home/agent" }
+escalation = { at = { branch = "design/x" }, cause = { unread = "open" }, from = "agent" }
 
 [[item]]
-escalation = { at = { branch = "design/queue" }, cause = "blocked", from = "/home/agent" }
+escalation = { at = { branch = "design/queue" }, cause = "blocked", from = "agent" }
 
 [[item]]
-escalation = { cause = { unread = "ending" }, from = "/home/placed/gone" }
+escalation = { cause = { unread = "ending" }, from = "placed/gone" }
 
 [[item]]
-worktree = { path = "/home/placed/gone", held = "dirty", merged = 40 }
+worktree = { path = "placed/gone", held = "dirty", merged = 40 }
 
 [[item]]
-worktree = { path = "/home/placed", held = "unpushed", merged = 41 }
+worktree = { path = "placed", held = "unpushed", merged = 41 }
 
 [[item]]
 ruling = { asked = "4c371128" }
@@ -279,14 +332,16 @@ ruling = { asked = "4c371128", ruled = "f6484f7e" }
 '''
 
 [[story.step]]
-stop = {}
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false}'
 heard = [
   "Unrun",
   { Succeeded = '[{"number":40,"state":"MERGED","title":"D1 Keep only what works","headRefName":"design/process-rebuild","body":"spec: tools-retirement#D1, tools-retirement#D2\n\nGenerated"},{"number":41,"state":"OPEN","title":"D3 The queue drains itself","headRefName":"design/queue","body":"spec: tools-retirement#D3"},{"number":42,"state":"CLOSED","title":"Target cache fallback","headRefName":"ci/fallback","body":"no spec line"},{"number":43,"state":"OPEN","title":"Lint additions","headRefName":"lint/additions","body":""},{"number":44,"state":"MERGED","title":"Elsewhere","headRefName":"design/x","body":"spec: none"}]' },
 ]
 
 [[story.step]]
-stop = {}
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false}'
 heard = [
   "Unrun",
   { Succeeded = '[{"number":40,"state":"MERGED","title":"D1 Keep only what works","headRefName":"design/process-rebuild","body":"spec: tools-retirement#D1, tools-retirement#D2\n\nGenerated"},{"number":41,"state":"OPEN","title":"D3 The queue drains itself","headRefName":"design/queue","body":"spec: tools-retirement#D3"},{"number":42,"state":"CLOSED","title":"Target cache fallback","headRefName":"ci/fallback","body":"no spec line"},{"number":43,"state":"OPEN","title":"Lint additions","headRefName":"lint/additions","body":""},{"number":44,"state":"MERGED","title":"Elsewhere","headRefName":"design/x","body":"spec: none"}]' },
@@ -294,134 +349,169 @@ heard = [
 
 [[story]]
 name = "a queue that does not parse, or holds free text, is named in the stall and left as it is"
-transcript = [["user", "o1", "Merge only when CI is green."], ["assistant", "p1", "Understood."]]
+records = [
+  '{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}',
+  '{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}',
+]
 queue = "[[item]]\nsaid = \"free text is not an item\"\npull = 44\n"
 
 [[story.step]]
-stop = {}
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false}'
 heard = ["Unrun"]
 
 [[story]]
 name = "pull requests that cannot be listed still let worktrees and rulings close"
-transcript = [["user", "o1", "Merge only when CI is green."], ["assistant", "p1", "Understood."]]
+records = [
+  '{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}',
+  '{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}',
+]
 queue = '''
 [[item]]
 pull = 43
 
 [[item]]
-worktree = { path = "/home/placed/gone", held = "dirty", merged = 40 }
+worktree = { path = "placed/gone", held = "dirty", merged = 40 }
 
 [[item]]
 ruling = { asked = "4c371128", ruled = "f6484f7e" }
 '''
 
 [[story.step]]
-stop = {}
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false}'
 heard = ["Unrun", { Failed = "" }]
 
 [[story]]
 name = "shell that is not plain is refused, as is a deletion run through another command or on arguments that are not literal; a plain one passes to the harness"
 
 [[story.step]]
-ran = 'for d in a b; do rm -rf "$d"; done'
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"for d in a b; do rm -rf \"$d\"; done"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "bash -c 'rm -rf /tmp/x'"
+words = ["hook", "pre-tool-use"]
+input = '''{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"bash -c 'rm -rf x'"},"tool_name":"Bash"}'''
 
 [[story.step]]
-ran = "find . -name x -delete"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"find . -name x -delete"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "ls | xargs rm"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"ls | xargs rm"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "echo $(rm x)"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"echo $(rm x)"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "find . -type d -empty -exec rmdir {} +"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"find . -type d -empty -exec rmdir {} +"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "bash <<'EOF'\nrm x\nEOF"
+words = ["hook", "pre-tool-use"]
+input = '''{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"bash <<'EOF'\nrm x\nEOF"},"tool_name":"Bash"}'''
 
 [[story.step]]
-ran = "test -d out && { rm -rf out; }"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"test -d out && { rm -rf out; }"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = """P=(${(f)"$(cargo metadata --no-deps | jq -r '.packages[].name')"}); cargo clean -q $P"""
+words = ["hook", "pre-tool-use"]
+input = '''{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"P=(${(f)\"$(cargo metadata --no-deps | jq -r '.packages[].name')\"}); cargo clean -q $P"},"tool_name":"Bash"}'''
 
 [[story.step]]
-ran = 'rm -rf "$d"'
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"rm -rf \"$d\""},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "git clean -fdx $DIR"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"git clean -fdx $DIR"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "rm x"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"rm x"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "cargo clean"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cargo clean"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "git rm x"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"git rm x"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "echo rm"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"echo rm"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "git commit -m \"$(cat <<'EOF'\nrm the loop: for x; do rm y; done\nEOF\n)\""
+words = ["hook", "pre-tool-use"]
+input = '''{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"git commit -m \"$(cat <<'EOF'\nrm the loop: for x; do rm y; done\nEOF\n)\""},"tool_name":"Bash"}'''
 
 [[story]]
 name = "untyped endings are sent back with the lines to end on, then queued until the agent's worktree is gone"
 queue = ""
 
 [[story.step]]
-finish = "I finished the work; CI should be green."
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"I finished the work; CI should be green.","session_id":"s","stop_hook_active":false}'
 
 [[story.step]]
-finish = "DONE #12 0123456789abcdef0123456789abcdef01234567 and more"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567 and more","session_id":"s","stop_hook_active":false}'
 
 [[story.step]]
-finish = "done #12 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"done #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 
 [[story.step]]
-finish = "DONE #0 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #0 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 
 [[story.step]]
-finish = "DONE 12 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE 12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 
 [[story.step]]
-finish = "DONE #12 0123456"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456","session_id":"s","stop_hook_active":false}'
 
 [[story.step]]
-finish = "DONE #12 0123456789abcdef0123456789abcdef012345670"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef012345670","session_id":"s","stop_hook_active":false}'
 
 [[story.step]]
-finish = "DONE main 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE main 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 
 [[story.step]]
-finish = "DONE Design/open-pr 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE Design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 
 [[story.step]]
-finish = "DONE design/open-pr/ 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr/ 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 
 [[story.step]]
-finish = ""
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"","session_id":"s","stop_hook_active":false}'
 
 [[story.step]]
-finish = "Still prose."
-reminded = "Yes"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"Still prose.","session_id":"s","stop_hook_active":true}'
 
 [[story]]
 name = "a done on a sha the pull request does not hold, or on one behind or conflicting with main, is sent back at once to merge main naming the merges it lacks"
 
 [[story.step]]
-finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
-reminded = "Yes"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":true}'
 heard = [{ Succeeded = '{"headRefOid":"fedcba9876543210fedcba9876543210fedcba98"}' }]
 
 [[story.step]]
-finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
-reminded = "Yes"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":true}'
 heard = [
   { Succeeded = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
   { Succeeded = '{"mergeStateStatus":"DIRTY","mergeable":"CONFLICTING"}' },
@@ -429,7 +519,8 @@ heard = [
 ]
 
 [[story.step]]
-finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
   { Succeeded = '{"mergeStateStatus":"BEHIND","mergeable":"MERGEABLE"}' },
@@ -440,20 +531,18 @@ heard = [
 name = "a done right after opening asks for mutants, waits for checks to appear, watches them, and stops on green clearing its escalations"
 queue = '''
 [[item]]
-escalation = { at = { pull = 12 }, cause = { unread = "checks" }, from = "/work/agent" }
+escalation = { at = { pull = 12 }, cause = { unread = "checks" }, from = "work/agent" }
 
 [[item]]
-escalation = { at = { pull = 13 }, cause = "blocked", from = "/work/agent" }
+escalation = { at = { pull = 13 }, cause = "blocked", from = "work/agent" }
 
 [[item]]
 pull = 12
 '''
 
 [[story.step]]
-finish = """
-
-DONE #12 0123456789ABCDEF0123456789ABCDEF01234567
-"""
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"\nDONE #12 0123456789ABCDEF0123456789ABCDEF01234567\n","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
   { Succeeded = '{"mergeStateStatus":"UNKNOWN","mergeable":"UNKNOWN"}' },
@@ -478,7 +567,8 @@ name = "a red done is sent back with each failed job's log tail, a repeat failur
 queue = ""
 
 [[story.step]]
-finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
   { Succeeded = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
@@ -531,7 +621,8 @@ test step line 42""" },
 ]
 
 [[story.step]]
-finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
   { Succeeded = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
@@ -541,7 +632,8 @@ heard = [
 ]
 
 [[story.step]]
-finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
   { Succeeded = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
@@ -552,8 +644,8 @@ heard = [
 ]
 
 [[story.step]]
-finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
-reminded = "Yes"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":true}'
 heard = [
   { Succeeded = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
   { Succeeded = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
@@ -566,7 +658,8 @@ name = "a check failing again on a changed head is sent back with its log, mutan
 queue = ""
 
 [[story.step]]
-finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
   { Succeeded = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
@@ -582,7 +675,8 @@ mutants-shard (1)\tRun mutants\t2026-11-28T03:04:00Z 3 mutants tested in 9s: 2 m
 ]
 
 [[story.step]]
-finish = "DONE #12 fedcba9876543210fedcba9876543210fedcba98"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 fedcba9876543210fedcba9876543210fedcba98","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"headRefOid":"fedcba9876543210fedcba9876543210fedcba98"}' },
   { Succeeded = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
@@ -598,7 +692,8 @@ mutants-shard (1)\tRun mutants\t2026-11-28T03:04:00Z 3 mutants tested in 9s: 2 m
 ]
 
 [[story.step]]
-finish = "DONE #12 fedcba9876543210fedcba9876543210fedcba98"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 fedcba9876543210fedcba9876543210fedcba98","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"headRefOid":"fedcba9876543210fedcba9876543210fedcba98"}' },
   { Succeeded = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
@@ -611,7 +706,8 @@ name = "a green that came on a rerun after a gate failed on the same head is esc
 queue = ""
 
 [[story.step]]
-finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
   { Succeeded = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
@@ -623,7 +719,8 @@ heard = [
 ]
 
 [[story.step]]
-finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
   { Succeeded = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
@@ -634,7 +731,8 @@ heard = [
 ]
 
 [[story.step]]
-finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
   { Succeeded = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
@@ -645,7 +743,8 @@ heard = [
 ]
 
 [[story.step]]
-finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
   { Succeeded = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
@@ -655,7 +754,8 @@ heard = [
 ]
 
 [[story.step]]
-finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
   { Succeeded = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
@@ -670,29 +770,35 @@ name = "a blocked agent and every unread step are queued on the pull request"
 queue = ""
 
 [[story.step]]
-finish = "BLOCKED #12 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"BLOCKED #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 
 [[story.step]]
-finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = ["Unrun"]
 
 [[story.step]]
-finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [{ Failed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' }]
 
 [[story.step]]
-finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [{ Succeeded = "{}" }]
 
 [[story.step]]
-finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
   { Succeeded = '{"mergeStateStatus":"CLEAN","mergeable":"DIVERGED"}' },
 ]
 
 [[story.step]]
-finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
   { Succeeded = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
@@ -702,7 +808,8 @@ heard = [
 ]
 
 [[story.step]]
-finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
   { Succeeded = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
@@ -711,7 +818,8 @@ heard = [
 ]
 
 [[story.step]]
-finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
   { Succeeded = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
@@ -725,7 +833,7 @@ heard = [
 name = "a done on a pushed branch opens its pull request, waits on ci, and clears the branch's escalation"
 queue = '''
 [[item]]
-escalation = { at = { branch = "design/open-pr" }, cause = { unread = "open" }, from = "/work/agent" }
+escalation = { at = { branch = "design/open-pr" }, cause = { unread = "open" }, from = "work/agent" }
 '''
 spec = """
 # Tools retirement
@@ -737,7 +845,8 @@ D20 Later work (owner 1).
 """
 
 [[story.step]]
-finish = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
   { Succeeded = '{"commits":[{"commit":{"message":"Open it\n\nSpec: none here\n\nWhy.\n\nSpec: tools-retirement#D2\nCo-Authored-By: A"}},{"commit":{"message":"Spec: other#D9"}}]}' },
@@ -756,13 +865,13 @@ heard = [
 name = "a done on a branch whose remote head differs, or that is not on the remote, is sent back to push"
 
 [[story.step]]
-finish = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
-reminded = "Yes"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":true}'
 heard = [{ Succeeded = '{"data":{"repository":{"ref":{"target":{"oid":"fedcba9876543210fedcba9876543210fedcba98"}}}}}' }]
 
 [[story.step]]
-finish = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
-reminded = "Yes"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":true}'
 heard = [{ Succeeded = '{"data":{"repository":{"ref":null}}}' }]
 
 [[story]]
@@ -777,53 +886,62 @@ D3 Typed agent outcomes (owner de7a042f): the hook refuses other endings.
 """
 
 [[story.step]]
-finish = "BLOCKED design/open-pr 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"BLOCKED design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 
 [[story.step]]
-finish = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [{ Succeeded = '{"data":{"repository":{"ref":{}}}}' }]
 
 [[story.step]]
-finish = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [{ Succeeded = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' }, "Unrun"]
 
 [[story.step]]
-finish = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
   { Succeeded = '{"commits":[]}' },
 ]
 
 [[story.step]]
-finish = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
   { Succeeded = '{"commits":[{"commit":{"message":"Open it\n\nSpec: none here\n\nWhy.\n\n\nCo-Authored-By: A"}},{"commit":{"message":"Spec: other#D9"}}]}' },
 ]
 
 [[story.step]]
-finish = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
   { Succeeded = '{"commits":[{"commit":{"message":"Spec: tools-retirement#D2\nCo-Authored-By: A"}}]}' },
 ]
 
 [[story.step]]
-finish = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
   { Succeeded = '{"commits":[{"commit":{"message":"Spec: other#D3\nCo-Authored-By: A"}}]}' },
 ]
 
 [[story.step]]
-finish = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
   { Succeeded = '{"commits":[{"commit":{"message":"Spec: owner 3c84f560\nCo-Authored-By: A"}}]}' },
 ]
 
 [[story.step]]
-finish = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
   { Succeeded = '{"commits":[{"commit":{"message":"Spec: tools-retirement#D3\nCo-Authored-By: A"}}]}' },
@@ -831,7 +949,8 @@ heard = [
 ]
 
 [[story.step]]
-finish = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
   { Succeeded = '{"commits":[{"commit":{"message":"Spec: tools-retirement#D3\nCo-Authored-By: A"}}]}' },
@@ -840,63 +959,67 @@ heard = [
 ]
 
 [[story]]
-name = "a workspace whose local settings name no specs, a relative path, or no repository escalates without guessing"
+name = "a workspace whose local settings name no specs escalates without guessing"
 queue = ""
 local = """
-queue = "/home/placed/queue.toml"
+queue = "placed/queue.toml"
 repository = "o/r"
 """
 
 [[story.step]]
-finish = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 heard = [
   { Succeeded = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
   { Succeeded = '{"commits":[{"commit":{"message":"Open it\n\nSpec: tools-retirement#D2\nCo-Authored-By: A"}}]}' },
 ]
 
 [[story]]
-name = "local settings naming the queue at a relative path, or no queue, refuse to escalate"
+name = "local settings naming no queue refuse to escalate"
 queue = ""
 local = """
-queue = "queue.toml"
 repository = "o/r"
 """
 
 [[story.step]]
-finish = "BLOCKED #12 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"BLOCKED #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 
 [[story]]
 name = "local settings with no repository escalate a done without gh"
 queue = ""
 local = """
-queue = "/home/placed/queue.toml"
+queue = "placed/queue.toml"
 project = "meta-dev"
 """
 
 [[story.step]]
-finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 
 [[story.step]]
-finish = "DONE design/open-pr 0123456789abcdef0123456789abcdef01234567"
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 
 [[story]]
 name = "a merged pull request's clean pushed worktree is removed, and any other is kept and queued until it is gone"
 queue = ""
 
 [[story.step]]
-used = "cd /work && gh pr merge 12 --merge -R o/r"
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"cd work && gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
 heard = [
   { Succeeded = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"MERGED"}' },
   { Succeeded = """
-worktree /work/main
+worktree work/main
 HEAD fedcba9876543210fedcba9876543210fedcba98
 branch refs/heads/main
 
-worktree /work/wt-open-pr
+worktree work/wt-open-pr
 HEAD 0123456789abcdef0123456789abcdef01234567
 branch refs/heads/design/open-pr
 
-worktree /work/detached
+worktree work/detached
 HEAD 0123456789abcdef0123456789abcdef01234567
 detached
 """ },
@@ -910,18 +1033,21 @@ detached
 ]
 
 [[story.step]]
-used = "gh pr view 12 && echo merge 12"
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"gh pr view 12 && echo merge 12"},"tool_name":"Bash","tool_response":{"stdout":""}}'
 
 [[story.step]]
-used = "cd /work && gh pr merge 12 --merge -R o/r"
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"cd work && gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
 heard = [{ Succeeded = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"OPEN"}' }]
 
 [[story.step]]
-used = "cd /work && gh pr merge 12 --merge -R o/r"
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"cd work && gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
 heard = [
   { Succeeded = '{"headRefName":"design/other","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"MERGED"}' },
   { Succeeded = """
-worktree /work/wt-open-pr
+worktree work/wt-open-pr
 HEAD 0123456789abcdef0123456789abcdef01234567
 branch refs/heads/design/open-pr
 """ },
@@ -933,11 +1059,13 @@ branch refs/heads/design/open-pr
 ]
 
 [[story.step]]
-used = "cd /work && gh pr merge 12 --merge -R o/r"
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"cd work && gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
 heard = [{ Failed = "" }]
 
 [[story.step]]
-used = "cd /work && gh pr merge 12 --merge -R o/r"
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"cd work && gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
 heard = [
   { Succeeded = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"MERGED"}' },
   { Failed = "" },
@@ -949,11 +1077,12 @@ heard = [
 ]
 
 [[story.step]]
-used = "cd /work && gh pr merge 12 --merge -R o/r"
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"cd work && gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
 heard = [
   { Succeeded = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"MERGED"}' },
   { Succeeded = """
-worktree /work/wt-open-pr
+worktree work/wt-open-pr
 HEAD 0123456789abcdef0123456789abcdef01234567
 branch refs/heads/design/open-pr
 """ },
@@ -968,11 +1097,12 @@ branch refs/heads/design/open-pr
 ]
 
 [[story.step]]
-used = "cd /work && gh pr merge 12 --merge -R o/r"
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"cd work && gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
 heard = [
   { Succeeded = '{"headRefName":"design/open-pr","headRefOid":"fedcba9876543210fedcba9876543210fedcba98","state":"MERGED"}' },
   { Succeeded = """
-worktree /work/wt-open-pr
+worktree work/wt-open-pr
 HEAD 0123456789abcdef0123456789abcdef01234567
 branch refs/heads/design/open-pr
 """ },
@@ -985,11 +1115,12 @@ branch refs/heads/design/open-pr
 ]
 
 [[story.step]]
-used = "cd /work && gh pr merge 12 --merge -R o/r"
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"cd work && gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
 heard = [
   { Succeeded = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"MERGED"}' },
   { Succeeded = """
-worktree /work/wt-open-pr
+worktree work/wt-open-pr
 HEAD 0123456789abcdef0123456789abcdef01234567
 branch refs/heads/design/open-pr
 """ },
@@ -1008,7 +1139,8 @@ queue = "[[item]]\nuninstalled = { merged = 11, step = \"build\" }\n"
 settings = '{"env":{"A":"1"},"hooks":{"Stop":"old"},"permissions":{"deny":["Monitor"]}}'
 
 [[story.step]]
-used = "gh pr merge 12 --merge -R o/r"
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
 heard = [
   { Succeeded = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"MERGED"}' },
   { Succeeded = "" },
@@ -1020,7 +1152,8 @@ heard = [
 ]
 
 [[story.step]]
-used = "gh pr merge 12 --merge -R o/r"
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
 heard = [
   { Succeeded = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"MERGED"}' },
   { Succeeded = "" },
@@ -1028,7 +1161,8 @@ heard = [
 ]
 
 [[story.step]]
-used = "gh pr merge 12 --merge -R o/r"
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
 heard = [
   { Succeeded = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"MERGED"}' },
   { Succeeded = "" },
@@ -1037,7 +1171,8 @@ heard = [
 ]
 
 [[story.step]]
-used = "gh pr merge 12 --merge -R o/r"
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
 heard = [
   { Succeeded = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"MERGED"}' },
   { Succeeded = "" },
@@ -1048,7 +1183,8 @@ heard = [
 ]
 
 [[story.step]]
-used = "gh pr merge 12 --merge -R o/r"
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
 heard = [
   { Succeeded = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"MERGED"}' },
   { Succeeded = "" },
@@ -1060,11 +1196,13 @@ heard = [
 ]
 
 [[story.step]]
-used = "gh pr merge 12 --merge -R o/r"
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
 heard = [{ Succeeded = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"OPEN"}' }]
 
 [[story.step]]
-stop = {}
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false}'
 heard = ["Unrun"]
 
 [[story]]
@@ -1073,7 +1211,8 @@ queue = ""
 settings = "not json\n"
 
 [[story.step]]
-used = "gh pr merge 12 --merge -R o/r"
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
 heard = [
   { Succeeded = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"MERGED"}' },
   { Succeeded = "" },
@@ -1086,80 +1225,105 @@ heard = [
 
 [[story]]
 name = "in-place edits anywhere, shell writes under a repository, and moves out of one are refused toward the edit tools"
-repositories = ["/home/repo"]
+repositories = ["repo"]
 
 [[story.step]]
-ran = "sed -i 's/a/b/' /tmp/x"
+words = ["hook", "pre-tool-use"]
+input = '''{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"sed -i 's/a/b/' x"},"tool_name":"Bash"}'''
 
 [[story.step]]
-ran = "for f in a; do perl -pi -e 's/a/b/' $f; done"
+words = ["hook", "pre-tool-use"]
+input = '''{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"for f in a; do perl -pi -e 's/a/b/' $f; done"},"tool_name":"Bash"}'''
 
 [[story.step]]
-ran = "ls | xargs perl -pi -e 's/a/b/'"
+words = ["hook", "pre-tool-use"]
+input = '''{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"ls | xargs perl -pi -e 's/a/b/'"},"tool_name":"Bash"}'''
 
 [[story.step]]
-ran = "echo a > /home/repo/src/x.rs"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"echo a > $HOME/repo/src/x.rs"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "cargo test 2>/dev/null | tee /home/repo/log.txt"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cargo test 2>err.txt | tee $HOME/repo/log.txt"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "mv /home/repo/a.rs /tmp/a.rs"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"mv $HOME/repo/a.rs a.rs"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "echo a > /tmp/out.txt"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"echo a > out.txt"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "sed -n 's/i/b/p' /home/repo/x.rs"
+words = ["hook", "pre-tool-use"]
+input = '''{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"sed -n 's/i/b/p' $HOME/repo/x.rs"},"tool_name":"Bash"}'''
 
 [[story.step]]
-ran = "mv /home/repo/a.rs /home/repo/b.rs"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"mv $HOME/repo/a.rs $HOME/repo/b.rs"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "mv /tmp/a /home/repo/a"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"mv a $HOME/repo/a"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "git mv /home/repo/a.rs /tmp/a.rs"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"git mv $HOME/repo/a.rs a.rs"},"tool_name":"Bash"}'
 
 [[story]]
 name = "relative shell writes are judged against a cd's target and the variables known, and refused when the path cannot be worked out"
-repositories = ["/home/repo"]
+repositories = ["repo"]
 
 [[story.step]]
-ran = "cd /home/repo && echo a > src/x.rs"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cd $HOME/repo && echo a > src/x.rs"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "cd /home && cd repo; mv a.rs /tmp/a.rs"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cd $HOME && cd repo; mv a.rs ../a.rs"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "cd /tmp && echo a > out.txt"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cd $HOME && echo a > out.txt"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "cd $REPO && echo a > out.txt"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cd $REPO && echo a > out.txt"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "cd - && mv a b"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cd - && mv a b"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "cd $REPO && echo a > /tmp/out.txt"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cd $REPO && echo a > $HOME/out.txt"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "S=/home/repo; echo a > $S/x.rs"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"S=$HOME/repo; echo a > $S/x.rs"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "export S=/tmp && cd $HOME/repo && mv a.rs $S/a.rs"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"export S=$HOME && cd $HOME/repo && mv a.rs $S/a.rs"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "echo a > $UNSET/x"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"echo a > $UNSET/x"},"tool_name":"Bash"}'
 
 [[story.step]]
-ran = "S=/tmp/s; echo a > $S/gold.txt"
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"S=s; echo a > $S/gold.txt"},"tool_name":"Bash"}'
 
 [[story]]
 name = "a ruling whose message id is not eight or more hexadecimal digits does not parse"
-transcript = [["user", "o1", "Merge only when CI is green."], ["assistant", "p1", "Understood."]]
+records = [
+  '{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}',
+  '{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}',
+]
 queue = "[[item]]\nruling = { asked = \"4c37\" }\n\n[[item]]\nruling = { asked = \"not-a-message-id\" }\n"
 
 [[story.step]]
-stop = {}
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false}'
 heard = ["Unrun"]

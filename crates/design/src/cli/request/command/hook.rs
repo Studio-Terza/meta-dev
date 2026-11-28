@@ -6,7 +6,7 @@ mod reply;
 mod subagent;
 mod unroll;
 
-use console_ports::{Environment, Heard};
+use console_ports::Heard;
 use file_ports::Files;
 use newtype::Enumerated;
 use store_ports::Store;
@@ -31,22 +31,17 @@ pub enum Hooked {
 impl Hooked {
     pub fn answered<F: Files + Clone, S: Store>(
         self,
-        environment: &impl Environment,
         heard: Option<&Heard>,
         ground: &Ground<'_, F, S>,
         tape: &Tape<'_>,
     ) -> Result<Uttered, Failure> {
         let input = || heard.cloned().ok_or(Failure::Usage);
         match self {
-            Hooked::Settings => Settings::listed(HookEvent::VARIANTS).written(),
-            Hooked::On(HookEvent::Stop) => Stopping::heard(input()?)?.answered(environment, ground, tape)?.uttered(),
-            Hooked::On(HookEvent::SubagentStop) => {
-                Finishing::heard(input()?)?.answered(environment, ground, tape)?.uttered()
-            }
-            Hooked::On(HookEvent::PreToolUse) => {
-                Running::heard(input()?)?.answered(environment, ground, tape)?.uttered()
-            }
-            Hooked::On(HookEvent::PostToolUse) => Used::heard(input()?)?.answered(environment, ground, tape)?.uttered(),
+            Hooked::Settings => Settings::listed(HookEvent::VARIANTS, &Settings::harness(ground, tape)?).written(),
+            Hooked::On(HookEvent::Stop) => Stopping::heard(input()?)?.answered(ground, tape)?.uttered(),
+            Hooked::On(HookEvent::SubagentStop) => Finishing::heard(input()?)?.answered(ground, tape)?.uttered(),
+            Hooked::On(HookEvent::PreToolUse) => Running::heard(input()?)?.answered(ground, tape)?.uttered(),
+            Hooked::On(HookEvent::PostToolUse) => Used::heard(input()?)?.answered(ground, tape)?.uttered(),
         }
     }
 }

@@ -3,11 +3,11 @@ mod harness;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::ops::Not;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use console_ports::{Environment, Shown};
+use console_ports::Shown;
 use design_messages::{EndedTasks, LastSaid, Overran, Overruns, OwnerHistory, Said};
-use dispatch_ports::Wall;
+use dispatch_ports::{Ran, Timeout, Wall};
 use file_ports::{Epoch, Files};
 use grammar::lines::Lines;
 use grammar::spec_line::Attachment;
@@ -66,8 +66,6 @@ pub struct Stopping {
     said: Option<Body>,
     #[serde(rename = "session_id", default)]
     session: Option<SessionId>,
-    #[serde(rename = "transcript_path", default)]
-    transcript: Option<PathBuf>,
 }
 
 #[derive(Debug)]
@@ -113,20 +111,43 @@ struct Continuation(Option<Continuing>);
 
 impl Settings {
     const KIND: &'static str = "command";
+    const TEMPORARY: &'static str = "/private/tmp";
+    const HARNESS: &'static str = "claude-";
+    const IDENTITY: &'static str = "id";
+    const QUICK: Timeout = Timeout::new(60);
 
-    pub fn listed(events: &[HookEvent]) -> Settings {
+    pub fn listed(events: &[HookEvent], harness: &Path) -> Settings {
         Settings {
             hooks: events
                 .iter()
                 .map(|event| {
                     let matchers = Settings::matchers(*event)
                         .iter()
-                        .map(|matcher| Matcher { matcher: *matcher, hooks: [Settings::handler(*event, *matcher)] })
+                        .map(|matcher| Matcher {
+                            matcher: *matcher,
+                            hooks: [Settings::handler(*event, *matcher, harness)],
+                        })
                         .collect();
                     (*event, matchers)
                 })
                 .collect(),
         }
+    }
+
+    pub fn harness<F: Files, S: Store>(ground: &Ground<'_, F, S>, tape: &Tape<'_>) -> Result<PathBuf, Failure> {
+        ground.harness().map_or_else(
+            || Settings::identified(ground, tape),
+            |configured| Ok(ground.rendered(configured).to_path_buf()),
+        )
+    }
+
+    fn identified<F: Files, S: Store>(ground: &Ground<'_, F, S>, tape: &Tape<'_>) -> Result<PathBuf, Failure> {
+        let ran = tape.spoke(Self::IDENTITY, &["-u"], ground.workspace(), Self::QUICK)?;
+        let printed = ran.as_ref().and_then(Ran::succeeded).ok_or(Failure::Unidentified)?;
+        let first = Lines::from(printed.as_ref()).into_iter().next();
+        let user: u32 =
+            first.and_then(|line| line.parse().ignoring(Ignored::Unidentified)).ok_or(Failure::Unidentified)?;
+        Ok(Path::new(Self::TEMPORARY).join(format!("{}{user}", Self::HARNESS)))
     }
 
     const fn matchers(event: HookEvent) -> &'static [Option<Tool>] {
@@ -137,10 +158,13 @@ impl Settings {
         }
     }
 
-    fn handler(event: HookEvent, matcher: Option<Tool>) -> Handler {
+    fn handler(event: HookEvent, matcher: Option<Tool>, harness: &Path) -> Handler {
         Handler {
             kind: Settings::KIND,
-            command: format!("design --workspace \"$CLAUDE_PROJECT_DIR\" hook {event}"),
+            command: format!(
+                "design --workspace \"$CLAUDE_PROJECT_DIR\" --harness \"{}\" hook {event}",
+                harness.display()
+            ),
             timeout: Settings::seconds(event, matcher),
         }
     }
@@ -166,7 +190,6 @@ impl Settings {
 impl Hook for Stopping {
     fn answered<F: Files + Clone, S: Store>(
         &self,
-        _environment: &impl Environment,
         ground: &Ground<'_, F, S>,
         tape: &Tape<'_>,
     ) -> Result<Reply<'_>, Failure> {
@@ -186,8 +209,8 @@ impl Stopping {
         "OVERRUN: these background tasks ran 20 minutes without finishing or writing output; check and stop them:";
 
     pub fn tasks<F: Files, S: Store>(&self, ground: &Ground<'_, F, S>, now: Wall) -> Option<Tasks> {
-        let harness = Harness::new(ground.files(), Epoch::new(now.into_inner()));
-        self.transcript.as_deref().map(|transcript| harness.tasks(transcript))
+        let harness = Harness::new(ground.files(), ground.harness(), Epoch::new(now.into_inner()));
+        self.session.as_ref().map(|session| harness.tasks(&ground.transcript(session)))
     }
 
     fn decided<F: Files, S: Store>(

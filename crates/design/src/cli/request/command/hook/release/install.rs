@@ -9,15 +9,13 @@ use store_ports::Store;
 
 use super::super::super::Ground;
 use super::super::super::crew::{Asked, Cut, Tape};
-use crate::cli::request::InstallStep;
 use crate::cli::request::ignored::Ignored;
+use crate::cli::request::{InstallStep, Kept};
 use invariants::Ignoring;
 
 #[derive(Clone, Copy, Debug)]
-pub struct Installing<'used> {
-    directory: &'used Path,
+pub struct Installing {
     pull: PullNumber,
-    workspace: &'used Path,
 }
 
 #[derive(Debug, Deserialize)]
@@ -33,46 +31,46 @@ struct Configured {
     rest: Map<String, Value>,
 }
 
-impl<'used> Installing<'used> {
+impl Installing {
     const GIT: &'static str = "git";
     const CARGO: &'static str = "cargo";
     const DESIGN: &'static str = "design";
     const CHECKOUT: &'static str = "install-";
+    const HERE: &'static str = ".";
     const QUICK: Timeout = Timeout::new(120);
     const BUILD: Timeout = Timeout::new(20 * 60);
 
-    pub fn new(directory: &'used Path, pull: PullNumber, workspace: &'used Path) -> Installing<'used> {
-        Installing { directory, pull, workspace }
+    pub fn new(pull: PullNumber) -> Installing {
+        Installing { pull }
     }
 
     pub fn installed<F: Files, S: Store>(
-        &self,
+        self,
         ground: &Ground<'_, F, S>,
         tape: &Tape<'_>,
     ) -> Result<Result<(), InstallStep>, Asked> {
         let prepared = ground.prepared(tape.scratch()).map_err(|_unmade| InstallStep::Checkout);
         let printed = match prepared {
-            Ok(()) => Cut::settled(self.printed(tape))?,
+            Ok(()) => Cut::settled(self.printed(tape, ground.workspace()))?,
             Err(step) => Err(step),
         };
         Ok(printed.and_then(|hooks| Self::hooked(ground, hooks).ok_or(InstallStep::Settings)))
     }
 
-    fn printed(&self, tape: &Tape<'_>) -> Result<Value, Cut<InstallStep>> {
-        let checkout = tape.scratch().join(format!("{}{}", Self::CHECKOUT, self.pull));
+    fn printed(self, tape: &Tape<'_>, workspace: &Path) -> Result<Value, Cut<InstallStep>> {
+        let checkout = Kept::Agents.within().join(format!("{}{}", Self::CHECKOUT, self.pull));
         let path = checkout.to_string_lossy();
         let quick = |program, arguments: &[&str], step| {
-            Self::ran(tape, program, arguments, self.directory, Self::QUICK)?.ok_or(Cut::Failed(step))
+            Self::ran(tape, program, arguments, workspace, Self::QUICK)?.ok_or(Cut::Failed(step))
         };
         quick(Self::GIT, &["fetch", "origin", "main"], InstallStep::Fetch)?;
         quick(Self::GIT, &["worktree", "add", "--detach", &path, "origin/main"], InstallStep::Checkout)?;
         let installed = ["install", "--path", "crates/design", "--locked", "--force"];
-        let built = Self::ran(tape, Self::CARGO, &installed, &checkout, Self::BUILD)?.ok_or(InstallStep::Build);
-        let removed =
-            Self::ran(tape, Self::GIT, &["worktree", "remove", "--force", &path], self.directory, Self::QUICK)?;
+        let built = Self::ran(tape, Self::CARGO, &installed, &workspace.join(&checkout), Self::BUILD)?
+            .ok_or(InstallStep::Build);
+        let removed = Self::ran(tape, Self::GIT, &["worktree", "remove", "--force", &path], workspace, Self::QUICK)?;
         built.and(removed.ok_or(InstallStep::Unchecked)).map_err(Cut::Failed)?;
-        let workspace = self.workspace.to_string_lossy();
-        let printed = quick(Self::DESIGN, &["--workspace", &workspace, "hook", "--settings"], InstallStep::Print)?;
+        let printed = quick(Self::DESIGN, &["--workspace", Self::HERE, "hook", "--settings"], InstallStep::Print)?;
         let settings: Printed = serde_json::from_str(&printed).map_err(|_unprinted| Cut::Failed(InstallStep::Print))?;
         Ok(settings.hooks)
     }
