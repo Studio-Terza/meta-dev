@@ -129,7 +129,21 @@ Reply with JSON only, no prose and no code fence: a list of {"uuid": the full uu
 [o1 2026-01-01T00:00:00Z] Merge only when CI is green.
 
 
-## a shell still running passes, even past an exit notice that has scrolled out of its tail
+## a shell still running passes
+$ hook stop < {"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}
+Ok(Hooked(Stop)) ExitCode(unix_exit_status(0)) ""
++120 claude -p --output-format json --setting-sources user --strict-mcp-config --tools  --model haiku in /home/work/.meta/agents fed:
+An AI agent just ended its turn with this message to its owner:
+Understood.
+
+Below are earlier messages from the owner, each headed by [uuid timestamp].
+List every passage that bears on the message: an earlier answer to anything it asks, a decision, rule, preference or instruction it should follow, or the next step the owner set. A missed passage costs far more than an extra one, so when unsure, include it.
+Reply with JSON only, no prose and no code fence: a list of {"uuid": the full uuid from the header, "quote": an excerpt of that message copied exactly, character for character, one or two sentences}. Reply [] if none bear on it.
+
+[o1 2026-01-01T00:00:00Z] Merge only when CI is green.
+
+
+## a shell whose exit notice has scrolled out of its tail is still running
 $ hook stop < {"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}
 Ok(Hooked(Stop)) ExitCode(unix_exit_status(0)) ""
 +120 claude -p --output-format json --setting-sources user --strict-mcp-config --tools  --model haiku in /home/work/.meta/agents fed:
