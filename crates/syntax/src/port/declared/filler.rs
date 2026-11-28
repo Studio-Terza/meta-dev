@@ -3,7 +3,7 @@ use quote::quote;
 
 use super::definition::Declared;
 use super::method::Method;
-use super::names::OpsName;
+use super::names::{Name, OpsRole};
 
 pub struct Filler;
 
@@ -20,7 +20,7 @@ impl Filler {
         }
     }
 
-    fn required_item(method: &Method, ops: &OpsName) -> TokenStream {
+    fn required_item(method: &Method, ops: &Name<OpsRole>) -> TokenStream {
         let name = method.name();
         let generics = method.generics();
         let bounds = &generics.where_clause;

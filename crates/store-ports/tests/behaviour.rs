@@ -89,11 +89,11 @@ impl Place {
         self.directory.path().join(".meta").join("design.sqlite")
     }
 
-    fn opened(&self) -> Sqlite {
+    fn opened(&self) -> <SqliteOpener as Opens>::Store {
         self.opened_as::<StreamSchema>()
     }
 
-    fn opened_as<S: Schema>(&self) -> Sqlite {
+    fn opened_as<S: Schema>(&self) -> <SqliteOpener as Opens>::Store {
         SqliteOpener.file::<S>(self.store())
     }
 
@@ -204,5 +204,3 @@ fn a_pull_number_and_a_check_name_read_back_and_refuse_zero_blank_and_control_ch
     }
     Ok(())
 }
-
-type Sqlite = <SqliteOpener as Opens>::Store;

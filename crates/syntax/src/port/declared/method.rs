@@ -7,7 +7,7 @@ use quote::quote;
 use syn::{FnArg, Generics, Ident, ReturnType, TraitItemFn, Type};
 
 use super::boundary::Spelling;
-use super::names::OpsName;
+use super::names::{Name, OpsRole};
 pub use parameter::Parameter;
 use per_type::PerType;
 pub use returned::Returned;
@@ -74,7 +74,7 @@ impl Method {
         self.per_type.as_ref().map_or_else(|| Some(Spelling::camel(&self.name)), |_| None)
     }
 
-    pub fn pass(&self, ops: &OpsName) -> TokenStream {
+    pub fn pass(&self, ops: &Name<OpsRole>) -> TokenStream {
         let named = self.per_type.clone().unwrap_or_else(|| {
             let op = Spelling::camel(&self.name);
             quote!(#ops::#op)

@@ -1,0 +1,9 @@
+[package]
+name = "corpus"
+
+[workspace]
+
+[lib]
+test = false
+doctest = false
+bench = false
