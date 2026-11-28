@@ -17,5 +17,6 @@ invariants::ignored! {
         Untitled => "a spec file that cannot be read gives no detail heading, so the pull request is unopened and that is escalated",
         Unremembered =>"a failed-check record that cannot be read or written counts no repeat failure",
         Unanswered =>"a failed transcript lookup or model call never blocks a stop; the stop proceeds as before",
+        Structured => "a message sent to an agent that is not plain text is a protocol reply with no brief to read, so it passes unchanged",
     }
 }

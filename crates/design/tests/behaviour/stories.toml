@@ -160,6 +160,35 @@ answers = [
 ]
 
 [[story]]
+name = "owner words bearing on a brief or a plain message are appended to it with their ids, and a structured message, a brief nothing bears on and a failed reading pass unchanged"
+transcript = [["user", "o1", "Merge only when CI is green."], ["assistant", "p1", "Understood."]]
+answers = [
+  { tool = "claude", asked = "Below are earlier messages", ran = "Succeeded", printed = '{"subtype":"success","result":"[{\"uuid\": \"o1\", \"quote\": \"Merge only when CI is green.\"}]"}' },
+  { tool = "claude", asked = "Below, numbered", ran = "Succeeded", printed = '{"subtype":"success","result":"[1]"}' },
+]
+
+[[story.step]]
+brief = "Land #12 once its checks finish."
+
+[[story.step]]
+sent = "Merge #12 now."
+
+[[story.step]]
+sent = { type = "shutdown_request", reason = "done" }
+
+[[story.step]]
+brief = "Rename the crate."
+answers = [
+  { tool = "claude", asked = "Below are earlier messages", ran = "Succeeded", printed = '{"subtype":"success","result":"[]"}' },
+]
+
+[[story.step]]
+brief = "Land #12 once its checks finish."
+answers = [
+  { tool = "claude", asked = "Below are earlier messages", ran = "Failed", printed = '{"subtype":"error_during_execution","is_error":true,"result":"refused"}' },
+]
+
+[[story]]
 name = "a stop without its last message asks about the lead's last stored words"
 transcript = [["user", "o1", "Merge only when CI is green."], ["assistant", "p1", "Understood."]]
 answers = [

@@ -335,6 +335,12 @@ enum Hooked {
     Used {
         used: String,
     },
+    Briefed {
+        brief: String,
+    },
+    Sent {
+        sent: Value,
+    },
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -496,6 +502,14 @@ impl Step {
             Hooked::Used { used } => Spoken::hook(
                 "post-tool-use",
                 &json!({"session_id": "s", "hook_event_name": "PostToolUse", "cwd": AGENT, "tool_name": "Bash", "tool_input": {"command": used}, "tool_response": {"stdout": ""}}),
+            ),
+            Hooked::Briefed { brief } => Spoken::hook(
+                "pre-tool-use",
+                &json!({"session_id": "s", "hook_event_name": "PreToolUse", "cwd": AGENT, "tool_name": "Agent", "tool_input": {"description": "d", "prompt": brief, "subagent_type": "worker"}}),
+            ),
+            Hooked::Sent { sent } => Spoken::hook(
+                "pre-tool-use",
+                &json!({"session_id": "s", "hook_event_name": "PreToolUse", "cwd": AGENT, "tool_name": "SendMessage", "tool_input": {"to": "worker", "summary": "s", "message": sent}}),
             ),
         }
     }

@@ -2,6 +2,7 @@ use std::fmt;
 use std::path::{Component, Path, PathBuf};
 
 use console_ports::{Heard, Shown};
+use dispatch_ports::{Clock, Shell};
 use file_ports::{Files, Kind};
 use grammar::{Construct, Directory, Edit, Edited, Editor, Flagged, Nested};
 use newtype::Wrapping;
@@ -9,6 +10,8 @@ use serde::{Deserialize, Serialize};
 use store_ports::Store;
 
 use super::super::Ground;
+use super::super::crew::Crew;
+use super::brief::Brief;
 use crate::cli::failure::Failure;
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
@@ -17,8 +20,16 @@ use crate::{HookEvent, Outcome};
 pub struct Running {
     #[serde(default)]
     cwd: PathBuf,
-    #[serde(default)]
-    tool_input: Input,
+    #[serde(flatten)]
+    tool: Tool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "tool_name", content = "tool_input")]
+enum Tool {
+    Bash(Input),
+    Agent(Brief),
+    SendMessage(Brief),
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -69,8 +80,19 @@ impl Running {
         serde_json::from_str(&heard.into_inner()).map_err(Failure::Unheard)
     }
 
-    pub fn answered<F: Files, S: Store>(&self, ground: &Ground<'_, F, S>) -> Result<Uttered, Failure> {
-        let command = self.tool_input.command.as_deref().unwrap_or_default();
+    pub fn answered<F: Files + Clone, S: Store, C: Clock, G: Shell>(
+        &self,
+        ground: &Ground<'_, F, S>,
+        crew: &Crew<'_, C, G>,
+    ) -> Result<Uttered, Failure> {
+        match &self.tool {
+            Tool::Bash(input) => self.judged(input, ground),
+            Tool::Agent(brief) | Tool::SendMessage(brief) => brief.told(ground, crew),
+        }
+    }
+
+    fn judged<F: Files, S: Store>(&self, input: &Input, ground: &Ground<'_, F, S>) -> Result<Uttered, Failure> {
+        let command = input.command.as_deref().unwrap_or_default();
         let judging = Judging { ground, cwd: &self.cwd };
         let refused = Nested::read(command)
             .map(Refusal::Unroll)
