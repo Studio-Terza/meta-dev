@@ -2,4 +2,4 @@
 
 mod boundary;
 
-pub use boundary::{Deletion, Directory, Edit, Edited, Editor, Plain, Unreadable};
+pub use boundary::{Deletion, Directory, Edit, Edited, Editor, Plain, Target, Unreadable};

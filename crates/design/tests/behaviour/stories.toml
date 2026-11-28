@@ -1025,7 +1025,7 @@ ran = "mv /tmp/a /home/repo/a"
 ran = "git mv /home/repo/a.rs /tmp/a.rs"
 
 [[story]]
-name = "relative shell writes are judged against a cd's target, and refused when that target cannot be worked out"
+name = "relative shell writes are judged against a cd's target and the variables known, and refused when the path cannot be worked out"
 repositories = ["/home/repo"]
 
 [[story.step]]
@@ -1045,6 +1045,18 @@ ran = "cd - && mv a b"
 
 [[story.step]]
 ran = "cd $REPO && echo a > /tmp/out.txt"
+
+[[story.step]]
+ran = "S=/home/repo; echo a > $S/x.rs"
+
+[[story.step]]
+ran = "export S=/tmp && cd $HOME/repo && mv a.rs $S/a.rs"
+
+[[story.step]]
+ran = "echo a > $UNSET/x"
+
+[[story.step]]
+ran = "S=/tmp/s; echo a > $S/gold.txt"
 
 [[story]]
 name = "a ruling whose message id is not eight or more hexadecimal digits does not parse"
