@@ -106,6 +106,18 @@ exit = "Failed"
 err = "cannot check the query cache: cannot read ./crates: "
 
 [[Run]]
+arguments = ["queries", "."]
+directories = [".sqlx", "crates"]
+exit = "Passed"
+
+[[Run]]
+arguments = ["queries", "."]
+directories = [".sqlx", "crates"]
+files = { ".sqlx/query-stale.json" = "{}" }
+exit = "Failed"
+out = "::error::the .sqlx query cache drifted from the schema; rewrite it with ci queries <workspace> --record\nquery-stale.json\n"
+
+[[Run]]
 arguments = ["queries", ".", "--record"]
 exit = "Failed"
 err = "cannot check the query cache: cannot read ./crates: "

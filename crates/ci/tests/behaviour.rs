@@ -14,6 +14,8 @@ use tempfile::TempDir;
 struct Run {
     arguments: Vec<Spelled>,
     #[serde(default)]
+    directories: Vec<PathBuf>,
+    #[serde(default)]
     files: BTreeMap<PathBuf, Spelled>,
     exit: Exit,
     #[serde(default)]
@@ -59,6 +61,7 @@ fn the_ci_binary_exits_as_its_command_line_does() -> Result<(), Failed> {
 fn every_run_exits_prints_and_writes_as_its_row_says() -> Result<(), Failed> {
     Rows::<Run>::read()?.iter().try_for_each(|run| {
         let directory = TempDir::new()?;
+        run.directories.iter().try_for_each(|made| fs::create_dir_all(directory.path().join(made)))?;
         run.files.iter().try_for_each(|(path, text)| fs::write(directory.path().join(path), text.as_str()))?;
         env::set_current_dir(directory.path())?;
         let arguments: Vec<OsString> = run.arguments.iter().map(|argument| OsString::from(argument.as_str())).collect();
