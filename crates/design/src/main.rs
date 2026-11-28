@@ -1,11 +1,14 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
+mod ports;
+
 use std::process::ExitCode;
 
 use console_ports::{Answer, Process, Shown};
 use design::{Agents, Cli};
-use dispatch_ports::{SystemClock, SystemShell};
+use dispatch_ports::SystemClock;
 use file_ports::Disk;
+use ports::SystemShell;
 use sqlite_ports::SqliteOpener;
 
 fn main() -> ExitCode {
