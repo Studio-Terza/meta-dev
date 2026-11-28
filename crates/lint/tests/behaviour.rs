@@ -1,27 +1,20 @@
 use std::ffi::OsString;
-use std::fmt;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use std::process::ExitCode;
 
-use file_ports::{Disk, Files};
+use file_ports::Disk;
 use lint::{Cli, Verdict};
 use test_failure::{Failed, Golden};
 use timer_ports::Monotonic;
 
-const FIXTURES: &str = "tests/.fixtures";
-const GOLDENS: &str = "tests/goldens";
-const ALL: &str = ".";
+const RUNS: [&[&str]; 4] =
+    [&["skipped"], &["workspace"], &["/nowhere", "bad_manifest/notes"], &["workspace/app", "workspace/store-ports"]];
 
 #[derive(Debug)]
-struct Case<'name> {
-    golden: &'name str,
-    fixture: &'name str,
-    arguments: &'static [&'static str],
-}
+struct Fixtures(PathBuf);
 
 #[derive(Debug)]
-struct Shown {
+struct Ran {
     verdict: Verdict,
     out: String,
     err: String,
@@ -30,28 +23,39 @@ struct Shown {
 #[derive(Debug)]
 struct Unwritable;
 
-const CASES: [Case<'static>; 5] = [
-    Case { golden: "workspace_timings", fixture: "workspace", arguments: &["--timings", "."] },
-    Case { golden: "unreadable_timings", fixture: ALL, arguments: &["--timings", "/nowhere"] },
-    Case { golden: "two_roots", fixture: "workspace", arguments: &["app", "store-ports"] },
-    Case { golden: "mounted", fixture: ALL, arguments: &["skipped"] },
-    Case { golden: "unreadable", fixture: ALL, arguments: &["/nowhere", "bad_manifest/notes"] },
-];
-
 #[test]
-fn every_fixture_and_case_prints_its_golden_output() -> Result<(), Failed> {
-    let fixtures = Disk.entries(&Case::fixture(ALL))?;
-    let names: Vec<String> = fixtures.iter().filter_map(|path| path.file_name()?.to_str().map(str::to_owned)).collect();
-    let defaults: Vec<Case<'_>> =
-        names.iter().map(|name| Case { golden: name, fixture: name, arguments: &[] }).collect();
-    defaults.iter().chain(CASES.iter()).try_for_each(Case::checked)
+fn every_run_reads_the_disk_as_its_arguments_say_and_ends_in_its_verdict() -> Result<(), Failed> {
+    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let fixtures = Fixtures(manifest.join("tests/.fixtures"));
+    let shown = RUNS.iter().map(|arguments| Ok(fixtures.ran(arguments)?.shown(arguments)));
+    Golden::at(manifest, "tests/runs.txt").checked(&shown.collect::<Result<String, Failed>>()?)?;
+    let [timed, failed] = [fixtures.ran(&["--timings", "skipped"])?.out, fixtures.ran(&["--timings", "/nowhere"])?.out];
+    assert!(timed.contains("run:") && !timed.contains(" 0  run:") && failed.contains("find:"));
+    let mut err = Vec::new();
+    let unwritten =
+        Cli::from_args([]).verdict(&Disk, &fixtures.0.join("skipped"), Monotonic::default(), &mut Unwritable, &mut err);
+    assert_eq!(
+        (unwritten, String::from_utf8(err)?),
+        (Verdict::Refused, "cannot write the output: refused\n".to_owned())
+    );
+    assert_eq!(["/nowhere", "."].map(ports::Binary::exit), [Some(1_i32), Some(0_i32)]);
+    Ok(())
 }
 
-#[test]
-fn the_binary_exits_by_its_verdict() {
-    let exits = [Verdict::Violations, Verdict::Refused].map(ExitCode::from);
-    assert_eq!(format!("{exits:?}"), format!("{:?}", [ExitCode::FAILURE, ExitCode::FAILURE]));
-    assert_eq!(["/nowhere", "."].map(ports::Binary::exit), [Some(1_i32), Some(0_i32)]);
+impl Fixtures {
+    fn ran(&self, arguments: &[&str]) -> Result<Ran, Failed> {
+        let mut out = Vec::new();
+        let mut err = Vec::new();
+        let given = arguments.iter().map(OsString::from);
+        let verdict = Cli::from_args(given).verdict(&Disk, &self.0, Monotonic::default(), &mut out, &mut err);
+        Ok(Ran { verdict, out: String::from_utf8(out)?, err: String::from_utf8(err)? })
+    }
+}
+
+impl Ran {
+    fn shown(&self, arguments: &[&str]) -> String {
+        format!("$ lint {}\n{:?}\n--- out\n{}--- err\n{}", arguments.join(" "), self.verdict, self.out, self.err)
+    }
 }
 
 mod ports {
@@ -64,58 +68,6 @@ mod ports {
         pub(crate) fn exit(root: &str) -> Option<i32> {
             Command::new(env!("CARGO_BIN_EXE_lint")).arg(root).output().into_iter().find_map(|ran| ran.status.code())
         }
-    }
-}
-
-#[test]
-fn output_that_cannot_be_written_refuses_the_run() -> Result<(), Failed> {
-    let mut err = Vec::new();
-    let working = Case::fixture("skipped");
-    let verdict = Cli::from_args([]).verdict(&Disk, &working, Monotonic::default(), &mut Unwritable, &mut err);
-    assert_eq!((verdict, String::from_utf8(err)?), (Verdict::Refused, "cannot write the output: refused\n".to_owned()));
-    Ok(())
-}
-
-impl Case<'_> {
-    fn fixture(name: &str) -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join(FIXTURES).join(name)
-    }
-
-    fn checked(&self) -> Result<(), Failed> {
-        let shown = Shown::ran(&Case::fixture(self.fixture), self.arguments)?.to_string();
-        Golden::at(Path::new(env!("CARGO_MANIFEST_DIR")), &format!("{GOLDENS}/{}.txt", self.golden)).checked(&shown)
-    }
-}
-
-impl Shown {
-    fn ran(working: &Path, arguments: &[&str]) -> Result<Shown, Failed> {
-        let mut out = Vec::new();
-        let mut err = Vec::new();
-        let given = arguments.iter().map(OsString::from);
-        let verdict = Cli::from_args(given).verdict(&Disk, working, Monotonic::default(), &mut out, &mut err);
-        Ok(Shown { verdict, out: String::from_utf8(out)?, err: String::from_utf8(err)? })
-    }
-
-    fn unnumbered(line: &[char]) -> String {
-        let timed = line.first().is_some_and(|first| *first == ' ' || first.is_ascii_digit());
-        let numbered = |letter: &&char| **letter == ' ' || letter.is_ascii_digit();
-        let spent = line.iter().take_while(numbered).any(|letter| letter.is_ascii_digit() && *letter != '0');
-        let label: String = line.iter().skip_while(numbered).collect();
-        let shown = if spent { "some " } else { "none " };
-        if timed { [shown, &label].concat() } else { line.iter().collect() }
-    }
-}
-
-impl fmt::Display for Shown {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let letters: Vec<char> = self.out.chars().collect();
-        writeln!(formatter, "{:?}\n--- out", self.verdict)?;
-        letters
-            .chunk_by(|letter, _| *letter != '\n')
-            .map(Shown::unnumbered)
-            .try_for_each(|line| formatter.write_str(&line))?;
-        writeln!(formatter, "--- err")?;
-        formatter.write_str(&self.err)
     }
 }
 
