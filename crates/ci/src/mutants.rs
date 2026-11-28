@@ -3,7 +3,7 @@ use std::fmt;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
-use grammar_lines::{Fields, Lines};
+use grammar::lines::{Fields, Lines};
 use serde::Deserialize;
 
 use crate::exit::Exit;
@@ -79,13 +79,11 @@ impl Changed {
 
     fn tested(numstat: &str) -> Result<BTreeSet<PathBuf>, Failure> {
         let tests = Component::Normal(Changed::TESTS.as_ref());
-        let paths: Vec<PathBuf> = numstat
-            .parse::<Lines>()
+        let paths: Vec<PathBuf> = Lines::from(numstat)
             .into_iter()
-            .flatten()
-            .map(|line| match line.parse::<Fields>().as_ref().map(AsRef::as_ref) {
-                Ok([_, _, path]) => Ok(PathBuf::from(path)),
-                Ok(_) | Err(_) => Err(Failure::Numstat(line.clone())),
+            .map(|line| match Fields::from(line.as_str()).as_ref() {
+                [_, _, path] => Ok(PathBuf::from(path)),
+                _ => Err(Failure::Numstat(line)),
             })
             .collect::<Result<_, Failure>>()?;
         Ok(paths

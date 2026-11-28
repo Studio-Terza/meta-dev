@@ -7,7 +7,7 @@ use console_ports::Heard;
 use design_messages::PullNumber;
 use dispatch_ports::{Clock, Ran, Shell, Timeout};
 use file_ports::Files;
-use grammar_git::Worktrees;
+use grammar::git::Worktrees;
 use newtype::Wrapping;
 use store_ports::Store;
 
@@ -153,7 +153,7 @@ impl<C: Clock, G: Shell> Releasing<'_, '_, C, G> {
     fn checkout(&self, landed: &Landed) -> Result<Option<Checkout>, Holding> {
         let ran = self.git(&["worktree", "list", "--porcelain"], self.directory);
         let printed = ran.as_ref().and_then(Ran::succeeded).ok_or(Held::Unlisted)?;
-        let listed = Worktrees::read(printed.as_ref());
+        let listed = Worktrees::from(printed.as_ref());
         Ok(landed.found(listed.listed().iter().map(Checkout::from)))
     }
 

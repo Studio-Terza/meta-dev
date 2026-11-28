@@ -1,7 +1,0 @@
-bare "abc": Some("abc")
-bare "_a-9": Some("_a-9")
-bare "msg:1": None
-bare "a b": None
-bare "-a": None
-bare "": None
-bare "abc\n": None

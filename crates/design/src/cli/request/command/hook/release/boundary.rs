@@ -1,7 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use design_messages::{CommitSha, PullNumber};
-use grammar_git::{MergeCommand, Worktree};
+use grammar::Grammar;
+use grammar::git::{MergeCommand, Worktree};
 use invariants::Ignoring;
 use serde::Deserialize;
 

@@ -13,7 +13,7 @@ bench = false
 [dependencies]
 invariants = { path = "../invariants" }
 file-ports = { path = "../file-ports" }
-grammar-prose = { path = "../grammar-prose" }
+grammar = { path = "../grammar" }
 hex.workspace = true
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }

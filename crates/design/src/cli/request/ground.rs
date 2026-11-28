@@ -1,9 +1,10 @@
 use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, Files, Kind};
-use grammar_detail::{Cited, Heading};
-use grammar_lines::Lines;
-use grammar_spec_line::Attachment;
+use grammar::Grammar;
+use grammar::detail::{Cited, Heading};
+use grammar::lines::Lines;
+use grammar::spec_line::Attachment;
 use invariants::Ignoring;
 use port_core::{Port, Run};
 use store_ports::Store;
@@ -60,11 +61,10 @@ impl<'run, F: Files, S: Store> Ground<'run, F, S> {
         let written = spec.to_string();
         let cited = Cited::read(&written)?;
         let text = self.files.read_text(&specs.spec(cited.project())).ignoring(Ignored::Untitled)?;
-        let lines = match text.as_ref().parse::<Lines>() {
-            Ok(lines) => lines,
-            Err(unsplit) => match unsplit {},
-        };
-        lines.into_iter().filter_map(|line| Heading::read(&line)).find(|heading| heading.detail() == cited.detail())
+        Lines::from(text.as_ref())
+            .into_iter()
+            .filter_map(|line| Heading::read(&line))
+            .find(|heading| heading.detail() == cited.detail())
     }
 
     pub fn workspace(&self) -> &Path {

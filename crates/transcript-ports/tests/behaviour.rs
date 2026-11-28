@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use test_failure::{Failed, Golden};
 
 use file_ports::{Bytes, Disk, Files, Memory};
-use grammar_lines::KeptLines;
+use grammar::lines::KeptLines;
 use invariants::{Ignoring, ignored};
 use port_core::{Calls, Run};
 use proptest::prelude::{any, prop_assert_eq, proptest};
@@ -99,7 +99,7 @@ fn every_fixture_line_reads_as_its_golden_classification() -> Result<(), Failed>
 
 #[test]
 fn resuming_from_the_cursor_yields_every_record_exactly_once() -> Result<(), Failed> {
-    let lines: Vec<String> = Transcript::fixture()?.parse::<KeptLines>().into_iter().flatten().take(4).collect();
+    let lines: Vec<String> = KeptLines::from(Transcript::fixture()?.as_str()).into_iter().take(4).collect();
     let text = lines.concat();
     (0..=text.len()).try_for_each(|cut| {
         let first = Transcript(text.chars().take(cut).collect()).read(Cursor::default())?;
