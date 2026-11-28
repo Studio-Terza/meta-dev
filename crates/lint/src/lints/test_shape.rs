@@ -1,14 +1,15 @@
 use std::collections::BTreeSet;
 
 use proc_macro2::{Delimiter, Group, Ident, Punct, Spacing, TokenStream, TokenTree};
-use syn::visit::{self, Visit};
+use syn::visit::Visit;
 use syn::{
     Attribute, ImplItemFn, ItemConst, ItemEnum, ItemFn, ItemMod, ItemStatic, ItemStruct, ItemTrait, ItemType,
-    ItemUnion, Lit, Macro, Meta, TraitItemFn, TypePath,
+    ItemUnion, Lit, Macro, Meta, TraitItemFn,
 };
 
 use crate::finding::{Found, Rule};
 use crate::gate::{Gate, TestMark};
+use crate::reached::Reached;
 use crate::source::{Place, Source};
 use crate::style::{Reads, Style};
 use crate::terms::Fix;
@@ -224,10 +225,10 @@ impl From<TokenTree> for Token {
     }
 }
 
-impl<'ast> Visit<'ast> for Named {
-    fn visit_type_path(&mut self, path: &'ast TypePath) {
-        self.0.extend(path.path.segments.iter().map(|segment| segment.ident.clone()));
-        visit::visit_type_path(self, path);
+impl Named {
+    fn reach<'ast>(&mut self, walk: impl FnOnce(&mut Reached<'ast>)) {
+        let paths = Reached::within(walk).paths();
+        self.0.extend(paths.flat_map(|path| path.path.segments.iter().map(|segment| segment.ident.clone())));
     }
 }
 
@@ -289,13 +290,13 @@ impl Hooks for TestShape {
 
     fn item_struct(&mut self, item: &ItemStruct) -> Descent {
         let mut named = Named::default();
-        named.visit_fields(&item.fields);
+        named.reach(|reached| reached.visit_fields(&item.fields));
         self.shaped(&item.attrs, &item.ident, named)
     }
 
     fn item_enum(&mut self, item: &ItemEnum) -> Descent {
         let mut named = Named::default();
-        item.variants.iter().for_each(|variant| named.visit_fields(&variant.fields));
+        named.reach(|reached| item.variants.iter().for_each(|variant| reached.visit_fields(&variant.fields)));
         self.shaped(&item.attrs, &item.ident, named)
     }
 
@@ -315,7 +316,7 @@ impl Hooks for TestShape {
     }
 
     fn item_const(&mut self, item: &ItemConst) -> Descent {
-        self.tables.visit_type(&item.ty);
+        self.tables.reach(|reached| reached.visit_type(&item.ty));
         self.held(&item.ident)
     }
 
@@ -324,7 +325,7 @@ impl Hooks for TestShape {
     }
 
     fn item_static(&mut self, item: &ItemStatic) -> Descent {
-        self.tables.visit_type(&item.ty);
+        self.tables.reach(|reached| reached.visit_type(&item.ty));
         self.held(&item.ident)
     }
 

@@ -1,13 +1,14 @@
 use std::fmt;
 
 use syn::spanned::Spanned;
-use syn::visit::{self, Visit};
+use syn::visit::Visit;
 use syn::{
     ImplItemType, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, ItemUnion, Macro, Signature, TraitItemType,
     TypePath,
 };
 
 use crate::finding::{Found, Rule};
+use crate::reached::Reached;
 use crate::source::Source;
 use crate::style::{Reads, Style};
 use crate::terms::Fix;
@@ -31,9 +32,6 @@ enum Holder {
     Associated,
 }
 
-#[derive(Debug, Default)]
-struct Primitives(Vec<TypePath>);
-
 #[derive(Debug)]
 struct Named<'path>(&'path TypePath);
 
@@ -46,13 +44,24 @@ impl PrimitiveBoundary {
         self.bounded.or(self.modules.iter().flatten().next().copied())
     }
 
-    fn read(&mut self, holder: Holder, walk: impl FnOnce(&mut Primitives)) {
-        let mut primitives = Primitives::default();
-        walk(&mut primitives);
-        let unbounded = self.inside().xor(Some(())).map_or_default(|()| primitives.0);
-        self.found.extend(unbounded.iter().map(|primitive| {
+    const NAMES: [&'static str; 18] = [
+        "str", "String", "bool", "char", "u8", "u16", "u32", "u64", "u128", "usize", "i8", "i16", "i32", "i64", "i128",
+        "isize", "f32", "f64",
+    ];
+
+    fn read<'ast>(&mut self, holder: Holder, walk: impl FnOnce(&mut Reached<'ast>)) {
+        let unbounded = self.inside().xor(Some(())).map(|()| Reached::within(walk));
+        let primitives =
+            unbounded.into_iter().flat_map(Reached::paths).filter(|path| PrimitiveBoundary::primitive(path).is_some());
+        self.found.extend(primitives.map(|primitive| {
             Found::spanned(primitive.span(), format_args!("{} in {holder}", Named(primitive)), PrimitiveBoundary::FIX)
         }));
+    }
+
+    fn primitive(path: &TypePath) -> Option<()> {
+        let last = path.path.segments.last().filter(|segment| segment.arguments.is_none())?;
+        let named = PrimitiveBoundary::NAMES.iter().any(|name| last.ident == name);
+        (path.qself.is_none() && named).then_some(())
     }
 }
 
@@ -73,26 +82,6 @@ impl fmt::Display for Holder {
 impl fmt::Display for Named<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.path.segments.last().map_or(Ok(()), |segment| write!(formatter, "{}", segment.ident))
-    }
-}
-
-impl Primitives {
-    const NAMES: [&'static str; 18] = [
-        "str", "String", "bool", "char", "u8", "u16", "u32", "u64", "u128", "usize", "i8", "i16", "i32", "i64", "i128",
-        "isize", "f32", "f64",
-    ];
-
-    fn primitive(path: &TypePath) -> Option<()> {
-        let last = path.path.segments.last().filter(|segment| segment.arguments.is_none())?;
-        let named = Primitives::NAMES.iter().any(|name| last.ident == name);
-        (path.qself.is_none() && named).then_some(())
-    }
-}
-
-impl<'ast> Visit<'ast> for Primitives {
-    fn visit_type_path(&mut self, path: &'ast TypePath) {
-        self.0.extend(Primitives::primitive(path).map(|()| path.clone()));
-        visit::visit_type_path(self, path);
     }
 }
 

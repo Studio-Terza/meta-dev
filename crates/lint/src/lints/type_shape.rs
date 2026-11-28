@@ -1,14 +1,15 @@
 use std::fmt;
 
 use syn::spanned::Spanned;
-use syn::visit::{self, Visit};
+use syn::visit::Visit;
 use syn::{
     Field, FnArg, GenericArgument, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, Macro, PathArguments, ReturnType,
-    Signature, Type, TypePath, TypeTuple,
+    Signature, Type, TypePath,
 };
 
 use crate::finding::{Found, Rule};
 use crate::gate::Gate;
+use crate::reached::{Reach, Reached};
 use crate::source::Source;
 use crate::style::{Reads, Style};
 use crate::terms::{Fix, Line, Word};
@@ -18,9 +19,6 @@ use crate::walk::{Descent, Expanded, Hooks};
 pub(crate) struct TypeShape {
     found: Vec<Found>,
 }
-
-#[derive(Debug, Default)]
-struct Shapes(Vec<Shape>);
 
 #[derive(Clone, Copy, Debug)]
 enum Shape {
@@ -44,6 +42,27 @@ impl Shape {
             Shape::StringError => Fix("errors are an enum with thiserror"),
         }
     }
+
+    fn of(reach: Reach<'_>) -> Option<Shape> {
+        match reach {
+            Reach::Tuple(tuple) => tuple.elems.first().map(|_| Shape::Tuple),
+            Reach::Path(path) => Shape::string_error(path),
+        }
+    }
+
+    fn string_error(path: &TypePath) -> Option<Shape> {
+        let result = path.path.segments.last().filter(|segment| segment.ident == "Result");
+        let error = result
+            .and_then(|segment| match &segment.arguments {
+                PathArguments::AngleBracketed(arguments) => arguments.args.iter().nth(1),
+                PathArguments::None | PathArguments::Parenthesized(_) => None,
+            })
+            .and_then(|argument| match argument {
+                GenericArgument::Type(error) => TypeShape::last_named(error, Word("String")),
+                _ => None,
+            });
+        error.map(|()| Shape::StringError)
+    }
 }
 
 impl TypeShape {
@@ -51,10 +70,9 @@ impl TypeShape {
 
     fn rooted<'ty>(&mut self, roots: impl Iterator<Item = &'ty Type>) -> Descent {
         roots.for_each(|root| {
-            let mut shapes = Shapes::default();
-            shapes.visit_type(root);
+            let shapes = Reached::within(|reached| reached.visit_type(root)).reaches().filter_map(Shape::of);
             let line = Line::of(root.span());
-            self.found.extend(shapes.0.into_iter().map(|shape| Found::at(line, shape, shape.fix())));
+            self.found.extend(shapes.map(|shape| Found::at(line, shape, shape.fix())));
         });
         Descent::Into
     }
@@ -77,28 +95,6 @@ impl TypeShape {
             }
             _ => None,
         }
-    }
-}
-
-impl<'ast> Visit<'ast> for Shapes {
-    fn visit_type_tuple(&mut self, tuple: &'ast TypeTuple) {
-        self.0.extend(tuple.elems.first().map(|_| Shape::Tuple));
-        visit::visit_type_tuple(self, tuple);
-    }
-
-    fn visit_type_path(&mut self, path: &'ast TypePath) {
-        let result = path.path.segments.last().filter(|segment| segment.ident == "Result");
-        let error = result
-            .and_then(|segment| match &segment.arguments {
-                PathArguments::AngleBracketed(arguments) => arguments.args.iter().nth(1),
-                PathArguments::None | PathArguments::Parenthesized(_) => None,
-            })
-            .and_then(|argument| match argument {
-                GenericArgument::Type(error) => TypeShape::last_named(error, Word("String")),
-                _ => None,
-            });
-        self.0.extend(error.map(|()| Shape::StringError));
-        visit::visit_type_path(self, path);
     }
 }
 

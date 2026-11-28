@@ -7,6 +7,7 @@ mod gate;
 mod graph;
 mod ignored;
 mod lints;
+mod reached;
 mod reading;
 mod source;
 mod spent;

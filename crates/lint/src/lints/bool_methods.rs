@@ -1,8 +1,9 @@
-use syn::visit::{self, Visit};
+use syn::visit::Visit;
 use syn::{ItemImpl, Macro, ReturnType, Signature, TypePath};
 
 use crate::finding::{Found, Rule};
 use crate::gate::Gate;
+use crate::reached::Reached;
 use crate::source::Source;
 use crate::style::{Reads, Style};
 use crate::terms::Fix;
@@ -13,19 +14,13 @@ pub(crate) struct BoolMethods {
     found: Vec<Found>,
 }
 
-#[derive(Debug, Default)]
-struct Flags(Option<()>);
-
 impl BoolMethods {
     const FIX: Fix =
         Fix("return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty");
-}
 
-impl<'ast> Visit<'ast> for Flags {
-    fn visit_type_path(&mut self, path: &'ast TypePath) {
+    fn flag(path: &TypePath) -> Option<()> {
         let flag = path.path.segments.last().filter(|segment| segment.ident == "bool" && segment.arguments.is_none());
-        self.0 = self.0.or(flag.and(path.qself.is_none().then_some(())));
-        visit::visit_type_path(self, path);
+        flag.and(path.qself.is_none().then_some(()))
     }
 }
 
@@ -41,9 +36,7 @@ impl Hooks for BoolMethods {
     fn signature(&mut self, signature: &Signature) -> Descent {
         let flagged = match &signature.output {
             ReturnType::Type(_, returned) => {
-                let mut flags = Flags::default();
-                flags.visit_type(returned);
-                flags.0
+                Reached::within(|reached| reached.visit_type(returned)).paths().find_map(BoolMethods::flag)
             }
             ReturnType::Default => None,
         };
