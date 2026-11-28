@@ -34,7 +34,7 @@ const CASES: [Case<'static>; 5] = [
     Case { golden: "workspace_timings", fixture: "workspace", arguments: &["--timings", "."] },
     Case { golden: "unreadable_timings", fixture: ALL, arguments: &["--timings", "/nowhere"] },
     Case { golden: "two_roots", fixture: "workspace", arguments: &["app", "store-ports"] },
-    Case { golden: "mounted", fixture: ALL, arguments: &["no_dyn"] },
+    Case { golden: "mounted", fixture: ALL, arguments: &["skipped"] },
     Case { golden: "unreadable", fixture: ALL, arguments: &["/nowhere", "bad_manifest/notes"] },
 ];
 
@@ -51,7 +51,7 @@ fn every_fixture_and_case_prints_its_golden_output() -> Result<(), Failed> {
 fn the_binary_exits_by_its_verdict() {
     let exits = [Verdict::Violations, Verdict::Refused].map(ExitCode::from);
     assert_eq!(format!("{exits:?}"), format!("{:?}", [ExitCode::FAILURE, ExitCode::FAILURE]));
-    assert_eq!(["/nowhere", "tests/.fixtures/budget_met"].map(ports::Binary::exit), [Some(1_i32), Some(0_i32)]);
+    assert_eq!(["/nowhere", "."].map(ports::Binary::exit), [Some(1_i32), Some(0_i32)]);
 }
 
 mod ports {
@@ -70,7 +70,7 @@ mod ports {
 #[test]
 fn output_that_cannot_be_written_refuses_the_run() -> Result<(), Failed> {
     let mut err = Vec::new();
-    let working = Case::fixture("budget_met");
+    let working = Case::fixture("skipped");
     let verdict = Cli::from_args([]).verdict(&Disk, &working, Monotonic::default(), &mut Unwritable, &mut err);
     assert_eq!((verdict, String::from_utf8(err)?), (Verdict::Refused, "cannot write the output: refused\n".to_owned()));
     Ok(())

@@ -796,9 +796,11 @@ name = "syntax"
 version = "0.1.0"
 dependencies = [
  "digest-ports",
+ "file-ports",
  "hex",
  "invariants",
  "json-ports",
+ "lint",
  "pipeline",
  "proc-macro2",
  "quote",
@@ -812,6 +814,7 @@ dependencies = [
  "syn",
  "test-failure",
  "thiserror",
+ "timer-ports",
  "toml-ports",
  "variant-ports",
 ]

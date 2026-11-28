@@ -27,7 +27,10 @@ toml-ports = { path = "../toml-ports" }
 variant-ports = { path = "../variant-ports" }
 
 [dev-dependencies]
+file-ports = { path = "../file-ports" }
 hex.workspace = true
+lint = { path = "../lint" }
+timer-ports = { path = "../timer-ports" }
 serde_json.workspace = true
 sha2.workspace = true
 rusqlite = { version = "0.37.0", default-features = false, features = ["column_metadata"] }
