@@ -1,0 +1,9 @@
+Violations
+--- out
+test budget: 2 of 15 lines are tests, at most 18% may be
+--- err
+a port's real adapter is named only in a binary's main.rs and in its own port crate's tests; everything else builds over doubles:
+app/src/lib.rs:1: names clock_ports::SystemClock, a port's real adapter; build over a double here, and wire the real adapter in a binary's main.rs
+app/src/lib.rs:3: names clock_ports::SystemClock, a port's real adapter; build over a double here, and wire the real adapter in a binary's main.rs
+app/src/lib.rs:3: names clock_ports::SystemClock, a port's real adapter; build over a double here, and wire the real adapter in a binary's main.rs
+app/tests/story.rs:1: names clock_ports::SystemClock, a port's real adapter; build over a double here, and wire the real adapter in a binary's main.rs

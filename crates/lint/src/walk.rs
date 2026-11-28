@@ -11,7 +11,7 @@ use crate::expansion::Expansion;
 use crate::hooks::{Descent, Expanded, Hooks, nodes};
 use crate::lints::{
     BoolMethods, Emitters, ExpressionFlow, ManualIteration, ModuleCycles, NamedLifetimes, NoDyn, NoFreeFns,
-    NoTestOnlyApi, ProcessStarters, PublicApiTests, PublicSurface, TypeShape, VecOutParams,
+    NoTestOnlyApi, ProcessStarters, PublicApiTests, PublicSurface, RealAdapters, TypeShape, VecOutParams,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -210,6 +210,7 @@ nodes!(walker {
         public_api_tests: PublicApiTests<'file>,
         emitters: Emitters,
         no_test_only_api: NoTestOnlyApi<'file>,
+        real_adapters: RealAdapters<'file>,
         test_scan: TestScan,
         module_cycles: ModuleCycles<'file>,
     ]

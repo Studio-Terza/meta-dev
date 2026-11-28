@@ -10,6 +10,7 @@ mod no_test_only_api;
 mod process_starters;
 mod public_api_tests;
 mod public_surface;
+mod real_adapters;
 mod type_shape;
 mod vec_out_params;
 
@@ -35,6 +36,7 @@ pub(crate) use no_test_only_api::NoTestOnlyApi;
 pub(crate) use process_starters::ProcessStarters;
 pub(crate) use public_api_tests::{ApiFact, Emitters, PublicApiTests};
 pub(crate) use public_surface::{PublicSurface, SurfaceFact};
+pub(crate) use real_adapters::{AdapterFact, RealAdapters};
 pub(crate) use type_shape::TypeShape;
 pub(crate) use vec_out_params::VecOutParams;
 
@@ -43,6 +45,7 @@ pub(crate) struct Facts {
     surface: Vec<SurfaceFact>,
     api: Vec<ApiFact>,
     test_only: Vec<Finding>,
+    adapters: Vec<AdapterFact>,
     modules: Vec<ModuleFact>,
 }
 
@@ -76,6 +79,7 @@ impl<'run> Lints<'run> {
             public_api_tests: lints.graph(),
             emitters: Pausable::admitted(Emitters::default(), lints.entered),
             no_test_only_api: lints.graph(),
+            real_adapters: lints.graph(),
             test_scan: Pausable::admitted(TestScan::default(), Some(())),
             module_cycles: Pausable::admitted(ModuleCycles::new(source), Some(())),
         };
@@ -93,6 +97,7 @@ impl<'run> Lints<'run> {
             public_api_tests,
             emitters,
             no_test_only_api,
+            real_adapters,
             test_scan,
             module_cycles,
         } = Walker::walked(lineup, file);
@@ -113,6 +118,7 @@ impl<'run> Lints<'run> {
             surface: Lints::facts(public_surface),
             api: api.collect(),
             test_only: Lints::facts(no_test_only_api),
+            adapters: Lints::facts(real_adapters),
             modules: Lints::facts(module_cycles),
         };
         let budget = Budget::of_file(source, test_scan.woken().unwrap_or_default(), gate);
@@ -145,6 +151,7 @@ impl Facts {
             surface: self.surface.into_iter().chain(later.surface).collect(),
             api: self.api.into_iter().chain(later.api).collect(),
             test_only: self.test_only.into_iter().chain(later.test_only).collect(),
+            adapters: self.adapters.into_iter().chain(later.adapters).collect(),
             modules: self.modules.into_iter().chain(later.modules).collect(),
         }
     }
@@ -153,7 +160,8 @@ impl Facts {
         let surface = PublicSurface::reduce(self.surface, packages);
         let api = PublicApiTests::reduce(self.api, packages);
         let test_only = NoTestOnlyApi::reduce(self.test_only, packages);
+        let adapters = RealAdapters::reduce(self.adapters, packages);
         let modules = ModuleCycles::reduce(self.modules, packages);
-        surface.into_iter().chain(api).chain(test_only).chain(modules).collect()
+        surface.into_iter().chain(api).chain(test_only).chain(adapters).chain(modules).collect()
     }
 }

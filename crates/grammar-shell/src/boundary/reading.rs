@@ -2,23 +2,88 @@ use std::iter;
 use std::ops::ControlFlow;
 
 use grammar::logos::{Lexer, Logos};
-use grammar::{Ignoring, Unlexed};
 
-use super::lexeme::{Argued, Lexeme, Line, PerlFlag, Quoted, SedFlag, Spelling, Whole};
-use super::occurrence::{Changed, Construct, Edit, Editor, Flagged, Occurrence, Spotted};
+use super::lexeme::{Here, Inside, Lexeme, Line, Spelling, Whole};
+use super::{Expanding, Part, Quoting, Simple, Unreadable, Word};
 
 enum Lexing<'text> {
-    Command(Lexer<'text, Lexeme<'text>>),
-    Quoted(Lexer<'text, Quoted<'text>>),
-    Body(Lexer<'text, Line<'text>>, Body<'text>),
+    Bare(Lexer<'text, Lexeme<'text>>),
+    Inside(Lexer<'text, Inside<'text>>),
+}
+
+pub(super) struct Reading<'text> {
+    lexing: Lexing<'text>,
+    words: Words,
+    closer: Closer,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Closer {
+    End,
+    Paren,
+    Backtick,
 }
 
 #[derive(Debug)]
-struct Body<'text> {
-    pending: Pending,
-    waiting: Vec<Pending>,
+struct Enclosed {
+    simples: Vec<Simple>,
+    length: usize,
+}
+
+type Step<'text> = ControlFlow<Result<Enclosed, Unreadable>, Reading<'text>>;
+
+#[derive(Debug, Default)]
+struct Words {
+    read: Vec<Simple>,
+    simple: Simple,
+    word: Option<Word>,
+    redirect: Option<Redirect>,
+    pending: Vec<Pending>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Redirect {
+    Input,
+    Output,
+    Heredoc(Strip),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Strip {
+    Tabs,
+    Kept,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Fed {
+    Script,
+    Data,
+}
+
+#[derive(Debug)]
+struct Pending {
+    delimiter: String,
+    strip: Strip,
+    quoting: Quoting,
+    owner: usize,
+    fed: Fed,
+}
+
+#[derive(Debug)]
+struct Feeding {
+    read: Vec<Simple>,
+    length: usize,
+}
+
+#[derive(Debug)]
+struct Bodied<'text> {
+    text: &'text str,
+    length: usize,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Scan<'text> {
     start: usize,
-    line: usize,
     seen: Seen<'text>,
 }
 
@@ -30,670 +95,290 @@ enum Seen<'text> {
     Indented(&'text str),
 }
 
-pub(super) struct Reading<'text> {
-    lexing: Lexing<'text>,
-    state: State,
-}
-
-#[derive(Debug)]
-struct State {
-    top: Frame,
-    outer: Vec<Frame>,
-    heredocs: Vec<Pending>,
-    found: Vec<Occurrence>,
-}
-
-#[derive(Debug)]
-struct Frame {
-    construct: Option<Construct>,
-    closer: Closer,
-    resume: Mode,
-    simple: Simple,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Closer {
-    Top,
-    Paren,
-    Backtick,
-    Arithmetic,
-    Done,
-    Fi,
-    Esac,
-    Brace,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Mode {
-    Command,
-    Quoted,
-}
-
-#[derive(Debug)]
-struct Simple {
-    word: Option<Word>,
-    position: Position,
-    prefixes: Vec<Construct>,
-    redirect: Option<Redirect>,
-    moved: Option<Vec<String>>,
-    cd: Option<Cding>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct Cding;
-
-#[derive(Debug, Default)]
-struct Word {
-    text: String,
-    quoting: Quoting,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-enum Quoting {
-    #[default]
-    Plain,
-    Quoted,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Redirect {
-    Input,
-    Output,
-    Delimiter(Strip),
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Strip {
-    Tabs,
-    Kept,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Position {
-    Command,
-    Argument(Head),
-    Pattern,
-    Named,
-    Body,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Head {
-    Plain,
-    Shell(Script),
-    Xargs(Expecting),
-    Find,
-    Case,
-    Sed,
-    Perl,
-    Tee,
-    Mv,
-    Cd,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Script {
-    Options,
-    Awaiting,
-    Given,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Expecting {
-    Utility,
-    Value,
-}
-
-#[derive(Debug)]
-struct Pending {
-    delimiter: String,
-    strip: Strip,
-    fed: Option<Vec<Construct>>,
+struct Data<'text> {
+    lexer: Lexer<'text, Here>,
+    scripts: Vec<Vec<Simple>>,
 }
 
 impl<'text> Reading<'text> {
-    pub(super) fn occurrences(text: &'text str) -> Vec<Occurrence> {
-        let first = Reading { lexing: Lexing::Command(Lexeme::lexer(text)), state: State::new() };
+    pub(super) fn simples(text: &'text str) -> Result<Vec<Simple>, Unreadable> {
+        Reading::enclosed(text, Closer::End).map(|enclosed| enclosed.simples)
+    }
+
+    fn enclosed(text: &'text str, closer: Closer) -> Result<Enclosed, Unreadable> {
+        let first = Reading { lexing: Lexing::Bare(Lexeme::lexer(text)), words: Words::default(), closer };
         match iter::repeat(()).try_fold(first, |reading, ()| reading.step()) {
-            ControlFlow::Break(found) => found,
-            ControlFlow::Continue(_endless) => Vec::new(),
+            ControlFlow::Break(read) => read,
+            ControlFlow::Continue(_endless) => Ok(Enclosed { simples: Vec::new(), length: 0 }),
         }
     }
 
-    fn step(self) -> ControlFlow<Vec<Occurrence>, Reading<'text>> {
-        let Reading { lexing, state } = self;
+    fn step(self) -> Step<'text> {
+        let Reading { lexing, words, closer } = self;
         match lexing {
-            Lexing::Command(mut lexer) => match lexer.next() {
-                Some(Ok(lexeme)) => ControlFlow::Continue(state.commanded(lexeme, lexer)),
-                Some(Err(())) => ControlFlow::Continue(state.noted(Spotted::Unreadable).commanding(lexer)),
-                None => ControlFlow::Break(state.ended()),
+            Lexing::Bare(mut lexer) => match lexer.next() {
+                Some(Ok(lexeme)) => words.bare(lexeme, lexer, closer),
+                Some(Err(())) => Words::refused(lexer.slice()),
+                None => match closer {
+                    Closer::End => words.finished(lexer.source().len()),
+                    Closer::Paren | Closer::Backtick => Words::refused(Words::UNCLOSED),
+                },
             },
-            Lexing::Quoted(mut lexer) => match lexer.next() {
-                Some(Ok(lexeme)) => ControlFlow::Continue(state.quoted(lexeme, lexer)),
-                Some(Err(())) => ControlFlow::Continue(state.noted(Spotted::Unreadable).quoting(lexer)),
-                None => ControlFlow::Break(state.ended()),
+            Lexing::Inside(mut lexer) => match lexer.next() {
+                Some(Ok(inside)) => words.inside(inside, lexer, closer),
+                Some(Err(())) => Words::refused(lexer.slice()),
+                None => Words::refused(Words::QUOTE),
             },
-            Lexing::Body(mut lexer, body) => {
-                match lexer.next().and_then(|lexed| lexed.ignoring(Unlexed::NotThisGrammar)) {
-                    Some(line) => ControlFlow::Continue(state.bodied(line, lexer, body)),
-                    None => ControlFlow::Break(state.unterminated(&lexer, &body)),
-                }
-            }
         }
     }
 }
 
-impl State {
-    fn new() -> State {
-        State {
-            top: Frame::new(None, Closer::Top, Mode::Command, Position::Command),
-            outer: Vec::new(),
-            heredocs: Vec::new(),
-            found: Vec::new(),
-        }
+impl Words {
+    const QUOTE: &'static str = "\"";
+    const UNCLOSED: &'static str = "a `$(` or backtick that is never closed";
+    const UNBODIED: &'static str = "a heredoc whose closing delimiter never comes";
+    const UNAIMED: &'static str = "a redirection with no target";
+    const GLOBS: [char; 3] = ['*', '?', '['];
+
+    fn refused<'text>(span: &str) -> Step<'text> {
+        ControlFlow::Break(Err(Unreadable { span: span.to_owned() }))
     }
 
-    fn ended(self) -> Vec<Occurrence> {
-        self.worded().flushed().found
-    }
-
-    fn commanded<'text>(self, lexeme: Lexeme<'text>, lexer: Lexer<'text, Lexeme<'text>>) -> Reading<'text> {
+    fn bare<'text>(self, lexeme: Lexeme<'text>, mut lexer: Lexer<'text, Lexeme<'text>>, closer: Closer) -> Step<'text> {
+        let slice = lexer.slice();
         match lexeme {
-            Lexeme::Literal(text) => self.part(text, Quoting::Plain).commanding(lexer),
-            Lexeme::Single(text) | Lexeme::Escaped(text) | Lexeme::Expansion(text) => {
-                self.part(text, Quoting::Quoted).commanding(lexer)
+            Lexeme::Blank | Lexeme::Duplicate => self.worded().barely(lexer, closer),
+            Lexeme::Separator => match self.worded().separated() {
+                Ok(separated) => separated.barely(lexer, closer),
+                Err(unreadable) => ControlFlow::Break(Err(unreadable)),
+            },
+            Lexeme::Newline => match self.worded().separated() {
+                Ok(separated) => separated.bodied(lexer, closer),
+                Err(unreadable) => ControlFlow::Break(Err(unreadable)),
+            },
+            Lexeme::Input => self.worded().redirected(Redirect::Input, lexer, closer),
+            Lexeme::Output => self.worded().redirected(Redirect::Output, lexer, closer),
+            Lexeme::Heredoc => self.worded().redirected(Redirect::Heredoc(Strip::Kept), lexer, closer),
+            Lexeme::Stripped => self.worded().redirected(Redirect::Heredoc(Strip::Tabs), lexer, closer),
+            Lexeme::Quote => self.part("", Quoting::Quoted, Expanding::Literal, None).inwardly(lexer.morph(), closer),
+            Lexeme::Quoted(text) => self
+                .part(text, Quoting::Quoted, Expanding::Literal, Some(Part::Text(text.to_owned())))
+                .barely(lexer, closer),
+            Lexeme::Variable(name) => {
+                let part = Some(Part::Variable(name.to_owned()));
+                self.part(slice, Quoting::Plain, Expanding::Expanded, part).barely(lexer, closer)
             }
-            Lexeme::Quote => self.part("", Quoting::Quoted).quoting(lexer.morph()),
-            Lexeme::Unreadable => self.worded().noted(Spotted::Unreadable).commanding(lexer),
-            Lexeme::Substitution => self.substituted(Closer::Paren, Mode::Command).commanding(lexer),
-            Lexeme::Arithmetic => self.counted(Mode::Command).commanding(lexer),
-            Lexeme::Backtick => self.backticked(lexer),
-            Lexeme::Blank | Lexeme::Comment | Lexeme::Duplicate => self.worded().commanding(lexer),
-            Lexeme::Newline => self.worded().separated().heredocs(lexer),
-            Lexeme::Separator => self.worded().separated().commanding(lexer),
-            Lexeme::CaseEnd => self.worded().case_ended().commanding(lexer),
-            Lexeme::Open => self.opened().commanding(lexer),
-            Lexeme::Parens => self.worded().positioned(Position::Body).commanding(lexer),
-            Lexeme::Close => self.worded().closed(lexer),
-            Lexeme::Closes => self.worded().closes(lexer),
-            Lexeme::Heredoc => self.worded().redirected(Redirect::Delimiter(Strip::Kept)).commanding(lexer),
-            Lexeme::Stripped => self.worded().redirected(Redirect::Delimiter(Strip::Tabs)).commanding(lexer),
-            Lexeme::Input => self.worded().redirected(Redirect::Input).commanding(lexer),
-            Lexeme::Output => self.worded().redirected(Redirect::Output).commanding(lexer),
+            Lexeme::Opaque(text) => {
+                self.part(text, Quoting::Plain, Expanding::Expanded, Some(Part::Opaque)).barely(lexer, closer)
+            }
+            Lexeme::Literal(text) => {
+                let globbed = text.contains(Words::GLOBS);
+                let expanding = if globbed { Expanding::Expanded } else { Expanding::Literal };
+                let part = if globbed { Part::Opaque } else { Part::Text(text.to_owned()) };
+                self.part(text, Quoting::Plain, expanding, Some(part)).barely(lexer, closer)
+            }
+            Lexeme::Tilde(text) => {
+                let part = if self.word.is_none() { Part::Opaque } else { Part::Text(text.to_owned()) };
+                self.part(text, Quoting::Plain, Expanding::Literal, Some(part)).barely(lexer, closer)
+            }
+            Lexeme::Substitution => match self.substituted(&mut lexer, Closer::Paren) {
+                Ok(substituted) => substituted.barely(lexer, closer),
+                Err(unreadable) => ControlFlow::Break(Err(unreadable)),
+            },
+            Lexeme::Backtick => match closer {
+                Closer::Backtick => self.finished(lexer.span().end),
+                Closer::End | Closer::Paren => match self.substituted(&mut lexer, Closer::Backtick) {
+                    Ok(substituted) => substituted.barely(lexer, closer),
+                    Err(unreadable) => ControlFlow::Break(Err(unreadable)),
+                },
+            },
+            Lexeme::Close => match closer {
+                Closer::Paren => self.finished(lexer.span().end),
+                Closer::End | Closer::Backtick => Words::refused(slice),
+            },
+            Lexeme::Unplain => Words::refused(slice),
         }
     }
 
-    fn quoted<'text>(self, lexeme: Quoted<'text>, lexer: Lexer<'text, Quoted<'text>>) -> Reading<'text> {
-        match lexeme {
-            Quoted::End => self.commanding(lexer.morph()),
-            Quoted::Unreadable => self.noted(Spotted::Unreadable).quoting(lexer),
-            Quoted::Text(text) | Quoted::Escaped(text) => self.part(text, Quoting::Quoted).quoting(lexer),
-            Quoted::Substitution => self.substituted(Closer::Paren, Mode::Quoted).commanding(lexer.morph()),
-            Quoted::Backtick => self.substituted(Closer::Backtick, Mode::Quoted).commanding(lexer.morph()),
-            Quoted::Arithmetic => self.counted(Mode::Quoted).commanding(lexer.morph()),
+    fn inside<'text>(
+        self,
+        inside: Inside<'text>,
+        mut lexer: Lexer<'text, Inside<'text>>,
+        closer: Closer,
+    ) -> Step<'text> {
+        let slice = lexer.slice();
+        match inside {
+            Inside::End => self.barely(lexer.morph(), closer),
+            Inside::Text(text) => {
+                let part = Some(Part::Text(text.to_owned()));
+                self.part(text, Quoting::Quoted, Expanding::Literal, part).inwardly(lexer, closer)
+            }
+            Inside::Variable(name) => {
+                let part = Some(Part::Variable(name.to_owned()));
+                self.part(slice, Quoting::Quoted, Expanding::Expanded, part).inwardly(lexer, closer)
+            }
+            Inside::Opaque(text) => {
+                self.part(text, Quoting::Quoted, Expanding::Expanded, Some(Part::Opaque)).inwardly(lexer, closer)
+            }
+            Inside::Substitution => match self.substituted(&mut lexer, Closer::Paren) {
+                Ok(substituted) => substituted.inwardly(lexer, closer),
+                Err(unreadable) => ControlFlow::Break(Err(unreadable)),
+            },
+            Inside::Backtick => match self.substituted(&mut lexer, Closer::Backtick) {
+                Ok(substituted) => substituted.inwardly(lexer, closer),
+                Err(unreadable) => ControlFlow::Break(Err(unreadable)),
+            },
+            Inside::Unplain => Words::refused(slice),
         }
     }
 
-    fn commanding<'text>(self, lexer: Lexer<'text, Lexeme<'text>>) -> Reading<'text> {
-        Reading { lexing: Lexing::Command(lexer), state: self }
+    fn barely<'text>(self, lexer: Lexer<'text, Lexeme<'text>>, closer: Closer) -> Step<'text> {
+        ControlFlow::Continue(Reading { lexing: Lexing::Bare(lexer), words: self, closer })
     }
 
-    fn quoting<'text>(self, lexer: Lexer<'text, Quoted<'text>>) -> Reading<'text> {
-        Reading { lexing: Lexing::Quoted(lexer), state: self }
+    fn inwardly<'text>(self, lexer: Lexer<'text, Inside<'text>>, closer: Closer) -> Step<'text> {
+        ControlFlow::Continue(Reading { lexing: Lexing::Inside(lexer), words: self, closer })
     }
 
-    fn substituted(self, closer: Closer, resume: Mode) -> State {
-        let frame = Frame::new(Some(Construct::Substitution), closer, resume, Position::Command);
-        self.part("", Quoting::Quoted).pushed(frame)
+    fn substituted<'text, Token: Logos<'text, Source = str>>(
+        self,
+        lexer: &mut Lexer<'text, Token>,
+        inner: Closer,
+    ) -> Result<Words, Unreadable> {
+        let opened = lexer.span().start;
+        let start = lexer.span().end;
+        let source = lexer.source();
+        let enclosed = Reading::enclosed(source.get(start..).unwrap_or_default(), inner)?;
+        lexer.bump(enclosed.length);
+        let text = source.get(opened..start + enclosed.length).unwrap_or_default();
+        let parted = self.part(text, Quoting::Plain, Expanding::Expanded, Some(Part::Opaque));
+        Ok(Words { simple: parted.simple.scripted(enclosed.simples), ..parted })
     }
 
-    fn counted(self, resume: Mode) -> State {
-        let frame = Frame::new(None, Closer::Arithmetic, resume, Position::Argument(Head::Plain));
-        self.part("", Quoting::Quoted).pushed(frame)
+    fn part(self, text: &str, quoting: Quoting, expanding: Expanding, part: Option<Part>) -> Words {
+        let begun = self.word.unwrap_or_default();
+        Words { word: Some(begun.extended(text, quoting, expanding, part)), ..self }
     }
 
-    fn backticked<'text>(self, lexer: Lexer<'text, Lexeme<'text>>) -> Reading<'text> {
-        match self.top.closer {
-            Closer::Backtick => self.worded().popped(lexer),
-            Closer::Top
-            | Closer::Paren
-            | Closer::Arithmetic
-            | Closer::Done
-            | Closer::Fi
-            | Closer::Esac
-            | Closer::Brace => self.substituted(Closer::Backtick, Mode::Command).commanding(lexer),
+    fn redirected<'text>(self, redirect: Redirect, lexer: Lexer<'text, Lexeme<'text>>, closer: Closer) -> Step<'text> {
+        match self.redirect {
+            Some(_pending) => Words::refused(lexer.slice()),
+            None => Words { redirect: Some(redirect), ..self }.barely(lexer, closer),
         }
     }
 
-    fn popped<'text>(self, lexer: Lexer<'text, Lexeme<'text>>) -> Reading<'text> {
-        let resume = self.top.resume;
-        let state = self.unwound();
-        match resume {
-            Mode::Command => state.commanding(lexer),
-            Mode::Quoted => state.quoting(lexer.morph()),
-        }
-    }
-
-    fn unwound(self) -> State {
-        let State { top, mut outer, heredocs, found } = self.flushed();
-        match outer.pop() {
-            Some(parent) => State { top: parent, outer, heredocs, found },
-            None => State { top, outer, heredocs, found },
-        }
-    }
-
-    fn closed<'text>(self, lexer: Lexer<'text, Lexeme<'text>>) -> Reading<'text> {
-        match (self.top.simple.position, self.top.closer) {
-            (Position::Pattern, _) => self.positioned(Position::Command).commanding(lexer),
-            (Position::Command | Position::Argument(_) | Position::Named | Position::Body, closer) => match closer {
-                Closer::Paren | Closer::Arithmetic => self.popped(lexer),
-                Closer::Top | Closer::Backtick | Closer::Done | Closer::Fi | Closer::Esac | Closer::Brace => {
-                    self.commanding(lexer)
+    fn worded(self) -> Words {
+        let Words { read, simple, word, redirect, pending } = self;
+        match (word, redirect) {
+            (None, _) => Words { read, simple, word: None, redirect, pending },
+            (Some(_input), Some(Redirect::Input)) => Words { read, simple, word: None, redirect: None, pending },
+            (Some(target), Some(Redirect::Output)) => {
+                Words { read, simple: simple.writing(target), word: None, redirect: None, pending }
+            }
+            (Some(delimiter), Some(Redirect::Heredoc(strip))) => {
+                let awaited = Pending {
+                    delimiter: delimiter.text,
+                    strip,
+                    quoting: delimiter.quoting,
+                    owner: read.len(),
+                    fed: simple.fed(),
+                };
+                Words {
+                    read,
+                    simple,
+                    word: None,
+                    redirect: None,
+                    pending: pending.into_iter().chain([awaited]).collect(),
                 }
-            },
-        }
-    }
-
-    fn closes<'text>(self, lexer: Lexer<'text, Lexeme<'text>>) -> Reading<'text> {
-        match self.top.closer {
-            Closer::Arithmetic => self.popped(lexer),
-            Closer::Paren => self.unwound().closed(lexer),
-            Closer::Top | Closer::Backtick | Closer::Done | Closer::Fi | Closer::Esac | Closer::Brace => {
-                self.commanding(lexer)
+            }
+            (Some(argument), None) => {
+                Words { read, simple: simple.worded(argument), word: None, redirect: None, pending }
             }
         }
     }
 
-    fn opened(self) -> State {
-        match (self.top.simple.word.as_ref(), self.top.simple.position) {
-            (Some(_word), _) => {
-                self.pushed(Frame::new(None, Closer::Paren, Mode::Command, Position::Argument(Head::Plain)))
-            }
-            (None, Position::Body) => {
-                self.pushed(Frame::new(Some(Construct::Function), Closer::Paren, Mode::Command, Position::Command))
-            }
-            (None, Position::Pattern) => self,
-            (None, Position::Command | Position::Argument(_) | Position::Named) => self
-                .positioned(Position::Argument(Head::Plain))
-                .pushed(Frame::new(Some(Construct::Subshell), Closer::Paren, Mode::Command, Position::Command)),
+    fn separated(self) -> Result<Words, Unreadable> {
+        let Words { read, simple, word, redirect, pending } = self;
+        let unaimed = redirect.map(|_pending| Unreadable { span: Words::UNAIMED.to_owned() });
+        let keyword = simple.keyword().map(|head| Unreadable { span: head.text.clone() });
+        unaimed.or(keyword).map_or(Ok(()), Err)?;
+        let kept = read.into_iter().chain([simple]).collect();
+        Ok(Words { read: kept, simple: Simple::default(), word, redirect: None, pending })
+    }
+
+    fn finished<'text>(self, length: usize) -> Step<'text> {
+        match self.worded().separated() {
+            Ok(words) if words.pending.is_empty() => ControlFlow::Break(Ok(Enclosed { simples: words.read, length })),
+            Ok(_unbodied) => Words::refused(Words::UNBODIED),
+            Err(unreadable) => ControlFlow::Break(Err(unreadable)),
         }
     }
 
-    fn pushed(self, frame: Frame) -> State {
-        let State { top, mut outer, heredocs, found } = self;
-        outer.push(top);
-        State { top: frame, outer, heredocs, found }
+    fn bodied<'text>(self, mut lexer: Lexer<'text, Lexeme<'text>>, closer: Closer) -> Step<'text> {
+        let rest = lexer.source().get(lexer.span().end..).unwrap_or_default();
+        let Words { read, pending, .. } = self;
+        let fed = pending.iter().try_fold(Feeding { read, length: 0 }, |feeding, awaited| feeding.fed(awaited, rest));
+        match fed {
+            Ok(feeding) => {
+                lexer.bump(feeding.length);
+                Words { read: feeding.read, ..Words::default() }.barely(lexer, closer)
+            }
+            Err(unreadable) => ControlFlow::Break(Err(unreadable)),
+        }
     }
+}
 
-    fn opening(self, construct: Construct, closer: Closer, inner: Position) -> State {
-        let frame = Frame::new(Some(construct), closer, Mode::Command, inner);
-        self.positioned(Position::Argument(Head::Plain)).pushed(frame)
-    }
-
-    fn ended_by(self, closer: Closer) -> State {
-        if self.top.closer == closer { self.unwound() } else { self }
-    }
-
-    fn simpled(self, change: impl FnOnce(Simple) -> Simple) -> State {
-        let State { top, outer, heredocs, found } = self;
-        State { top: Frame { simple: change(top.simple), ..top }, outer, heredocs, found }
-    }
-
-    fn positioned(self, position: Position) -> State {
-        self.simpled(|simple| Simple { position, ..simple })
-    }
-
-    fn redirected(self, redirect: Redirect) -> State {
-        self.simpled(|simple| Simple { redirect: Some(redirect), ..simple })
-    }
-
-    fn prefixed(self, construct: Construct) -> State {
-        self.simpled(|simple| Simple {
-            prefixes: simple.prefixes.into_iter().chain(iter::once(construct)).collect(),
-            position: Position::Command,
-            ..simple
-        })
-    }
-
-    fn part(self, text: &str, quoting: Quoting) -> State {
-        self.simpled(|simple| Simple { word: Some(simple.word.unwrap_or_default().extended(text, quoting)), ..simple })
-    }
-
-    fn separated(self) -> State {
-        self.flushed().simpled(Simple::separated)
-    }
-
-    fn flushed(self) -> State {
-        let State { top, outer, heredocs, found } = self;
-        let Frame { construct, closer, resume, simple } = top;
-        let Simple { word, position, prefixes, redirect, moved, cd } = simple;
-        let state = State {
-            top: Frame {
-                construct,
-                closer,
-                resume,
-                simple: Simple { word, position, prefixes, redirect, moved: None, cd: None },
-            },
-            outer,
-            heredocs,
-            found,
+impl Feeding {
+    fn fed(self, awaited: &Pending, rest: &str) -> Result<Feeding, Unreadable> {
+        let unbodied = || Unreadable { span: Words::UNBODIED.to_owned() };
+        let body = Bodied::read(rest.get(self.length..).unwrap_or_default(), awaited).ok_or_else(unbodied)?;
+        let scripts = match (awaited.fed, awaited.quoting) {
+            (Fed::Script, Quoting::Plain | Quoting::Quoted) => vec![Reading::simples(body.text)?],
+            (Fed::Data, Quoting::Plain) => Data::scripts(body.text)?,
+            (Fed::Data, Quoting::Quoted) => Vec::new(),
         };
-        let spoken = moved.as_deref().and_then(<[String]>::split_last);
-        let edit = spoken.filter(|(_destination, sources)| !sources.is_empty()).map(|(destination, sources)| {
-            Spotted::Edit(Edit::Moved { sources: sources.to_vec(), destination: destination.clone() })
-        });
-        let unknown = cd.map(|Cding| Spotted::Changed(Changed::Unknown));
-        edit.into_iter().chain(unknown).fold(state, State::noted)
-    }
-
-    fn spotted(self, edit: Edit) -> State {
-        self.noted(Spotted::Edit(edit))
-    }
-
-    fn noted(self, spotted: Spotted) -> State {
-        let occurrence = Occurrence::new(spotted, self.within());
-        State { found: self.found.into_iter().chain(iter::once(occurrence)).collect(), ..self }
-    }
-
-    fn case_ended(self) -> State {
-        match self.top.closer {
-            Closer::Esac => self.separated().positioned(Position::Pattern),
-            Closer::Top
-            | Closer::Paren
-            | Closer::Backtick
-            | Closer::Arithmetic
-            | Closer::Done
-            | Closer::Fi
-            | Closer::Brace => self.separated(),
-        }
-    }
-
-    fn worded(self) -> State {
-        let State { top, outer, heredocs, found } = self;
-        let Frame { construct, closer, resume, simple: building } = top;
-        let Simple { word: taken, position, prefixes, redirect, moved, cd } = building;
-        let simple = Simple { word: None, position, prefixes, redirect, moved, cd };
-        let state = State { top: Frame { construct, closer, resume, simple }, outer, heredocs, found };
-        match taken {
-            Some(word) => state.word(word),
-            None => state,
-        }
-    }
-
-    fn word(self, word: Word) -> State {
-        match self.top.simple.redirect {
-            Some(Redirect::Input) => self.simpled(Simple::redirected),
-            Some(Redirect::Output) => self.spotted(Edit::Wrote(word.text)).simpled(Simple::redirected),
-            Some(Redirect::Delimiter(strip)) => {
-                let fed = self.fed();
-                self.simpled(Simple::redirected).awaiting(Pending { delimiter: word.text, strip, fed })
-            }
-            None => self.terminated(&word),
-        }
-    }
-
-    fn fed(&self) -> Option<Vec<Construct>> {
-        match self.top.simple.position {
-            Position::Argument(Head::Shell(_)) => Some(self.within()),
-            Position::Command
-            | Position::Argument(
-                Head::Plain
-                | Head::Xargs(_)
-                | Head::Find
-                | Head::Case
-                | Head::Sed
-                | Head::Perl
-                | Head::Tee
-                | Head::Mv
-                | Head::Cd,
-            )
-            | Position::Pattern
-            | Position::Named
-            | Position::Body => None,
-        }
-    }
-
-    fn awaiting(self, pending: Pending) -> State {
-        State { heredocs: self.heredocs.into_iter().chain(iter::once(pending)).collect(), ..self }
-    }
-
-    fn terminated(self, word: &Word) -> State {
-        let execing = self.top.simple.prefixes.last() == Some(&Construct::Find);
-        match (execing, Whole::read::<Argued>(&word.text)) {
-            (true, Some(Argued::Terminator)) => self.simpled(Simple::unprefixed),
-            (true | false, _) => self.placed(word),
-        }
-    }
-
-    fn placed(self, word: &Word) -> State {
-        let spelled = (Whole::read::<Spelling>(&word.text), word.quoting);
-        match self.top.simple.position {
-            Position::Command => self.command(word),
-            Position::Argument(head) => self.argued(head, word),
-            Position::Pattern => match spelled {
-                (Some(Spelling::Esac), Quoting::Plain) => self.ended_by(Closer::Esac),
-                (_, Quoting::Plain | Quoting::Quoted) => self,
-            },
-            Position::Named => self.positioned(Position::Body),
-            Position::Body => match spelled {
-                (Some(Spelling::Brace), Quoting::Plain) => {
-                    self.opening(Construct::Function, Closer::Brace, Position::Command)
-                }
-                (_, Quoting::Plain | Quoting::Quoted) => self.command(word),
-            },
-        }
-    }
-
-    fn command(self, word: &Word) -> State {
-        let argument = |head| Position::Argument(head);
-        match (Whole::read::<Spelling>(&word.text), word.quoting) {
-            (Some(Spelling::For), Quoting::Plain) => self.opening(Construct::Loop, Closer::Done, argument(Head::Plain)),
-            (Some(Spelling::While), Quoting::Plain) => self.opening(Construct::Loop, Closer::Done, Position::Command),
-            (Some(Spelling::If), Quoting::Plain) => self.opening(Construct::Conditional, Closer::Fi, Position::Command),
-            (Some(Spelling::Case), Quoting::Plain) => {
-                self.opening(Construct::Conditional, Closer::Esac, argument(Head::Case))
-            }
-            (Some(Spelling::Lead), Quoting::Plain) | (Some(Spelling::Assignment), _) => self,
-            (Some(Spelling::Brace), Quoting::Plain) => self.opening(Construct::Group, Closer::Brace, Position::Command),
-            (Some(Spelling::Unbrace), Quoting::Plain) => self.ended_by(Closer::Brace),
-            (Some(Spelling::Done), Quoting::Plain) => self.ended_by(Closer::Done),
-            (Some(Spelling::Fi), Quoting::Plain) => self.ended_by(Closer::Fi),
-            (Some(Spelling::Esac), Quoting::Plain) => self.ended_by(Closer::Esac),
-            (Some(Spelling::Function), Quoting::Plain) => self.positioned(Position::Named),
-            (Some(Spelling::Rm), _) => self.flagged(Flagged::Rm, None).positioned(argument(Head::Plain)),
-            (Some(Spelling::Rmdir), _) => self.flagged(Flagged::Rmdir, None).positioned(argument(Head::Plain)),
-            (Some(Spelling::Shell), _) => self.positioned(argument(Head::Shell(Script::Options))),
-            (Some(Spelling::Xargs), _) => self.positioned(argument(Head::Xargs(Expecting::Utility))),
-            (Some(Spelling::Find), _) => self.positioned(argument(Head::Find)),
-            (Some(Spelling::Sed), _) => self.positioned(argument(Head::Sed)),
-            (Some(Spelling::Perl), _) => self.positioned(argument(Head::Perl)),
-            (Some(Spelling::Tee), _) => self.positioned(argument(Head::Tee)),
-            (Some(Spelling::Mv), _) => {
-                self.simpled(|simple| Simple { moved: Some(Vec::new()), ..simple }).positioned(argument(Head::Mv))
-            }
-            (Some(Spelling::Cd), _) => {
-                self.simpled(|simple| Simple { cd: Some(Cding), ..simple }).positioned(argument(Head::Cd))
-            }
-            (
-                Some(
-                    Spelling::For
-                    | Spelling::While
-                    | Spelling::If
-                    | Spelling::Case
-                    | Spelling::Lead
-                    | Spelling::Brace
-                    | Spelling::Unbrace
-                    | Spelling::Done
-                    | Spelling::Fi
-                    | Spelling::Esac
-                    | Spelling::Function
-                    | Spelling::Test,
-                ),
-                Quoting::Quoted,
-            )
-            | (Some(Spelling::Test), Quoting::Plain)
-            | (None, _) => self.positioned(argument(Head::Plain)),
-        }
-    }
-
-    fn argued(self, head: Head, word: &Word) -> State {
-        match head {
-            Head::Sed => match Whole::read::<SedFlag>(&word.text) {
-                Some(SedFlag::InPlace) => self.spotted(Edit::InPlace(Editor::Sed)),
-                Some(SedFlag::Other) | None => self,
-            },
-            Head::Perl => match Whole::read::<PerlFlag>(&word.text) {
-                Some(PerlFlag::InPlace) => self.spotted(Edit::InPlace(Editor::Perl)),
-                Some(PerlFlag::Other) | None => self,
-            },
-            Head::Tee => match Whole::read::<PerlFlag>(&word.text) {
-                Some(PerlFlag::InPlace | PerlFlag::Other) => self,
-                None => self.spotted(Edit::Wrote(word.text.clone())),
-            },
-            Head::Mv => match Whole::read::<PerlFlag>(&word.text) {
-                Some(PerlFlag::InPlace | PerlFlag::Other) => self,
-                None => self.simpled(|simple| Simple {
-                    moved: simple.moved.map(|moved| moved.into_iter().chain(iter::once(word.text.clone())).collect()),
-                    ..simple
-                }),
-            },
-            Head::Cd => match Whole::read::<PerlFlag>(&word.text) {
-                Some(PerlFlag::InPlace | PerlFlag::Other) => self,
-                None => {
-                    let opaque = word.text.chars().any(|letter| Self::OPAQUE.contains(&letter));
-                    let changed = if opaque { Changed::Unknown } else { Changed::To(word.text.clone()) };
-                    self.simpled(|simple| Simple { cd: None, ..simple })
-                        .noted(Spotted::Changed(changed))
-                        .positioned(Position::Argument(Head::Plain))
-                }
-            },
-            Head::Plain | Head::Shell(_) | Head::Xargs(_) | Head::Find | Head::Case => {
-                self.scanned_argument(head, word)
-            }
-        }
-    }
-
-    const OPAQUE: [char; 3] = ['$', '`', '~'];
-
-    fn scanned_argument(self, head: Head, word: &Word) -> State {
-        let argued = Whole::read::<Argued>(&word.text);
-        let shell = |script| Position::Argument(Head::Shell(script));
-        match (head, argued) {
-            (
-                Head::Plain | Head::Shell(Script::Given) | Head::Sed | Head::Perl | Head::Tee | Head::Mv | Head::Cd,
-                _,
-            )
-            | (
-                Head::Case,
-                Some(
-                    Argued::Exec | Argued::Delete | Argued::Terminator | Argued::Valued | Argued::Script | Argued::Flag,
-                )
-                | None,
-            )
-            | (Head::Shell(Script::Options), Some(Argued::Flag | Argued::Valued | Argued::Exec | Argued::Delete))
-            | (Head::Xargs(Expecting::Utility), Some(Argued::Flag | Argued::Script | Argued::Exec | Argued::Delete))
-            | (
-                Head::Find,
-                Some(Argued::Terminator | Argued::In | Argued::Valued | Argued::Script | Argued::Flag) | None,
-            ) => self,
-            (Head::Case, Some(Argued::In)) => self.positioned(Position::Pattern),
-            (Head::Shell(Script::Options), Some(Argued::Script)) => self.positioned(shell(Script::Awaiting)),
-            (Head::Shell(Script::Options), Some(Argued::Terminator | Argued::In) | None) => {
-                self.positioned(shell(Script::Given))
-            }
-            (Head::Shell(Script::Awaiting), _) => self.scripted(&word.text).positioned(shell(Script::Given)),
-            (Head::Xargs(Expecting::Value), _) => self.positioned(Position::Argument(Head::Xargs(Expecting::Utility))),
-            (Head::Xargs(Expecting::Utility), Some(Argued::Valued)) => {
-                self.positioned(Position::Argument(Head::Xargs(Expecting::Value)))
-            }
-            (Head::Xargs(Expecting::Utility), Some(Argued::Terminator | Argued::In) | None) => {
-                self.prefixed(Construct::Xargs).command(word)
-            }
-            (Head::Find, Some(Argued::Exec)) => self.prefixed(Construct::Find),
-            (Head::Find, Some(Argued::Delete)) => self.flagged(Flagged::Delete, Some(Construct::Find)),
-        }
-    }
-
-    fn within(&self) -> Vec<Construct> {
-        self.outer
-            .iter()
-            .chain(iter::once(&self.top))
-            .filter_map(|frame| frame.construct)
-            .chain(self.top.simple.prefixes.iter().copied())
-            .collect()
-    }
-
-    fn flagged(self, flagged: Flagged, construct: Option<Construct>) -> State {
-        let within = self.within().into_iter().chain(construct).collect();
-        let occurrence = Occurrence::new(Spotted::Flagged(flagged), within);
-        State { found: self.found.into_iter().chain(iter::once(occurrence)).collect(), ..self }
-    }
-
-    fn scripted(self, script: &str) -> State {
-        let outer: Vec<Construct> = self.within().into_iter().chain(iter::once(Construct::ShellScript)).collect();
-        let inner = Reading::occurrences(script).into_iter().map(|occurrence| occurrence.inside(&outer));
-        State { found: self.found.into_iter().chain(inner).collect(), ..self }
-    }
-
-    fn heredocs<'text>(self, lexer: Lexer<'text, Lexeme<'text>>) -> Reading<'text> {
-        let State { top, outer, heredocs, found } = self;
-        let state = State { top, outer, heredocs: Vec::new(), found };
-        let mut waiting: Vec<Pending> = heredocs.into_iter().rev().collect();
-        match waiting.pop() {
-            Some(pending) => {
-                let start = lexer.span().end;
-                state.bodying(lexer.morph(), Body { pending, waiting, start, line: start, seen: Seen::Nothing })
-            }
-            None => state.commanding(lexer),
-        }
-    }
-
-    fn bodied<'text>(self, line: Line<'text>, lexer: Lexer<'text, Line<'text>>, body: Body<'text>) -> Reading<'text> {
-        match line {
-            Line::Tabs => self.bodying(lexer, Body { seen: body.seen.tabbed(), ..body }),
-            Line::Text(text) => self.bodying(lexer, Body { seen: body.seen.texted(text), ..body }),
-            Line::End => {
-                let end = lexer.span().end;
-                match body.read().filter(|read| *read == body.pending.delimiter) {
-                    Some(_delimiter) => {
-                        let text = lexer.source().get(body.start..body.line).unwrap_or_default();
-                        let Body { pending, mut waiting, .. } = body;
-                        let state = self.scanned(&pending, text);
-                        match waiting.pop() {
-                            Some(next) => state.bodying(
-                                lexer,
-                                Body { pending: next, waiting, start: end, line: end, seen: Seen::Nothing },
-                            ),
-                            None => state.commanding(lexer.morph()),
-                        }
-                    }
-                    None => self.bodying(lexer, Body { line: end, seen: Seen::Nothing, ..body }),
-                }
-            }
-        }
-    }
-
-    fn unterminated<'text>(self, lexer: &Lexer<'text, Line<'text>>, body: &Body<'text>) -> Vec<Occurrence> {
-        let text = lexer.source().get(body.start..).unwrap_or_default();
-        self.scanned(&body.pending, text).ended()
-    }
-
-    fn bodying<'text>(self, lexer: Lexer<'text, Line<'text>>, body: Body<'text>) -> Reading<'text> {
-        Reading { lexing: Lexing::Body(lexer, body), state: self }
-    }
-
-    fn scanned(self, pending: &Pending, text: &str) -> State {
-        State { found: self.found.into_iter().chain(pending.read(text)).collect(), ..self }
+        let read = self
+            .read
+            .into_iter()
+            .enumerate()
+            .map(|(at, simple)| if at == awaited.owner { simple.scripted_all(&scripts) } else { simple })
+            .collect();
+        Ok(Feeding { read, length: self.length + body.length })
     }
 }
 
-impl<'text> Body<'text> {
-    fn read(&self) -> Option<&'text str> {
-        match (self.seen, self.pending.strip) {
+impl<'text> Bodied<'text> {
+    fn read(text: &'text str, awaited: &Pending) -> Option<Bodied<'text>> {
+        let first = Scan { start: 0, seen: Seen::Nothing };
+        let walked = Line::lexer(text).spanned().try_fold(first, |scan, (line, span)| match line {
+            Ok(Line::Tabs) => ControlFlow::Continue(Scan { seen: scan.seen.tabbed(), ..scan }),
+            Ok(Line::Text(read)) => ControlFlow::Continue(Scan { seen: scan.seen.texted(read), ..scan }),
+            Ok(Line::End) => match scan.ends(awaited) {
+                Some(()) => {
+                    ControlFlow::Break(Bodied { text: text.get(..scan.start).unwrap_or_default(), length: span.end })
+                }
+                None => ControlFlow::Continue(Scan { start: span.end, seen: Seen::Nothing }),
+            },
+            Err(()) => ControlFlow::Continue(scan),
+        });
+        match walked {
+            ControlFlow::Break(bodied) => Some(bodied),
+            ControlFlow::Continue(last) => (last.start < text.len())
+                .then_some(())
+                .and_then(|()| last.ends(awaited))
+                .map(|()| Bodied { text: text.get(..last.start).unwrap_or_default(), length: text.len() }),
+        }
+    }
+}
+
+impl Scan<'_> {
+    fn ends(&self, awaited: &Pending) -> Option<()> {
+        let line = match (self.seen, awaited.strip) {
             (Seen::Nothing, Strip::Tabs | Strip::Kept) | (Seen::Tabs, Strip::Tabs) => Some(""),
             (Seen::Text(text), Strip::Tabs | Strip::Kept) | (Seen::Indented(text), Strip::Tabs) => Some(text),
             (Seen::Tabs | Seen::Indented(_), Strip::Kept) => None,
-        }
+        };
+        line.filter(|read| *read == awaited.delimiter).map(|_read| ())
     }
 }
 
@@ -714,55 +399,83 @@ impl<'text> Seen<'text> {
     }
 }
 
-impl Frame {
-    fn new(construct: Option<Construct>, closer: Closer, resume: Mode, position: Position) -> Frame {
-        Frame {
-            construct,
-            closer,
-            resume,
-            simple: Simple { word: None, position, prefixes: Vec::new(), redirect: None, moved: None, cd: None },
+impl<'text> Data<'text> {
+    fn scripts(body: &'text str) -> Result<Vec<Vec<Simple>>, Unreadable> {
+        let first = Data { lexer: Here::lexer(body), scripts: Vec::new() };
+        match iter::repeat(()).try_fold(first, |data, ()| data.step()) {
+            ControlFlow::Break(read) => read,
+            ControlFlow::Continue(_endless) => Ok(Vec::new()),
+        }
+    }
+
+    fn step(self) -> ControlFlow<Result<Vec<Vec<Simple>>, Unreadable>, Data<'text>> {
+        let Data { mut lexer, scripts } = self;
+        let unreadable = |span: &str| ControlFlow::Break(Err(Unreadable { span: span.to_owned() }));
+        match lexer.next() {
+            None => ControlFlow::Break(Ok(scripts)),
+            Some(Ok(Here::Text)) => ControlFlow::Continue(Data { lexer, scripts }),
+            Some(Ok(Here::Substitution)) => Data::enclosing(lexer, scripts, Closer::Paren),
+            Some(Ok(Here::Backtick)) => Data::enclosing(lexer, scripts, Closer::Backtick),
+            Some(Ok(Here::Unplain) | Err(())) => unreadable(lexer.slice()),
+        }
+    }
+
+    fn enclosing(
+        mut lexer: Lexer<'text, Here>,
+        scripts: Vec<Vec<Simple>>,
+        closer: Closer,
+    ) -> ControlFlow<Result<Vec<Vec<Simple>>, Unreadable>, Data<'text>> {
+        let rest = lexer.source().get(lexer.span().end..).unwrap_or_default();
+        match Reading::enclosed(rest, closer) {
+            Ok(enclosed) => {
+                lexer.bump(enclosed.length);
+                ControlFlow::Continue(Data { lexer, scripts: scripts.into_iter().chain([enclosed.simples]).collect() })
+            }
+            Err(unreadable) => ControlFlow::Break(Err(unreadable)),
         }
     }
 }
 
 impl Simple {
-    fn separated(self) -> Simple {
-        let position = match self.position {
-            Position::Pattern => Position::Pattern,
-            Position::Command | Position::Argument(_) | Position::Named | Position::Body => Position::Command,
-        };
-        Simple { word: None, position, prefixes: Vec::new(), redirect: None, moved: None, cd: None }
+    fn writing(self, target: Word) -> Simple {
+        Simple { written: self.written.into_iter().chain([target]).collect(), ..self }
     }
 
-    fn redirected(self) -> Simple {
-        Simple { redirect: None, ..self }
+    fn worded(self, argument: Word) -> Simple {
+        Simple { words: self.words.into_iter().chain([argument]).collect(), ..self }
     }
 
-    fn unprefixed(self) -> Simple {
-        let Simple { word, prefixes, redirect, moved, cd, .. } = self;
-        let kept = prefixes.len().saturating_sub(1);
-        Simple {
-            word,
-            position: Position::Argument(Head::Find),
-            prefixes: prefixes.into_iter().take(kept).collect(),
-            redirect,
-            moved,
-            cd,
-        }
+    fn scripted(self, script: Vec<Simple>) -> Simple {
+        Simple { scripts: self.scripts.into_iter().chain([script]).collect(), ..self }
+    }
+
+    fn scripted_all(self, scripts: &[Vec<Simple>]) -> Simple {
+        Simple { scripts: self.scripts.into_iter().chain(scripts.iter().cloned()).collect(), ..self }
+    }
+
+    fn head(&self) -> Option<&Word> {
+        self.words.iter().find(|word| Whole::read::<Spelling>(&word.text) != Some(Spelling::Assignment))
+    }
+
+    fn keyword(&self) -> Option<&Word> {
+        self.head().filter(|word| {
+            word.quoting == Quoting::Plain && Whole::read::<Spelling>(&word.text) == Some(Spelling::Keyword)
+        })
+    }
+
+    fn fed(&self) -> Fed {
+        let shelled = self.head().and_then(|word| Whole::read::<Spelling>(&word.text)) == Some(Spelling::Shell);
+        if shelled { Fed::Script } else { Fed::Data }
     }
 }
 
 impl Word {
-    fn extended(self, text: &str, quoting: Quoting) -> Word {
-        Word { text: [self.text.as_str(), text].concat(), quoting: self.quoting.max(quoting) }
-    }
-}
-
-impl Pending {
-    fn read(&self, body: &str) -> Vec<Occurrence> {
-        self.fed.as_ref().map_or_else(Vec::new, |fed| {
-            let outer: Vec<Construct> = fed.iter().copied().chain(iter::once(Construct::Heredoc)).collect();
-            Reading::occurrences(body).into_iter().map(|occurrence| occurrence.inside(&outer)).collect()
-        })
+    fn extended(self, text: &str, quoting: Quoting, expanding: Expanding, part: Option<Part>) -> Word {
+        Word {
+            text: [self.text.as_str(), text].concat(),
+            quoting: self.quoting.max(quoting),
+            expanding: self.expanding.max(expanding),
+            parts: self.parts.into_iter().chain(part).collect(),
+        }
     }
 }

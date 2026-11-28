@@ -8,9 +8,12 @@ use std::process::ExitCode;
 use crate::process::ignored::Ignored;
 use crate::{Answer, Complaint, Environment, Heard, Shown};
 use invariants::Ignoring;
+use port_core::Real;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Process;
+
+impl Real for Process {}
 
 impl Process {
     pub fn stream<Ended>(respond: impl FnOnce(Vec<OsString>, &mut Stdout, &mut Stderr) -> Ended) -> Ended {

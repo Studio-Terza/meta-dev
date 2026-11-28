@@ -1,10 +1,11 @@
+use std::ffi::OsStr;
 use std::fmt;
 use std::path::{Component, Path, PathBuf};
 
-use console_ports::{Heard, Shown};
+use console_ports::{Environment, Heard, Shown};
 use dispatch_ports::{Clock, Shell};
 use file_ports::{Files, Kind};
-use grammar_shell::{Construct, Directory, Edit, Edited, Editor, Flagged, Nested, Unreadable};
+use grammar_shell::{Deletion, Directory, Edit, Edited, Editor, Plain, Target, Unreadable};
 use newtype::Wrapping;
 use serde::{Deserialize, Serialize};
 use store_ports::Store;
@@ -40,17 +41,18 @@ struct Input {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Refusal {
-    Unreadable,
-    Unroll(Nested),
-    InPlace { editor: Editor, within: Option<Construct> },
-    Wrote { path: PathBuf, repository: PathBuf, within: Option<Construct> },
-    Moved { path: PathBuf, repository: PathBuf, within: Option<Construct> },
-    Unresolved { written: String, within: Option<Construct> },
+    Unreadable(Unreadable),
+    Unruled(Deletion),
+    InPlace(Editor),
+    Wrote { path: PathBuf, repository: PathBuf },
+    Moved { path: PathBuf, repository: PathBuf },
+    Unresolved { written: String },
 }
 
 #[derive(Debug)]
-struct Judging<'ground, 'run, F: Files, S: Store> {
+struct Judging<'ground, 'run, F: Files, S: Store, E: Environment> {
     ground: &'ground Ground<'run, F, S>,
+    environment: &'ground E,
     cwd: &'ground Path,
 }
 
@@ -83,38 +85,41 @@ impl Running {
 
     pub fn answered<F: Files + Clone, S: Store, C: Clock, G: Shell>(
         &self,
+        environment: &impl Environment,
         ground: &Ground<'_, F, S>,
         crew: &Crew<'_, C, G>,
     ) -> Result<Uttered, Failure> {
         match &self.tool {
-            Tool::Bash(input) => self.judged(input, ground),
+            Tool::Bash(input) => Judging { ground, environment, cwd: &self.cwd }.judged(input),
             Tool::Agent(brief) | Tool::SendMessage(brief) => brief.told(ground, crew),
         }
     }
+}
 
-    fn judged<F: Files, S: Store>(&self, input: &Input, ground: &Ground<'_, F, S>) -> Result<Uttered, Failure> {
+impl<F: Files, S: Store, E: Environment> Judging<'_, '_, F, S, E> {
+    const REPOSITORY: &'static str = ".git";
+
+    fn judged(&self, input: &Input) -> Result<Uttered, Failure> {
         let command = input.command.as_deref().unwrap_or_default();
-        let judging = Judging { ground, cwd: &self.cwd };
-        let refused = Unreadable::read(command)
-            .map(|Unreadable| Refusal::Unreadable)
-            .or_else(|| Nested::read(command).map(Refusal::Unroll))
-            .or_else(|| Edited::read(command).iter().find_map(|edited| judging.refusal(edited)));
+        let refused = match Plain::read(command) {
+            Ok(plain) => plain
+                .unruled()
+                .first()
+                .map(|deletion| Refusal::Unruled(*deletion))
+                .or_else(|| plain.edits().iter().find_map(|edited| self.refusal(edited))),
+            Err(unreadable) => Some(Refusal::Unreadable(unreadable)),
+        };
         refused
             .map_or_else(|| Ok(Uttered::silent(Ok(Outcome::Hooked(HookEvent::PreToolUse)))), |refusal| refusal.denied())
     }
-}
-
-impl<F: Files, S: Store> Judging<'_, '_, F, S> {
-    const REPOSITORY: &'static str = ".git";
 
     fn refusal(&self, edited: &Edited) -> Option<Refusal> {
-        let within = edited.construct();
         let directory = edited.directory();
-        let unresolved = |written: &str| Refusal::Unresolved { written: written.to_owned(), within };
+        let unresolved = |written: &Target| Refusal::Unresolved { written: written.to_string() };
         match edited.edit() {
-            Edit::InPlace(editor) => Some(Refusal::InPlace { editor: *editor, within }),
+            Edit::InPlace(editor) => Some(Refusal::InPlace(*editor)),
             Edit::Wrote(written) => match self.resolved(written, directory) {
-                Some(path) => self.repository(&path).map(|repository| Refusal::Wrote { path, repository, within }),
+                Some(path) => self.repository(&path).map(|repository| Refusal::Wrote { path, repository }),
                 None => Some(unresolved(written)),
             },
             Edit::Moved { sources, destination } => {
@@ -122,25 +127,35 @@ impl<F: Files, S: Store> Judging<'_, '_, F, S> {
                     .iter()
                     .chain([destination])
                     .find(|written| self.resolved(written, directory).is_none())
-                    .map(|written| unresolved(written));
+                    .map(unresolved);
                 let landing = self.resolved(destination, directory).and_then(|path| self.repository(&path));
                 blind.or_else(|| {
                     sources.iter().filter_map(|source| self.resolved(source, directory)).find_map(|path| {
                         let repository = self.repository(&path).filter(|held| landing.as_ref() != Some(held))?;
-                        Some(Refusal::Moved { path, repository, within })
+                        Some(Refusal::Moved { path, repository })
                     })
                 })
             }
         }
     }
 
-    fn resolved(&self, written: &str, directory: &Directory) -> Option<PathBuf> {
-        let base = match directory {
+    fn resolved(&self, written: &Target, directory: &Directory) -> Option<PathBuf> {
+        let path = self.expanded(written)?;
+        let absolute = Path::new(&path).is_absolute().then(PathBuf::new);
+        let base = absolute.or_else(|| match directory {
             Directory::Started => Some(self.cwd.to_path_buf()),
-            Directory::Changed(steps) => Some(steps.iter().fold(self.cwd.to_path_buf(), |base, step| base.join(step))),
-            Directory::Unknown => Path::new(written).is_absolute().then(PathBuf::new),
-        }?;
-        Some(Self::folded(&base.join(written)))
+            Directory::Changed(steps) => {
+                steps.iter().try_fold(self.cwd.to_path_buf(), |base, step| Some(base.join(self.expanded(step)?)))
+            }
+            Directory::Unknown => None,
+        })?;
+        Some(Self::folded(&base.join(path)))
+    }
+
+    fn expanded(&self, target: &Target) -> Option<String> {
+        target.resolved(|name| {
+            self.environment.variable(OsStr::new(name)).and_then(|value| value.to_str().map(str::to_owned))
+        })
     }
 
     fn folded(path: &Path) -> PathBuf {
@@ -167,11 +182,13 @@ impl Refusal {
         Ok(Uttered::new(Shown::said(format_args!("{json}\n")), Ok(Outcome::Blocked)))
     }
 
-    const fn word(flagged: Flagged) -> &'static str {
-        match flagged {
-            Flagged::Rm => "rm",
-            Flagged::Rmdir => "rmdir",
-            Flagged::Delete => "-delete",
+    const fn word(deletion: Deletion) -> &'static str {
+        match deletion {
+            Deletion::Rm => "rm",
+            Deletion::Rmdir => "rmdir",
+            Deletion::FindDelete => "find -delete",
+            Deletion::CargoClean => "cargo clean",
+            Deletion::GitClean => "git clean",
         }
     }
 
@@ -181,74 +198,53 @@ impl Refusal {
             Editor::Perl => "perl -pi",
         }
     }
-
-    const fn construct(construct: Construct) -> &'static str {
-        match construct {
-            Construct::ShellScript => "a `sh -c` script",
-            Construct::Loop => "a loop",
-            Construct::Conditional => "an `if` or `case`",
-            Construct::Function => "a function",
-            Construct::Subshell => "a subshell",
-            Construct::Group => "a `{ ...; }` group",
-            Construct::Substitution => "a command substitution",
-            Construct::Xargs => "`xargs`",
-            Construct::Find => "`find`",
-            Construct::Heredoc => "a heredoc fed to a shell",
-        }
-    }
-
-    fn within(within: Option<Construct>) -> String {
-        within.map_or_else(String::new, |construct| format!(" inside {}", Refusal::construct(construct)))
-    }
 }
 
 impl fmt::Display for Refusal {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Refusal::Unreadable => write!(
+            Refusal::Unreadable(unreadable) => write!(
                 formatter,
-                "Refused: this command holds shell the harness cannot read (an array assignment, a zsh \
-                 `${{(flags)...}}` expansion, or text no shell lexeme covers), so it would stall waiting for \
-                 permission. Run plain single commands instead: one command per call, literal arguments, no \
-                 arrays, loops or expansions over command output."
+                "Refused: this is not a plain command, so the harness cannot read it and would stall waiting for \
+                 permission (it stopped at `{}`). Run plain commands only: words, literal arguments, quotes, \
+                 $NAME, pipes and ; && ||, with `$(...)`, backticks and heredocs holding only such commands; no \
+                 loops, conditionals, subshells, functions, arrays or arithmetic. Unroll the work into separate \
+                 plain calls.",
+                unreadable.span()
             ),
-            Refusal::Unroll(nested) => {
-                let word = Refusal::word(nested.flagged());
-                let construct = Refusal::construct(nested.construct());
+            Refusal::Unruled(deletion) => {
+                let word = Refusal::word(*deletion);
                 write!(
                     formatter,
-                    "Refused: `{word}` inside {construct}. The harness flags `{word}` there and stalls the call. \
-                     Unroll it into separate plain top-level commands: list the targets first, \
-                     then run each `rm` as its own command with literal paths."
+                    "Refused: `{word}` here is run through another command or on arguments that are not literal, so \
+                     the harness cannot rule it out and stalls the call. Unroll it: list the targets first, then run \
+                     each `{word}` as its own plain top-level command with literal paths."
                 )
             }
-            Refusal::InPlace { editor, within } => write!(
+            Refusal::InPlace(editor) => write!(
                 formatter,
-                "Refused: `{}`{} edits a file in place. Edit files only with the Edit or Write tools.",
-                Refusal::editor(*editor),
-                Refusal::within(*within)
+                "Refused: `{}` edits a file in place. Edit files only with the Edit or Write tools.",
+                Refusal::editor(*editor)
             ),
-            Refusal::Wrote { path, repository, within } => write!(
+            Refusal::Wrote { path, repository } => write!(
                 formatter,
-                "Refused: a shell write{} into {}, under the repository at {}. Write files there only with the \
-                 Edit or Write tools.",
-                Refusal::within(*within),
+                "Refused: a shell write into {}, under the repository at {}. Write files there only with the Edit \
+                 or Write tools.",
                 path.display(),
                 repository.display()
             ),
-            Refusal::Moved { path, repository, within } => write!(
+            Refusal::Moved { path, repository } => write!(
                 formatter,
-                "Refused: `mv`{} takes {} out of the repository at {}, and a move out of a repository is a delete. \
+                "Refused: `mv` takes {} out of the repository at {}, and a move out of a repository is a delete. \
                  Use `git mv` to move it within the repository, or `git rm` to delete it.",
-                Refusal::within(*within),
                 path.display(),
                 repository.display()
             ),
-            Refusal::Unresolved { written, within } => write!(
+            Refusal::Unresolved { written } => write!(
                 formatter,
-                "Refused: a shell write or move{} onto {written} after a `cd` whose target cannot be worked out. \
-                 Use absolute paths, or edit files with the Edit or Write tools.",
-                Refusal::within(*within)
+                "Refused: a shell write or move onto {written}, whose path cannot be worked out (a variable that is \
+                 not set, a glob or command output, or a `cd` whose target is unknown). Use absolute paths, or edit \
+                 files with the Edit or Write tools."
             ),
         }
     }

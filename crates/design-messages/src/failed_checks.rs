@@ -1,3 +1,3 @@
 mod boundary;
 
-pub use boundary::{CheckName, FailedBefore, Failing, PullNumber};
+pub use boundary::{CheckName, CommitSha, FailedBefore, Failing, PullNumber};

@@ -1,0 +1,10 @@
+{
+  "query": "\nINSERT\n  OR IGNORE INTO failed_checks (pull, head, name)\nVALUES\n  (?1, ?2, ?3)\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  }
+}

@@ -3,7 +3,7 @@ use std::iter;
 use std::num::{NonZeroU32, NonZeroU64};
 use std::path::Path;
 
-use design_messages::{CheckName, PullNumber};
+use design_messages::{CheckName, CommitSha, PullNumber};
 use dispatch_ports::{Clock, Deadline, Due, Pause, Ran, Shell, Timeout};
 use file_ports::Files;
 use grammar_spec_line::Attachment;
@@ -14,7 +14,7 @@ use store_ports::Store;
 
 use super::super::super::Ground;
 use super::super::super::crew::Crew;
-use super::boundary::{Branch, Branched, CommitSha, Compared, FailedJob, First, JobId, Opened, Pushed};
+use super::boundary::{Branch, Branched, Compared, FailedJob, First, JobId, Opened, Pushed};
 use crate::cli::request::ignored::Ignored;
 use crate::cli::request::{Landed, Local, Repository, UnreadStep};
 

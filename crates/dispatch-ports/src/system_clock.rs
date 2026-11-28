@@ -2,12 +2,14 @@ use std::thread;
 use std::time::{Duration, SystemTime};
 
 use newtype::Wrapping;
-use port_core::Pass;
+use port_core::{Pass, Real};
 
 use crate::{ClockFiller, Pause, Wall, clock_ops};
 
 #[derive(Debug)]
 pub struct SystemClock;
+
+impl Real for SystemClock {}
 
 impl ClockFiller for SystemClock {
     fn now(&self, _pass: Pass<'_, clock_ops::Now>) -> Wall {
