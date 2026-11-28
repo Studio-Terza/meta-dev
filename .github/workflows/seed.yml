@@ -1,7 +1,8 @@
 name: seed
 
-# Builds on main exactly what ci's clippy and test jobs build, under their
-# target keys, so a pull request's first run starts from main's caches.
+# Builds on main, from a clean target/, exactly what ci's clippy and test jobs
+# build, and saves it under their keys. Pull requests only restore, so every PR
+# starts from main's lean state and stale artifacts never accumulate.
 # It times and judges nothing: a failure here is fix-forward, never a gate.
 # The env block must match ci.yml's, because the target key hashes it.
 
@@ -35,13 +36,6 @@ jobs:
           echo "prefix=clippy-${{ runner.os }}-$build-" >> "$GITHUB_OUTPUT"
           echo "near=clippy-${{ runner.os }}-$build-$registry-" >> "$GITHUB_OUTPUT"
           echo "key=clippy-${{ runner.os }}-$build-$registry-${{ github.sha }}" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache/restore@v4
-        with:
-          path: target
-          key: ${{ steps.target.outputs.key }}
-          restore-keys: |
-            ${{ steps.target.outputs.near }}
-            ${{ steps.target.outputs.prefix }}
       - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
       - uses: actions/cache/save@v4
         if: always()
@@ -63,13 +57,6 @@ jobs:
           echo "prefix=target-${{ runner.os }}-$build-" >> "$GITHUB_OUTPUT"
           echo "near=target-${{ runner.os }}-$build-$registry-" >> "$GITHUB_OUTPUT"
           echo "key=target-${{ runner.os }}-$build-$registry-${{ github.sha }}" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache/restore@v4
-        with:
-          path: target
-          key: ${{ steps.target.outputs.key }}
-          restore-keys: |
-            ${{ steps.target.outputs.near }}
-            ${{ steps.target.outputs.prefix }}
       - run: cargo test --locked --workspace --no-run
       - uses: actions/cache/save@v4
         if: always()

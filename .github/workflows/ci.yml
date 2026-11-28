@@ -45,11 +45,6 @@ jobs:
             ${{ steps.target.outputs.near }}
             ${{ steps.target.outputs.prefix }}
       - run: '"$TIMER" timed ci/limits.toml clippy --since ../clippy.start cargo clippy --locked --workspace --all-targets --all-features -- -D warnings'
-      - uses: actions/cache/save@v4
-        if: always()
-        with:
-          path: target
-          key: ${{ steps.target.outputs.key }}
 
   test:
     runs-on: ubuntu-latest
@@ -86,11 +81,6 @@ jobs:
           name: test-compile-timings
           path: target/cargo-timings/cargo-timing.html
           if-no-files-found: ignore
-      - uses: actions/cache/save@v4
-        if: always()
-        with:
-          path: target
-          key: ${{ steps.target.outputs.key }}
 
   lint:
     runs-on: ubuntu-latest

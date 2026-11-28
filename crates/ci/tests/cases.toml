@@ -156,3 +156,198 @@ mutants: 241 of 241 selected, 241 in the diff; every one tested, in 3 shards
 """
 files = { "workspace.json" = '[{"name":"m.rs:0:1: m","file":"m.rs"},{"name":"m.rs:1:1: m","file":"m.rs"},{"name":"m.rs:2:1: m","file":"m.rs"},{"name":"m.rs:3:1: m","file":"m.rs"},{"name":"m.rs:4:1: m","file":"m.rs"},{"name":"m.rs:5:1: m","file":"m.rs"},{"name":"m.rs:6:1: m","file":"m.rs"},{"name":"m.rs:7:1: m","file":"m.rs"},{"name":"m.rs:8:1: m","file":"m.rs"},{"name":"m.rs:9:1: m","file":"m.rs"},{"name":"m.rs:10:1: m","file":"m.rs"},{"name":"m.rs:11:1: m","file":"m.rs"},{"name":"m.rs:12:1: m","file":"m.rs"},{"name":"m.rs:13:1: m","file":"m.rs"},{"name":"m.rs:14:1: m","file":"m.rs"},{"name":"m.rs:15:1: m","file":"m.rs"},{"name":"m.rs:16:1: m","file":"m.rs"},{"name":"m.rs:17:1: m","file":"m.rs"},{"name":"m.rs:18:1: m","file":"m.rs"},{"name":"m.rs:19:1: m","file":"m.rs"},{"name":"m.rs:20:1: m","file":"m.rs"},{"name":"m.rs:21:1: m","file":"m.rs"},{"name":"m.rs:22:1: m","file":"m.rs"},{"name":"m.rs:23:1: m","file":"m.rs"},{"name":"m.rs:24:1: m","file":"m.rs"},{"name":"m.rs:25:1: m","file":"m.rs"},{"name":"m.rs:26:1: m","file":"m.rs"},{"name":"m.rs:27:1: m","file":"m.rs"},{"name":"m.rs:28:1: m","file":"m.rs"},{"name":"m.rs:29:1: m","file":"m.rs"},{"name":"m.rs:30:1: m","file":"m.rs"},{"name":"m.rs:31:1: m","file":"m.rs"},{"name":"m.rs:32:1: m","file":"m.rs"},{"name":"m.rs:33:1: m","file":"m.rs"},{"name":"m.rs:34:1: m","file":"m.rs"},{"name":"m.rs:35:1: m","file":"m.rs"},{"name":"m.rs:36:1: m","file":"m.rs"},{"name":"m.rs:37:1: m","file":"m.rs"},{"name":"m.rs:38:1: m","file":"m.rs"},{"name":"m.rs:39:1: m","file":"m.rs"},{"name":"m.rs:40:1: m","file":"m.rs"},{"name":"m.rs:41:1: m","file":"m.rs"},{"name":"m.rs:42:1: m","file":"m.rs"},{"name":"m.rs:43:1: m","file":"m.rs"},{"name":"m.rs:44:1: m","file":"m.rs"},{"name":"m.rs:45:1: m","file":"m.rs"},{"name":"m.rs:46:1: m","file":"m.rs"},{"name":"m.rs:47:1: m","file":"m.rs"},{"name":"m.rs:48:1: m","file":"m.rs"},{"name":"m.rs:49:1: m","file":"m.rs"},{"name":"m.rs:50:1: m","file":"m.rs"},{"name":"m.rs:51:1: m","file":"m.rs"},{"name":"m.rs:52:1: m","file":"m.rs"},{"name":"m.rs:53:1: m","file":"m.rs"},{"name":"m.rs:54:1: m","file":"m.rs"},{"name":"m.rs:55:1: m","file":"m.rs"},{"name":"m.rs:56:1: m","file":"m.rs"},{"name":"m.rs:57:1: m","file":"m.rs"},{"name":"m.rs:58:1: m","file":"m.rs"},{"name":"m.rs:59:1: m","file":"m.rs"},{"name":"m.rs:60:1: m","file":"m.rs"},{"name":"m.rs:61:1: m","file":"m.rs"},{"name":"m.rs:62:1: m","file":"m.rs"},{"name":"m.rs:63:1: m","file":"m.rs"},{"name":"m.rs:64:1: m","file":"m.rs"},{"name":"m.rs:65:1: m","file":"m.rs"},{"name":"m.rs:66:1: m","file":"m.rs"},{"name":"m.rs:67:1: m","file":"m.rs"},{"name":"m.rs:68:1: m","file":"m.rs"},{"name":"m.rs:69:1: m","file":"m.rs"},{"name":"m.rs:70:1: m","file":"m.rs"},{"name":"m.rs:71:1: m","file":"m.rs"},{"name":"m.rs:72:1: m","file":"m.rs"},{"name":"m.rs:73:1: m","file":"m.rs"},{"name":"m.rs:74:1: m","file":"m.rs"},{"name":"m.rs:75:1: m","file":"m.rs"},{"name":"m.rs:76:1: m","file":"m.rs"},{"name":"m.rs:77:1: m","file":"m.rs"},{"name":"m.rs:78:1: m","file":"m.rs"},{"name":"m.rs:79:1: m","file":"m.rs"},{"name":"m.rs:80:1: m","file":"m.rs"},{"name":"m.rs:81:1: m","file":"m.rs"},{"name":"m.rs:82:1: m","file":"m.rs"},{"name":"m.rs:83:1: m","file":"m.rs"},{"name":"m.rs:84:1: m","file":"m.rs"},{"name":"m.rs:85:1: m","file":"m.rs"},{"name":"m.rs:86:1: m","file":"m.rs"},{"name":"m.rs:87:1: m","file":"m.rs"},{"name":"m.rs:88:1: m","file":"m.rs"},{"name":"m.rs:89:1: m","file":"m.rs"},{"name":"m.rs:90:1: m","file":"m.rs"},{"name":"m.rs:91:1: m","file":"m.rs"},{"name":"m.rs:92:1: m","file":"m.rs"},{"name":"m.rs:93:1: m","file":"m.rs"},{"name":"m.rs:94:1: m","file":"m.rs"},{"name":"m.rs:95:1: m","file":"m.rs"},{"name":"m.rs:96:1: m","file":"m.rs"},{"name":"m.rs:97:1: m","file":"m.rs"},{"name":"m.rs:98:1: m","file":"m.rs"},{"name":"m.rs:99:1: m","file":"m.rs"},{"name":"m.rs:100:1: m","file":"m.rs"},{"name":"m.rs:101:1: m","file":"m.rs"},{"name":"m.rs:102:1: m","file":"m.rs"},{"name":"m.rs:103:1: m","file":"m.rs"},{"name":"m.rs:104:1: m","file":"m.rs"},{"name":"m.rs:105:1: m","file":"m.rs"},{"name":"m.rs:106:1: m","file":"m.rs"},{"name":"m.rs:107:1: m","file":"m.rs"},{"name":"m.rs:108:1: m","file":"m.rs"},{"name":"m.rs:109:1: m","file":"m.rs"},{"name":"m.rs:110:1: m","file":"m.rs"},{"name":"m.rs:111:1: m","file":"m.rs"},{"name":"m.rs:112:1: m","file":"m.rs"},{"name":"m.rs:113:1: m","file":"m.rs"},{"name":"m.rs:114:1: m","file":"m.rs"},{"name":"m.rs:115:1: m","file":"m.rs"},{"name":"m.rs:116:1: m","file":"m.rs"},{"name":"m.rs:117:1: m","file":"m.rs"},{"name":"m.rs:118:1: m","file":"m.rs"},{"name":"m.rs:119:1: m","file":"m.rs"},{"name":"m.rs:120:1: m","file":"m.rs"},{"name":"m.rs:121:1: m","file":"m.rs"},{"name":"m.rs:122:1: m","file":"m.rs"},{"name":"m.rs:123:1: m","file":"m.rs"},{"name":"m.rs:124:1: m","file":"m.rs"},{"name":"m.rs:125:1: m","file":"m.rs"},{"name":"m.rs:126:1: m","file":"m.rs"},{"name":"m.rs:127:1: m","file":"m.rs"},{"name":"m.rs:128:1: m","file":"m.rs"},{"name":"m.rs:129:1: m","file":"m.rs"},{"name":"m.rs:130:1: m","file":"m.rs"},{"name":"m.rs:131:1: m","file":"m.rs"},{"name":"m.rs:132:1: m","file":"m.rs"},{"name":"m.rs:133:1: m","file":"m.rs"},{"name":"m.rs:134:1: m","file":"m.rs"},{"name":"m.rs:135:1: m","file":"m.rs"},{"name":"m.rs:136:1: m","file":"m.rs"},{"name":"m.rs:137:1: m","file":"m.rs"},{"name":"m.rs:138:1: m","file":"m.rs"},{"name":"m.rs:139:1: m","file":"m.rs"},{"name":"m.rs:140:1: m","file":"m.rs"},{"name":"m.rs:141:1: m","file":"m.rs"},{"name":"m.rs:142:1: m","file":"m.rs"},{"name":"m.rs:143:1: m","file":"m.rs"},{"name":"m.rs:144:1: m","file":"m.rs"},{"name":"m.rs:145:1: m","file":"m.rs"},{"name":"m.rs:146:1: m","file":"m.rs"},{"name":"m.rs:147:1: m","file":"m.rs"},{"name":"m.rs:148:1: m","file":"m.rs"},{"name":"m.rs:149:1: m","file":"m.rs"},{"name":"m.rs:150:1: m","file":"m.rs"},{"name":"m.rs:151:1: m","file":"m.rs"},{"name":"m.rs:152:1: m","file":"m.rs"},{"name":"m.rs:153:1: m","file":"m.rs"},{"name":"m.rs:154:1: m","file":"m.rs"},{"name":"m.rs:155:1: m","file":"m.rs"},{"name":"m.rs:156:1: m","file":"m.rs"},{"name":"m.rs:157:1: m","file":"m.rs"},{"name":"m.rs:158:1: m","file":"m.rs"},{"name":"m.rs:159:1: m","file":"m.rs"},{"name":"m.rs:160:1: m","file":"m.rs"},{"name":"m.rs:161:1: m","file":"m.rs"},{"name":"m.rs:162:1: m","file":"m.rs"},{"name":"m.rs:163:1: m","file":"m.rs"},{"name":"m.rs:164:1: m","file":"m.rs"},{"name":"m.rs:165:1: m","file":"m.rs"},{"name":"m.rs:166:1: m","file":"m.rs"},{"name":"m.rs:167:1: m","file":"m.rs"},{"name":"m.rs:168:1: m","file":"m.rs"},{"name":"m.rs:169:1: m","file":"m.rs"},{"name":"m.rs:170:1: m","file":"m.rs"},{"name":"m.rs:171:1: m","file":"m.rs"},{"name":"m.rs:172:1: m","file":"m.rs"},{"name":"m.rs:173:1: m","file":"m.rs"},{"name":"m.rs:174:1: m","file":"m.rs"},{"name":"m.rs:175:1: m","file":"m.rs"},{"name":"m.rs:176:1: m","file":"m.rs"},{"name":"m.rs:177:1: m","file":"m.rs"},{"name":"m.rs:178:1: m","file":"m.rs"},{"name":"m.rs:179:1: m","file":"m.rs"},{"name":"m.rs:180:1: m","file":"m.rs"},{"name":"m.rs:181:1: m","file":"m.rs"},{"name":"m.rs:182:1: m","file":"m.rs"},{"name":"m.rs:183:1: m","file":"m.rs"},{"name":"m.rs:184:1: m","file":"m.rs"},{"name":"m.rs:185:1: m","file":"m.rs"},{"name":"m.rs:186:1: m","file":"m.rs"},{"name":"m.rs:187:1: m","file":"m.rs"},{"name":"m.rs:188:1: m","file":"m.rs"},{"name":"m.rs:189:1: m","file":"m.rs"},{"name":"m.rs:190:1: m","file":"m.rs"},{"name":"m.rs:191:1: m","file":"m.rs"},{"name":"m.rs:192:1: m","file":"m.rs"},{"name":"m.rs:193:1: m","file":"m.rs"},{"name":"m.rs:194:1: m","file":"m.rs"},{"name":"m.rs:195:1: m","file":"m.rs"},{"name":"m.rs:196:1: m","file":"m.rs"},{"name":"m.rs:197:1: m","file":"m.rs"},{"name":"m.rs:198:1: m","file":"m.rs"},{"name":"m.rs:199:1: m","file":"m.rs"},{"name":"m.rs:200:1: m","file":"m.rs"},{"name":"m.rs:201:1: m","file":"m.rs"},{"name":"m.rs:202:1: m","file":"m.rs"},{"name":"m.rs:203:1: m","file":"m.rs"},{"name":"m.rs:204:1: m","file":"m.rs"},{"name":"m.rs:205:1: m","file":"m.rs"},{"name":"m.rs:206:1: m","file":"m.rs"},{"name":"m.rs:207:1: m","file":"m.rs"},{"name":"m.rs:208:1: m","file":"m.rs"},{"name":"m.rs:209:1: m","file":"m.rs"},{"name":"m.rs:210:1: m","file":"m.rs"},{"name":"m.rs:211:1: m","file":"m.rs"},{"name":"m.rs:212:1: m","file":"m.rs"},{"name":"m.rs:213:1: m","file":"m.rs"},{"name":"m.rs:214:1: m","file":"m.rs"},{"name":"m.rs:215:1: m","file":"m.rs"},{"name":"m.rs:216:1: m","file":"m.rs"},{"name":"m.rs:217:1: m","file":"m.rs"},{"name":"m.rs:218:1: m","file":"m.rs"},{"name":"m.rs:219:1: m","file":"m.rs"},{"name":"m.rs:220:1: m","file":"m.rs"},{"name":"m.rs:221:1: m","file":"m.rs"},{"name":"m.rs:222:1: m","file":"m.rs"},{"name":"m.rs:223:1: m","file":"m.rs"},{"name":"m.rs:224:1: m","file":"m.rs"},{"name":"m.rs:225:1: m","file":"m.rs"},{"name":"m.rs:226:1: m","file":"m.rs"},{"name":"m.rs:227:1: m","file":"m.rs"},{"name":"m.rs:228:1: m","file":"m.rs"},{"name":"m.rs:229:1: m","file":"m.rs"},{"name":"m.rs:230:1: m","file":"m.rs"},{"name":"m.rs:231:1: m","file":"m.rs"},{"name":"m.rs:232:1: m","file":"m.rs"},{"name":"m.rs:233:1: m","file":"m.rs"},{"name":"m.rs:234:1: m","file":"m.rs"},{"name":"m.rs:235:1: m","file":"m.rs"},{"name":"m.rs:236:1: m","file":"m.rs"},{"name":"m.rs:237:1: m","file":"m.rs"},{"name":"m.rs:238:1: m","file":"m.rs"},{"name":"m.rs:239:1: m","file":"m.rs"},{"name":"m.rs:240:1: m","file":"m.rs"}]', "diff.json" = '[{"name":"m.rs:0:1: m","file":"m.rs"},{"name":"m.rs:1:1: m","file":"m.rs"},{"name":"m.rs:2:1: m","file":"m.rs"},{"name":"m.rs:3:1: m","file":"m.rs"},{"name":"m.rs:4:1: m","file":"m.rs"},{"name":"m.rs:5:1: m","file":"m.rs"},{"name":"m.rs:6:1: m","file":"m.rs"},{"name":"m.rs:7:1: m","file":"m.rs"},{"name":"m.rs:8:1: m","file":"m.rs"},{"name":"m.rs:9:1: m","file":"m.rs"},{"name":"m.rs:10:1: m","file":"m.rs"},{"name":"m.rs:11:1: m","file":"m.rs"},{"name":"m.rs:12:1: m","file":"m.rs"},{"name":"m.rs:13:1: m","file":"m.rs"},{"name":"m.rs:14:1: m","file":"m.rs"},{"name":"m.rs:15:1: m","file":"m.rs"},{"name":"m.rs:16:1: m","file":"m.rs"},{"name":"m.rs:17:1: m","file":"m.rs"},{"name":"m.rs:18:1: m","file":"m.rs"},{"name":"m.rs:19:1: m","file":"m.rs"},{"name":"m.rs:20:1: m","file":"m.rs"},{"name":"m.rs:21:1: m","file":"m.rs"},{"name":"m.rs:22:1: m","file":"m.rs"},{"name":"m.rs:23:1: m","file":"m.rs"},{"name":"m.rs:24:1: m","file":"m.rs"},{"name":"m.rs:25:1: m","file":"m.rs"},{"name":"m.rs:26:1: m","file":"m.rs"},{"name":"m.rs:27:1: m","file":"m.rs"},{"name":"m.rs:28:1: m","file":"m.rs"},{"name":"m.rs:29:1: m","file":"m.rs"},{"name":"m.rs:30:1: m","file":"m.rs"},{"name":"m.rs:31:1: m","file":"m.rs"},{"name":"m.rs:32:1: m","file":"m.rs"},{"name":"m.rs:33:1: m","file":"m.rs"},{"name":"m.rs:34:1: m","file":"m.rs"},{"name":"m.rs:35:1: m","file":"m.rs"},{"name":"m.rs:36:1: m","file":"m.rs"},{"name":"m.rs:37:1: m","file":"m.rs"},{"name":"m.rs:38:1: m","file":"m.rs"},{"name":"m.rs:39:1: m","file":"m.rs"},{"name":"m.rs:40:1: m","file":"m.rs"},{"name":"m.rs:41:1: m","file":"m.rs"},{"name":"m.rs:42:1: m","file":"m.rs"},{"name":"m.rs:43:1: m","file":"m.rs"},{"name":"m.rs:44:1: m","file":"m.rs"},{"name":"m.rs:45:1: m","file":"m.rs"},{"name":"m.rs:46:1: m","file":"m.rs"},{"name":"m.rs:47:1: m","file":"m.rs"},{"name":"m.rs:48:1: m","file":"m.rs"},{"name":"m.rs:49:1: m","file":"m.rs"},{"name":"m.rs:50:1: m","file":"m.rs"},{"name":"m.rs:51:1: m","file":"m.rs"},{"name":"m.rs:52:1: m","file":"m.rs"},{"name":"m.rs:53:1: m","file":"m.rs"},{"name":"m.rs:54:1: m","file":"m.rs"},{"name":"m.rs:55:1: m","file":"m.rs"},{"name":"m.rs:56:1: m","file":"m.rs"},{"name":"m.rs:57:1: m","file":"m.rs"},{"name":"m.rs:58:1: m","file":"m.rs"},{"name":"m.rs:59:1: m","file":"m.rs"},{"name":"m.rs:60:1: m","file":"m.rs"},{"name":"m.rs:61:1: m","file":"m.rs"},{"name":"m.rs:62:1: m","file":"m.rs"},{"name":"m.rs:63:1: m","file":"m.rs"},{"name":"m.rs:64:1: m","file":"m.rs"},{"name":"m.rs:65:1: m","file":"m.rs"},{"name":"m.rs:66:1: m","file":"m.rs"},{"name":"m.rs:67:1: m","file":"m.rs"},{"name":"m.rs:68:1: m","file":"m.rs"},{"name":"m.rs:69:1: m","file":"m.rs"},{"name":"m.rs:70:1: m","file":"m.rs"},{"name":"m.rs:71:1: m","file":"m.rs"},{"name":"m.rs:72:1: m","file":"m.rs"},{"name":"m.rs:73:1: m","file":"m.rs"},{"name":"m.rs:74:1: m","file":"m.rs"},{"name":"m.rs:75:1: m","file":"m.rs"},{"name":"m.rs:76:1: m","file":"m.rs"},{"name":"m.rs:77:1: m","file":"m.rs"},{"name":"m.rs:78:1: m","file":"m.rs"},{"name":"m.rs:79:1: m","file":"m.rs"},{"name":"m.rs:80:1: m","file":"m.rs"},{"name":"m.rs:81:1: m","file":"m.rs"},{"name":"m.rs:82:1: m","file":"m.rs"},{"name":"m.rs:83:1: m","file":"m.rs"},{"name":"m.rs:84:1: m","file":"m.rs"},{"name":"m.rs:85:1: m","file":"m.rs"},{"name":"m.rs:86:1: m","file":"m.rs"},{"name":"m.rs:87:1: m","file":"m.rs"},{"name":"m.rs:88:1: m","file":"m.rs"},{"name":"m.rs:89:1: m","file":"m.rs"},{"name":"m.rs:90:1: m","file":"m.rs"},{"name":"m.rs:91:1: m","file":"m.rs"},{"name":"m.rs:92:1: m","file":"m.rs"},{"name":"m.rs:93:1: m","file":"m.rs"},{"name":"m.rs:94:1: m","file":"m.rs"},{"name":"m.rs:95:1: m","file":"m.rs"},{"name":"m.rs:96:1: m","file":"m.rs"},{"name":"m.rs:97:1: m","file":"m.rs"},{"name":"m.rs:98:1: m","file":"m.rs"},{"name":"m.rs:99:1: m","file":"m.rs"},{"name":"m.rs:100:1: m","file":"m.rs"},{"name":"m.rs:101:1: m","file":"m.rs"},{"name":"m.rs:102:1: m","file":"m.rs"},{"name":"m.rs:103:1: m","file":"m.rs"},{"name":"m.rs:104:1: m","file":"m.rs"},{"name":"m.rs:105:1: m","file":"m.rs"},{"name":"m.rs:106:1: m","file":"m.rs"},{"name":"m.rs:107:1: m","file":"m.rs"},{"name":"m.rs:108:1: m","file":"m.rs"},{"name":"m.rs:109:1: m","file":"m.rs"},{"name":"m.rs:110:1: m","file":"m.rs"},{"name":"m.rs:111:1: m","file":"m.rs"},{"name":"m.rs:112:1: m","file":"m.rs"},{"name":"m.rs:113:1: m","file":"m.rs"},{"name":"m.rs:114:1: m","file":"m.rs"},{"name":"m.rs:115:1: m","file":"m.rs"},{"name":"m.rs:116:1: m","file":"m.rs"},{"name":"m.rs:117:1: m","file":"m.rs"},{"name":"m.rs:118:1: m","file":"m.rs"},{"name":"m.rs:119:1: m","file":"m.rs"},{"name":"m.rs:120:1: m","file":"m.rs"},{"name":"m.rs:121:1: m","file":"m.rs"},{"name":"m.rs:122:1: m","file":"m.rs"},{"name":"m.rs:123:1: m","file":"m.rs"},{"name":"m.rs:124:1: m","file":"m.rs"},{"name":"m.rs:125:1: m","file":"m.rs"},{"name":"m.rs:126:1: m","file":"m.rs"},{"name":"m.rs:127:1: m","file":"m.rs"},{"name":"m.rs:128:1: m","file":"m.rs"},{"name":"m.rs:129:1: m","file":"m.rs"},{"name":"m.rs:130:1: m","file":"m.rs"},{"name":"m.rs:131:1: m","file":"m.rs"},{"name":"m.rs:132:1: m","file":"m.rs"},{"name":"m.rs:133:1: m","file":"m.rs"},{"name":"m.rs:134:1: m","file":"m.rs"},{"name":"m.rs:135:1: m","file":"m.rs"},{"name":"m.rs:136:1: m","file":"m.rs"},{"name":"m.rs:137:1: m","file":"m.rs"},{"name":"m.rs:138:1: m","file":"m.rs"},{"name":"m.rs:139:1: m","file":"m.rs"},{"name":"m.rs:140:1: m","file":"m.rs"},{"name":"m.rs:141:1: m","file":"m.rs"},{"name":"m.rs:142:1: m","file":"m.rs"},{"name":"m.rs:143:1: m","file":"m.rs"},{"name":"m.rs:144:1: m","file":"m.rs"},{"name":"m.rs:145:1: m","file":"m.rs"},{"name":"m.rs:146:1: m","file":"m.rs"},{"name":"m.rs:147:1: m","file":"m.rs"},{"name":"m.rs:148:1: m","file":"m.rs"},{"name":"m.rs:149:1: m","file":"m.rs"},{"name":"m.rs:150:1: m","file":"m.rs"},{"name":"m.rs:151:1: m","file":"m.rs"},{"name":"m.rs:152:1: m","file":"m.rs"},{"name":"m.rs:153:1: m","file":"m.rs"},{"name":"m.rs:154:1: m","file":"m.rs"},{"name":"m.rs:155:1: m","file":"m.rs"},{"name":"m.rs:156:1: m","file":"m.rs"},{"name":"m.rs:157:1: m","file":"m.rs"},{"name":"m.rs:158:1: m","file":"m.rs"},{"name":"m.rs:159:1: m","file":"m.rs"},{"name":"m.rs:160:1: m","file":"m.rs"},{"name":"m.rs:161:1: m","file":"m.rs"},{"name":"m.rs:162:1: m","file":"m.rs"},{"name":"m.rs:163:1: m","file":"m.rs"},{"name":"m.rs:164:1: m","file":"m.rs"},{"name":"m.rs:165:1: m","file":"m.rs"},{"name":"m.rs:166:1: m","file":"m.rs"},{"name":"m.rs:167:1: m","file":"m.rs"},{"name":"m.rs:168:1: m","file":"m.rs"},{"name":"m.rs:169:1: m","file":"m.rs"},{"name":"m.rs:170:1: m","file":"m.rs"},{"name":"m.rs:171:1: m","file":"m.rs"},{"name":"m.rs:172:1: m","file":"m.rs"},{"name":"m.rs:173:1: m","file":"m.rs"},{"name":"m.rs:174:1: m","file":"m.rs"},{"name":"m.rs:175:1: m","file":"m.rs"},{"name":"m.rs:176:1: m","file":"m.rs"},{"name":"m.rs:177:1: m","file":"m.rs"},{"name":"m.rs:178:1: m","file":"m.rs"},{"name":"m.rs:179:1: m","file":"m.rs"},{"name":"m.rs:180:1: m","file":"m.rs"},{"name":"m.rs:181:1: m","file":"m.rs"},{"name":"m.rs:182:1: m","file":"m.rs"},{"name":"m.rs:183:1: m","file":"m.rs"},{"name":"m.rs:184:1: m","file":"m.rs"},{"name":"m.rs:185:1: m","file":"m.rs"},{"name":"m.rs:186:1: m","file":"m.rs"},{"name":"m.rs:187:1: m","file":"m.rs"},{"name":"m.rs:188:1: m","file":"m.rs"},{"name":"m.rs:189:1: m","file":"m.rs"},{"name":"m.rs:190:1: m","file":"m.rs"},{"name":"m.rs:191:1: m","file":"m.rs"},{"name":"m.rs:192:1: m","file":"m.rs"},{"name":"m.rs:193:1: m","file":"m.rs"},{"name":"m.rs:194:1: m","file":"m.rs"},{"name":"m.rs:195:1: m","file":"m.rs"},{"name":"m.rs:196:1: m","file":"m.rs"},{"name":"m.rs:197:1: m","file":"m.rs"},{"name":"m.rs:198:1: m","file":"m.rs"},{"name":"m.rs:199:1: m","file":"m.rs"},{"name":"m.rs:200:1: m","file":"m.rs"},{"name":"m.rs:201:1: m","file":"m.rs"},{"name":"m.rs:202:1: m","file":"m.rs"},{"name":"m.rs:203:1: m","file":"m.rs"},{"name":"m.rs:204:1: m","file":"m.rs"},{"name":"m.rs:205:1: m","file":"m.rs"},{"name":"m.rs:206:1: m","file":"m.rs"},{"name":"m.rs:207:1: m","file":"m.rs"},{"name":"m.rs:208:1: m","file":"m.rs"},{"name":"m.rs:209:1: m","file":"m.rs"},{"name":"m.rs:210:1: m","file":"m.rs"},{"name":"m.rs:211:1: m","file":"m.rs"},{"name":"m.rs:212:1: m","file":"m.rs"},{"name":"m.rs:213:1: m","file":"m.rs"},{"name":"m.rs:214:1: m","file":"m.rs"},{"name":"m.rs:215:1: m","file":"m.rs"},{"name":"m.rs:216:1: m","file":"m.rs"},{"name":"m.rs:217:1: m","file":"m.rs"},{"name":"m.rs:218:1: m","file":"m.rs"},{"name":"m.rs:219:1: m","file":"m.rs"},{"name":"m.rs:220:1: m","file":"m.rs"},{"name":"m.rs:221:1: m","file":"m.rs"},{"name":"m.rs:222:1: m","file":"m.rs"},{"name":"m.rs:223:1: m","file":"m.rs"},{"name":"m.rs:224:1: m","file":"m.rs"},{"name":"m.rs:225:1: m","file":"m.rs"},{"name":"m.rs:226:1: m","file":"m.rs"},{"name":"m.rs:227:1: m","file":"m.rs"},{"name":"m.rs:228:1: m","file":"m.rs"},{"name":"m.rs:229:1: m","file":"m.rs"},{"name":"m.rs:230:1: m","file":"m.rs"},{"name":"m.rs:231:1: m","file":"m.rs"},{"name":"m.rs:232:1: m","file":"m.rs"},{"name":"m.rs:233:1: m","file":"m.rs"},{"name":"m.rs:234:1: m","file":"m.rs"},{"name":"m.rs:235:1: m","file":"m.rs"},{"name":"m.rs:236:1: m","file":"m.rs"},{"name":"m.rs:237:1: m","file":"m.rs"},{"name":"m.rs:238:1: m","file":"m.rs"},{"name":"m.rs:239:1: m","file":"m.rs"},{"name":"m.rs:240:1: m","file":"m.rs"}]', "changed" = "" }
 written = { "output" = "shards=[0,1,2]\n" }
+
+# The kill matrix: m1 is caught by the golden test and two twins, so all three are redundant; m2 by
+# a test no golden test notices; m3 times out with no named test failing, m4 is missed and m5 is
+# unviable. A test that fails before any binary is named is nobody's kill. The shard is read twice,
+# as one mutant in two shards' logs would be.
+[[case]]
+arguments = ["kill-matrix", "report.json", ".", "."]
+code = 0
+out = "kill matrix: 3 mutants caught, 1 by no named test, 1 missed, 1 unviable; 5 tests, 1 golden: 1 tautological, 3 in 1 redundant groups, 1 pinning\n"
+[case.files]
+"outcomes.json" = '''
+{
+  "outcomes": [
+    { "scenario": "Baseline", "summary": "Success", "log_path": "baseline.log", "diff_path": null },
+    { "scenario": { "Mutant": { "name": "a.rs:1:1: m1", "package": "ci" } }, "summary": "CaughtMutant", "log_path": "m1.log" },
+    { "scenario": { "Mutant": { "name": "a.rs:2:1: m2", "package": "ci" } }, "summary": "CaughtMutant", "log_path": "m2.log" },
+    { "scenario": { "Mutant": { "name": "a.rs:3:1: m3", "package": "ci" } }, "summary": "Timeout", "log_path": "m3.log" },
+    { "scenario": { "Mutant": { "name": "a.rs:4:1: m4", "package": "ci" } }, "summary": "MissedMutant", "log_path": "m4.log" },
+    { "scenario": { "Mutant": { "name": "a.rs:5:1: m5", "package": "ci" } }, "summary": "Unviable", "log_path": "m5.log" }
+  ],
+  "total_mutants": 5
+}
+'''
+"baseline.log" = '''
+test orphan ... ok
+     Running `/t/target/debug/build/ci/0123456789abcdef/out/behaviour-0123456789abcdef`
+
+running 1 test
+test every_case_as_its_golden_says ... ok
+
+     Running `/t/target/debug/build/lint/fedcba9876543210/out/behaviour-fedcba9876543210`
+
+running 4 tests
+test a_lint_pins ... ok
+test twin_one ... ok
+test twin_two ... ok
+test never_kills ... ignored
+'''
+"m1.log" = '''
+     Running `/t/target/debug/build/ci/0123456789abcdef/out/behaviour-0123456789abcdef`
+test every_case_as_its_golden_says ... FAILED
+error: test failed, to rerun pass `-p ci --test behaviour`
+     Running `/t/target/debug/build/lint/fedcba9876543210/out/behaviour-fedcba9876543210`
+test a_lint_pins ... ok
+test twin_one ... FAILED
+test twin_two ... FAILED
+test never_kills ... ok
+'''
+"m2.log" = '''
+test orphan ... FAILED
+     Running `/t/target/debug/build/lint/fedcba9876543210/out/behaviour-fedcba9876543210`
+test a_lint_pins ... FAILED
+test twin_one ... ok
+'''
+"m3.log" = '''
+     Running `/t/target/debug/build/lint/fedcba9876543210/out/behaviour-fedcba9876543210`
+test twin_one ... ok
+'''
+"m4.log" = '''
+     Running `/t/target/debug/build/lint/fedcba9876543210/out/behaviour-fedcba9876543210`
+test twin_one ... ok
+test never_kills ... ok
+'''
+"m5.log" = "error[E0308]: mismatched types\n"
+[case.written]
+"report.json" = '''
+{
+  "caught": 3,
+  "unviable": 1,
+  "missed": [
+    "a.rs:4:1: m4"
+  ],
+  "unattributed": [
+    "a.rs:3:1: m3"
+  ],
+  "golden": [
+    {
+      "package": "ci",
+      "binary": "behaviour",
+      "name": "every_case_as_its_golden_says"
+    }
+  ],
+  "tautological": [
+    {
+      "package": "lint",
+      "binary": "behaviour",
+      "name": "never_kills"
+    }
+  ],
+  "redundant": [
+    [
+      {
+        "package": "ci",
+        "binary": "behaviour",
+        "name": "every_case_as_its_golden_says"
+      },
+      {
+        "package": "lint",
+        "binary": "behaviour",
+        "name": "twin_one"
+      },
+      {
+        "package": "lint",
+        "binary": "behaviour",
+        "name": "twin_two"
+      }
+    ]
+  ],
+  "pinning": [
+    {
+      "package": "lint",
+      "binary": "behaviour",
+      "name": "a_lint_pins"
+    }
+  ],
+  "kills": [
+    {
+      "test": {
+        "package": "ci",
+        "binary": "behaviour",
+        "name": "every_case_as_its_golden_says"
+      },
+      "killed": [
+        "a.rs:1:1: m1"
+      ]
+    },
+    {
+      "test": {
+        "package": "lint",
+        "binary": "behaviour",
+        "name": "a_lint_pins"
+      },
+      "killed": [
+        "a.rs:2:1: m2"
+      ]
+    },
+    {
+      "test": {
+        "package": "lint",
+        "binary": "behaviour",
+        "name": "never_kills"
+      },
+      "killed": []
+    },
+    {
+      "test": {
+        "package": "lint",
+        "binary": "behaviour",
+        "name": "twin_one"
+      },
+      "killed": [
+        "a.rs:1:1: m1"
+      ]
+    },
+    {
+      "test": {
+        "package": "lint",
+        "binary": "behaviour",
+        "name": "twin_two"
+      },
+      "killed": [
+        "a.rs:1:1: m1"
+      ]
+    }
+  ]
+}
+'''
+
+[[case]]
+arguments = ["kill-matrix", "report.json"]
+code = 1
+err = "usage: ci timed "
+
+[[case]]
+arguments = ["kill-matrix", "report.json", "."]
+code = 1
+err = "cannot read ./outcomes.json: "
+
+[[case]]
+arguments = ["kill-matrix", "report.json", "."]
+code = 1
+err = "cannot read the outcomes in ./outcomes.json: "
+files = { "outcomes.json" = '{ "outcomes": [{ "scenario": "Baseline", "summary": "Shrugged", "log_path": "baseline.log" }] }' }
+
+[[case]]
+arguments = ["kill-matrix", "report.json", "."]
+code = 1
+err = "cannot read ./baseline.log: "
+files = { "outcomes.json" = '{ "outcomes": [{ "scenario": "Baseline", "summary": "Success", "log_path": "baseline.log" }] }' }
+
+[[case]]
+arguments = ["kill-matrix", "absent/report.json", "."]
+code = 1
+err = "cannot write absent/report.json: "
+files = { "outcomes.json" = '{ "outcomes": [] }' }

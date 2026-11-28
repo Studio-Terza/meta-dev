@@ -7,6 +7,7 @@ use invariants::Ignoring;
 
 use crate::failure::Failure;
 use crate::ignored::Ignored;
+use crate::kills::Kills;
 use crate::mutants::Plan;
 use crate::timed::Timed;
 
@@ -14,6 +15,7 @@ use crate::timed::Timed;
 pub enum Cli {
     Timed(Timed),
     Plan(Plan),
+    Kills(Kills),
     Usage,
 }
 
@@ -26,6 +28,7 @@ pub(crate) enum Exit {
 impl Cli {
     const TIMED: &'static str = "timed";
     const PLAN: &'static str = "mutants-plan";
+    const KILLS: &'static str = "kill-matrix";
     const SINCE: &'static str = "--since";
 
     #[must_use]
@@ -40,6 +43,9 @@ impl Cli {
             [name, workspace, diff, changed, unselected, output] if name == Cli::PLAN => {
                 Cli::Plan(Plan::new([workspace, diff, changed, unselected, output].map(PathBuf::from)))
             }
+            [name, report, shards @ ..] if name == Cli::KILLS && !shards.is_empty() => {
+                Cli::Kills(Kills::new(report, shards))
+            }
             _ => Cli::Usage,
         }
     }
@@ -48,6 +54,7 @@ impl Cli {
         let ran = match self {
             Cli::Timed(timed) => timed.run(out),
             Cli::Plan(plan) => plan.run(out),
+            Cli::Kills(kills) => kills.run(out),
             Cli::Usage => Err(Failure::Usage),
         };
         let exit = ran.or_else(|failure| writeln!(err, "{failure}").map(|()| Exit::Failed));
