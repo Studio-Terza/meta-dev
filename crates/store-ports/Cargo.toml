@@ -11,11 +11,11 @@ doctest = false
 bench = false
 
 [dependencies]
+derive = { path = "../derive" }
 invariants = { path = "../invariants" }
 newtype = { path = "../newtype" }
 pipeline = { path = "../pipeline" }
 port-core = { path = "../port-core" }
-store-ports-macros = { path = "../store-ports-macros" }
 thiserror.workspace = true
 
 [dev-dependencies]

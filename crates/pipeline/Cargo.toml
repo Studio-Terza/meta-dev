@@ -11,7 +11,7 @@ doctest = false
 bench = false
 
 [dependencies]
-newtype-derive = { path = "../newtype-derive" }
+derive = { path = "../derive" }
 
 [dev-dependencies]
 proptest.workspace = true
