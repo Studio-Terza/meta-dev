@@ -1,5 +1,6 @@
 use std::fmt;
 use std::iter;
+use std::num::{NonZeroU32, NonZeroU64};
 use std::ops::Not;
 use std::path::Path;
 
@@ -80,6 +81,44 @@ enum State {
 #[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(from = "String")]
 struct Link(Option<JobId>);
+
+#[derive(Debug, Deserialize)]
+struct Run {
+    #[serde(rename = "databaseId")]
+    id: NonZeroU64,
+    attempt: NonZeroU32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Attempt {
+    run: NonZeroU64,
+    number: u32,
+}
+
+#[derive(Debug, Deserialize)]
+struct Attempted {
+    jobs: Vec<Job>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Job {
+    name: CheckName,
+    conclusion: Conclusion,
+}
+
+#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum Conclusion {
+    Success,
+    Failure,
+    TimedOut,
+    Cancelled,
+    Skipped,
+    Neutral,
+    StartupFailure,
+    #[serde(other)]
+    Unfinished,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Unopened {
@@ -231,6 +270,30 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
         listed.map_or(Ok(None), |checks| Verdict::read(&checks))
     }
 
+    pub fn gated(&self, head: CommitSha) -> Result<Option<CheckName>, UnreadStep> {
+        let sha = head.to_string();
+        let runs: Vec<Run> =
+            self.read(&["run", "list", "--commit", &sha, "--json", "databaseId,attempt"]).ok_or(UnreadStep::Runs)?;
+        runs.iter()
+            .flat_map(Run::earlier)
+            .map(|attempt| self.attempted(attempt))
+            .find_map(Result::transpose)
+            .transpose()
+    }
+
+    fn attempted(&self, attempt: Attempt) -> Result<Option<CheckName>, UnreadStep> {
+        let asked =
+            ["run", "view", &attempt.run.to_string(), "--attempt", &attempt.number.to_string(), "--json", "jobs"];
+        let attempted: Attempted = self.read(&asked).ok_or(UnreadStep::Attempt)?;
+        Ok(attempted.jobs.into_iter().find_map(Job::gated))
+    }
+
+    fn read<T: DeserializeOwned>(&self, arguments: &[&str]) -> Option<T> {
+        let ran = self.ran(arguments, Self::QUICK);
+        let printed = ran.as_ref().and_then(Ran::succeeded)?;
+        serde_json::from_str(printed.as_ref()).ignoring(Ignored::Unattempted)
+    }
+
     pub fn log(&self, job: JobId) -> String {
         let ran = self.ran(&["run", "view", "--job", &job.to_string(), "--log-failed"], Self::QUICK);
         ran.as_ref().and_then(Ran::succeeded).map_or_else(|| Hub::<C, G>::UNLOGGED.to_owned(), ToString::to_string)
@@ -256,6 +319,26 @@ impl Verdict {
         match self {
             Verdict::Green => Vec::new(),
             Verdict::Red(jobs) => jobs,
+        }
+    }
+}
+
+impl Run {
+    fn earlier(&self) -> impl Iterator<Item = Attempt> + use<'_> {
+        (1..self.attempt.get()).map(|number| Attempt { run: self.id, number })
+    }
+}
+
+impl Job {
+    fn gated(self) -> Option<CheckName> {
+        match self.conclusion {
+            Conclusion::Failure | Conclusion::TimedOut => Some(self.name),
+            Conclusion::Success
+            | Conclusion::Cancelled
+            | Conclusion::Skipped
+            | Conclusion::Neutral
+            | Conclusion::StartupFailure
+            | Conclusion::Unfinished => None,
         }
     }
 }

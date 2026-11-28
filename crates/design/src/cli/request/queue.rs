@@ -68,6 +68,7 @@ pub enum Target {
 pub enum Cause {
     Blocked,
     RepeatFailure(CheckName),
+    GatedRerun(CheckName),
     Unread(UnreadStep),
 }
 
@@ -87,6 +88,8 @@ pub enum UnreadStep {
     Spec,
     Detail,
     Open,
+    Runs,
+    Attempt,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -300,6 +303,7 @@ impl fmt::Display for Cause {
         match self {
             Cause::Blocked => formatter.write_str("blocked"),
             Cause::RepeatFailure(check) => write!(formatter, "repeat failure of {check}"),
+            Cause::GatedRerun(check) => write!(formatter, "green only on a rerun after {check} failed a gate"),
             Cause::Unread(step) => write!(formatter, "unread {step}"),
         }
     }
