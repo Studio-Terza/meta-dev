@@ -20,7 +20,7 @@ seconds = 3
 [[call]]
 program = "sleep"
 arguments = ["30"]
-seconds = 1
+seconds = 0
 
 [[call]]
 program = "a-program-that-is-not-installed"
