@@ -565,12 +565,10 @@ dependencies = [
  "invariants",
  "port-core",
  "proc-macro2",
- "proptest",
  "quote",
  "ra-ap-rustc_lexer",
  "rayon",
  "serde",
- "shapes",
  "syn",
  "tempfile",
  "thiserror",
@@ -912,8 +910,11 @@ version = "0.1.0"
 dependencies = [
  "file-doubles",
  "file-ports",
+ "fixture",
  "newtype",
+ "port-core",
  "proptest",
+ "serde",
 ]
 
 [[package]]

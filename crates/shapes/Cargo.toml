@@ -8,12 +8,18 @@ publish.workspace = true
 [lib]
 test = false
 doctest = false
+bench = false
 
 [dependencies]
 file-doubles = { path = "../file-doubles" }
 file-ports = { path = "../file-ports" }
 newtype = { path = "../newtype" }
 proptest.workspace = true
+
+[dev-dependencies]
+fixture = { path = "../fixture" }
+port-core = { path = "../port-core" }
+serde.workspace = true
 
 [lints]
 workspace = true
