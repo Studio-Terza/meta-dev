@@ -8,11 +8,13 @@ publish.workspace = true
 [lib]
 test = false
 doctest = false
+bench = false
 
 [[bin]]
 name = "ci"
 path = "src/main.rs"
 test = false
+bench = false
 
 [dependencies]
 console-ports = { path = "../console-ports" }

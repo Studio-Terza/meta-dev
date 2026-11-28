@@ -8,11 +8,13 @@ publish.workspace = true
 [lib]
 test = false
 doctest = false
+bench = false
 
 [[bin]]
 name = "design"
 path = "src/main.rs"
 test = false
+bench = false
 
 [dependencies]
 invariants = { path = "../invariants" }
