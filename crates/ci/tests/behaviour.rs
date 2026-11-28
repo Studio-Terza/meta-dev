@@ -4,12 +4,12 @@ use std::path::Path;
 
 use serde::Deserialize;
 use tempfile::TempDir;
-use test_failure::Failed;
+use test_failure::{Cases, Failed};
 
 const CASES: &str = "tests/cases.toml";
 
 #[derive(Debug, Deserialize)]
-struct Cases {
+struct Fixture {
     case: Vec<Case>,
 }
 
@@ -44,7 +44,7 @@ mod ports {
 
 #[test]
 fn every_case_exits_prints_and_writes_as_expected() -> Result<(), Failed> {
-    let cases: Cases = toml::from_str(&fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(CASES))?)?;
+    let cases: Fixture = Cases::read(&Path::new(env!("CARGO_MANIFEST_DIR")).join(CASES))?;
     let drifted: Vec<Option<String>> = cases.case.iter().map(Case::drifted).collect::<Result<_, Failed>>()?;
     assert_eq!(drifted.into_iter().flatten().collect::<Vec<String>>(), Vec::<String>::new());
     Ok(())

@@ -6,14 +6,13 @@ use std::process::ExitCode;
 
 use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Memory};
 use lint::{Cli, Verdict};
-use test_failure::Failed;
+use test_failure::{Failed, Golden};
 use timer_ports::Monotonic;
 
 const FIXTURES: &str = "tests/fixtures";
 const GOLDENS: &str = "tests/goldens";
 const STORED_MANIFEST: &str = "manifest.toml";
 const MANIFEST: &str = "Cargo.toml";
-const RECORD: &str = "RECORD_GOLDENS";
 const DEPTH: usize = 5_000;
 const BUDGET_MET: &str = "Clean\n--- out\ntest budget: 9 of 50 lines are tests, at most 18% may be\n--- err\n";
 const BUDGET_PAST: &str = "Violations\n--- out\n--- err\ntest budget: 10 of 50 lines are tests, at most 18% may be; cut test lines or test through fewer, table-driven cases\n";
@@ -56,16 +55,7 @@ fn every_fixture_and_case_prints_its_golden_output() -> Result<(), Failed> {
     let names: Vec<String> = fixtures.iter().filter_map(|path| path.file_name()?.to_str().map(str::to_owned)).collect();
     let defaults: Vec<Case<'_>> =
         names.iter().map(|name| Case { golden: name, fixture: name, mount: ".", arguments: &["."] }).collect();
-    let drifted: Vec<String> = defaults
-        .iter()
-        .chain(CASES.iter())
-        .map(Case::drifted)
-        .collect::<Result<Vec<Option<String>>, Failed>>()?
-        .into_iter()
-        .flatten()
-        .collect();
-    assert_eq!(drifted, Vec::<String>::new());
-    Ok(())
+    defaults.iter().chain(CASES.iter()).try_for_each(Case::checked)
 }
 
 #[test]
@@ -143,13 +133,10 @@ impl Case<'_> {
         .collect()
     }
 
-    fn drifted(&self) -> Result<Option<String>, Failed> {
+    fn checked(&self) -> Result<(), Failed> {
         let files = Case::mounted(self.fixture, self.mount)?;
         let shown = Shown::ran(&files, self.arguments)?.to_string();
-        let golden = Path::new(env!("CARGO_MANIFEST_DIR")).join(GOLDENS).join(format!("{}.txt", self.golden));
-        std::env::var_os(RECORD).map_or(Ok(()), |_| Disk.write(&golden, Bytes::new(shown.clone().into_bytes())))?;
-        let expected = Disk.read_text(&golden)?;
-        Ok((shown != expected.as_ref()).then(|| format!("{}:\n{shown}", self.golden)))
+        Golden::at(Path::new(env!("CARGO_MANIFEST_DIR")), &format!("{GOLDENS}/{}.txt", self.golden)).checked(&shown)
     }
 
     fn mounted(fixture: &str, mount: &str) -> Result<Memory, FileFailure> {

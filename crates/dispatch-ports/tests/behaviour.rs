@@ -1,4 +1,3 @@
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use dispatch_ports::{
@@ -7,10 +6,10 @@ use dispatch_ports::{
 };
 use port_core::{Calls, Run};
 use serde::Deserialize;
-use test_failure::Failed;
+use test_failure::{Cases, Failed, Golden};
 
 #[derive(Debug, Deserialize)]
-struct Cases {
+struct Fixture {
     pause: u32,
     call: Vec<Spoken>,
 }
@@ -38,8 +37,8 @@ impl Spoken {
 #[test]
 fn each_shell_call_returns_its_printing_and_whether_it_succeeded_failed_or_ran_past_its_deadline() -> Result<(), Failed>
 {
-    let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
-    let cases: Cases = toml::from_str(&fs::read_to_string(directory.join("calls.toml"))?)?;
+    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let cases: Fixture = Cases::read(&manifest.join("tests/calls.toml"))?;
     let run = Run::root();
     let shown = {
         let shell = run.port(SystemShell);
@@ -75,8 +74,5 @@ fn each_shell_call_returns_its_printing_and_whether_it_succeeded_failed_or_ran_p
     ];
     assert_eq!(counted, [Calls::new(1); 4]);
     measured.settled()?;
-    let golden = directory.join("ran.txt");
-    std::env::var_os("RECORD_GOLDENS").map_or(Ok(()), |_| fs::write(&golden, &shown))?;
-    assert_eq!(shown, fs::read_to_string(golden)?);
-    Ok(())
+    Golden::at(manifest, "tests/ran.txt").checked(&shown)
 }

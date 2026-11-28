@@ -1,7 +1,7 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
 use std::path::{Path, PathBuf};
-use test_failure::Failed;
+use test_failure::{Failed, Golden};
 
 use file_ports::{Bytes, Disk, Files, Memory};
 use grammar_lines::KeptLines;
@@ -26,7 +26,6 @@ const DIRECTORY: &str = "/projects/work";
 const SESSION: &str = "/projects/work/s1.jsonl";
 const FIXTURE: &str = "tests/lines.jsonl";
 const GOLDEN: &str = "tests/lines.txt";
-const RECORD: &str = "RECORD_GOLDENS";
 
 struct Transcript(String);
 
@@ -95,10 +94,7 @@ fn every_fixture_line_reads_as_its_golden_classification() -> Result<(), Failed>
     let read = Transcript(Transcript::fixture()?).read(Cursor::default())?;
     let shown: String =
         read.into_iter().flat_map(Transcript::shown).flat_map(|class| [class, "\n".to_owned()]).collect();
-    let golden = Path::new(env!("CARGO_MANIFEST_DIR")).join(GOLDEN);
-    std::env::var_os(RECORD).map_or(Ok(()), |_| Disk.write(&golden, Bytes::new(shown.clone().into_bytes())))?;
-    assert_eq!(shown, Disk.read_text(&golden)?.as_ref());
-    Ok(())
+    Golden::at(Path::new(env!("CARGO_MANIFEST_DIR")), GOLDEN).checked(&shown)
 }
 
 #[test]
