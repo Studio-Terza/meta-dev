@@ -4,13 +4,13 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use proc_macro2::TokenStream;
-use query_cache::{Entry, Origin, Table};
+use query_cache::Entry;
 use rusqlite::{Connection, Statement};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use syn::parse::{ParseStream, Parser};
 use syn::visit::Visit;
-use syn::{Field, Ident, ItemStruct, LitStr, Macro, Token, Type};
+use syn::{LitStr, Macro, Token, Type};
 use test_failure::Failed;
 
 #[derive(Debug)]
@@ -149,9 +149,6 @@ impl Column {
 impl Queries {
     const PORT: &'static str = "store_ports";
     const QUERY: &'static str = "query";
-    const RECORD: &'static str = "record";
-
-    const UNNAMED: &'static str = "a record is a struct with named fields";
 
     fn literal(input: ParseStream<'_>) -> syn::Result<LitStr> {
         if !input.peek(LitStr) {
@@ -161,24 +158,6 @@ impl Queries {
         let literal = input.parse::<LitStr>()?;
         input.parse::<TokenStream>()?;
         Ok(literal)
-    }
-
-    fn table(input: ParseStream<'_>) -> syn::Result<LitStr> {
-        input.parse::<Ident>()?;
-        input.parse::<Token![=]>()?;
-        input.parse::<LitStr>()
-    }
-
-    fn placed(table: Table, field: &Field) -> syn::Result<Table> {
-        let name = field.ident.as_ref().ok_or_else(|| syn::Error::new_spanned(field, Queries::UNNAMED))?;
-        let marked = field.attrs.iter().find(|attribute| attribute.path().is_ident(Queries::RECORD));
-        let origin = marked
-            .map(|attribute| {
-                let word = attribute.parse_args::<Ident>()?;
-                word.to_string().parse::<Origin>().map_err(|failed| syn::Error::new(word.span(), failed))
-            })
-            .transpose()?;
-        Ok(table.column(&name.to_string(), origin.unwrap_or(Origin::Given)))
     }
 }
 
@@ -194,16 +173,6 @@ impl<'ast> Visit<'ast> for Queries {
             query.map(|_query| Queries::literal.parse2(invocation.tokens.clone()).map(|literal| vec![literal.value()])),
         );
         syn::visit::visit_macro(self, invocation);
-    }
-
-    fn visit_item_struct(&mut self, record: &'ast ItemStruct) {
-        let marked = record.attrs.iter().find(|attribute| attribute.path().is_ident(Queries::RECORD));
-        self.0.extend(marked.map(|attribute| {
-            let named = attribute.parse_args_with(Queries::table)?;
-            let described = record.fields.iter().try_fold(Table::named(&named.value()), Queries::placed)?;
-            Ok(described.statements().to_vec())
-        }));
-        syn::visit::visit_item_struct(self, record);
     }
 }
 
@@ -231,7 +200,7 @@ const COLUMNS: &str = r#"{"describe": {"columns": [{"name": "a", "type_info": "T
 const TWO_PARAMETERS: &str = r#"{"describe": {"columns": [], "parameters": {"Right": 2}, "nullable": []}}"#;
 
 #[test]
-fn a_record_table_spells_its_statements_and_a_cached_query_binds_only_what_it_takes() -> Result<(), serde_json::Error> {
+fn a_cached_query_binds_only_what_it_takes_and_describes_its_columns() -> Result<(), serde_json::Error> {
     let entry: Entry<String> = serde_json::from_str(TWO_PARAMETERS)?;
     let refused = [1, 2, 3].map(|given| entry.bound(given).map_err(|refusal| refusal.to_string()));
     let unbound = |given: usize| Err(format!("the query takes 2 parameters but {given} are bound"));
@@ -245,19 +214,5 @@ fn a_record_table_spells_its_statements_and_a_cached_query_binds_only_what_it_ta
         })
         .collect();
     assert_eq!(columns, ["a Some(\"::std::string::String\") Some(())", "b Some(\"i64\") None", "c None Some(())"]);
-    let full = Table::named("r")
-        .column("id", Origin::GeneratedKey)
-        .column("body", Origin::Given)
-        .column("at", Origin::Generated);
-    let bare = Table::named("s").column("id", Origin::GeneratedKey);
-    let spelled = [full.statements().join("\n"), bare.statements().join("\n"), full.overwrite("body")];
-    assert_eq!(
-        spelled,
-        [
-            "INSERT INTO r (body) VALUES (?1) RETURNING id AS \"id!\", body AS \"body!\", at AS \"at!\"\nSELECT id AS \"id!\", body AS \"body!\", at AS \"at!\" FROM r WHERE id = ?1\nUPDATE r SET body = ?1, at = ?2 WHERE id = ?3\nDELETE FROM r WHERE id = ?1\nSELECT id AS \"id!\", body AS \"body!\", at AS \"at!\" FROM r",
-            "INSERT INTO s DEFAULT VALUES RETURNING id AS \"id!\"\nSELECT id AS \"id!\" FROM s WHERE id = ?1\nUPDATE s SET id = id WHERE id = ?1\nDELETE FROM s WHERE id = ?1\nSELECT id AS \"id!\" FROM s",
-            "UPDATE r SET body = ?1",
-        ]
-    );
     Ok(())
 }

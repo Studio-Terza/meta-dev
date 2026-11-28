@@ -6,7 +6,7 @@ use hex::FromHex;
 use newtype::{Checked, CheckedDeserialize, Display, Newtype, Serialize, Spelled};
 use port_core::Op;
 use serde::Deserialize;
-use store_ports::{Batch, Columns, Execute, Prepared, Query, StoreFailure};
+use store_ports::{Batch, Columns, Execute, Prepared, Query, StoreFailure, Written};
 
 #[derive(Clone, Copy, Debug, Op)]
 pub struct FailedBefore {
@@ -120,14 +120,14 @@ VALUES
 impl Batch for Failing {
     type Failure = StoreFailure;
 
-    type Done = ();
+    type Done = Written;
 
-    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let Failing { pull, head, checks } = self;
         let rows = [FailedBefore::cleared(pull)]
             .into_iter()
             .chain(checks.iter().map(|name| FailedBefore::inserted(pull, head, name)));
-        statements.written_all(rows)
+        statements.written(rows)
     }
 }
 

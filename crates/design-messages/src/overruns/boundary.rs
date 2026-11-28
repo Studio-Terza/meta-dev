@@ -1,4 +1,4 @@
-use store_ports::{Batch, Columns, Execute, Prepared, Query, StoreFailure};
+use store_ports::{Batch, Columns, Execute, Prepared, Query, StoreFailure, Written};
 use transcript_ports::Body;
 
 use super::{Overran, Overruns};
@@ -26,12 +26,12 @@ VALUES
 impl Batch for Overran {
     type Failure = StoreFailure;
 
-    type Done = ();
+    type Done = Written;
 
-    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
         let Overran(tasks) = self;
         let rows: Vec<OverrunRow> = tasks.into_iter().map(|task| OverrunRow { task }).collect();
-        statements.written_all(rows.iter().map(OverrunRow::inserted))
+        statements.written(rows.iter().map(OverrunRow::inserted))
     }
 }
 
