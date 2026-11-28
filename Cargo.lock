@@ -927,6 +927,7 @@ name = "test-failure"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "tempfile",
  "toml",
 ]
 
