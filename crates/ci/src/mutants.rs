@@ -26,10 +26,12 @@ struct Mutant {
     file: String,
 }
 
-#[derive(Debug, Measure)]
-struct Partition {
-    selected: Vec<Mutant>,
-    unselected: Vec<Mutant>,
+pipeline::measured! {
+    #[derive(Debug)]
+    struct Partition {
+        selected: Vec<Mutant>,
+        unselected: Vec<Mutant>,
+    }
 }
 
 #[derive(Debug)]

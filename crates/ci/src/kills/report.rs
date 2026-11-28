@@ -6,12 +6,14 @@ use pipeline::{Edges, Measure};
 use crate::kills::log::{Kind, Test};
 use crate::kills::outcomes::{Fate, Mutant, Ran};
 
-#[derive(Debug, Measure)]
-pub(crate) struct Matrix {
-    kills: Edges<Test, Mutant>,
-    caught: BTreeSet<Mutant>,
-    missed: BTreeSet<Mutant>,
-    unviable: BTreeSet<Mutant>,
+pipeline::measured! {
+    #[derive(Debug)]
+    pub(crate) struct Matrix {
+        kills: Edges<Test, Mutant>,
+        caught: BTreeSet<Mutant>,
+        missed: BTreeSet<Mutant>,
+        unviable: BTreeSet<Mutant>,
+    }
 }
 
 #[derive(Debug, serde::Serialize)]

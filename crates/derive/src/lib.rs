@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use syntax::newtype::{
-    CheckedDeserializing, Constructors, Deserializing, Formatting, Generating, Joined, Serializing, Spelled,
+    CheckedDeserializing, Constructors, Deserializing, Formatting, Generating, Serializing, Spelled,
 };
 use syntax::port::{Declared, Op, Resource};
 use syntax::store::{Columns, Query};
@@ -49,11 +49,6 @@ pub fn derive_checked_deserialize(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(Serialize, attributes(newtype))]
 pub fn derive_serialize(input: TokenStream) -> TokenStream {
     Input::<Serializing>::derived(input.into()).into()
-}
-
-#[proc_macro_derive(Measure)]
-pub fn derive_measure(input: TokenStream) -> TokenStream {
-    Input::<Joined>::derived(input.into()).into()
 }
 
 #[proc_macro_derive(Spelled)]

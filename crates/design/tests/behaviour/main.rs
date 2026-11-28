@@ -1,5 +1,7 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
+mod lint;
+
 use std::ffi::OsString;
 use std::fs::{self, File};
 use std::io::{self, Write};
@@ -617,10 +619,10 @@ mod ports {
     pub struct Design;
 
     impl Design {
-        pub fn fed(home: &Path, arguments: &[&str], input: &str) -> Result<Output, Failed> {
+        pub fn fed(home: &Path, at: &Path, arguments: &[&str], input: &str) -> Result<Output, Failed> {
             let mut child = Command::new(env!("CARGO_BIN_EXE_design"))
                 .env("HOME", home)
-                .current_dir(home)
+                .current_dir(at)
                 .args(arguments)
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
@@ -633,15 +635,19 @@ mod ports {
 }
 
 #[test]
-fn the_design_binary_wires_the_real_ports_and_reads_its_event_from_standard_input() -> Result<(), Failed> {
+fn the_design_binary_wires_the_real_ports_reads_its_event_from_standard_input_and_lints() -> Result<(), Failed> {
     let home = TempDir::new()?;
     let workspace = home.path().join("work");
     let slug = Letters::slugged(&workspace.to_string_lossy());
     fs::create_dir_all(home.path().join(".claude/projects").join(slug))?;
     let rooted = ["--workspace", &workspace.to_string_lossy(), "hook", "stop"].map(str::to_owned);
     let words: Vec<&str> = rooted.iter().map(String::as_str).collect();
-    let unreadable = Design::fed(home.path(), &words, "not json")?;
+    let unreadable = Design::fed(home.path(), home.path(), &words, "not json")?;
     assert_eq!((unreadable.status.code(), unreadable.stdout), (Some(1_i32), Vec::new()));
     assert!(String::from_utf8(unreadable.stderr)?.contains("cannot read the hook input: "));
+    let linted = ["/nowhere", "."]
+        .map(|root| Design::fed(home.path(), Path::new(env!("CARGO_MANIFEST_DIR")), &["lint", root], ""));
+    let codes = linted.into_iter().map(|ran| Ok(ran?.status.code())).collect::<Result<Vec<Option<i32>>, Failed>>()?;
+    assert_eq!(codes, [Some(1_i32), Some(0_i32)]);
     Ok(())
 }

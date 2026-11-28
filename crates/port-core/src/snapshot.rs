@@ -6,8 +6,10 @@ use pipeline::Measure;
 use super::calls::Calls;
 use super::op::{Op, OpName};
 
-#[derive(Clone, Debug, PartialEq, Eq, Measure)]
-pub struct Snapshot(BTreeMap<OpName, Calls>);
+pipeline::measured! {
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub struct Snapshot(BTreeMap<OpName, Calls>);
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Counted {

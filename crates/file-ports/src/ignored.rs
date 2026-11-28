@@ -8,5 +8,6 @@ invariants::ignored! {
         Unstored => "appending to a path with nothing stored starts from empty",
         Outside => "a held path outside the directory is not one of its entries",
         BeforeEpoch => "a file time before 1970 reads as the epoch itself",
+        Unlisted => "a directory that cannot be listed holds no packages to read",
     }
 }

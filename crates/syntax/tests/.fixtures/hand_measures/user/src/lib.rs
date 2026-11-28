@@ -1,0 +1,14 @@
+use pipeline::Measure;
+
+pipeline::measured! {
+    pub struct Generated(usize);
+}
+
+#[derive(Default)]
+pub struct Hand(usize);
+
+impl pipeline::Measure for Hand {
+    fn joined(self, other: Hand) -> Hand {
+        Hand(self.0.joined(other.0))
+    }
+}

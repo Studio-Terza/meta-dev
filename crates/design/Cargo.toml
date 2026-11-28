@@ -33,7 +33,9 @@ serde.workspace = true
 sqlite-ports = { path = "../sqlite-ports" }
 store-ports = { path = "../store-ports" }
 strum.workspace = true
+syntax = { path = "../syntax" }
 thiserror.workspace = true
+timer-ports = { path = "../timer-ports" }
 toml-ports = { path = "../toml-ports" }
 transcript-ports = { path = "../transcript-ports" }
 

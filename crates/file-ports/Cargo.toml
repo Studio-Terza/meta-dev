@@ -15,6 +15,7 @@ invariants = { path = "../invariants" }
 newtype = { path = "../newtype" }
 pipeline = { path = "../pipeline" }
 proptest.workspace = true
+syntax = { path = "../syntax" }
 thiserror.workspace = true
 
 [dev-dependencies]

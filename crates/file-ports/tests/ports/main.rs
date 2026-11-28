@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use test_failure::Failed;
 
 use file_ports::{
-    Absent, Bytes, Cached, Disk, FileFailure, Files, Kind, Memory, Offset, Size, Stamp, Stamps, Tail, Text,
+    Absent, Bytes, Cached, Disk, Disked, FileFailure, Files, Kind, Memory, Offset, Size, Stamp, Stamps, Tail, Text,
 };
 use invariants::Ignoring;
 use newtype::Wrapping;
@@ -325,5 +325,18 @@ fn read_from_returns_the_bytes_after_the_offset_alike_on_disk_and_in_memory() ->
         .map(|at| [(); 2].map(|()| Some(Bytes::from("0123456789".get(at..).unwrap_or_default()))))
         .collect();
     assert_eq!(tails, wanted);
+    Ok(())
+}
+
+#[test]
+fn a_source_tree_holds_rust_files_and_manifests_and_skips_hidden_and_built_directories() -> Result<(), Failed> {
+    let tree = Disked::new(&Disk).tree(Path::new(env!("CARGO_MANIFEST_DIR")), Path::new("tests/.skipped"))?;
+    assert_eq!(tree.inside().collect::<Vec<&Path>>(), [Path::new("Cargo.toml"), Path::new("src/lib.rs")]);
+    let missing = Disked::new(&Disk).tree(Path::new(env!("CARGO_MANIFEST_DIR")), Path::new("tests/absent"));
+    let shown = match missing {
+        Ok(_) => String::new(),
+        Err(failure) => failure.to_string(),
+    };
+    assert_eq!(shown, "cannot read tests/absent: No such file or directory (os error 2)");
     Ok(())
 }

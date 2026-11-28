@@ -160,9 +160,11 @@ dependencies = [
  "sqlite-ports",
  "store-ports",
  "strum",
+ "syntax",
  "tempfile",
  "test-failure",
  "thiserror",
+ "timer-ports",
  "toml-ports",
  "transcript-ports",
 ]
@@ -263,6 +265,7 @@ dependencies = [
  "newtype",
  "pipeline",
  "proptest",
+ "syntax",
  "tempfile",
  "test-failure",
  "thiserror",
@@ -284,9 +287,9 @@ checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
 name = "fuzz"
 version = "0.1.0"
 dependencies = [
+ "design",
  "file-ports",
  "invariants",
- "lint",
  "proptest",
  "timer-ports",
 ]
@@ -409,25 +412,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lint"
-version = "0.1.0"
-dependencies = [
- "console-ports",
- "file-ports",
- "invariants",
- "pipeline",
- "port-core",
- "proc-macro2",
- "ra-ap-rustc_lexer",
- "rayon",
- "syn",
- "test-failure",
- "thiserror",
- "timer-ports",
- "toml",
-]
-
-[[package]]
 name = "linux-raw-sys"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -503,7 +487,6 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 name = "pipeline"
 version = "0.1.0"
 dependencies = [
- "derive",
  "proptest",
 ]
 
@@ -801,12 +784,17 @@ dependencies = [
 name = "syntax"
 version = "0.1.0"
 dependencies = [
+ "design",
  "digest-ports",
+ "file-ports",
  "hex",
  "invariants",
  "json-ports",
+ "pipeline",
  "proc-macro2",
  "quote",
+ "ra-ap-rustc_lexer",
+ "rayon",
  "rusqlite",
  "serde",
  "serde_json",
@@ -815,6 +803,8 @@ dependencies = [
  "syn",
  "test-failure",
  "thiserror",
+ "timer-ports",
+ "toml-ports",
  "variant-ports",
 ]
 
@@ -866,6 +856,7 @@ version = "0.1.0"
 dependencies = [
  "pipeline",
  "port-core",
+ "syntax",
 ]
 
 [[package]]

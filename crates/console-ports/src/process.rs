@@ -1,13 +1,9 @@
-mod ignored;
-
 use std::env;
 use std::ffi::{OsStr, OsString};
-use std::io::{self, Stderr, Stdout, Write};
+use std::io::{self, Stderr, Stdout};
 use std::process::ExitCode;
 
-use crate::process::ignored::Ignored;
-use crate::{Answer, Complaint, Environment, Heard, Shown};
-use invariants::Ignoring;
+use crate::{Answer, Environment, Heard};
 use port_core::Real;
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -21,16 +17,7 @@ impl Process {
     }
 
     pub fn tell(parse: impl FnOnce(Vec<OsString>) -> Answer) -> ExitCode {
-        Process::written(&parse(env::args_os().skip(1).collect()))
-    }
-
-    fn written(answer: &Answer) -> ExitCode {
-        let shown: &Shown = answer.as_ref();
-        let complaint: &Complaint = answer.as_ref();
-        let written = io::stdout()
-            .write_all(AsRef::<str>::as_ref(shown).as_bytes())
-            .and_then(|()| io::stderr().write_all(AsRef::<str>::as_ref(complaint).as_bytes()));
-        written.ignoring(Ignored::Unwritable).map_or(ExitCode::FAILURE, |()| answer.code())
+        Process::stream(|arguments, out, err| parse(arguments).written(out, err))
     }
 }
 

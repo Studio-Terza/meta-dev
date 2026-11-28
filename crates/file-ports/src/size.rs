@@ -1,12 +1,13 @@
 use invariants::Ignoring;
 use newtype::{Arbitrary, Newtype};
-use pipeline::Measure;
 
 use crate::Bytes;
 use crate::ignored::Ignored;
 
-#[derive(Newtype, Arbitrary, Measure, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Size(u64);
+pipeline::measured! {
+    #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    pub struct Size(u64);
+}
 
 impl From<&Bytes> for Size {
     fn from(bytes: &Bytes) -> Size {
