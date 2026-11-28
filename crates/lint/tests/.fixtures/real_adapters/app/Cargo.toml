@@ -1,2 +1,13 @@
 [package]
 name = "app"
+
+[lib]
+test = false
+doctest = false
+bench = false
+
+[[bin]]
+name = "app"
+test = false
+doctest = false
+bench = false

@@ -1,2 +1,7 @@
 [package]
 name = "exporter"
+
+[lib]
+test = false
+doctest = false
+bench = false

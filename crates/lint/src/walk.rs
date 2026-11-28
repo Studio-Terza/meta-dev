@@ -17,8 +17,8 @@ use crate::hooks::{Descent, Expanded, Hooks, nodes};
 use crate::lint::{Fact, Lint, Reads};
 use crate::lints::{
     AdapterFacts, ApiFacts, BoolMethods, ExpressionFlow, HandMeasures, ManualIteration, ModuleCycles, ModuleFacts,
-    NamedLifetimes, NoComments, NoDyn, NoFreeFns, NoTestOnlyApi, ProcessStarters, PublicApiTests, PublicSurface,
-    RealAdapters, SurfaceFacts, TestOnlyFacts, TypeShape, VecOutParams,
+    NamedLifetimes, NoComments, NoDyn, NoFreeFns, NoTestOnlyApi, OptoutFacts, ProcessStarters, PublicApiTests,
+    PublicSurface, RealAdapters, SurfaceFacts, TargetOptouts, TestOnlyFacts, TypeShape, VecOutParams,
 };
 use crate::source::Source;
 use crate::workspace::Package;
@@ -279,6 +279,7 @@ nodes!(walker {
         real_adapters: RealAdapters<'file> => AdapterFacts,
         module_cycles: ModuleCycles<'file> => ModuleFacts,
         hand_measures: HandMeasures => Findings,
+        target_optouts: TargetOptouts => OptoutFacts,
         test_budget: TestBudget => Budget,
     ]
 });

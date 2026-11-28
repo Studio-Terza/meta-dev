@@ -38,6 +38,20 @@ impl Feature {
     }
 }
 
+#[derive(Debug)]
+struct Section {
+    key: &'static str,
+    shown: &'static str,
+    kind: CrateKind,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Read<'manifest> {
+    directory: &'manifest Path,
+    named: &'manifest str,
+    text: &'manifest str,
+}
+
 #[derive(Clone, Debug)]
 struct Target {
     path: PathBuf,
@@ -50,6 +64,7 @@ pub(crate) struct Package {
     name: String,
     manifest: Arc<Path>,
     features: Vec<Feature>,
+    unopted: Vec<Feature>,
     declared: Vec<Target>,
 }
 
@@ -72,6 +87,10 @@ impl Package {
 
     pub(crate) fn features(&self) -> &[Feature] {
         &self.features
+    }
+
+    pub(crate) fn unopted(&self) -> &[Feature] {
+        &self.unopted
     }
 }
 
@@ -118,6 +137,13 @@ impl Workspace {
         ("examples", CrateKind::Examples),
         ("benches", CrateKind::Benches),
     ];
+    const OPTED: [Section; 2] = [
+        Section { key: "lib", shown: "[lib]", kind: CrateKind::Library },
+        Section { key: "bin", shown: "[[bin]]", kind: CrateKind::Binary },
+    ];
+    const LIB_PATH: &'static str = "src/lib.rs";
+    const MAIN_PATH: &'static str = "src/main.rs";
+    const BINS: &'static str = "src/bin";
     const DECLARED: [(&'static str, CrateKind); 5] = [
         ("lib", CrateKind::Library),
         ("bin", CrateKind::Binary),
@@ -170,6 +196,7 @@ impl Workspace {
             name: named.to_owned(),
             manifest: tree.shown(manifest),
             features: Workspace::features(text, &table),
+            unopted: Workspace::unopted(tree, Read { directory: &directory, named, text }, &table),
             declared: Workspace::declared(&directory, &table),
             directory: directory.clone(),
         });
@@ -187,10 +214,18 @@ impl Workspace {
                 .iter()
                 .map(|(key, _)| Feature {
                     name: key.get_ref().to_string(),
-                    line: text.get(..key.span().start).map_or(0, |before| before.matches('\n').count()) + 1,
+                    line: Workspace::line(text, key.span().start),
                 })
                 .collect()
         })
+    }
+
+    fn line(text: &str, start: usize) -> usize {
+        text.get(..start).map_or(0, |before| before.matches('\n').count()) + 1
+    }
+
+    fn unopted(tree: &Tree, read: Read<'_>, table: &DeTable<'_>) -> Vec<Feature> {
+        Workspace::OPTED.iter().flat_map(|section| section.unopted(tree, read, table)).collect()
     }
 
     fn declared(directory: &Path, table: &DeTable<'_>) -> Vec<Target> {
@@ -232,6 +267,73 @@ impl Workspace {
             [file] => (Path::new(file).extension() == Some(OsStr::new(Workspace::SOURCE_EXTENSION))).then_some(()),
             [_, main] => (*main == Workspace::MAIN).then_some(()),
             _ => None,
+        }
+    }
+}
+
+impl Section {
+    const OPT_OUTS: [&'static str; 3] = ["test", "doctest", "bench"];
+
+    fn unopted(&self, tree: &Tree, read: Read<'_>, table: &DeTable<'_>) -> Vec<Feature> {
+        let Read { directory, named, text } = read;
+        let found = table.iter().find(|(key, _)| key.get_ref() == self.key);
+        let entries: Vec<&DeTable<'_>> = found.map_or_default(|(_, value)| match value.get_ref() {
+            DeValue::Array(listed) => listed.iter().filter_map(|entry| entry.get_ref().as_table()).collect(),
+            single => single.as_table().into_iter().collect(),
+        });
+        let declared: Vec<PathBuf> = entries.iter().flat_map(|entry| self.paths(directory, named, entry)).collect();
+        let missing = self.built(tree, directory).into_iter().filter(|root| !declared.contains(root)).map(|root| {
+            let file = root.strip_prefix(directory).ignoring(Ignored::Outside).unwrap_or(&root).display().to_string();
+            Feature { name: format!("{file} is built with no {} section", self.shown), line: 1 }
+        });
+        let unopted = entries.into_iter().filter(|entry| {
+            !Section::OPT_OUTS
+                .iter()
+                .all(|key| entry.get(*key).and_then(|value| value.get_ref().as_bool()) == Some(false))
+        });
+        let lined = unopted.map(|entry| {
+            let first = entry.iter().map(|(key, _)| key.span().start).min().unwrap_or_default();
+            Feature {
+                name: format!("{} target without test, doctest and bench set false", self.shown),
+                line: Workspace::line(text, first),
+            }
+        });
+        missing.chain(lined).collect()
+    }
+
+    fn paths(&self, directory: &Path, named: &str, entry: &DeTable<'_>) -> Vec<PathBuf> {
+        let given = entry.get("path").and_then(|path| path.get_ref().as_str());
+        let name = entry.get("name").and_then(|name| name.get_ref().as_str()).unwrap_or(named);
+        given.map_or_else(
+            || match self.kind {
+                CrateKind::Binary => vec![
+                    directory.join(Workspace::MAIN_PATH),
+                    directory.join(Workspace::BINS).join(format!("{name}.{}", Workspace::SOURCE_EXTENSION)),
+                    directory.join(Workspace::BINS).join(name).join(Workspace::MAIN),
+                ],
+                CrateKind::Library | CrateKind::Build | CrateKind::Tests | CrateKind::Examples | CrateKind::Benches => {
+                    vec![directory.join(Workspace::LIB_PATH)]
+                }
+            },
+            |path| vec![directory.join(path)],
+        )
+    }
+
+    fn built(&self, tree: &Tree, directory: &Path) -> Vec<PathBuf> {
+        let file = |relative: &str| tree.text(&directory.join(relative)).map(|_| directory.join(relative));
+        match self.kind {
+            CrateKind::Binary => {
+                let bins = directory.join(Workspace::BINS);
+                let nested: Vec<PathBuf> = tree
+                    .below(&bins)
+                    .filter(|path| Workspace::target_root(&bins, path).is_some())
+                    .map(Path::to_path_buf)
+                    .collect();
+                file(Workspace::MAIN_PATH).into_iter().chain(nested).collect()
+            }
+            CrateKind::Library | CrateKind::Build | CrateKind::Tests | CrateKind::Examples | CrateKind::Benches => {
+                file(Workspace::LIB_PATH).into_iter().collect()
+            }
         }
     }
 }
