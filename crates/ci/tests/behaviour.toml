@@ -6,7 +6,7 @@
 program = "CARGO_BIN_EXE_ci"
 arguments = ["timed"]
 exit = "Failed"
-timeout = 60
+timeout = 3
 
 [[Run]]
 arguments = ["timed", "limits.toml", "lint", "true"]

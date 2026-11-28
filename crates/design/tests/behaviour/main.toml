@@ -28,7 +28,7 @@ workspace = "work"
 directories = ["work/.meta"]
 words = ["hook", "stop"]
 input = "not json"
-timeout = 60
+timeout = 3
 
 [Binary.refused-loop]
 program = "CARGO_BIN_EXE_design"
@@ -37,7 +37,7 @@ workspace = "work"
 directories = ["work/.meta"]
 words = ["hook", "pre-tool-use"]
 input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"for d in a b; do rm -rf \"$d\"; done"},"tool_name":"Bash"}'
-timeout = 60
+timeout = 3
 
 # ingest reads each session once, a dry run writes nothing, and a grown transcript resumes
 [Story.ingest-resumes.files]

@@ -134,6 +134,7 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
     const QUICK: Timeout = Timeout::new(60);
     const WATCH: Timeout = Timeout::new(20 * 60);
     const POLL: Pause = Pause::new(10);
+    const POLLS: usize = 120;
     const LANDED: &'static str = "100";
     const UNLOGGED: &'static str = "(the log could not be read)";
     const BASE: &'static str = "main";
@@ -238,6 +239,7 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
         let deadline = Deadline::after(self.crew.now(), Self::WATCH);
         iter::repeat_with(|| self.crew.now())
             .take_while(|now| deadline.due(*now) == Due::Pending)
+            .take(Self::POLLS)
             .find_map(|_now| self.checks(pull).map(|read| read.or_else(|| self.watched(pull))).transpose())
             .unwrap_or(Err(UnreadStep::Overdue))
     }
