@@ -1,51 +1,22 @@
 {
-  "db_name": "SQLite",
   "query": "\nSELECT\n  uuid,\n  at,\n  author,\n  body\nFROM\n  messages\nWHERE\n  session = ?1\n  AND author = ?2\nORDER BY\n  at DESC\nLIMIT\n  1\n",
   "describe": {
     "columns": [
       {
         "name": "uuid",
-        "ordinal": 0,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "messages",
-            "name": "uuid"
-          }
-        }
+        "type_info": "Text"
       },
       {
         "name": "at",
-        "ordinal": 1,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "messages",
-            "name": "at"
-          }
-        }
+        "type_info": "Text"
       },
       {
         "name": "author",
-        "ordinal": 2,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "messages",
-            "name": "author"
-          }
-        }
+        "type_info": "Text"
       },
       {
         "name": "body",
-        "ordinal": 3,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "messages",
-            "name": "body"
-          }
-        }
+        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -57,6 +28,5 @@
       false,
       false
     ]
-  },
-  "hash": "317bdb9efa44d0b69e3a6d84d43744d6533e37cc53e418e9334fc1fa0dd63af5"
+  }
 }

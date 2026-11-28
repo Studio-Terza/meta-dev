@@ -1,29 +1,14 @@
 {
-  "db_name": "SQLite",
   "query": "INSERT INTO cursors (session, read_to) VALUES (?1, ?2) RETURNING session AS \"session!\", read_to AS \"read_to!\"",
   "describe": {
     "columns": [
       {
         "name": "session!",
-        "ordinal": 0,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "cursors",
-            "name": "session"
-          }
-        }
+        "type_info": "Text"
       },
       {
         "name": "read_to!",
-        "ordinal": 1,
-        "type_info": "Integer",
-        "origin": {
-          "Table": {
-            "table": "cursors",
-            "name": "read_to"
-          }
-        }
+        "type_info": "Integer"
       }
     ],
     "parameters": {
@@ -33,6 +18,5 @@
       false,
       false
     ]
-  },
-  "hash": "cc502834af61c6f2b0f577cac996a7c872543a2300dd0f962d7717df57c9dd61"
+  }
 }
