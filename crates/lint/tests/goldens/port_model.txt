@@ -1,0 +1,8 @@
+Violations
+--- out
+test budget: 0 of 8 lines are tests, at most 18% may be
+--- err
+a foreign crate named in code lives in exactly one port crate:
+first/Cargo.toml:5: serde is a foreign interface named in the code of first, second; confine it to one port crate that wraps it in our own types, and depend on that crate
+first/src/lib.rs:3: pub use of serde; wrap what callers need in the port's own types instead of re-exporting the library
+second/Cargo.toml:5: serde is a foreign interface named in the code of first, second; confine it to one port crate that wraps it in our own types, and depend on that crate

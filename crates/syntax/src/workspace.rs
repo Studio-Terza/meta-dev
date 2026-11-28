@@ -38,6 +38,33 @@ impl Feature {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Needed {
+    Shipped,
+    Tests,
+}
+
+#[derive(Debug)]
+pub(crate) struct Dependency {
+    name: String,
+    needed: Needed,
+    line: usize,
+}
+
+impl Dependency {
+    pub(crate) fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub(crate) fn needed(&self) -> Needed {
+        self.needed
+    }
+
+    pub(crate) fn line(&self) -> usize {
+        self.line
+    }
+}
+
 #[derive(Clone, Debug)]
 struct Target {
     path: PathBuf,
@@ -50,6 +77,7 @@ pub(crate) struct Package {
     name: String,
     manifest: Arc<Path>,
     features: Vec<Feature>,
+    dependencies: Vec<Dependency>,
     declared: Vec<Target>,
 }
 
@@ -72,6 +100,10 @@ impl Package {
 
     pub(crate) fn features(&self) -> &[Feature] {
         &self.features
+    }
+
+    pub(crate) fn dependencies(&self) -> &[Dependency] {
+        &self.dependencies
     }
 }
 
@@ -117,6 +149,11 @@ impl Workspace {
         ("tests", CrateKind::Tests),
         ("examples", CrateKind::Examples),
         ("benches", CrateKind::Benches),
+    ];
+    const NEEDED: [(&'static str, Needed); 3] = [
+        ("dependencies", Needed::Shipped),
+        ("build-dependencies", Needed::Shipped),
+        ("dev-dependencies", Needed::Tests),
     ];
     const DECLARED: [(&'static str, CrateKind); 5] = [
         ("lib", CrateKind::Library),
@@ -170,6 +207,7 @@ impl Workspace {
             name: named.to_owned(),
             manifest: tree.shown(manifest),
             features: Workspace::features(table),
+            dependencies: Workspace::dependencies(table),
             declared: Workspace::declared(&directory, table),
             directory: directory.clone(),
         });
@@ -178,6 +216,25 @@ impl Workspace {
 
     fn string<'value>(value: Value<'value, '_>, key: &str) -> Option<&'value str> {
         value.table().and_then(|table| table.get(key)).and_then(Value::text)
+    }
+
+    fn dependencies(table: Table<'_, '_>) -> Vec<Dependency> {
+        Workspace::NEEDED
+            .iter()
+            .flat_map(|(section, needed)| {
+                let dependencies = table.get(section).and_then(Value::table);
+                let listed = dependencies.map_or_default(Table::keys);
+                let foreign = listed.into_iter().filter(move |key| {
+                    let declared = dependencies.and_then(|inner| inner.get(key.name())).and_then(Value::table);
+                    declared.and_then(|inner| inner.get("path")).is_none()
+                });
+                foreign.map(|key| Dependency {
+                    name: key.name().chars().map(|letter| if letter == '-' { '_' } else { letter }).collect(),
+                    needed: *needed,
+                    line: key.line(),
+                })
+            })
+            .collect()
     }
 
     fn features(table: Table<'_, '_>) -> Vec<Feature> {

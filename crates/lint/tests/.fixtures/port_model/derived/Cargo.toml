@@ -1,0 +1,5 @@
+[package]
+name = "derived"
+
+[dependencies]
+serde = "1"

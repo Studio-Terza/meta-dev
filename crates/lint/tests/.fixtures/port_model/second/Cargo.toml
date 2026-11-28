@@ -1,0 +1,8 @@
+[package]
+name = "second"
+
+[dependencies]
+serde = "1"
+
+[dev-dependencies]
+first = { path = "../first" }
