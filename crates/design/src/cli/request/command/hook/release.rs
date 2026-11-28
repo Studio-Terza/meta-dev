@@ -12,7 +12,7 @@ use newtype::Wrapping;
 use store_ports::Store;
 
 use super::super::Ground;
-use super::super::crew::Crew;
+use super::super::crew::{Asked, Crew, Cut, Tape};
 use super::reply::{Hook, Reply};
 use super::subagent::Hub;
 use crate::cli::failure::Failure;
@@ -22,9 +22,8 @@ pub use boundary::Used;
 use boundary::{Checkout, Landed, State};
 use install::Installing;
 
-#[derive(Debug)]
-struct Releasing<'used, 'crew, C: Clock, G: Shell> {
-    crew: &'crew Crew<'crew, C, G>,
+#[derive(Clone, Copy, Debug)]
+struct Releasing<'used> {
     directory: &'used Path,
     pull: PullNumber,
 }
@@ -68,12 +67,12 @@ impl Used {
         crew: &Crew<'_, C, G>,
     ) -> Result<Reply<'static>, Failure> {
         let local = ground.local();
-        let releasing = Releasing { crew, directory: self.directory(), pull };
-        let landing = match releasing.landed(&local) {
+        let releasing = Releasing { directory: self.directory(), pull };
+        let landing = match crew.driven(|tape| Cut::settled(releasing.landed(tape, &local))) {
             Ok(landed) => match landed.state() {
                 State::Merged => Landing::Merged {
-                    released: releasing.released(&landed),
-                    installed: Installing::new(crew, self.directory(), pull).installed(ground),
+                    released: crew.driven(|tape| Cut::settled(releasing.released(tape, &landed))),
+                    installed: Installing::new(self.directory(), pull, ground.workspace()).installed(ground, crew),
                 },
                 State::Open | State::Closed => Landing::Unmerged,
             },
@@ -135,45 +134,51 @@ impl Landing {
     }
 }
 
-impl<C: Clock, G: Shell> Releasing<'_, '_, C, G> {
+impl Releasing<'_> {
     const PROGRAM: &'static str = "git";
     const QUICK: Timeout = Timeout::new(60);
 
-    fn landed(&self, local: &Local) -> Result<Landed, Holding> {
-        let repository = local.repository().ok_or(Holding::from(Held::NoRepository))?;
-        let hub = Hub::new(self.crew, self.directory, repository);
-        Ok(hub.viewed(self.pull, "state,headRefName,headRefOid", Held::Unviewed)?)
+    fn landed(&self, tape: &Tape<'_>, local: &Local) -> Result<Landed, Cut<Holding>> {
+        let repository = local.repository().ok_or(Cut::from(Held::NoRepository))?;
+        let hub = Hub::new(self.directory, repository);
+        hub.viewed(tape, self.pull, "state,headRefName,headRefOid", Holding::from(Held::Unviewed))
     }
 
-    fn released(&self, landed: &Landed) -> Result<Released, Holding> {
-        self.checkout(landed)?.map_or(Ok(Released::Untouched), |found| self.freed(landed, &found))
+    fn released(&self, tape: &Tape<'_>, landed: &Landed) -> Result<Released, Cut<Holding>> {
+        self.checkout(tape, landed)?.map_or(Ok(Released::Untouched), |found| self.freed(tape, landed, &found))
     }
 
-    fn checkout(&self, landed: &Landed) -> Result<Option<Checkout>, Holding> {
-        let ran = self.git(&["worktree", "list", "--porcelain"], self.directory);
-        let printed = ran.as_ref().and_then(Ran::succeeded).ok_or(Held::Unlisted)?;
+    fn checkout(&self, tape: &Tape<'_>, landed: &Landed) -> Result<Option<Checkout>, Cut<Holding>> {
+        let ran = Self::git(tape, &["worktree", "list", "--porcelain"], self.directory)?;
+        let printed = ran.as_ref().and_then(Ran::succeeded).ok_or(Cut::from(Held::Unlisted))?;
         let listed = Worktrees::read(printed.as_ref());
         Ok(landed.found(listed.listed().iter().map(Checkout::from)))
     }
 
-    fn freed(&self, landed: &Landed, checkout: &Checkout) -> Result<Released, Holding> {
-        let held = |held: Held| Holding { held, worktree: Some(checkout.as_ref().to_path_buf()) };
-        let status = self.git(&["status", "--short"], checkout.as_ref());
+    fn freed(&self, tape: &Tape<'_>, landed: &Landed, checkout: &Checkout) -> Result<Released, Cut<Holding>> {
+        let held = |held: Held| Cut::Failed(Holding { held, worktree: Some(checkout.as_ref().to_path_buf()) });
+        let status = Self::git(tape, &["status", "--short"], checkout.as_ref())?;
         let printed = status.as_ref().and_then(Ran::succeeded).ok_or_else(|| held(Held::Unstatused))?;
         printed.as_ref().is_empty().then_some(()).ok_or_else(|| held(Held::Dirty))?;
         let pushed = landed.pushed(checkout).ok_or_else(|| held(Held::Unpushed))?;
         let path = pushed.as_ref().to_string_lossy();
-        let removed = self.git(&["worktree", "remove", &path], self.directory);
+        let removed = Self::git(tape, &["worktree", "remove", &path], self.directory)?;
         removed.as_ref().and_then(Ran::succeeded).map(|_removed| Released::Removed).ok_or_else(|| held(Held::Unremoved))
     }
 
-    fn git(&self, arguments: &[&str], directory: &Path) -> Option<Ran> {
-        self.crew.spoke(Self::PROGRAM, arguments, directory, Self::QUICK)
+    fn git(tape: &Tape<'_>, arguments: &[&str], directory: &Path) -> Result<Option<Ran>, Asked> {
+        tape.spoke(Self::PROGRAM, arguments, directory, Self::QUICK)
     }
 }
 
 impl From<Held> for Holding {
     fn from(held: Held) -> Holding {
         Holding { held, worktree: None }
+    }
+}
+
+impl From<Held> for Cut<Holding> {
+    fn from(held: Held) -> Cut<Holding> {
+        Cut::Failed(Holding::from(held))
     }
 }

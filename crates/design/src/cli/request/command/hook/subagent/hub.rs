@@ -4,25 +4,21 @@ use std::num::{NonZeroU32, NonZeroU64};
 use std::path::Path;
 
 use design_messages::{CheckName, CommitSha, PullNumber};
-use dispatch_ports::{Clock, Deadline, Due, Pause, Ran, Shell, Timeout};
-use file_ports::Files;
+use dispatch_ports::{Deadline, Due, Pause, Ran, Timeout};
 use grammar_spec_line::Attachment;
 use invariants::Ignoring;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
-use store_ports::Store;
 
-use super::super::super::Ground;
-use super::super::super::crew::Crew;
+use super::super::super::crew::{Asked, Cut, Tape};
 use super::boundary::{Branch, Branched, Compared, FailedJob, First, JobId, Opened, Pushed};
 use crate::cli::request::ignored::Ignored;
-use crate::cli::request::{Landed, Local, Repository, UnreadStep};
+use crate::cli::request::{Landed, Repository, UnreadStep};
 
-#[derive(Debug)]
-pub struct Hub<'crew, C: Clock, G: Shell> {
-    crew: &'crew Crew<'crew, C, G>,
-    directory: &'crew Path,
-    repository: &'crew Repository,
+#[derive(Clone, Copy, Debug)]
+pub struct Hub<'hook> {
+    directory: &'hook Path,
+    repository: &'hook Repository,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -170,7 +166,7 @@ struct Oid {
     oid: CommitSha,
 }
 
-impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
+impl<'hook> Hub<'hook> {
     const PROGRAM: &'static str = "gh";
     const API: &'static str = "api";
     const QUICK: Timeout = Timeout::new(60);
@@ -182,151 +178,158 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
     const REMOTE: &'static str = "query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name)\
                                   {ref(qualifiedName:$ref){target{oid}}}}";
 
-    pub fn new(
-        crew: &'crew Crew<'crew, C, G>,
-        directory: &'crew Path,
-        repository: &'crew Repository,
-    ) -> Hub<'crew, C, G> {
-        Hub { crew, directory, repository }
+    pub fn new(directory: &'hook Path, repository: &'hook Repository) -> Hub<'hook> {
+        Hub { directory, repository }
     }
 
-    fn ran(&self, arguments: &[&str], timeout: Timeout) -> Option<Ran> {
+    fn ran(&self, tape: &Tape<'_>, arguments: &[&str], timeout: Timeout) -> Result<Option<Ran>, Asked> {
         let named = self.repository.to_string();
         let scoped = (arguments.first() != Some(&Self::API)).then_some(["-R", named.as_str()]);
         let spoken: Vec<&str> = arguments.iter().copied().chain(scoped.into_iter().flatten()).collect();
-        self.crew.spoke(Hub::<C, G>::PROGRAM, &spoken, self.directory, timeout)
+        tape.spoke(Self::PROGRAM, &spoken, self.directory, timeout)
     }
 
-    fn read<T: DeserializeOwned, Unread: Copy>(&self, arguments: &[&str], unread: Unread) -> Result<T, Unread> {
-        let ran = self.ran(arguments, Self::QUICK);
-        let printed = ran.as_ref().and_then(Ran::succeeded).ok_or(unread)?;
-        serde_json::from_str(printed.as_ref()).map_err(|_unparsed| unread)
-    }
-
-    pub fn viewed<T: DeserializeOwned, Unread: Copy>(
+    fn read<T: DeserializeOwned, Unread>(
         &self,
+        tape: &Tape<'_>,
+        arguments: &[&str],
+        unread: Unread,
+    ) -> Result<T, Cut<Unread>> {
+        let ran = self.ran(tape, arguments, Self::QUICK)?;
+        match ran.as_ref().and_then(Ran::succeeded).map(|printed| serde_json::from_str(printed.as_ref())) {
+            Some(Ok(read)) => Ok(read),
+            Some(Err(_)) | None => Err(Cut::Failed(unread)),
+        }
+    }
+
+    pub fn viewed<T: DeserializeOwned, Unread>(
+        &self,
+        tape: &Tape<'_>,
         pull: PullNumber,
         fields: &str,
         unread: Unread,
-    ) -> Result<T, Unread> {
-        self.read(&["pr", "view", &pull.to_string(), "--json", fields], unread)
+    ) -> Result<T, Cut<Unread>> {
+        self.read(tape, &["pr", "view", &pull.to_string(), "--json", fields], unread)
     }
 
-    pub fn landed(&self) -> Option<Vec<Landed>> {
+    pub fn landed(&self, tape: &Tape<'_>) -> Result<Option<Vec<Landed>>, Asked> {
         let asked =
             ["pr", "list", "--state", "all", "--limit", Self::LANDED, "--json", "number,state,title,headRefName,body"];
-        self.read(&asked, UnreadStep::Landed).ignoring(Ignored::Undrained)
+        Ok(Cut::settled(self.read(tape, &asked, UnreadStep::Landed))?.ignoring(Ignored::Undrained))
     }
 
-    pub fn opened<F: Files, S: Store>(
+    pub fn cited(&self, tape: &Tape<'_>, branched: &Branched) -> Result<Attachment, Cut<Unopened>> {
+        let held = self.remote(tape, branched.branch())?;
+        (held == Some(branched.head())).then_some(()).ok_or(Cut::Failed(Unopened::Unpushed(held)))?;
+        let first = self.first(tape, branched.head())?;
+        first.spec().cloned().ok_or(Cut::Failed(Unopened::Unread(UnreadStep::Spec)))
+    }
+
+    pub fn opened(
         &self,
+        tape: &Tape<'_>,
         branched: &Branched,
-        ground: &Ground<'_, F, S>,
-        local: &Local,
-    ) -> Result<Pushed, Unopened> {
-        let held = self.remote(branched.branch())?;
-        (held == Some(branched.head())).then_some(()).ok_or(Unopened::Unpushed(held))?;
-        let first = self.first(branched.head())?;
-        let spec = first.spec().ok_or(UnreadStep::Spec)?;
-        let specs = local.specs().ok_or(UnreadStep::NoSpecs)?;
-        let title = ground.titled(specs, spec).ok_or(UnreadStep::Detail)?.to_string();
+        spec: &Attachment,
+        title: &str,
+    ) -> Result<Pushed, Cut<UnreadStep>> {
         let branch = branched.branch().to_string();
         let body = Body(spec).to_string();
-        let asked =
-            ["pr", "create", "--head", &branch, "--base", Hub::<C, G>::BASE, "--title", &title, "--body", &body];
-        self.ran(&asked, Self::QUICK).as_ref().and_then(Ran::succeeded).ok_or(UnreadStep::Open)?;
-        let opened: Opened = self.read(&["pr", "view", &branch, "--json", "number"], UnreadStep::Open)?;
+        let asked = ["pr", "create", "--head", &branch, "--base", Self::BASE, "--title", title, "--body", &body];
+        self.ran(tape, &asked, Self::QUICK)?.as_ref().and_then(Ran::succeeded).ok_or(Cut::Failed(UnreadStep::Open))?;
+        let opened: Opened = self.read(tape, &["pr", "view", &branch, "--json", "number"], UnreadStep::Open)?;
         Ok(Pushed::new(opened.pull(), branched.head()))
     }
 
-    fn remote(&self, branch: &Branch) -> Result<Option<CommitSha>, UnreadStep> {
+    fn remote(&self, tape: &Tape<'_>, branch: &Branch) -> Result<Option<CommitSha>, Cut<Unopened>> {
         let reference = format!("ref=refs/heads/{branch}");
-        let query = format!("query={}", Hub::<C, G>::REMOTE);
+        let query = format!("query={}", Self::REMOTE);
         let owner = format!("owner={}", self.repository.owner());
         let name = format!("name={}", self.repository.name());
         let asked = [Self::API, "graphql", "-F", &owner, "-F", &name, "-f", &reference, "-f", &query];
-        let found: Found = self.read(&asked, UnreadStep::Remote)?;
+        let found: Found = self.read(tape, &asked, Unopened::Unread(UnreadStep::Remote))?;
         Ok(found.data.repository.reference.map(|targeted| targeted.target.oid))
     }
 
-    fn first(&self, head: CommitSha) -> Result<First, UnreadStep> {
-        let compare = format!("repos/{}/compare/{}...{head}", self.repository, Hub::<C, G>::BASE);
-        let compared: Compared = self.read(&[Self::API, &compare], UnreadStep::Commits)?;
-        compared.first().ok_or(UnreadStep::Commits)
+    fn first(&self, tape: &Tape<'_>, head: CommitSha) -> Result<First, Cut<Unopened>> {
+        let compare = format!("repos/{}/compare/{}...{head}", self.repository, Self::BASE);
+        let unread = Unopened::Unread(UnreadStep::Commits);
+        self.read::<Compared, _>(tape, &[Self::API, &compare], unread)?.first().ok_or(Cut::Failed(unread))
     }
 
-    pub fn head(&self, pull: PullNumber) -> Result<CommitSha, UnreadStep> {
-        self.viewed::<Head, _>(pull, "headRefOid", UnreadStep::Head).map(|read| read.head)
+    pub fn head(&self, tape: &Tape<'_>, pull: PullNumber) -> Result<CommitSha, Cut<UnreadStep>> {
+        self.viewed::<Head, _>(tape, pull, "headRefOid", UnreadStep::Head).map(|read| read.head)
     }
 
-    pub fn mergeable(&self, pull: PullNumber) -> Result<Merge, UnreadStep> {
-        self.viewed::<Merging, _>(pull, "mergeable,mergeStateStatus", UnreadStep::Mergeable).map(Merging::merge)
+    pub fn mergeable(&self, tape: &Tape<'_>, pull: PullNumber) -> Result<Merge, Cut<UnreadStep>> {
+        let fields = "mergeable,mergeStateStatus";
+        self.viewed::<Merging, _>(tape, pull, fields, UnreadStep::Mergeable).map(Merging::merge)
     }
 
-    pub fn lacking(&self, head: CommitSha) -> Vec<String> {
-        let compare = format!("repos/{}/compare/{head}...{}", self.repository, Hub::<C, G>::BASE);
-        self.read::<Compared, _>(&[Self::API, &compare], UnreadStep::Lacking)
-            .ignoring(Ignored::Unlacked)
-            .map_or_default(Compared::titles)
+    pub fn lacking(&self, tape: &Tape<'_>, head: CommitSha) -> Result<Vec<String>, Asked> {
+        let compare = format!("repos/{}/compare/{head}...{}", self.repository, Self::BASE);
+        let read = Cut::settled(self.read::<Compared, _>(tape, &[Self::API, &compare], UnreadStep::Lacking))?;
+        Ok(read.ignoring(Ignored::Unlacked).map_or_default(Compared::titles))
     }
 
-    pub fn settled(&self, pull: PullNumber) -> Result<Verdict, UnreadStep> {
-        let deadline = Deadline::after(self.crew.now(), Self::WATCH);
-        iter::repeat_with(|| self.crew.now())
+    pub fn settled(&self, tape: &Tape<'_>, pull: PullNumber) -> Result<Verdict, Cut<UnreadStep>> {
+        let deadline = Deadline::after(tape.now(), Self::WATCH);
+        iter::repeat_with(|| tape.now())
             .take_while(|now| deadline.due(*now) == Due::Pending)
-            .find_map(|_now| self.checks(pull).map(|read| read.or_else(|| self.watched(pull))).transpose())
-            .unwrap_or(Err(UnreadStep::Overdue))
+            .find_map(|_now| self.polled(tape, pull).transpose())
+            .unwrap_or(Err(Cut::Failed(UnreadStep::Overdue)))
     }
 
-    fn watched(&self, pull: PullNumber) -> Option<Verdict> {
-        self.ran(&["pr", "checks", &pull.to_string(), "--watch", "--fail-fast"], Self::WATCH);
-        self.crew.paused(Self::POLL);
-        None
+    fn polled(&self, tape: &Tape<'_>, pull: PullNumber) -> Result<Option<Verdict>, Cut<UnreadStep>> {
+        let listed = self.listed(tape, pull)?;
+        let verdict = listed.map_or(Ok(None), |checks| Verdict::read(&checks)).map_err(Cut::Failed)?;
+        verdict.map_or_else(
+            || {
+                self.ran(tape, &["pr", "checks", &pull.to_string(), "--watch", "--fail-fast"], Self::WATCH)?;
+                tape.paused(Self::POLL)?;
+                Ok(None)
+            },
+            |found| Ok(Some(found)),
+        )
     }
 
-    pub fn requested(&self, pull: PullNumber) -> Result<(), UnreadStep> {
-        let listed = self.listed(pull).unwrap_or_default();
+    pub fn requested(&self, tape: &Tape<'_>, pull: PullNumber) -> Result<(), Cut<UnreadStep>> {
+        let listed = self.listed(tape, pull)?.unwrap_or_default();
         let number = pull.to_string();
-        let label = |change: &str| self.ran(&["pr", "edit", &number, change, Check::GATE], Self::QUICK);
-        let relabeled = Check::gate(&listed).is_none().then(|| {
-            label("--remove-label");
-            label("--add-label")
-        });
-        let added = relabeled.is_none_or(|ran| ran.as_ref().and_then(Ran::succeeded).is_some());
-        added.then_some(()).ok_or(UnreadStep::Label)
+        let label = |change: &str| self.ran(tape, &["pr", "edit", &number, change, Check::GATE], Self::QUICK);
+        let added = Check::gate(&listed).is_some() || {
+            label("--remove-label")?;
+            label("--add-label")?.as_ref().and_then(Ran::succeeded).is_some()
+        };
+        added.then_some(()).ok_or(Cut::Failed(UnreadStep::Label))
     }
 
-    fn listed(&self, pull: PullNumber) -> Option<Vec<Check>> {
-        let ran = self.ran(&["pr", "checks", &pull.to_string(), "--json", "name,bucket,link"], Self::QUICK);
+    fn listed(&self, tape: &Tape<'_>, pull: PullNumber) -> Result<Option<Vec<Check>>, Asked> {
+        let ran = self.ran(tape, &["pr", "checks", &pull.to_string(), "--json", "name,bucket,link"], Self::QUICK)?;
         let printed = ran.as_ref().and_then(Ran::printed);
-        printed.and_then(|read| serde_json::from_str(read.as_ref()).ignoring(Ignored::Unlisted))
+        Ok(printed.and_then(|read| serde_json::from_str(read.as_ref()).ignoring(Ignored::Unlisted)))
     }
 
-    fn checks(&self, pull: PullNumber) -> Result<Option<Verdict>, UnreadStep> {
-        self.listed(pull).map_or(Ok(None), |checks| Verdict::read(&checks))
-    }
-
-    pub fn gated(&self, head: CommitSha) -> Result<Option<CheckName>, UnreadStep> {
+    pub fn gated(&self, tape: &Tape<'_>, head: CommitSha) -> Result<Option<CheckName>, Cut<UnreadStep>> {
         let sha = head.to_string();
-        let runs: Vec<Run> =
-            self.read(&["run", "list", "--commit", &sha, "--json", "databaseId,attempt"], UnreadStep::Runs)?;
+        let asked = ["run", "list", "--commit", &sha, "--json", "databaseId,attempt"];
+        let runs: Vec<Run> = self.read(tape, &asked, UnreadStep::Runs)?;
         runs.iter()
             .flat_map(Run::earlier)
-            .map(|attempt| self.attempted(attempt))
+            .map(|attempt| self.attempted(tape, attempt))
             .find_map(Result::transpose)
             .transpose()
     }
 
-    fn attempted(&self, attempt: Attempt) -> Result<Option<CheckName>, UnreadStep> {
+    fn attempted(&self, tape: &Tape<'_>, attempt: Attempt) -> Result<Option<CheckName>, Cut<UnreadStep>> {
         let asked =
             ["run", "view", &attempt.run.to_string(), "--attempt", &attempt.number.to_string(), "--json", "jobs"];
-        let attempted: Attempted = self.read(&asked, UnreadStep::Attempt)?;
+        let attempted: Attempted = self.read(tape, &asked, UnreadStep::Attempt)?;
         Ok(attempted.jobs.into_iter().find_map(Job::gated))
     }
 
-    pub fn log(&self, job: JobId) -> String {
-        let ran = self.ran(&["run", "view", "--job", &job.to_string(), "--log-failed"], Self::QUICK);
-        ran.as_ref().and_then(Ran::succeeded).map_or_else(|| Hub::<C, G>::UNLOGGED.to_owned(), ToString::to_string)
+    pub fn log(&self, tape: &Tape<'_>, job: JobId) -> Result<String, Asked> {
+        let ran = self.ran(tape, &["run", "view", "--job", &job.to_string(), "--log-failed"], Self::QUICK)?;
+        Ok(ran.as_ref().and_then(Ran::succeeded).map_or_else(|| Self::UNLOGGED.to_owned(), ToString::to_string))
     }
 }
 

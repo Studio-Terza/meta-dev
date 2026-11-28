@@ -15,7 +15,7 @@ use newtype::Wrapping;
 use store_ports::Store;
 
 use super::super::Ground;
-use super::super::crew::Crew;
+use super::super::crew::{Asked, Crew, Cut, Tape};
 use super::reply::{Hook, Reply};
 use crate::cli::failure::Failure;
 pub use crate::cli::request::UnreadStep;
@@ -94,7 +94,7 @@ impl Hook for Finishing {
         match (self.said(), self.reminder()) {
             (Said::Typed(Report::Blocked(at)), _reminder) => desk.escalated(Some(at), Escalation::Blocked),
             (Said::Typed(Report::Done(at)), _reminder) => match local.repository() {
-                Some(repository) => desk.landed(at, &Hub::new(crew, self.directory(), repository)),
+                Some(repository) => desk.landed(at, Hub::new(self.directory(), repository), crew),
                 None => desk.escalated(Some(at), Escalation::Unread(UnreadStep::NoRepository)),
             },
             (Said::Untyped, Reminder::First) => Ok(Reply::Block { reason: Untyped.to_string() }),
@@ -104,26 +104,47 @@ impl Hook for Finishing {
 }
 
 impl<F: Files, S: Store> Desk<'_, '_, F, S> {
-    fn landed<C: Clock, G: Shell>(&self, at: &At, hub: &Hub<'_, C, G>) -> Result<Reply<'static>, Failure> {
+    fn landed<C: Clock, G: Shell>(
+        &self,
+        at: &At,
+        hub: Hub<'_>,
+        crew: &Crew<'_, C, G>,
+    ) -> Result<Reply<'static>, Failure> {
         match at {
-            At::Pull(pushed) => self.done(*pushed, &[Target::from(pushed)], hub),
-            At::Branch(branched) => match hub.opened(branched, self.ground, self.local) {
-                Ok(pushed) => self.done(pushed, &[Target::from(&pushed), Target::from(branched)], hub),
+            At::Pull(pushed) => self.done(*pushed, &[Target::from(pushed)], hub, crew),
+            At::Branch(branched) => match self.opened(branched, hub, crew) {
+                Ok(pushed) => self.done(pushed, &[Target::from(&pushed), Target::from(branched)], hub, crew),
                 Err(Unopened::Unpushed(held)) => Ok(Reply::Block { reason: Stale { branched, held }.to_string() }),
                 Err(Unopened::Unread(step)) => self.escalated(Some(at), Escalation::Unread(step)),
             },
         }
     }
 
+    fn opened<C: Clock, G: Shell>(
+        &self,
+        branched: &Branched,
+        hub: Hub<'_>,
+        crew: &Crew<'_, C, G>,
+    ) -> Result<Pushed, Unopened> {
+        let spec = crew.driven(|tape| Cut::settled(hub.cited(tape, branched)))?;
+        let specs = self.local.specs().ok_or(UnreadStep::NoSpecs)?;
+        let title = self.ground.titled(specs, &spec).ok_or(UnreadStep::Detail)?.to_string();
+        Ok(crew.driven(|tape| Cut::settled(hub.opened(tape, branched, &spec, &title)))?)
+    }
+
     fn done<C: Clock, G: Shell>(
         &self,
         pushed: Pushed,
         passed: &[Target],
-        hub: &Hub<'_, C, G>,
+        hub: Hub<'_>,
+        crew: &Crew<'_, C, G>,
     ) -> Result<Reply<'static>, Failure> {
         let at = At::Pull(pushed);
         let store = self.ground.store();
-        let ended = pushed.checked(hub, store).map(|Checked { ending, failing }| {
+        let failed = store.read(FailedBefore::new(pushed.pull(), pushed.head())).ignoring(Ignored::Unremembered);
+        let before = failed.unwrap_or_default();
+        let checked = crew.driven(|tape| Cut::settled(pushed.checked(tape, hub, &before)));
+        let ended = checked.map(|Checked { ending, failing }| {
             failing.map(|recorded| store.write(recorded).ignoring(Ignored::Unremembered));
             ending
         });
@@ -131,7 +152,10 @@ impl<F: Files, S: Store> Desk<'_, '_, F, S> {
             Ok(Ending::Stop) => self.cleared(passed),
             Ok(Ending::Unpushed { held }) => Ok(Reply::Block { reason: Unpushed { pushed, held }.to_string() }),
             Ok(Ending::MergeMain { lacking }) => Ok(Reply::Block { reason: Stalled { pushed, lacking }.to_string() }),
-            Ok(Ending::Failing(jobs)) => Ok(Reply::Block { reason: Logged::fetched(pushed, &jobs, hub).to_string() }),
+            Ok(Ending::Failing(jobs)) => {
+                let logged = crew.driven(|tape| Logged::fetched(tape, pushed, &jobs, hub));
+                Ok(Reply::Block { reason: logged.to_string() })
+            }
             Ok(Ending::Escalate(escalation)) => self.escalated(Some(&at), escalation),
             Err(step) => self.escalated(Some(&at), Escalation::Unread(step)),
         }
@@ -158,18 +182,18 @@ impl<F: Files, S: Store> Desk<'_, '_, F, S> {
 }
 
 impl Pushed {
-    fn checked<C: Clock, G: Shell>(self, hub: &Hub<'_, C, G>, store: &impl Store) -> Result<Checked, UnreadStep> {
-        let held = hub.head(self.pull())?;
+    fn checked(self, tape: &Tape<'_>, hub: Hub<'_>, before: &[CheckName]) -> Result<Checked, Cut<UnreadStep>> {
+        let held = hub.head(tape, self.pull())?;
         if held == self.head() {
-            match hub.mergeable(self.pull())? {
-                Merge::Stale => Ok(Checked::ended(Ending::MergeMain { lacking: hub.lacking(self.head()) })),
+            match hub.mergeable(tape, self.pull())? {
+                Merge::Stale => Ok(Checked::ended(Ending::MergeMain { lacking: hub.lacking(tape, self.head())? })),
                 Merge::Current => {
-                    hub.requested(self.pull())?;
-                    let judged = self.judged(hub.settled(self.pull())?, store);
+                    hub.requested(tape, self.pull())?;
+                    let judged = self.judged(hub.settled(tape, self.pull())?, before);
                     match judged.ending {
                         Ending::Stop => Ok(Checked {
                             ending: hub
-                                .gated(self.head())?
+                                .gated(tape, self.head())?
                                 .map_or(Ending::Stop, |check| Ending::Escalate(Escalation::GatedRerun(check))),
                             failing: judged.failing,
                         }),
@@ -185,9 +209,7 @@ impl Pushed {
         }
     }
 
-    fn judged(self, verdict: Verdict, store: &impl Store) -> Checked {
-        let before: Vec<CheckName> =
-            store.read(FailedBefore::new(self.pull(), self.head())).ignoring(Ignored::Unremembered).unwrap_or_default();
+    fn judged(self, verdict: Verdict, before: &[CheckName]) -> Checked {
         let jobs = verdict.failed();
         let names = jobs.iter().map(|job| job.check().clone()).collect();
         let failing = Some(Failing::new(self.pull(), self.head(), names));
@@ -210,9 +232,9 @@ impl Checked {
 impl Logged {
     const LINES: usize = 40;
 
-    fn fetched<C: Clock, G: Shell>(pushed: Pushed, failed: &[FailedJob], hub: &Hub<'_, C, G>) -> Logged {
-        let jobs = failed.iter().map(|job| Excerpt::excerpted(job.clone(), &hub.log(job.job()))).collect();
-        Logged { pushed, jobs }
+    fn fetched(tape: &Tape<'_>, pushed: Pushed, failed: &[FailedJob], hub: Hub<'_>) -> Result<Logged, Asked> {
+        let logged = failed.iter().map(|job| Ok(Excerpt::excerpted(job.clone(), &hub.log(tape, job.job())?)));
+        Ok(Logged { pushed, jobs: logged.collect::<Result<_, Asked>>()? })
     }
 }
 

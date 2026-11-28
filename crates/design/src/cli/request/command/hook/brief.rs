@@ -1,3 +1,4 @@
+use design_messages::OwnerHistory;
 use dispatch_ports::{Clock, Shell};
 use file_ports::Files;
 use invariants::Ignoring;
@@ -9,7 +10,7 @@ use transcript_ports::Body;
 use super::super::Ground;
 use super::super::crew::Crew;
 use super::super::ingest::Ingest;
-use super::answers::{Answering, Moment};
+use super::answers::{Answers, Moment};
 use super::reply::{Reply, Telling, Told};
 use crate::cli::failure::Failure;
 use crate::cli::request::ignored::Ignored;
@@ -45,8 +46,11 @@ impl Brief {
             let store = ground.store();
             ground.prepared(crew.scratch())?;
             Ingest::read(store, &ground.transcripts())?;
-            let answers = Answering::new(store, crew).searched(body, Moment::Briefing).ignoring(Ignored::Unanswered);
-            answers.flatten().map_or_else(passed, |found| {
+            let answers = store
+                .read(OwnerHistory)
+                .ignoring(Ignored::Unanswered)
+                .and_then(|history| crew.driven(|tape| Answers::searched(tape, body, Moment::Briefing, &history)));
+            answers.map_or_else(passed, |found| {
                 let said = self.said.telling(format!("{body}\n\n{found}"));
                 Ok(Reply::Rewrite { input: Told::new(said, &self.rest) })
             })

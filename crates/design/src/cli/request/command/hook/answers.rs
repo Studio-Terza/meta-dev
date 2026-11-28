@@ -1,36 +1,25 @@
 mod boundary;
 
-use design_messages::{OwnerHistory, Quote, Said};
-use dispatch_ports::{Clock, Shell, Timeout};
-use store_ports::Store;
+use design_messages::{Quote, Said};
+use dispatch_ports::Timeout;
 use transcript_ports::Body;
 
-use super::super::crew::{Crew, Prompt};
-use crate::cli::failure::Failure;
-use boundary::Asked;
+use super::super::crew::{Asked, Prompt, Tape};
+use boundary::Asked as Question;
 pub use boundary::{Answers, Moment};
 
-#[derive(Debug)]
-pub struct Answering<'ports, S: Store, C: Clock, G: Shell> {
-    store: &'ports S,
-    crew: &'ports Crew<'ports, C, G>,
-}
-
-impl<'ports, S: Store, C: Clock, G: Shell> Answering<'ports, S, C, G> {
+impl Answers {
     const TIMEOUT: Timeout = Timeout::new(120);
 
-    pub fn new(store: &'ports S, crew: &'ports Crew<'ports, C, G>) -> Answering<'ports, S, C, G> {
-        Answering { store, crew }
-    }
-
-    pub fn searched(&self, said: &Body, moment: Moment) -> Result<Option<Answers>, Failure> {
-        let asked = Asked::new(said, moment);
-        let history: Vec<Said> = self.store.read(OwnerHistory)?;
-        let reading = asked.reading(&history);
-        let fanned = self.crew.fanned(reading.prompts(), Self::TIMEOUT);
+    pub fn searched(tape: &Tape<'_>, said: &Body, moment: Moment, history: &[Said]) -> Result<Option<Answers>, Asked> {
+        let asked = Question::new(said, moment);
+        let reading = asked.reading(history);
+        let fanned = tape.fanned(reading.prompts(), Self::TIMEOUT)?;
         let quoted: Vec<Quote> = reading.quoted(&fanned).into_iter().flatten().collect();
-        let trimmed =
-            quoted.first().and_then(|_| self.crew.replied(&Prompt::from(&asked.trimming(&quoted)), Self::TIMEOUT));
+        let trimmed = match quoted.first() {
+            Some(_first) => tape.replied(&Prompt::from(&asked.trimming(&quoted)), Self::TIMEOUT)?,
+            None => None,
+        };
         Ok(trimmed.and_then(|reply| Answers::kept(&reply, &quoted)))
     }
 }
