@@ -16,7 +16,7 @@ struct ReadTo {
     cursor: Cursor,
 }
 
-#[derive(Debug, Default, Measure)]
+#[derive(Debug, Measure)]
 pub struct Tally {
     ends: Vec<ReadTo>,
     authorship: BTreeMap<Authorship, Count>,

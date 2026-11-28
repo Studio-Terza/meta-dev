@@ -2,8 +2,8 @@ Violations
 --- out
 lint timings in milliseconds, each stage summed over files and threads:
 run: wall time of the whole run
-find: list the packages and their crate roots
-parse: read and parse each file once
+find: read the tree once and list its packages and crate roots
+parse: parse each file once
 visit: walk each file's tree once through every lint and the test budget
 reduce: join the graph lints' facts
 --- err

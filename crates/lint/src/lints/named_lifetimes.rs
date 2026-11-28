@@ -1,9 +1,8 @@
 use syn::{LifetimeParam, Macro};
 
-use crate::finding::{Found, Rule};
+use crate::finding::Found;
 use crate::hooks::{Descent, Expanded, Hooks};
-use crate::source::Source;
-use crate::style::{Reads, Style};
+use crate::lint::style;
 
 #[derive(Debug, Default)]
 pub(crate) struct NamedLifetimes {
@@ -28,15 +27,4 @@ impl Hooks for NamedLifetimes {
     }
 }
 
-impl<'file> Style<'file> for NamedLifetimes {
-    const RULE: Rule = Rule::NamedLifetimes;
-    const READS: Reads = Reads::Every;
-
-    fn new(_: &'file Source) -> NamedLifetimes {
-        NamedLifetimes::default()
-    }
-
-    fn found(self) -> Vec<Found> {
-        self.found
-    }
-}
+style!(NamedLifetimes, Every, "lifetimes are named with a word, never a letter");

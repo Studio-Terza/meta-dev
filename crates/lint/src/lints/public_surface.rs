@@ -1,13 +1,14 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
 
+use pipeline::{Edges, Measure};
 use proc_macro2::Ident;
 use syn::{Item, ItemUse, Macro, Visibility};
 
-use crate::finding::{Finding, Found, Rule};
-use crate::graph::Graph;
+use crate::finding::{Finding, Found};
 use crate::hooks::{Descent, Expanded, Hooks};
+use crate::lint::{Fact, Lint, Reads};
 use crate::source::{Place, Source};
 use crate::use_leaf::UseLeaf;
 use crate::workspace::Package;
@@ -39,11 +40,8 @@ enum Used {
     Globbed,
 }
 
-#[derive(Debug, Default)]
-struct Reach {
-    names: BTreeSet<String>,
-    used: Used,
-}
+#[derive(Debug, Measure)]
+pub(crate) struct SurfaceFacts(Vec<SurfaceFact>);
 
 #[derive(Debug)]
 pub(crate) struct PublicSurface<'file> {
@@ -53,18 +51,13 @@ pub(crate) struct PublicSurface<'file> {
     facts: Vec<SurfaceFact>,
 }
 
-impl Reach {
-    fn absorb(&mut self, reached: &Reached, reader: Reader) {
-        let used = match (reached, reader) {
+impl Used {
+    fn of(reached: &Reached, reader: Reader) -> Used {
+        match (reached, reader) {
             (_, Reader::Tests | Reader::Neither) => Used::Unused,
             (Reached::Named(_), Reader::Shipped) => Used::Named,
             (Reached::Glob, Reader::Shipped) => Used::Globbed,
-        };
-        self.used = self.used.max(used);
-        self.names.extend(match reached {
-            Reached::Named(name) => Some(name.clone()),
-            Reached::Glob => None,
-        });
+        }
     }
 }
 
@@ -130,8 +123,11 @@ impl Hooks for PublicSurface<'_> {
     }
 }
 
-impl<'file> Graph<'file> for PublicSurface<'file> {
-    type Fact = SurfaceFact;
+impl<'file> Lint<'file> for PublicSurface<'file> {
+    const HEADLINE: &'static str = "a crate exports exactly what another crate uses";
+    const READS: Reads = Reads::Every;
+
+    type Fact = SurfaceFacts;
 
     fn new(source: &'file Source) -> PublicSurface<'file> {
         let reader = match source.place() {
@@ -143,41 +139,52 @@ impl<'file> Graph<'file> for PublicSurface<'file> {
         PublicSurface { source, reader, own_crate, facts: Vec::new() }
     }
 
-    fn facts(self) -> Vec<SurfaceFact> {
+    fn fact(self, _: &'file Source) -> SurfaceFacts {
         let tested = (self.reader == Reader::Tests).then(|| self.source.package().crate_name());
-        self.facts
-            .into_iter()
-            .filter(|fact| match (fact, &tested) {
-                (SurfaceFact::Sighting { crate_name, .. }, Some(own)) => crate_name == own,
-                _ => true,
-            })
-            .collect()
-    }
-
-    fn reduce(facts: Vec<SurfaceFact>, _: &[Arc<Package>]) -> Vec<Finding> {
-        let reaches = facts.iter().fold(BTreeMap::new(), |mut reaches: BTreeMap<&str, Reach>, fact| {
-            let sighted = match fact {
-                SurfaceFact::Sighting { crate_name, reached, reader } => Some(crate_name).zip(Some((reached, *reader))),
-                SurfaceFact::Export { .. } => None,
-            };
-            sighted.map_or_default(|(crate_name, (reached, reader))| {
-                reaches.entry(crate_name.as_str()).or_default().absorb(reached, reader);
-            });
-            reaches
+        let kept = self.facts.into_iter().filter(|fact| match (fact, &tested) {
+            (SurfaceFact::Sighting { crate_name, .. }, Some(own)) => crate_name == own,
+            _ => true,
         });
-        facts
+        SurfaceFacts(kept.collect())
+    }
+}
+
+impl Fact for SurfaceFacts {
+    fn findings(self, _: &[Arc<Package>]) -> Vec<Finding> {
+        let sightings: Vec<(&str, &Reached, Reader)> = self
+            .0
+            .iter()
+            .filter_map(|fact| match fact {
+                SurfaceFact::Sighting { crate_name, reached, reader } => Some((crate_name.as_str(), reached, *reader)),
+                SurfaceFact::Export { .. } => None,
+            })
+            .collect();
+        let named: Edges<&str, &str> =
+            Edges::total(sightings.iter().filter_map(|(crate_name, reached, _)| match reached {
+                Reached::Named(name) => Some(Edges::edge(*crate_name, name.as_str())),
+                Reached::Glob => None,
+            }));
+        let used =
+            sightings.iter().fold(BTreeMap::new(), |mut used: BTreeMap<&str, Used>, (crate_name, reached, reader)| {
+                let entry = used.entry(crate_name).or_default();
+                *entry = (*entry).max(Used::of(reached, *reader));
+                used
+            });
+        self.0
             .iter()
             .filter_map(|fact| match fact {
                 SurfaceFact::Export { crate_name, name, path, line } => {
-                    let reach = reaches.get(crate_name.as_str());
-                    let unnamed = reach.filter(|known| known.used == Used::Named && !known.names.contains(name));
+                    let named_only = used.get(crate_name.as_str()).filter(|reach| **reach == Used::Named);
+                    let unnamed = named_only
+                        .and_then(|_| named.targets(&crate_name.as_str()))
+                        .filter(|names| !names.contains(name.as_str()));
                     unnamed.map(|_| {
                         Found::at(
                             *line,
                             format_args!("{name} is exported but no other crate names it"),
                             "export it when a user appears",
                         )
-                        .in_file(Rule::PublicSurface, path)
+                        .in_file(PublicSurface::HEADLINE, path)
                     })
                 }
                 SurfaceFact::Sighting { .. } => None,
