@@ -79,6 +79,7 @@ pub enum UnreadStep {
     Ending,
     Head,
     Mergeable,
+    Label,
     Overdue,
     Checks,
     NoRepository,

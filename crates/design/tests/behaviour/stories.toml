@@ -411,7 +411,7 @@ answers = [
 ]
 
 [[story]]
-name = "a done right after opening waits for checks to appear, watches them, and stops on green clearing its escalations"
+name = "a done right after opening asks for mutants, waits for checks to appear, watches them, and stops on green clearing its escalations"
 queue = '''
 [[item]]
 escalation = { at = { pull = 12 }, cause = { unread = "checks" }, from = "/work/agent" }
@@ -426,6 +426,9 @@ answers = [
   { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
   { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"UNKNOWN"}' },
   { asked = "run list --commit 0123456789abcdef0123456789abcdef01234567 --json databaseId,attempt -R o/r", ran = "Succeeded", printed = '[{"attempt":1,"databaseId":9}]' },
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = "" },
+  { asked = "pr edit 12 --remove-label mutants -R o/r", ran = "Failed", printed = "" },
+  { asked = "pr edit 12 --add-label mutants -R o/r", ran = "Succeeded", printed = "https://github.com/o/r/pull/12" },
   { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = "" },
   { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = "[]" },
   { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/455","name":"plan"},{"bucket":"pending","link":"","name":"test"}]' },
@@ -448,7 +451,7 @@ answers = [
   { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
   { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"MERGEABLE"}' },
   { asked = "run list --commit 0123456789abcdef0123456789abcdef01234567 --json databaseId,attempt -R o/r", ran = "Succeeded", printed = '[{"attempt":1,"databaseId":9}]' },
-  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"fail","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"},{"bucket":"cancel","link":"https://github.com/o/r/actions/runs/9/job/458?pr=12","name":"build"},{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/457","name":"lint"}]' },
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"fail","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"},{"bucket":"cancel","link":"https://github.com/o/r/actions/runs/9/job/458?pr=12","name":"build"},{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/457","name":"lint"},{"bucket":"pass","link":"https://github.com/o/r/actions/runs/10/job/460","name":"mutants"}]' },
   { asked = "run view --job 456 --log-failed -R o/r", ran = "Succeeded", printed = """
 test step line 1
 test step line 2
@@ -500,7 +503,8 @@ finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
 [[story.step]]
 finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
 answers = [
-  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Succeeded", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"}]' },
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Succeeded", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"},{"bucket":"pass","link":"https://github.com/o/r/actions/runs/10/job/460","name":"mutants"}]' },
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Succeeded", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"},{"bucket":"pass","link":"https://github.com/o/r/actions/runs/10/job/460","name":"mutants"}]' },
 ]
 
 [[story.step]]
@@ -516,7 +520,9 @@ queue = ""
 answers = [
   { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
   { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"MERGEABLE"}' },
-  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Succeeded", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"clippy"}]' },
+  { asked = "pr edit 12 --remove-label mutants -R o/r", ran = "Succeeded", printed = "https://github.com/o/r/pull/12" },
+  { asked = "pr edit 12 --add-label mutants -R o/r", ran = "Succeeded", printed = "https://github.com/o/r/pull/12" },
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Succeeded", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"clippy"},{"bucket":"pass","link":"https://github.com/o/r/actions/runs/10/job/460","name":"mutants"}]' },
 ]
 
 [[story.step]]
@@ -588,7 +594,9 @@ finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
 answers = [
   { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
   { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"MERGEABLE"}' },
-  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"fail","link":"https://ci.example/9","name":"status"}]' },
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"}]' },
+  { asked = "pr edit 12 --remove-label mutants -R o/r", ran = "Succeeded", printed = "https://github.com/o/r/pull/12" },
+  { asked = "pr edit 12 --add-label mutants -R o/r", ran = "Failed", printed = "could not add label: 'mutants' not found" },
 ]
 
 [[story.step]]
@@ -596,7 +604,15 @@ finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
 answers = [
   { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
   { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"MERGEABLE"}' },
-  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"pending","link":"","name":"test"}]' },
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"fail","link":"https://ci.example/9","name":"status"},{"bucket":"pending","link":"","name":"mutants"}]' },
+]
+
+[[story.step]]
+finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"MERGEABLE"}' },
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"pending","link":"","name":"test"},{"bucket":"pending","link":"","name":"mutants"}]' },
   { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Overdue", printed = "" },
 ]
 
@@ -631,6 +647,9 @@ https://github.com/o/r/pull/12
   { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"MERGEABLE"}' },
   { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Succeeded", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"}]' },
   { asked = "run list --commit 0123456789abcdef0123456789abcdef01234567 --json databaseId,attempt -R o/r", ran = "Succeeded", printed = '[{"attempt":1,"databaseId":9}]' },
+  { asked = "pr edit 12 --remove-label mutants -R o/r", ran = "Succeeded", printed = "https://github.com/o/r/pull/12" },
+  { asked = "pr edit 12 --add-label mutants -R o/r", ran = "Succeeded", printed = "https://github.com/o/r/pull/12" },
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Succeeded", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"},{"bucket":"pass","link":"https://github.com/o/r/actions/runs/10/job/460","name":"mutants"}]' },
 ]
 
 [[story]]
