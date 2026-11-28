@@ -1,0 +1,373 @@
+(
+    [
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Blocked,
+            ),
+            Answer {
+                shown: Shown(
+                    "{\"decision\":\"block\",\"reason\":\"CI failed on #12 at 0123456789abcdef0123456789abcdef01234567. Fix these jobs, push, then end with DONE #12 <full sha>.\\n\\ntest (job 456):\\ntest step line 3\\ntest step line 4\\ntest step line 5\\ntest step line 6\\ntest step line 7\\ntest step line 8\\ntest step line 9\\ntest step line 10\\ntest step line 11\\ntest step line 12\\ntest step line 13\\ntest step line 14\\ntest step line 15\\ntest step line 16\\ntest step line 17\\ntest step line 18\\ntest step line 19\\ntest step line 20\\ntest step line 21\\ntest step line 22\\ntest step line 23\\ntest step line 24\\ntest step line 25\\ntest step line 26\\ntest step line 27\\ntest step line 28\\ntest step line 29\\ntest step line 30\\ntest step line 31\\ntest step line 32\\ntest step line 33\\ntest step line 34\\ntest step line 35\\ntest step line 36\\ntest step line 37\\ntest step line 38\\ntest step line 39\\ntest step line 40\\ntest step line 41\\ntest step line 42\\n\\nbuild (job 458):\\n(the log could not be read)\\n\"}\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "pr",
+                            "view",
+                            "12",
+                            "--json",
+                            "headRefOid",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "pr",
+                            "view",
+                            "12",
+                            "--json",
+                            "mergeable",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "pr",
+                            "checks",
+                            "12",
+                            "--json",
+                            "name,bucket,link",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "run",
+                            "view",
+                            "--job",
+                            "456",
+                            "--log-failed",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "run",
+                            "view",
+                            "--job",
+                            "458",
+                            "--log-failed",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                ],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Hooked(
+                    SubagentStop,
+                ),
+            ),
+            Answer {
+                shown: Shown(
+                    "",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "pr",
+                            "view",
+                            "12",
+                            "--json",
+                            "headRefOid",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "pr",
+                            "view",
+                            "12",
+                            "--json",
+                            "mergeable",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "pr",
+                            "checks",
+                            "12",
+                            "--json",
+                            "name,bucket,link",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                ],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Blocked,
+            ),
+            Answer {
+                shown: Shown(
+                    "{\"decision\":\"block\",\"reason\":\"CI failed on #12 at 0123456789abcdef0123456789abcdef01234567. Fix these jobs, push, then end with DONE #12 <full sha>.\\n\\ntest (job 456):\\ntest step line 3\\ntest step line 4\\ntest step line 5\\ntest step line 6\\ntest step line 7\\ntest step line 8\\ntest step line 9\\ntest step line 10\\ntest step line 11\\ntest step line 12\\ntest step line 13\\ntest step line 14\\ntest step line 15\\ntest step line 16\\ntest step line 17\\ntest step line 18\\ntest step line 19\\ntest step line 20\\ntest step line 21\\ntest step line 22\\ntest step line 23\\ntest step line 24\\ntest step line 25\\ntest step line 26\\ntest step line 27\\ntest step line 28\\ntest step line 29\\ntest step line 30\\ntest step line 31\\ntest step line 32\\ntest step line 33\\ntest step line 34\\ntest step line 35\\ntest step line 36\\ntest step line 37\\ntest step line 38\\ntest step line 39\\ntest step line 40\\ntest step line 41\\ntest step line 42\\n\\nbuild (job 458):\\n(the log could not be read)\\n\"}\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "pr",
+                            "view",
+                            "12",
+                            "--json",
+                            "headRefOid",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "pr",
+                            "view",
+                            "12",
+                            "--json",
+                            "mergeable",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "pr",
+                            "checks",
+                            "12",
+                            "--json",
+                            "name,bucket,link",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "run",
+                            "view",
+                            "--job",
+                            "456",
+                            "--log-failed",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "run",
+                            "view",
+                            "--job",
+                            "458",
+                            "--log-failed",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                ],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Escalated,
+            ),
+            Answer {
+                shown: Shown(
+                    "",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "pr",
+                            "view",
+                            "12",
+                            "--json",
+                            "headRefOid",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "pr",
+                            "view",
+                            "12",
+                            "--json",
+                            "mergeable",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "pr",
+                            "checks",
+                            "12",
+                            "--json",
+                            "name,bucket,link",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                ],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+    ],
+    Ok(
+        "[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\npull = 12\n\n[item.escalation.cause]\nrepeat-failure = \"test\"\n",
+    ),
+)

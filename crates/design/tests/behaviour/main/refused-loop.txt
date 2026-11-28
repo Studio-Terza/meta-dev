@@ -1,0 +1,12 @@
+(
+    Ok(
+        Succeeded(
+            Printed(
+                "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Refused: `rm` inside a loop. The harness flags `rm` there and stalls the call. Unroll it into separate plain top-level commands: list the targets first, then run each `rm` as its own command with literal paths.\"}}\n",
+            ),
+        ),
+    ),
+    Calls(
+        1,
+    ),
+)

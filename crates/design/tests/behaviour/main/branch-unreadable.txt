@@ -1,0 +1,613 @@
+(
+    [
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Escalated,
+            ),
+            Answer {
+                shown: Shown(
+                    "",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Escalated,
+            ),
+            Answer {
+                shown: Shown(
+                    "",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "api",
+                            "graphql",
+                            "-F",
+                            "owner=o",
+                            "-F",
+                            "name=r",
+                            "-f",
+                            "ref=refs/heads/design/open-pr",
+                            "-f",
+                            "query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                ],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Escalated,
+            ),
+            Answer {
+                shown: Shown(
+                    "",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "api",
+                            "graphql",
+                            "-F",
+                            "owner=o",
+                            "-F",
+                            "name=r",
+                            "-f",
+                            "ref=refs/heads/design/open-pr",
+                            "-f",
+                            "query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "api",
+                            "repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                ],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Escalated,
+            ),
+            Answer {
+                shown: Shown(
+                    "",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "api",
+                            "graphql",
+                            "-F",
+                            "owner=o",
+                            "-F",
+                            "name=r",
+                            "-f",
+                            "ref=refs/heads/design/open-pr",
+                            "-f",
+                            "query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "api",
+                            "repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                ],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Escalated,
+            ),
+            Answer {
+                shown: Shown(
+                    "",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "api",
+                            "graphql",
+                            "-F",
+                            "owner=o",
+                            "-F",
+                            "name=r",
+                            "-f",
+                            "ref=refs/heads/design/open-pr",
+                            "-f",
+                            "query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "api",
+                            "repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                ],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Escalated,
+            ),
+            Answer {
+                shown: Shown(
+                    "",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "api",
+                            "graphql",
+                            "-F",
+                            "owner=o",
+                            "-F",
+                            "name=r",
+                            "-f",
+                            "ref=refs/heads/design/open-pr",
+                            "-f",
+                            "query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "api",
+                            "repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                ],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Escalated,
+            ),
+            Answer {
+                shown: Shown(
+                    "",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "api",
+                            "graphql",
+                            "-F",
+                            "owner=o",
+                            "-F",
+                            "name=r",
+                            "-f",
+                            "ref=refs/heads/design/open-pr",
+                            "-f",
+                            "query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "api",
+                            "repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                ],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Escalated,
+            ),
+            Answer {
+                shown: Shown(
+                    "",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "api",
+                            "graphql",
+                            "-F",
+                            "owner=o",
+                            "-F",
+                            "name=r",
+                            "-f",
+                            "ref=refs/heads/design/open-pr",
+                            "-f",
+                            "query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "api",
+                            "repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                ],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Escalated,
+            ),
+            Answer {
+                shown: Shown(
+                    "",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "api",
+                            "graphql",
+                            "-F",
+                            "owner=o",
+                            "-F",
+                            "name=r",
+                            "-f",
+                            "ref=refs/heads/design/open-pr",
+                            "-f",
+                            "query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "api",
+                            "repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "pr",
+                            "create",
+                            "--head",
+                            "design/open-pr",
+                            "--base",
+                            "main",
+                            "--title",
+                            "D3 Typed agent outcomes",
+                            "--body",
+                            "spec: tools-retirement#D3\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                ],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Escalated,
+            ),
+            Answer {
+                shown: Shown(
+                    "",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "api",
+                            "graphql",
+                            "-F",
+                            "owner=o",
+                            "-F",
+                            "name=r",
+                            "-f",
+                            "ref=refs/heads/design/open-pr",
+                            "-f",
+                            "query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "api",
+                            "repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "pr",
+                            "create",
+                            "--head",
+                            "design/open-pr",
+                            "--base",
+                            "main",
+                            "--title",
+                            "D3 Typed agent outcomes",
+                            "--body",
+                            "spec: tools-retirement#D3\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "pr",
+                            "view",
+                            "design/open-pr",
+                            "--json",
+                            "number",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                ],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+    ],
+    Ok(
+        "[[item]]\n\n[item.escalation]\ncause = \"blocked\"\nfrom = \"/work/agent\"\n\n[item.escalation.at]\nbranch = \"design/open-pr\"\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\nbranch = \"design/open-pr\"\n\n[item.escalation.cause]\nunread = \"remote\"\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\nbranch = \"design/open-pr\"\n\n[item.escalation.cause]\nunread = \"commits\"\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\nbranch = \"design/open-pr\"\n\n[item.escalation.cause]\nunread = \"commits\"\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\nbranch = \"design/open-pr\"\n\n[item.escalation.cause]\nunread = \"spec\"\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\nbranch = \"design/open-pr\"\n\n[item.escalation.cause]\nunread = \"detail\"\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\nbranch = \"design/open-pr\"\n\n[item.escalation.cause]\nunread = \"detail\"\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\nbranch = \"design/open-pr\"\n\n[item.escalation.cause]\nunread = \"detail\"\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\nbranch = \"design/open-pr\"\n\n[item.escalation.cause]\nunread = \"open\"\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\nbranch = \"design/open-pr\"\n\n[item.escalation.cause]\nunread = \"open\"\n",
+    ),
+)

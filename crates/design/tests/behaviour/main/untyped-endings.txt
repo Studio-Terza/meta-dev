@@ -1,0 +1,367 @@
+(
+    [
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Blocked,
+            ),
+            Answer {
+                shown: Shown(
+                    "{\"decision\":\"block\",\"reason\":\"End your turn with exactly one line and nothing else: DONE <branch> <full sha> once that commit is the pushed head of a branch with no pull request yet, DONE #<pr> <full sha> once the pull request's head is that commit, or BLOCKED #<pr> <full sha> when you cannot go on.\"}\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Blocked,
+            ),
+            Answer {
+                shown: Shown(
+                    "{\"decision\":\"block\",\"reason\":\"End your turn with exactly one line and nothing else: DONE <branch> <full sha> once that commit is the pushed head of a branch with no pull request yet, DONE #<pr> <full sha> once the pull request's head is that commit, or BLOCKED #<pr> <full sha> when you cannot go on.\"}\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Blocked,
+            ),
+            Answer {
+                shown: Shown(
+                    "{\"decision\":\"block\",\"reason\":\"End your turn with exactly one line and nothing else: DONE <branch> <full sha> once that commit is the pushed head of a branch with no pull request yet, DONE #<pr> <full sha> once the pull request's head is that commit, or BLOCKED #<pr> <full sha> when you cannot go on.\"}\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Blocked,
+            ),
+            Answer {
+                shown: Shown(
+                    "{\"decision\":\"block\",\"reason\":\"End your turn with exactly one line and nothing else: DONE <branch> <full sha> once that commit is the pushed head of a branch with no pull request yet, DONE #<pr> <full sha> once the pull request's head is that commit, or BLOCKED #<pr> <full sha> when you cannot go on.\"}\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Blocked,
+            ),
+            Answer {
+                shown: Shown(
+                    "{\"decision\":\"block\",\"reason\":\"End your turn with exactly one line and nothing else: DONE <branch> <full sha> once that commit is the pushed head of a branch with no pull request yet, DONE #<pr> <full sha> once the pull request's head is that commit, or BLOCKED #<pr> <full sha> when you cannot go on.\"}\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Blocked,
+            ),
+            Answer {
+                shown: Shown(
+                    "{\"decision\":\"block\",\"reason\":\"End your turn with exactly one line and nothing else: DONE <branch> <full sha> once that commit is the pushed head of a branch with no pull request yet, DONE #<pr> <full sha> once the pull request's head is that commit, or BLOCKED #<pr> <full sha> when you cannot go on.\"}\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Blocked,
+            ),
+            Answer {
+                shown: Shown(
+                    "{\"decision\":\"block\",\"reason\":\"End your turn with exactly one line and nothing else: DONE <branch> <full sha> once that commit is the pushed head of a branch with no pull request yet, DONE #<pr> <full sha> once the pull request's head is that commit, or BLOCKED #<pr> <full sha> when you cannot go on.\"}\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Blocked,
+            ),
+            Answer {
+                shown: Shown(
+                    "{\"decision\":\"block\",\"reason\":\"End your turn with exactly one line and nothing else: DONE <branch> <full sha> once that commit is the pushed head of a branch with no pull request yet, DONE #<pr> <full sha> once the pull request's head is that commit, or BLOCKED #<pr> <full sha> when you cannot go on.\"}\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Blocked,
+            ),
+            Answer {
+                shown: Shown(
+                    "{\"decision\":\"block\",\"reason\":\"End your turn with exactly one line and nothing else: DONE <branch> <full sha> once that commit is the pushed head of a branch with no pull request yet, DONE #<pr> <full sha> once the pull request's head is that commit, or BLOCKED #<pr> <full sha> when you cannot go on.\"}\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Blocked,
+            ),
+            Answer {
+                shown: Shown(
+                    "{\"decision\":\"block\",\"reason\":\"End your turn with exactly one line and nothing else: DONE <branch> <full sha> once that commit is the pushed head of a branch with no pull request yet, DONE #<pr> <full sha> once the pull request's head is that commit, or BLOCKED #<pr> <full sha> when you cannot go on.\"}\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Blocked,
+            ),
+            Answer {
+                shown: Shown(
+                    "{\"decision\":\"block\",\"reason\":\"End your turn with exactly one line and nothing else: DONE <branch> <full sha> once that commit is the pushed head of a branch with no pull request yet, DONE #<pr> <full sha> once the pull request's head is that commit, or BLOCKED #<pr> <full sha> when you cannot go on.\"}\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Escalated,
+            ),
+            Answer {
+                shown: Shown(
+                    "",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+    ],
+    Ok(
+        "[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.cause]\nunread = \"ending\"\n",
+    ),
+)

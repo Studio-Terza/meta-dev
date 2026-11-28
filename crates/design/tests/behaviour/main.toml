@@ -1,0 +1,1022 @@
+# Each story runs design's commands and hooks, step by step, against a fresh home with a real file
+# store; its golden beside this file holds what each step ended with and showed, every scripted call
+# it made, and the queue it leaves. `Home` holds what every story's home starts with.
+
+[[Home]]
+moved = { "/private/tmp" = "tmp", "/home" = "" }
+environment = { HOME = "/home", PWD = "/home" }
+arguments = ["--workspace", "work"]
+directories = ["/home/work/.meta", "/home/placed"]
+queue = "/home/placed/queue.toml"
+
+[Home.files]
+"/home/work/.meta/local.toml" = """
+queue = "/home/placed/queue.toml"
+specs = "/home/placed/specs"
+repository = "o/r"
+"""
+"/home/.claude/projects/-home-work/s.jsonl" = ""
+
+# The design binary itself, named by the variable cargo sets for its tests and run on the real
+# ports through the system shell: an event it cannot read fails, and one it reads is answered on
+# standard output.
+[Binary.unreadable-input]
+program = "CARGO_BIN_EXE_design"
+flag = "--workspace"
+workspace = "work"
+directories = ["work/.meta"]
+words = ["hook", "stop"]
+input = "not json"
+timeout = 60
+
+[Binary.refused-loop]
+program = "CARGO_BIN_EXE_design"
+flag = "--workspace"
+workspace = "work"
+directories = ["work/.meta"]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"for d in a b; do rm -rf \"$d\"; done"},"tool_name":"Bash"}'
+timeout = 60
+
+# ingest reads each session once, a dry run writes nothing, and a grown transcript resumes
+[Story.ingest-resumes.files]
+"/home/.claude/projects/-home-work/s.jsonl" = '''
+{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}
+{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}
+{"type":"brand-new-kind","uuid":"x1","parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z"}
+'''
+
+[[Story.ingest-resumes.step]]
+words = ["ingest", "--dry-run"]
+
+[[Story.ingest-resumes.step]]
+words = ["ingest"]
+
+[[Story.ingest-resumes.step]]
+words = ["ingest"]
+
+[[Story.ingest-resumes.step]]
+words = ["ingest"]
+
+[Story.ingest-resumes.step.append]
+"/home/.claude/projects/-home-work/s.jsonl" = '''
+{"message":{"content":"Ship it.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o2"}
+'''
+
+# words the cli does not know are refused with the usage, and the hook settings print
+[[Story.unknown-words.step]]
+words = ["frobnicate"]
+
+[[Story.unknown-words.step]]
+words = ["hook"]
+
+[[Story.unknown-words.step]]
+words = ["hook", "stop", "--settings"]
+
+[[Story.unknown-words.step]]
+words = ["ingest", "--wet"]
+
+[[Story.unknown-words.step]]
+words = []
+
+[[Story.unknown-words.step]]
+words = ["hook", "--settings"]
+
+[[Story.unknown-words.step]]
+words = ["hook", "stop"]
+input = "not json"
+
+# a continuing stop passes at once
+[[Story.continuing-stop.step]]
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":true,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}'
+
+# a stop with nothing running stalls, and one without a transcript passes
+[Story.nothing-running.files]
+"/home/.claude/projects/-home-work/s.jsonl" = '''
+{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}
+{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}
+'''
+
+[[Story.nothing-running.step]]
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}'
+
+[[Story.nothing-running.step]]
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":null}'
+
+# a shell still running passes
+[Story.shell-running.files]
+"/home/.claude/projects/-home-work/s.jsonl" = '''
+{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}
+{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}
+'''
+"/private/tmp/claude-501/-home-work/s/tasks/b1.output" = "building\n"
+
+[[Story.shell-running.step]]
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}'
+
+# an agent quiet under twenty minutes passes
+[Story.agent-under-twenty.files]
+"/home/.claude/projects/-home-work/s.jsonl" = '''
+{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}
+{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}
+'''
+"/home/.claude/projects/-home-work/s/subagents/agent-busy.jsonl" = "{\"type\":\"user\"}\n"
+
+[Story.agent-under-twenty.quiet]
+"/home/.claude/projects/-home-work/s/subagents/agent-busy.jsonl" = { secs = 1140, nanos = 0 }
+
+[[Story.agent-under-twenty.step]]
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}'
+
+# finished tasks and files that are not tasks stall
+[Story.finished-tasks.files]
+"/home/.claude/projects/-home-work/s.jsonl" = '''
+{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}
+{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}
+'''
+"/private/tmp/claude-501/-home-work/s/tasks/b1.output" = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n[exited with code 0]\n"
+"/private/tmp/claude-501/-home-work/s/tasks/b2.log" = "building\n"
+"/private/tmp/claude-501/-home-work/s/tasks/b3.output" = "building\n\n[killed]"
+"/home/.claude/projects/-home-work/s/subagents/agent-done.jsonl" = "{\"type\":\"user\"}\n{\"type\":\"assistant\",\"message\":{\"stop_reason\":\"end_turn\"}}\n"
+"/home/.claude/projects/-home-work/s/subagents/agent-done.meta.json" = "{}\n"
+
+[Story.finished-tasks.quiet]
+"/home/.claude/projects/-home-work/s/subagents/agent-done.jsonl" = { secs = 1200, nanos = 0 }
+"/home/.claude/projects/-home-work/s/subagents/agent-done.meta.json" = { secs = 1200, nanos = 0 }
+
+[[Story.finished-tasks.step]]
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}'
+
+# an agent quiet for twenty minutes overruns once, and agents the lead stopped or the harness reported ended do not
+[Story.agent-overruns-once.files]
+"/home/.claude/projects/-home-work/s.jsonl" = '''
+{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}
+{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}
+{"type":"assistant","uuid":"t1","parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:01Z","message":{"model":"claude","content":[{"type":"tool_use","id":"toolu_1","name":"TaskStop","input":{"task_id":"noskip"}}]}}
+{"type":"user","uuid":"t2","parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:02Z","origin":{"kind":"task-notification"},"message":{"content":"<task-notification>\n<task-id>a26ca09f4c3ef4cfd</task-id>\n<status>killed</status>\n</task-notification>"}}
+'''
+"/home/.claude/projects/-home-work/s/subagents/agent-hung.jsonl" = "{\"type\":\"user\"}\n{\"type\":\"api-request\"}\n"
+"/home/.claude/projects/-home-work/s/subagents/agent-anoskip-0bb9aacb9e503d6c.jsonl" = "{\"type\":\"user\"}\n{\"type\":\"api-request\"}\n"
+"/home/.claude/projects/-home-work/s/subagents/agent-a26ca09f4c3ef4cfd.jsonl" = "{\"type\":\"user\"}\n{\"type\":\"api-request\"}\n"
+
+[Story.agent-overruns-once.quiet]
+"/home/.claude/projects/-home-work/s/subagents/agent-hung.jsonl" = { secs = 1200, nanos = 0 }
+"/home/.claude/projects/-home-work/s/subagents/agent-anoskip-0bb9aacb9e503d6c.jsonl" = { secs = 1200, nanos = 0 }
+"/home/.claude/projects/-home-work/s/subagents/agent-a26ca09f4c3ef4cfd.jsonl" = { secs = 1200, nanos = 0 }
+
+[[Story.agent-overruns-once.step]]
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}'
+
+[[Story.agent-overruns-once.step]]
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}'
+
+# agents that stopped on a stop sequence, were let stop by SubagentStop or went silent an hour ago do not overrun, and agents told to go on do
+[Story.agents-ended.files]
+"/home/.claude/projects/-home-work/s.jsonl" = '''
+{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}
+{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}
+'''
+"/home/.claude/projects/-home-work/s/subagents/agent-sequenced.jsonl" = "{\"type\":\"user\",\"message\":{\"role\":\"user\"}}\n{\"type\":\"api-request\"}\n{\"type\":\"assistant\",\"message\":{\"role\":\"assistant\",\"stop_reason\":\"stop_sequence\"}}\n"
+"/home/.claude/projects/-home-work/s/subagents/agent-let.jsonl" = "{\"type\":\"api-request\"}\n{\"type\":\"assistant\",\"message\":{\"role\":\"assistant\",\"stop_reason\":\"end_turn\"}}\n{\"type\":\"attachment\",\"attachment\":{\"type\":\"prompt_snapshot\",\"tools\":[]}}\n{\"type\":\"attachment\",\"attachment\":{\"type\":\"hook_success\",\"hookEvent\":\"SubagentStop\",\"hookName\":\"SubagentStop\",\"exitCode\":0}}\n"
+"/home/.claude/projects/-home-work/s/subagents/agent-erred.jsonl" = "{\"type\":\"api-request\"}\n{\"type\":\"assistant\",\"message\":{\"role\":\"assistant\",\"stop_reason\":\"end_turn\"}}\n{\"type\":\"attachment\",\"attachment\":{\"type\":\"hook_non_blocking_error\",\"hookEvent\":\"SubagentStop\",\"hookName\":\"SubagentStop\",\"exitCode\":1}}\n"
+"/home/.claude/projects/-home-work/s/subagents/agent-gone.jsonl" = "{\"type\":\"assistant\",\"message\":{\"role\":\"assistant\",\"stop_reason\":\"tool_use\"}}\n{\"type\":\"user\",\"message\":{\"role\":\"user\"}}\n{\"type\":\"api-request\"}\n"
+"/home/.claude/projects/-home-work/s/subagents/agent-blocked.jsonl" = "{\"type\":\"api-request\"}\n{\"type\":\"assistant\",\"message\":{\"role\":\"assistant\",\"stop_reason\":\"end_turn\"}}\n{\"type\":\"attachment\",\"attachment\":{\"type\":\"hook_blocking_error\",\"hookEvent\":\"SubagentStop\",\"hookName\":\"SubagentStop\"}}\n"
+"/home/.claude/projects/-home-work/s/subagents/agent-checked.jsonl" = "{\"type\":\"assistant\",\"message\":{\"role\":\"assistant\",\"stop_reason\":\"end_turn\"}}\n{\"type\":\"attachment\",\"attachment\":{\"type\":\"hook_success\",\"hookEvent\":\"PostToolUse\",\"hookName\":\"PostToolUse:Bash\",\"exitCode\":0}}\n"
+
+[Story.agents-ended.quiet]
+"/home/.claude/projects/-home-work/s/subagents/agent-sequenced.jsonl" = { secs = 1200, nanos = 0 }
+"/home/.claude/projects/-home-work/s/subagents/agent-let.jsonl" = { secs = 1200, nanos = 0 }
+"/home/.claude/projects/-home-work/s/subagents/agent-erred.jsonl" = { secs = 1200, nanos = 0 }
+"/home/.claude/projects/-home-work/s/subagents/agent-gone.jsonl" = { secs = 3600, nanos = 0 }
+"/home/.claude/projects/-home-work/s/subagents/agent-blocked.jsonl" = { secs = 1200, nanos = 0 }
+"/home/.claude/projects/-home-work/s/subagents/agent-checked.jsonl" = { secs = 3540, nanos = 0 }
+
+[[Story.agents-ended.step]]
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}'
+
+# owner words bearing on a question are quoted and block once
+[Story.owner-words-quoted]
+answers = [
+  { tool = "claude", asked = "Below are earlier messages", ran = "Succeeded", printed = '{"subtype":"success","result":"[{\"uuid\": \"o1\", \"quote\": \"Merge only when CI is green.\"}]"}' },
+  { tool = "claude", asked = "Below, numbered", ran = "Succeeded", printed = '{"subtype":"success","result":"Keep: [1]"}' },
+]
+
+[Story.owner-words-quoted.files]
+"/home/.claude/projects/-home-work/s.jsonl" = '''
+{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}
+{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}
+'''
+
+[[Story.owner-words-quoted.step]]
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":"Shall I merge the branch now?","session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}'
+
+# a quote the owner never wrote, a refused reading and an unparsed reply quote nothing
+[Story.quotes-nothing.files]
+"/home/.claude/projects/-home-work/s.jsonl" = '''
+{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}
+{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}
+'''
+
+[[Story.quotes-nothing.step]]
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":"Shall I merge the branch now?","session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}'
+answers = [
+  { tool = "claude", asked = "Below are earlier messages", ran = "Succeeded", printed = '{"subtype":"success","result":"[{\"uuid\": \"o1\", \"quote\": \"Never said this.\"}]"}' },
+]
+
+[[Story.quotes-nothing.step]]
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":"Shall I merge the branch now?","session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}'
+answers = [
+  { tool = "claude", asked = "Below are earlier messages", ran = "Failed", printed = '{"subtype":"error_during_execution","is_error":true,"result":"refused"}' },
+]
+
+[[Story.quotes-nothing.step]]
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":"Shall I merge the branch now?","session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}'
+answers = [
+  { tool = "claude", asked = "Below are earlier messages", ran = "Succeeded", printed = "not json" },
+]
+
+# a stop without its last message asks about the lead's last stored words
+[Story.stop-without-message]
+answers = [
+  { tool = "claude", asked = "Below are earlier messages", ran = "Succeeded", printed = '{"subtype":"success","result":"[{\"uuid\": \"o1\", \"quote\": \"Merge only when CI is green.\"}]"}' },
+  { tool = "claude", asked = "Below, numbered", ran = "Succeeded", printed = '{"subtype":"success","result":"[1]"}' },
+]
+
+[Story.stop-without-message.files]
+"/home/.claude/projects/-home-work/s.jsonl" = '''
+{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}
+{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}
+'''
+
+[[Story.stop-without-message.step]]
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}'
+
+# short owner replies carry the lead question they answered
+[Story.short-replies]
+answers = [
+  { tool = "claude", asked = "Below are earlier messages", ran = "Succeeded", printed = '{"subtype":"success","result":"[{\"uuid\": \"a2\", \"quote\": \"yes\"}, {\"uuid\": \"a4\", \"quote\": \"Next, port the hook\"}, {\"uuid\": \"a6\", \"quote\": \"sure\"}, {\"uuid\": \"a8\", \"quote\": \"no\"}, {\"uuid\": \"a10\", \"quote\": \"merge it\"}]"}' },
+  { tool = "claude", asked = "Below, numbered", ran = "Succeeded", printed = '{"subtype":"success","result":"[1, 2, 3, 4, 5]"}' },
+]
+
+[Story.short-replies.files]
+"/home/.claude/projects/-home-work/s.jsonl" = '''
+{"message":{"content":[{"text":"I checked CI\nShall I merge #12 now? Nothing else is waiting on this answer.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"a1"}
+{"message":{"content":"yes","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"a2"}
+{"message":{"content":[{"text":"Merged.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"a3"}
+{"message":{"content":"Next, port the hook and keep every quote it reads exactly as it is today.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"a4"}
+{"message":{"content":[{"text":"Done. Ship it?","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"a5"}
+{"message":{"content":"sure","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"a6"}
+{"message":{"content":[{"text":"Anything else","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"a7"}
+{"message":{"content":"no","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"a8"}
+{"message":{"content":[{"text":"What next?","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"a9"}
+{"message":{"content":"yes, merge it and then port the hook","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"a10"}
+'''
+
+[[Story.short-replies.step]]
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":"Shall I port the hook?","session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}'
+
+# a stalled stop drains the queue in code and shows only what stays open
+[Story.queue-drains]
+answers = [
+  { asked = "pr list --state all --limit 100 --json number,state,title,headRefName,body -R o/r", ran = "Succeeded", printed = '[{"number":40,"state":"MERGED","title":"D1 Keep only what works","headRefName":"design/process-rebuild","body":"spec: tools-retirement#D1, tools-retirement#D2\n\nGenerated"},{"number":41,"state":"OPEN","title":"D3 The queue drains itself","headRefName":"design/queue","body":"spec: tools-retirement#D3"},{"number":42,"state":"CLOSED","title":"Target cache fallback","headRefName":"ci/fallback","body":"no spec line"},{"number":43,"state":"OPEN","title":"Lint additions","headRefName":"lint/additions","body":""},{"number":44,"state":"MERGED","title":"Elsewhere","headRefName":"design/x","body":"spec: none"}]' },
+]
+
+[Story.queue-drains.files]
+"/home/.claude/projects/-home-work/s.jsonl" = '''
+{"message":{"content":"what clears the queue?\nSome things need a ruling.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"4c371128-0000-4000-8000-000000000000"}
+{"message":{"content":"Defer the merge queue.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"f6484f7e-0000-4000-8000-000000000000"}
+{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}
+'''
+"/home/placed/specs/tools-retirement.md" = """
+# Tools retirement
+
+D1 Dropped until missed (D2 later): waits.
+D3 Hook rules only when missed (owner 2026-11-26): landing is deleted.
+"""
+"/home/placed/queue.toml" = '''
+[[item]]
+spec = "tools-retirement#D1"
+
+[[item]]
+spec = "tools-retirement#D3"
+
+[[item]]
+pull = 42
+
+[[item]]
+pull = 43
+
+[[item]]
+pull = 99
+
+[[item]]
+escalation = { at = { pull = 42 }, cause = { repeat-failure = "test" }, from = "/home/agent" }
+
+[[item]]
+escalation = { at = { branch = "design/x" }, cause = { unread = "open" }, from = "/home/agent" }
+
+[[item]]
+escalation = { at = { branch = "design/queue" }, cause = "blocked", from = "/home/agent" }
+
+[[item]]
+escalation = { cause = { unread = "ending" }, from = "/home/placed/gone" }
+
+[[item]]
+worktree = { path = "/home/placed/gone", held = "dirty", merged = 40 }
+
+[[item]]
+worktree = { path = "/home/placed", held = "unpushed", merged = 41 }
+
+[[item]]
+ruling = { asked = "4c371128" }
+
+[[item]]
+ruling = { asked = "4c371128", ruled = "f6484f7e" }
+'''
+
+[[Story.queue-drains.step]]
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}'
+
+[[Story.queue-drains.step]]
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}'
+
+# a queue that does not parse, or holds free text, is named in the stall and left as it is
+[Story.queue-unparsed.files]
+"/home/.claude/projects/-home-work/s.jsonl" = '''
+{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}
+{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}
+'''
+"/home/placed/queue.toml" = "[[item]]\nsaid = \"free text is not an item\"\npull = 44\n"
+
+[[Story.queue-unparsed.step]]
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}'
+
+# pull requests that cannot be listed still let worktrees and rulings close
+[Story.pulls-unlisted]
+answers = [
+  { asked = "pr list --state all --limit 100 --json number,state,title,headRefName,body -R o/r", ran = "Failed", printed = "" },
+]
+
+[Story.pulls-unlisted.files]
+"/home/.claude/projects/-home-work/s.jsonl" = '''
+{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}
+{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}
+'''
+"/home/placed/queue.toml" = '''
+[[item]]
+pull = 43
+
+[[item]]
+worktree = { path = "/home/placed/gone", held = "dirty", merged = 40 }
+
+[[item]]
+ruling = { asked = "4c371128", ruled = "f6484f7e" }
+'''
+
+[[Story.pulls-unlisted.step]]
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}'
+
+# a flagged command hidden in a script is refused and told to unroll; a plain one passes to the harness
+[[Story.hidden-command.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"for d in a b; do rm -rf \"$d\"; done"},"tool_name":"Bash"}'
+
+[[Story.hidden-command.step]]
+words = ["hook", "pre-tool-use"]
+input = '''{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"bash -c 'rm -rf /tmp/x'"},"tool_name":"Bash"}'''
+
+[[Story.hidden-command.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"find . -name x -delete"},"tool_name":"Bash"}'
+
+[[Story.hidden-command.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"ls | xargs rm"},"tool_name":"Bash"}'
+
+[[Story.hidden-command.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"echo $(rm x)"},"tool_name":"Bash"}'
+
+[[Story.hidden-command.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"find . -type d -empty -exec rmdir {} +"},"tool_name":"Bash"}'
+
+[[Story.hidden-command.step]]
+words = ["hook", "pre-tool-use"]
+input = '''{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"bash <<'EOF'\nrm x\nEOF"},"tool_name":"Bash"}'''
+
+[[Story.hidden-command.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"test -d out && { rm -rf out; }"},"tool_name":"Bash"}'
+
+[[Story.hidden-command.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"rm x"},"tool_name":"Bash"}'
+
+[[Story.hidden-command.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"git rm x"},"tool_name":"Bash"}'
+
+[[Story.hidden-command.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"echo rm"},"tool_name":"Bash"}'
+
+[[Story.hidden-command.step]]
+words = ["hook", "pre-tool-use"]
+input = '''{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"git commit -m \"$(cat <<'EOF'\nrm the loop: for x; do rm y; done\nEOF\n)\""},"tool_name":"Bash"}'''
+
+# untyped endings are sent back with the lines to end on, then queued until the agent's worktree is gone
+[Story.untyped-endings.files]
+"/home/placed/queue.toml" = ""
+
+[[Story.untyped-endings.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"I finished the work; CI should be green.","session_id":"s","stop_hook_active":false}'
+
+[[Story.untyped-endings.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567 and more","session_id":"s","stop_hook_active":false}'
+
+[[Story.untyped-endings.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"done #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+
+[[Story.untyped-endings.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #0 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+
+[[Story.untyped-endings.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE 12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+
+[[Story.untyped-endings.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456","session_id":"s","stop_hook_active":false}'
+
+[[Story.untyped-endings.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef012345670","session_id":"s","stop_hook_active":false}'
+
+[[Story.untyped-endings.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE main 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+
+[[Story.untyped-endings.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE Design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+
+[[Story.untyped-endings.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr/ 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+
+[[Story.untyped-endings.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"","session_id":"s","stop_hook_active":false}'
+
+[[Story.untyped-endings.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"Still prose.","session_id":"s","stop_hook_active":true}'
+
+# a done on a sha the pull request does not hold, or on a conflicting one, is sent back without waiting on ci
+[[Story.done-wrong-sha.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":true}'
+answers = [
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"fedcba9876543210fedcba9876543210fedcba98"}' },
+]
+
+[[Story.done-wrong-sha.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":true}'
+answers = [
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"CONFLICTING"}' },
+]
+
+# a done right after opening waits for checks to appear, watches them, and stops on green clearing its escalations
+[Story.done-waits-checks]
+answers = [
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"UNKNOWN"}' },
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = "" },
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = "[]" },
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/455","name":"plan"},{"bucket":"pending","link":"","name":"test"}]' },
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Succeeded", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/455","name":"plan"},{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"},{"bucket":"skipping","link":"https://github.com/o/r/actions/runs/9/job/459","name":"mutants"}]' },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Failed", printed = "no checks reported" },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Failed", printed = "no checks reported" },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Succeeded", printed = "" },
+]
+
+[Story.done-waits-checks.files]
+"/home/placed/queue.toml" = '''
+[[item]]
+escalation = { at = { pull = 12 }, cause = { unread = "checks" }, from = "/work/agent" }
+
+[[item]]
+escalation = { at = { pull = 13 }, cause = "blocked", from = "/work/agent" }
+
+[[item]]
+pull = 12
+'''
+
+[[Story.done-waits-checks.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"\nDONE #12 0123456789ABCDEF0123456789ABCDEF01234567\n","session_id":"s","stop_hook_active":false}'
+
+# a red done is sent back with each failed job's log tail, a repeat failure is escalated, and a green between them clears the repeat
+[Story.red-done]
+answers = [
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"MERGEABLE"}' },
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"fail","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"},{"bucket":"cancel","link":"https://github.com/o/r/actions/runs/9/job/458?pr=12","name":"build"},{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/457","name":"lint"}]' },
+  { asked = "run view --job 456 --log-failed -R o/r", ran = "Succeeded", printed = """
+test step line 1
+test step line 2
+test step line 3
+test step line 4
+test step line 5
+test step line 6
+test step line 7
+test step line 8
+test step line 9
+test step line 10
+test step line 11
+test step line 12
+test step line 13
+test step line 14
+test step line 15
+test step line 16
+test step line 17
+test step line 18
+test step line 19
+test step line 20
+test step line 21
+test step line 22
+test step line 23
+test step line 24
+test step line 25
+test step line 26
+test step line 27
+test step line 28
+test step line 29
+test step line 30
+test step line 31
+test step line 32
+test step line 33
+test step line 34
+test step line 35
+test step line 36
+test step line 37
+test step line 38
+test step line 39
+test step line 40
+test step line 41
+test step line 42""" },
+]
+
+[Story.red-done.files]
+"/home/placed/queue.toml" = ""
+
+[[Story.red-done.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+
+[[Story.red-done.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+answers = [
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Succeeded", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"}]' },
+]
+
+[[Story.red-done.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+
+[[Story.red-done.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":true}'
+
+# a blocked agent and every unread step are queued on the pull request
+[Story.blocked-agent.files]
+"/home/placed/queue.toml" = ""
+
+[[Story.blocked-agent.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"BLOCKED #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+
+[[Story.blocked-agent.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+
+[[Story.blocked-agent.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+answers = [
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Failed", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+]
+
+[[Story.blocked-agent.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+answers = [
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = "{}" },
+]
+
+[[Story.blocked-agent.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+answers = [
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"DIVERGED"}' },
+]
+
+[[Story.blocked-agent.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+answers = [
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"MERGEABLE"}' },
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"fail","link":"https://ci.example/9","name":"status"}]' },
+]
+
+[[Story.blocked-agent.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+answers = [
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"MERGEABLE"}' },
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"pending","link":"","name":"test"}]' },
+  { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Overdue", printed = "" },
+]
+
+# a done on a pushed branch opens its pull request, waits on ci, and clears the branch's escalation
+[Story.done-opens-pull.files]
+"/home/placed/queue.toml" = '''
+[[item]]
+escalation = { at = { branch = "design/open-pr" }, cause = { unread = "open" }, from = "/work/agent" }
+'''
+"/home/placed/specs/tools-retirement.md" = """
+# Tools retirement
+
+D1 Dropped until missed (D2 later): waits.
+
+D2 Typed agent outcomes (owner de7a042f): the hook refuses (with D3) other endings.
+D20 Later work (owner 1).
+"""
+
+[[Story.done-opens-pull.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+answers = [
+  { asked = "api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}", ran = "Succeeded", printed = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
+  { asked = "api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567", ran = "Succeeded", printed = '{"commits":[{"commit":{"message":"Open it\n\nSpec: none here\n\nWhy.\n\nSpec: tools-retirement#D2\nCo-Authored-By: A"}},{"commit":{"message":"Spec: other#D9"}}]}' },
+  { asked = """
+pr create --head design/open-pr --base main --title D2 Typed agent outcomes --body spec: tools-retirement#D2
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code) -R o/r""", ran = "Succeeded", printed = """
+https://github.com/o/r/pull/12
+""" },
+  { asked = "pr view design/open-pr --json number -R o/r", ran = "Succeeded", printed = '{"number":12}' },
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"MERGEABLE"}' },
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Succeeded", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"}]' },
+]
+
+# a done on a branch whose remote head differs, or that is not on the remote, is sent back to push
+[[Story.branch-differs.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":true}'
+answers = [
+  { asked = "api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}", ran = "Succeeded", printed = '{"data":{"repository":{"ref":{"target":{"oid":"fedcba9876543210fedcba9876543210fedcba98"}}}}}' },
+]
+
+[[Story.branch-differs.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":true}'
+answers = [
+  { asked = "api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}", ran = "Succeeded", printed = '{"data":{"repository":{"ref":null}}}' },
+]
+
+# a branch that cannot be read, cited or opened is queued on the branch
+[Story.branch-unreadable]
+answers = [
+  { asked = "api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}", ran = "Succeeded", printed = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
+]
+
+[Story.branch-unreadable.files]
+"/home/placed/queue.toml" = ""
+"/home/placed/specs/tools-retirement.md" = """
+D1 Dropped (D2 later).
+D20 Later work (owner 1).
+D2
+ D2 Indented (owner 2).
+D3 Typed agent outcomes (owner de7a042f): the hook refuses other endings.
+"""
+
+[[Story.branch-unreadable.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"BLOCKED design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+
+[[Story.branch-unreadable.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+answers = [
+  { asked = "api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}", ran = "Succeeded", printed = '{"data":{"repository":{"ref":{}}}}' },
+]
+
+[[Story.branch-unreadable.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+
+[[Story.branch-unreadable.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+answers = [
+  { asked = "api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567", ran = "Succeeded", printed = '{"commits":[]}' },
+]
+
+[[Story.branch-unreadable.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+answers = [
+  { asked = "api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567", ran = "Succeeded", printed = '{"commits":[{"commit":{"message":"Open it\n\nSpec: none here\n\nWhy.\n\n\nCo-Authored-By: A"}},{"commit":{"message":"Spec: other#D9"}}]}' },
+]
+
+[[Story.branch-unreadable.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+answers = [
+  { asked = "api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567", ran = "Succeeded", printed = '{"commits":[{"commit":{"message":"Spec: tools-retirement#D2\nCo-Authored-By: A"}}]}' },
+]
+
+[[Story.branch-unreadable.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+answers = [
+  { asked = "api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567", ran = "Succeeded", printed = '{"commits":[{"commit":{"message":"Spec: other#D3\nCo-Authored-By: A"}}]}' },
+]
+
+[[Story.branch-unreadable.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+answers = [
+  { asked = "api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567", ran = "Succeeded", printed = '{"commits":[{"commit":{"message":"Spec: owner 3c84f560\nCo-Authored-By: A"}}]}' },
+]
+
+[[Story.branch-unreadable.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+answers = [
+  { asked = "api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567", ran = "Succeeded", printed = '{"commits":[{"commit":{"message":"Spec: tools-retirement#D3\nCo-Authored-By: A"}}]}' },
+]
+
+[[Story.branch-unreadable.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+answers = [
+  { asked = "api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567", ran = "Succeeded", printed = '{"commits":[{"commit":{"message":"Spec: tools-retirement#D3\nCo-Authored-By: A"}}]}' },
+  { asked = """
+pr create --head design/open-pr --base main --title D3 Typed agent outcomes --body spec: tools-retirement#D3
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code) -R o/r""", ran = "Succeeded", printed = "" },
+  { asked = "pr view design/open-pr --json number -R o/r", ran = "Succeeded", printed = "{}" },
+]
+
+# a workspace whose local settings name no specs, a relative path, or no repository escalates without guessing
+[Story.local-no-specs]
+answers = [
+  { asked = "api graphql -F owner=o -F name=r -f ref=refs/heads/design/open-pr -f query=query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){target{oid}}}}", ran = "Succeeded", printed = '{"data":{"repository":{"ref":{"target":{"oid":"0123456789abcdef0123456789abcdef01234567"}}}}}' },
+  { asked = "api repos/o/r/compare/main...0123456789abcdef0123456789abcdef01234567", ran = "Succeeded", printed = '{"commits":[{"commit":{"message":"Open it\n\nSpec: tools-retirement#D2\nCo-Authored-By: A"}}]}' },
+]
+
+[Story.local-no-specs.files]
+"/home/placed/queue.toml" = ""
+"/home/work/.meta/local.toml" = """
+queue = "/home/placed/queue.toml"
+repository = "o/r"
+"""
+
+[[Story.local-no-specs.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+
+# local settings naming the queue at a relative path, or no queue, refuse to escalate
+[Story.local-relative-queue.files]
+"/home/placed/queue.toml" = ""
+"/home/work/.meta/local.toml" = """
+queue = "queue.toml"
+repository = "o/r"
+"""
+
+[[Story.local-relative-queue.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"BLOCKED #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+
+# local settings with no repository escalate a done without gh
+[Story.local-no-repository.files]
+"/home/placed/queue.toml" = ""
+"/home/work/.meta/local.toml" = """
+queue = "/home/placed/queue.toml"
+project = "meta-dev"
+"""
+
+[[Story.local-no-repository.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+
+[[Story.local-no-repository.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE design/open-pr 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+
+# a merged pull request's clean pushed worktree is removed, and any other is kept and queued until it is gone
+[Story.merged-worktree]
+answers = [
+  { asked = "pr view 12 --json state,headRefName,headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"MERGED"}' },
+  { tool = "git", asked = "worktree list --porcelain", ran = "Succeeded", printed = """
+worktree /work/wt-open-pr
+HEAD 0123456789abcdef0123456789abcdef01234567
+branch refs/heads/design/open-pr
+""" },
+  { tool = "git", asked = "status --short", ran = "Succeeded", printed = "" },
+]
+
+[Story.merged-worktree.files]
+"/home/placed/queue.toml" = ""
+
+[[Story.merged-worktree.step]]
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"cd /work && gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
+answers = [
+  { tool = "git", asked = "worktree list --porcelain", ran = "Succeeded", printed = """
+worktree /work/main
+HEAD fedcba9876543210fedcba9876543210fedcba98
+branch refs/heads/main
+
+worktree /work/wt-open-pr
+HEAD 0123456789abcdef0123456789abcdef01234567
+branch refs/heads/design/open-pr
+
+worktree /work/detached
+HEAD 0123456789abcdef0123456789abcdef01234567
+detached
+""" },
+  { tool = "git", asked = "worktree remove /work/wt-open-pr", ran = "Succeeded", printed = "" },
+]
+
+[[Story.merged-worktree.step]]
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"gh pr view 12 && echo merge 12"},"tool_name":"Bash","tool_response":{"stdout":""}}'
+
+[[Story.merged-worktree.step]]
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"cd /work && gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
+answers = [
+  { asked = "pr view 12 --json state,headRefName,headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"OPEN"}' },
+]
+
+[[Story.merged-worktree.step]]
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"cd /work && gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
+answers = [
+  { asked = "pr view 12 --json state,headRefName,headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefName":"design/other","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"MERGED"}' },
+]
+
+[[Story.merged-worktree.step]]
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"cd /work && gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
+answers = [
+  { asked = "pr view 12 --json state,headRefName,headRefOid -R o/r", ran = "Failed", printed = "" },
+]
+
+[[Story.merged-worktree.step]]
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"cd /work && gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
+answers = [
+  { tool = "git", asked = "worktree list --porcelain", ran = "Failed", printed = "" },
+]
+
+[[Story.merged-worktree.step]]
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"cd /work && gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
+answers = [
+  { tool = "git", asked = "status --short", ran = "Succeeded", printed = """
+ M src/lib.rs
+""" },
+]
+
+[[Story.merged-worktree.step]]
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"cd /work && gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
+answers = [
+  { asked = "pr view 12 --json state,headRefName,headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefName":"design/open-pr","headRefOid":"fedcba9876543210fedcba9876543210fedcba98","state":"MERGED"}' },
+]
+
+[[Story.merged-worktree.step]]
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"cd /work && gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
+answers = [
+  { tool = "git", asked = "worktree remove /work/wt-open-pr", ran = "Failed", printed = "" },
+]
+
+# in-place edits anywhere, shell writes under a repository, and moves out of one are refused toward the edit tools
+[Story.in-place-edits]
+directories = ["/home/repo/.git"]
+
+[[Story.in-place-edits.step]]
+words = ["hook", "pre-tool-use"]
+input = '''{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"sed -i 's/a/b/' /tmp/x"},"tool_name":"Bash"}'''
+
+[[Story.in-place-edits.step]]
+words = ["hook", "pre-tool-use"]
+input = '''{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"for f in a; do perl -pi -e 's/a/b/' $f; done"},"tool_name":"Bash"}'''
+
+[[Story.in-place-edits.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"echo a > /home/repo/src/x.rs"},"tool_name":"Bash"}'
+
+[[Story.in-place-edits.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cargo test 2>/dev/null | tee /home/repo/log.txt"},"tool_name":"Bash"}'
+
+[[Story.in-place-edits.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"mv /home/repo/a.rs /tmp/a.rs"},"tool_name":"Bash"}'
+
+[[Story.in-place-edits.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"echo a > /tmp/out.txt"},"tool_name":"Bash"}'
+
+[[Story.in-place-edits.step]]
+words = ["hook", "pre-tool-use"]
+input = '''{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"sed -n 's/i/b/p' /home/repo/x.rs"},"tool_name":"Bash"}'''
+
+[[Story.in-place-edits.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"mv /home/repo/a.rs /home/repo/b.rs"},"tool_name":"Bash"}'
+
+[[Story.in-place-edits.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"mv /tmp/a /home/repo/a"},"tool_name":"Bash"}'
+
+[[Story.in-place-edits.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"git mv /home/repo/a.rs /tmp/a.rs"},"tool_name":"Bash"}'
+
+# relative shell writes are judged against a cd's target, and refused when that target cannot be worked out
+[Story.relative-writes]
+directories = ["/home/repo/.git"]
+
+[[Story.relative-writes.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cd /home/repo && echo a > src/x.rs"},"tool_name":"Bash"}'
+
+[[Story.relative-writes.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cd /home && cd repo; mv a.rs /tmp/a.rs"},"tool_name":"Bash"}'
+
+[[Story.relative-writes.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cd /tmp && echo a > out.txt"},"tool_name":"Bash"}'
+
+[[Story.relative-writes.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cd $REPO && echo a > out.txt"},"tool_name":"Bash"}'
+
+[[Story.relative-writes.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cd - && mv a b"},"tool_name":"Bash"}'
+
+[[Story.relative-writes.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cd $REPO && echo a > /tmp/out.txt"},"tool_name":"Bash"}'
+
+# a ruling whose message id is not eight or more hexadecimal digits does not parse
+[Story.ruling-unparsed.files]
+"/home/.claude/projects/-home-work/s.jsonl" = '''
+{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}
+{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}
+'''
+"/home/placed/queue.toml" = "[[item]]\nruling = { asked = \"4c37\" }\n\n[[item]]\nruling = { asked = \"not-a-message-id\" }\n"
+
+[[Story.ruling-unparsed.step]]
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}'

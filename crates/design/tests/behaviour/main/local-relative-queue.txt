@@ -1,0 +1,37 @@
+(
+    [
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Err(
+                "cannot write the queue: the workspace local.toml names no absolute queue path",
+            ),
+            Answer {
+                shown: Shown(
+                    "",
+                ),
+                complaint: Complaint(
+                    "cannot write the queue: the workspace local.toml names no absolute queue path\n",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        1,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+    ],
+    Ok(
+        "",
+    ),
+)

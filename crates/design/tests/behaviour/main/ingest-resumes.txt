@@ -1,0 +1,124 @@
+(
+    [
+        (
+            [
+                "ingest",
+                "--dry-run",
+            ],
+            Ok(
+                Ingested,
+            ),
+            Answer {
+                shown: Shown(
+                    "session s read to 494\nauthorship owner 1\nauthorship lead 1\nunrecognised brand-new-kind 1\nwritten 3\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "ingest",
+            ],
+            Ok(
+                Ingested,
+            ),
+            Answer {
+                shown: Shown(
+                    "session s read to 494\nauthorship owner 1\nauthorship lead 1\nunrecognised brand-new-kind 1\nwritten 3\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "ingest",
+            ],
+            Ok(
+                Ingested,
+            ),
+            Answer {
+                shown: Shown(
+                    "written 0\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "ingest",
+            ],
+            Ok(
+                Ingested,
+            ),
+            Answer {
+                shown: Shown(
+                    "session s read to 667\nauthorship owner 1\nwritten 2\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+    ],
+    Err(
+        NotFound,
+    ),
+)

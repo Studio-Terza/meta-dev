@@ -37,8 +37,9 @@ transcript-ports = { path = "../transcript-ports" }
 
 [dev-dependencies]
 console-doubles = { path = "../console-doubles" }
+dispatch-doubles = { path = "../dispatch-doubles" }
 file-doubles = { path = "../file-doubles" }
-test-failure = { path = "../test-failure" }
+fixture = { path = "../fixture" }
 tempfile.workspace = true
 
 [lints]

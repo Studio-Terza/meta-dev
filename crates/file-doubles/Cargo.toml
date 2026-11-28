@@ -14,6 +14,8 @@ file-ports = { path = "../file-ports", features = ["laws"] }
 invariants = { path = "../invariants" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
+sqlite-ports = { path = "../sqlite-ports" }
+store-ports = { path = "../store-ports" }
 
 [lints]
 workspace = true

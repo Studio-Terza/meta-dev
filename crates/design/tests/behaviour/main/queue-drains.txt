@@ -1,0 +1,145 @@
+(
+    [
+        (
+            [
+                "hook",
+                "stop",
+            ],
+            Ok(
+                Blocked,
+            ),
+            Answer {
+                shown: Shown(
+                    "{\"decision\":\"block\",\"reason\":\"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\\nOpen items in the queue:\\n- tools-retirement#D3 D3 Hook rules only when missed (closes when its pull request merges)\\n- #43 Lint additions (closes when it merges or closes)\\n- #99 (closes when it merges or closes)\\n- agent outcome: blocked on design/queue, from /home/agent (closes when a DONE on design/queue passes, or it merges or closes)\\n- worktree /home/placed kept (unpushed) after #41 D3 The queue drains itself merged (closes when it is removed)\\n- owner ruling asked in 4c371128: \\\"what clears the queue?\\\" (closes when ruling.ruled names the answer)\\n\"}\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [
+                    Asked {
+                        after: 120,
+                        program: "claude",
+                        arguments: [
+                            "-p",
+                            "--output-format",
+                            "json",
+                            "--setting-sources",
+                            "user",
+                            "--strict-mcp-config",
+                            "--tools",
+                            "",
+                            "--model",
+                            "haiku",
+                        ],
+                        directory: "/home/work/.meta/agents",
+                        fed: Some(
+                            "An AI agent just ended its turn with this message to its owner:\nUnderstood.\n\nBelow are earlier messages from the owner, each headed by [uuid timestamp].\nList every passage that bears on the message: an earlier answer to anything it asks, a decision, rule, preference or instruction it should follow, or the next step the owner set. A missed passage costs far more than an extra one, so when unsure, include it.\nReply with JSON only, no prose and no code fence: a list of {\"uuid\": the full uuid from the header, \"quote\": an excerpt of that message copied exactly, character for character, one or two sentences}. Reply [] if none bear on it.\n\n[4c371128-0000-4000-8000-000000000000 2026-01-01T00:00:00Z] what clears the queue?\nSome things need a ruling.\n\n[f6484f7e-0000-4000-8000-000000000000 2026-01-01T00:00:00Z] Defer the merge queue.",
+                        ),
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "pr",
+                            "list",
+                            "--state",
+                            "all",
+                            "--limit",
+                            "100",
+                            "--json",
+                            "number,state,title,headRefName,body",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/home/work/.meta/agents",
+                        fed: None,
+                    },
+                ],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "stop",
+            ],
+            Ok(
+                Blocked,
+            ),
+            Answer {
+                shown: Shown(
+                    "{\"decision\":\"block\",\"reason\":\"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\\nOpen items in the queue:\\n- tools-retirement#D3 D3 Hook rules only when missed (closes when its pull request merges)\\n- #43 Lint additions (closes when it merges or closes)\\n- #99 (closes when it merges or closes)\\n- agent outcome: blocked on design/queue, from /home/agent (closes when a DONE on design/queue passes, or it merges or closes)\\n- worktree /home/placed kept (unpushed) after #41 D3 The queue drains itself merged (closes when it is removed)\\n- owner ruling asked in 4c371128: \\\"what clears the queue?\\\" (closes when ruling.ruled names the answer)\\n\"}\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [
+                    Asked {
+                        after: 120,
+                        program: "claude",
+                        arguments: [
+                            "-p",
+                            "--output-format",
+                            "json",
+                            "--setting-sources",
+                            "user",
+                            "--strict-mcp-config",
+                            "--tools",
+                            "",
+                            "--model",
+                            "haiku",
+                        ],
+                        directory: "/home/work/.meta/agents",
+                        fed: Some(
+                            "An AI agent just ended its turn with this message to its owner:\nUnderstood.\n\nBelow are earlier messages from the owner, each headed by [uuid timestamp].\nList every passage that bears on the message: an earlier answer to anything it asks, a decision, rule, preference or instruction it should follow, or the next step the owner set. A missed passage costs far more than an extra one, so when unsure, include it.\nReply with JSON only, no prose and no code fence: a list of {\"uuid\": the full uuid from the header, \"quote\": an excerpt of that message copied exactly, character for character, one or two sentences}. Reply [] if none bear on it.\n\n[4c371128-0000-4000-8000-000000000000 2026-01-01T00:00:00Z] what clears the queue?\nSome things need a ruling.\n\n[f6484f7e-0000-4000-8000-000000000000 2026-01-01T00:00:00Z] Defer the merge queue.",
+                        ),
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "pr",
+                            "list",
+                            "--state",
+                            "all",
+                            "--limit",
+                            "100",
+                            "--json",
+                            "number,state,title,headRefName,body",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/home/work/.meta/agents",
+                        fed: None,
+                    },
+                ],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+    ],
+    Ok(
+        "[[item]]\nspec = \"tools-retirement#D3\"\n\n[[item]]\npull = 43\n\n[[item]]\npull = 99\n\n[[item]]\n\n[item.escalation]\ncause = \"blocked\"\nfrom = \"/home/agent\"\n\n[item.escalation.at]\nbranch = \"design/queue\"\n\n[[item]]\n\n[item.worktree]\npath = \"/home/placed\"\nheld = \"unpushed\"\nmerged = 41\n\n[[item]]\n\n[item.ruling]\nasked = \"4c371128\"\n",
+    ),
+)

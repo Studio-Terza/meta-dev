@@ -1,0 +1,191 @@
+(
+    [
+        (
+            [
+                "hook",
+                "pre-tool-use",
+            ],
+            Ok(
+                Blocked,
+            ),
+            Answer {
+                shown: Shown(
+                    "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Refused: a shell write into /home/repo/src/x.rs, under the repository at /home/repo. Write files there only with the Edit or Write tools.\"}}\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "pre-tool-use",
+            ],
+            Ok(
+                Blocked,
+            ),
+            Answer {
+                shown: Shown(
+                    "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Refused: `mv` takes /home/repo/a.rs out of the repository at /home/repo, and a move out of a repository is a delete. Use `git mv` to move it within the repository, or `git rm` to delete it.\"}}\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "pre-tool-use",
+            ],
+            Ok(
+                Hooked(
+                    PreToolUse,
+                ),
+            ),
+            Answer {
+                shown: Shown(
+                    "",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "pre-tool-use",
+            ],
+            Ok(
+                Blocked,
+            ),
+            Answer {
+                shown: Shown(
+                    "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Refused: a shell write or move onto out.txt after a `cd` whose target cannot be worked out. Use absolute paths, or edit files with the Edit or Write tools.\"}}\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "pre-tool-use",
+            ],
+            Ok(
+                Blocked,
+            ),
+            Answer {
+                shown: Shown(
+                    "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Refused: a shell write or move onto a after a `cd` whose target cannot be worked out. Use absolute paths, or edit files with the Edit or Write tools.\"}}\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "pre-tool-use",
+            ],
+            Ok(
+                Hooked(
+                    PreToolUse,
+                ),
+            ),
+            Answer {
+                shown: Shown(
+                    "",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+    ],
+    Err(
+        NotFound,
+    ),
+)

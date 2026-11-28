@@ -1,0 +1,78 @@
+(
+    [
+        (
+            [
+                "hook",
+                "stop",
+            ],
+            Ok(
+                Blocked,
+            ),
+            Answer {
+                shown: Shown(
+                    "{\"decision\":\"block\",\"reason\":\"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\\nEarlier owner words bearing on this:\\na2 2026-01-01T00:00:00Z: the lead said \\\"Shall I merge #12 now?\\\" and the owner replied \\\"yes\\\"\\na4 2026-01-01T00:00:00Z: \\\"Next, port the hook\\\"\\na6 2026-01-01T00:00:00Z: the lead said \\\"Ship it?\\\" and the owner replied \\\"sure\\\"\\na8 2026-01-01T00:00:00Z: the lead said \\\"Anything else\\\" and the owner replied \\\"no\\\"\\na10 2026-01-01T00:00:00Z: \\\"merge it\\\"\\n\"}\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [
+                    Asked {
+                        after: 120,
+                        program: "claude",
+                        arguments: [
+                            "-p",
+                            "--output-format",
+                            "json",
+                            "--setting-sources",
+                            "user",
+                            "--strict-mcp-config",
+                            "--tools",
+                            "",
+                            "--model",
+                            "haiku",
+                        ],
+                        directory: "/home/work/.meta/agents",
+                        fed: Some(
+                            "An AI agent just ended its turn with this message to its owner:\nShall I port the hook?\n\nBelow are earlier messages from the owner, each headed by [uuid timestamp].\nList every passage that bears on the message: an earlier answer to anything it asks, a decision, rule, preference or instruction it should follow, or the next step the owner set. A missed passage costs far more than an extra one, so when unsure, include it.\nReply with JSON only, no prose and no code fence: a list of {\"uuid\": the full uuid from the header, \"quote\": an excerpt of that message copied exactly, character for character, one or two sentences}. Reply [] if none bear on it.\n\n[a10 2026-01-01T00:00:00Z] yes, merge it and then port the hook\n\n[a2 2026-01-01T00:00:00Z] (replying to the lead's \"Shall I merge #12 now?\") yes\n\n[a4 2026-01-01T00:00:00Z] Next, port the hook and keep every quote it reads exactly as it is today.\n\n[a6 2026-01-01T00:00:00Z] (replying to the lead's \"Ship it?\") sure\n\n[a8 2026-01-01T00:00:00Z] (replying to the lead's \"Anything else\") no",
+                        ),
+                    },
+                    Asked {
+                        after: 120,
+                        program: "claude",
+                        arguments: [
+                            "-p",
+                            "--output-format",
+                            "json",
+                            "--setting-sources",
+                            "user",
+                            "--strict-mcp-config",
+                            "--tools",
+                            "",
+                            "--model",
+                            "haiku",
+                        ],
+                        directory: "/home/work/.meta/agents",
+                        fed: Some(
+                            "An AI agent just ended its turn with this message to its owner:\nShall I port the hook?\n\nBelow, numbered, are passages the owner wrote earlier, each with its message uuid and timestamp.\nKeep only the passages the agent needs now: an earlier answer to what it asks, or a decision, rule, preference or next step that bears directly on what it says it will do. Keep at most 8.\nReply with JSON only, no prose and no code fence: a list of passage numbers, such as [3, 1]. Reply [] if none bear on it.\n\n1. a2 2026-01-01T00:00:00Z: the lead said \"Shall I merge #12 now?\" and the owner replied \"yes\"\n2. a4 2026-01-01T00:00:00Z: \"Next, port the hook\"\n3. a6 2026-01-01T00:00:00Z: the lead said \"Ship it?\" and the owner replied \"sure\"\n4. a8 2026-01-01T00:00:00Z: the lead said \"Anything else\" and the owner replied \"no\"\n5. a10 2026-01-01T00:00:00Z: \"merge it\"",
+                        ),
+                    },
+                ],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+    ],
+    Err(
+        NotFound,
+    ),
+)

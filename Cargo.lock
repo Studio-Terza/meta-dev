@@ -147,9 +147,11 @@ dependencies = [
  "console-doubles",
  "console-ports",
  "design-messages",
+ "dispatch-doubles",
  "dispatch-ports",
  "file-doubles",
  "file-ports",
+ "fixture",
  "grammar",
  "grammar-git",
  "grammar-spec-line",
@@ -163,7 +165,6 @@ dependencies = [
  "store-ports",
  "strum",
  "tempfile",
- "test-failure",
  "thiserror",
  "toml",
  "transcript-ports",
@@ -202,6 +203,7 @@ dependencies = [
  "newtype",
  "port-core",
  "serde",
+ "strum",
 ]
 
 [[package]]
@@ -264,6 +266,8 @@ dependencies = [
  "invariants",
  "newtype",
  "port-core",
+ "sqlite-ports",
+ "store-ports",
 ]
 
 [[package]]

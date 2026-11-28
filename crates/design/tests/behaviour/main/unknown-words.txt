@@ -1,0 +1,213 @@
+(
+    [
+        (
+            [
+                "frobnicate",
+            ],
+            Err(
+                "usage: design [--workspace <dir>] (ingest [--dry-run] | hook (stop | subagent-stop | pre-tool-use | post-tool-use | --settings))",
+            ),
+            Answer {
+                shown: Shown(
+                    "",
+                ),
+                complaint: Complaint(
+                    "usage: design [--workspace <dir>] (ingest [--dry-run] | hook (stop | subagent-stop | pre-tool-use | post-tool-use | --settings))\n",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        1,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+            ],
+            Err(
+                "usage: design [--workspace <dir>] (ingest [--dry-run] | hook (stop | subagent-stop | pre-tool-use | post-tool-use | --settings))",
+            ),
+            Answer {
+                shown: Shown(
+                    "",
+                ),
+                complaint: Complaint(
+                    "usage: design [--workspace <dir>] (ingest [--dry-run] | hook (stop | subagent-stop | pre-tool-use | post-tool-use | --settings))\n",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        1,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "stop",
+                "--settings",
+            ],
+            Err(
+                "usage: design [--workspace <dir>] (ingest [--dry-run] | hook (stop | subagent-stop | pre-tool-use | post-tool-use | --settings))",
+            ),
+            Answer {
+                shown: Shown(
+                    "",
+                ),
+                complaint: Complaint(
+                    "usage: design [--workspace <dir>] (ingest [--dry-run] | hook (stop | subagent-stop | pre-tool-use | post-tool-use | --settings))\n",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        1,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "ingest",
+                "--wet",
+            ],
+            Err(
+                "usage: design [--workspace <dir>] (ingest [--dry-run] | hook (stop | subagent-stop | pre-tool-use | post-tool-use | --settings))",
+            ),
+            Answer {
+                shown: Shown(
+                    "",
+                ),
+                complaint: Complaint(
+                    "usage: design [--workspace <dir>] (ingest [--dry-run] | hook (stop | subagent-stop | pre-tool-use | post-tool-use | --settings))\n",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        1,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [],
+            Err(
+                "usage: design [--workspace <dir>] (ingest [--dry-run] | hook (stop | subagent-stop | pre-tool-use | post-tool-use | --settings))",
+            ),
+            Answer {
+                shown: Shown(
+                    "",
+                ),
+                complaint: Complaint(
+                    "usage: design [--workspace <dir>] (ingest [--dry-run] | hook (stop | subagent-stop | pre-tool-use | post-tool-use | --settings))\n",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        1,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "--settings",
+            ],
+            Ok(
+                Settings,
+            ),
+            Answer {
+                shown: Shown(
+                    "{\n  \"hooks\": {\n    \"Stop\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"design --workspace \\\"$CLAUDE_PROJECT_DIR\\\" hook stop\",\n            \"timeout\": 3600\n          }\n        ]\n      }\n    ],\n    \"SubagentStop\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"design --workspace \\\"$CLAUDE_PROJECT_DIR\\\" hook subagent-stop\",\n            \"timeout\": 1500\n          }\n        ]\n      }\n    ],\n    \"PreToolUse\": [\n      {\n        \"matcher\": \"Bash\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"design --workspace \\\"$CLAUDE_PROJECT_DIR\\\" hook pre-tool-use\",\n            \"timeout\": 30\n          }\n        ]\n      }\n    ],\n    \"PostToolUse\": [\n      {\n        \"matcher\": \"Bash\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"design --workspace \\\"$CLAUDE_PROJECT_DIR\\\" hook post-tool-use\",\n            \"timeout\": 300\n          }\n        ]\n      }\n    ]\n  }\n}\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "stop",
+            ],
+            Err(
+                "cannot read the hook input: expected ident at line 1 column 2",
+            ),
+            Answer {
+                shown: Shown(
+                    "",
+                ),
+                complaint: Complaint(
+                    "cannot read the hook input: expected ident at line 1 column 2\n",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        1,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+    ],
+    Err(
+        NotFound,
+    ),
+)
