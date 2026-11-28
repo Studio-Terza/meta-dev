@@ -13,6 +13,7 @@ bench = false
 [dependencies]
 invariants = { path = "../invariants" }
 newtype = { path = "../newtype" }
+port-core = { path = "../port-core" }
 
 [dev-dependencies]
 

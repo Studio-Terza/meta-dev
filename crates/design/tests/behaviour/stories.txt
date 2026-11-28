@@ -521,35 +521,42 @@ queue:
 [[item]]
 pull = 43
 
-## a flagged command hidden in a script is refused and told to unroll; a plain one passes to the harness
+## shell that is not plain is refused, as is a deletion run through another command or on arguments that are not literal; a plain one passes to the harness
 $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"for d in a b; do rm -rf \"$d\"; done"},"tool_name":"Bash"}
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `rm` inside a loop. The harness flags `rm` there and stalls the call. Unroll it into separate plain top-level commands: list the targets first, then run each `rm` as its own command with literal paths."}}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: this is not a plain command, so the harness cannot read it and would stall waiting for permission (it stopped at `for`). Run plain commands only: words, literal arguments, quotes, $NAME, pipes and ; && ||, with `$(...)`, backticks and heredocs holding only such commands; no loops, conditionals, subshells, functions, arrays or arithmetic. Unroll the work into separate plain calls."}}
 Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"bash -c 'rm -rf /tmp/x'"},"tool_name":"Bash"}
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `rm` inside a `sh -c` script. The harness flags `rm` there and stalls the call. Unroll it into separate plain top-level commands: list the targets first, then run each `rm` as its own command with literal paths."}}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `rm` here is run through another command or on arguments that are not literal, so the harness cannot rule it out and stalls the call. Unroll it: list the targets first, then run each `rm` as its own plain top-level command with literal paths."}}
 Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"find . -name x -delete"},"tool_name":"Bash"}
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `-delete` inside `find`. The harness flags `-delete` there and stalls the call. Unroll it into separate plain top-level commands: list the targets first, then run each `rm` as its own command with literal paths."}}
-Ok(Blocked) ExitCode(unix_exit_status(0)) ""
+Ok(Hooked(PreToolUse)) ExitCode(unix_exit_status(0)) ""
 $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"ls | xargs rm"},"tool_name":"Bash"}
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `rm` inside `xargs`. The harness flags `rm` there and stalls the call. Unroll it into separate plain top-level commands: list the targets first, then run each `rm` as its own command with literal paths."}}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `rm` here is run through another command or on arguments that are not literal, so the harness cannot rule it out and stalls the call. Unroll it: list the targets first, then run each `rm` as its own plain top-level command with literal paths."}}
 Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"echo $(rm x)"},"tool_name":"Bash"}
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `rm` inside a command substitution. The harness flags `rm` there and stalls the call. Unroll it into separate plain top-level commands: list the targets first, then run each `rm` as its own command with literal paths."}}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `rm` here is run through another command or on arguments that are not literal, so the harness cannot rule it out and stalls the call. Unroll it: list the targets first, then run each `rm` as its own plain top-level command with literal paths."}}
 Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"find . -type d -empty -exec rmdir {} +"},"tool_name":"Bash"}
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `rmdir` inside `find`. The harness flags `rmdir` there and stalls the call. Unroll it into separate plain top-level commands: list the targets first, then run each `rm` as its own command with literal paths."}}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `rmdir` here is run through another command or on arguments that are not literal, so the harness cannot rule it out and stalls the call. Unroll it: list the targets first, then run each `rmdir` as its own plain top-level command with literal paths."}}
 Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"bash <<'EOF'\nrm x\nEOF"},"tool_name":"Bash"}
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `rm` inside a heredoc fed to a shell. The harness flags `rm` there and stalls the call. Unroll it into separate plain top-level commands: list the targets first, then run each `rm` as its own command with literal paths."}}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `rm` here is run through another command or on arguments that are not literal, so the harness cannot rule it out and stalls the call. Unroll it: list the targets first, then run each `rm` as its own plain top-level command with literal paths."}}
 Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"test -d out && { rm -rf out; }"},"tool_name":"Bash"}
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `rm` inside a `{ ...; }` group. The harness flags `rm` there and stalls the call. Unroll it into separate plain top-level commands: list the targets first, then run each `rm` as its own command with literal paths."}}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: this is not a plain command, so the harness cannot read it and would stall waiting for permission (it stopped at `{`). Run plain commands only: words, literal arguments, quotes, $NAME, pipes and ; && ||, with `$(...)`, backticks and heredocs holding only such commands; no loops, conditionals, subshells, functions, arrays or arithmetic. Unroll the work into separate plain calls."}}
 Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"P=(${(f)\"$(cargo metadata --no-deps | jq -r '.packages[].name')\"}); cargo clean -q $P"},"tool_name":"Bash"}
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: this command holds shell the harness cannot read (an array assignment, a zsh `${(flags)...}` expansion, or text no shell lexeme covers), so it would stall waiting for permission. Run plain single commands instead: one command per call, literal arguments, no arrays, loops or expansions over command output."}}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: this is not a plain command, so the harness cannot read it and would stall waiting for permission (it stopped at `(`). Run plain commands only: words, literal arguments, quotes, $NAME, pipes and ; && ||, with `$(...)`, backticks and heredocs holding only such commands; no loops, conditionals, subshells, functions, arrays or arithmetic. Unroll the work into separate plain calls."}}
+Ok(Blocked) ExitCode(unix_exit_status(0)) ""
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"rm -rf \"$d\""},"tool_name":"Bash"}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `rm` here is run through another command or on arguments that are not literal, so the harness cannot rule it out and stalls the call. Unroll it: list the targets first, then run each `rm` as its own plain top-level command with literal paths."}}
+Ok(Blocked) ExitCode(unix_exit_status(0)) ""
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"git clean -fdx $DIR"},"tool_name":"Bash"}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `git clean` here is run through another command or on arguments that are not literal, so the harness cannot rule it out and stalls the call. Unroll it: list the targets first, then run each `git clean` as its own plain top-level command with literal paths."}}
 Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"rm x"},"tool_name":"Bash"}
+Ok(Hooked(PreToolUse)) ExitCode(unix_exit_status(0)) ""
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cargo clean"},"tool_name":"Bash"}
 Ok(Hooked(PreToolUse)) ExitCode(unix_exit_status(0)) ""
 $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"git rm x"},"tool_name":"Bash"}
 Ok(Hooked(PreToolUse)) ExitCode(unix_exit_status(0)) ""
@@ -691,6 +698,43 @@ pull = 12
 
 [item.escalation.cause]
 repeat-failure = "test"
+
+## a check failing again on a changed head is sent back with its log, mutants with only their MISSED lines, and failing twice on the same head is escalated
+$ hook subagent-stop < {"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}
+{"decision":"block","reason":"CI failed on #12 at 0123456789abcdef0123456789abcdef01234567. Fix these jobs, push, then end with DONE #12 <full sha>.\n\nmutants-shard (1) (job 470):\nmutants-shard (1)\tRun mutants\t2026-11-28T03:01:00Z MISSED   crates/design/src/a.rs:10:5: replace A::b -> bool with true in 1.0s build + 2.0s test\nmutants-shard (1)\tRun mutants\t2026-11-28T03:03:00Z MISSED   crates/design/src/a.rs:20:9: delete ! in A::d in 1.0s build + 2.0s test\n\nmutants (job 471):\nmutants\tevery shard succeeded\t2026-11-28T03:05:00Z Process completed with exit code 1.\n"}
+Ok(Blocked) ExitCode(unix_exit_status(0)) ""
++60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable,mergeStateStatus -R o/r
++60 gh pr checks 12 --json name,bucket,link -R o/r
++60 gh pr checks 12 --json name,bucket,link -R o/r
++60 gh run view --job 470 --log-failed -R o/r
++60 gh run view --job 471 --log-failed -R o/r
+$ hook subagent-stop < {"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 fedcba9876543210fedcba9876543210fedcba98","session_id":"s","stop_hook_active":false}
+{"decision":"block","reason":"CI failed on #12 at fedcba9876543210fedcba9876543210fedcba98. Fix these jobs, push, then end with DONE #12 <full sha>.\n\nmutants-shard (1) (job 470):\nmutants-shard (1)\tRun mutants\t2026-11-28T03:01:00Z MISSED   crates/design/src/a.rs:10:5: replace A::b -> bool with true in 1.0s build + 2.0s test\nmutants-shard (1)\tRun mutants\t2026-11-28T03:03:00Z MISSED   crates/design/src/a.rs:20:9: delete ! in A::d in 1.0s build + 2.0s test\n\nmutants (job 471):\nmutants\tevery shard succeeded\t2026-11-28T03:05:00Z Process completed with exit code 1.\n"}
+Ok(Blocked) ExitCode(unix_exit_status(0)) ""
++60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable,mergeStateStatus -R o/r
++60 gh pr checks 12 --json name,bucket,link -R o/r
++60 gh pr checks 12 --json name,bucket,link -R o/r
++60 gh run view --job 470 --log-failed -R o/r
++60 gh run view --job 471 --log-failed -R o/r
+$ hook subagent-stop < {"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 fedcba9876543210fedcba9876543210fedcba98","session_id":"s","stop_hook_active":false}
+Ok(Escalated) ExitCode(unix_exit_status(0)) ""
++60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable,mergeStateStatus -R o/r
++60 gh pr checks 12 --json name,bucket,link -R o/r
++60 gh pr checks 12 --json name,bucket,link -R o/r
+queue:
+[[item]]
+
+[item.escalation]
+from = "/work/agent"
+
+[item.escalation.at]
+pull = 12
+
+[item.escalation.cause]
+repeat-failure = "mutants-shard (1)"
 
 ## a green that came on a rerun after a gate failed on the same head is escalated, a rerun after an infrastructure failure passes, and runs that cannot be read are escalated
 $ hook subagent-stop < {"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}
@@ -1348,7 +1392,10 @@ $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","sessi
 {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `sed -i` edits a file in place. Edit files only with the Edit or Write tools."}}
 Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"for f in a; do perl -pi -e 's/a/b/' $f; done"},"tool_name":"Bash"}
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `perl -pi` inside a loop edits a file in place. Edit files only with the Edit or Write tools."}}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: this is not a plain command, so the harness cannot read it and would stall waiting for permission (it stopped at `for`). Run plain commands only: words, literal arguments, quotes, $NAME, pipes and ; && ||, with `$(...)`, backticks and heredocs holding only such commands; no loops, conditionals, subshells, functions, arrays or arithmetic. Unroll the work into separate plain calls."}}
+Ok(Blocked) ExitCode(unix_exit_status(0)) ""
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"ls | xargs perl -pi -e 's/a/b/'"},"tool_name":"Bash"}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `perl -pi` edits a file in place. Edit files only with the Edit or Write tools."}}
 Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"echo a > /home/repo/src/x.rs"},"tool_name":"Bash"}
 {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: a shell write into /home/repo/src/x.rs, under the repository at /home/repo. Write files there only with the Edit or Write tools."}}
@@ -1370,7 +1417,7 @@ Ok(Hooked(PreToolUse)) ExitCode(unix_exit_status(0)) ""
 $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"git mv /home/repo/a.rs /tmp/a.rs"},"tool_name":"Bash"}
 Ok(Hooked(PreToolUse)) ExitCode(unix_exit_status(0)) ""
 
-## relative shell writes are judged against a cd's target, and refused when that target cannot be worked out
+## relative shell writes are judged against a cd's target and the variables known, and refused when the path cannot be worked out
 $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cd /home/repo && echo a > src/x.rs"},"tool_name":"Bash"}
 {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: a shell write into /home/repo/src/x.rs, under the repository at /home/repo. Write files there only with the Edit or Write tools."}}
 Ok(Blocked) ExitCode(unix_exit_status(0)) ""
@@ -1380,12 +1427,23 @@ Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cd /tmp && echo a > out.txt"},"tool_name":"Bash"}
 Ok(Hooked(PreToolUse)) ExitCode(unix_exit_status(0)) ""
 $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cd $REPO && echo a > out.txt"},"tool_name":"Bash"}
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: a shell write or move onto out.txt after a `cd` whose target cannot be worked out. Use absolute paths, or edit files with the Edit or Write tools."}}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: a shell write or move onto out.txt, whose path cannot be worked out (a variable that is not set, a glob or command output, or a `cd` whose target is unknown). Use absolute paths, or edit files with the Edit or Write tools."}}
 Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cd - && mv a b"},"tool_name":"Bash"}
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: a shell write or move onto a after a `cd` whose target cannot be worked out. Use absolute paths, or edit files with the Edit or Write tools."}}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: a shell write or move onto a, whose path cannot be worked out (a variable that is not set, a glob or command output, or a `cd` whose target is unknown). Use absolute paths, or edit files with the Edit or Write tools."}}
 Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"cd $REPO && echo a > /tmp/out.txt"},"tool_name":"Bash"}
+Ok(Hooked(PreToolUse)) ExitCode(unix_exit_status(0)) ""
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"S=/home/repo; echo a > $S/x.rs"},"tool_name":"Bash"}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: a shell write into /home/repo/x.rs, under the repository at /home/repo. Write files there only with the Edit or Write tools."}}
+Ok(Blocked) ExitCode(unix_exit_status(0)) ""
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"export S=/tmp && cd $HOME/repo && mv a.rs $S/a.rs"},"tool_name":"Bash"}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `mv` takes /home/repo/a.rs out of the repository at /home/repo, and a move out of a repository is a delete. Use `git mv` to move it within the repository, or `git rm` to delete it."}}
+Ok(Blocked) ExitCode(unix_exit_status(0)) ""
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"echo a > $UNSET/x"},"tool_name":"Bash"}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: a shell write or move onto $UNSET/x, whose path cannot be worked out (a variable that is not set, a glob or command output, or a `cd` whose target is unknown). Use absolute paths, or edit files with the Edit or Write tools."}}
+Ok(Blocked) ExitCode(unix_exit_status(0)) ""
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"S=/tmp/s; echo a > $S/gold.txt"},"tool_name":"Bash"}
 Ok(Hooked(PreToolUse)) ExitCode(unix_exit_status(0)) ""
 
 ## a ruling whose message id is not eight or more hexadecimal digits does not parse

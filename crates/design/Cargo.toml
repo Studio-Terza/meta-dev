@@ -32,7 +32,6 @@ grammar-report = { path = "../grammar-report" }
 grammar-repository = { path = "../grammar-repository" }
 grammar-shell = { path = "../grammar-shell" }
 grammar-spec-line = { path = "../grammar-spec-line" }
-hex.workspace = true
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 serde.workspace = true

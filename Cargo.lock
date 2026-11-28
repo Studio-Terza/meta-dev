@@ -71,6 +71,7 @@ version = "0.1.0"
 dependencies = [
  "invariants",
  "newtype",
+ "port-core",
 ]
 
 [[package]]
@@ -150,7 +151,6 @@ dependencies = [
  "grammar-repository",
  "grammar-shell",
  "grammar-spec-line",
- "hex",
  "invariants",
  "newtype",
  "port-core",
@@ -172,9 +172,11 @@ version = "0.1.0"
 dependencies = [
  "file-ports",
  "grammar-prose",
+ "hex",
  "invariants",
  "newtype",
  "port-core",
+ "serde",
  "store-ports",
  "thiserror",
  "transcript-ports",

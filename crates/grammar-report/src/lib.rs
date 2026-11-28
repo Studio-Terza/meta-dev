@@ -2,4 +2,4 @@
 
 mod boundary;
 
-pub use boundary::{AgentReport, BranchName, Ended, JobLink, Target};
+pub use boundary::{AgentReport, BranchName, Ended, JobLink, MissedMutant, Target};

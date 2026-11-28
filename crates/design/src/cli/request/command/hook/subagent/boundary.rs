@@ -1,14 +1,12 @@
 use std::fmt;
 use std::num::{NonZeroU32, NonZeroU64};
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 
-use design_messages::PullNumber;
+use design_messages::{CommitSha, PullNumber};
 use grammar_lines::Lines;
 use grammar_report::{AgentReport, BranchName, Ended, JobLink, Target};
 use grammar_repository::SpecTrailer;
 use grammar_spec_line::Attachment;
-use hex::FromHex;
 use invariants::Ignoring;
 use newtype::{Display, Newtype};
 use serde::Deserialize;
@@ -99,16 +97,8 @@ pub struct Opened {
     number: NonZeroU32,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
-#[serde(try_from = "String")]
-pub struct CommitSha([u8; 20]);
-
 #[derive(Newtype, Display, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct JobId(NonZeroU64);
-
-#[derive(Debug, thiserror::Error)]
-#[error("not a full commit sha of forty hexadecimal digits")]
-pub struct Unhexed;
 
 impl Finishing {
     pub fn said(&self) -> &Said {
@@ -227,28 +217,6 @@ impl TryFrom<String> for Branch {
 impl fmt::Display for Branch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.0)
-    }
-}
-
-impl FromStr for CommitSha {
-    type Err = Unhexed;
-
-    fn from_str(text: &str) -> Result<CommitSha, Unhexed> {
-        <[u8; 20]>::from_hex(text).map(CommitSha).map_err(|_unhexed| Unhexed)
-    }
-}
-
-impl TryFrom<String> for CommitSha {
-    type Error = Unhexed;
-
-    fn try_from(text: String) -> Result<CommitSha, Unhexed> {
-        text.parse()
-    }
-}
-
-impl fmt::Display for CommitSha {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(&hex::encode(self.0))
     }
 }
 

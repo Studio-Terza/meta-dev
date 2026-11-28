@@ -6,12 +6,14 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, SystemTime};
 
 use invariants::Ignoring;
-use port_core::Pass;
+use port_core::{Pass, Real};
 
 use crate::{Call, Deadline, DispatchFailure, Due, Ignored, Printed, Ran, ShellFiller, Wall, shell_ops};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SystemShell;
+
+impl Real for SystemShell {}
 
 #[derive(Debug)]
 struct Running {

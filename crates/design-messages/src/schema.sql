@@ -24,6 +24,7 @@ CREATE TABLE overruns (
 
 CREATE TABLE failed_checks (
     pull INTEGER NOT NULL CHECK (pull > 0),
+    head TEXT NOT NULL CHECK (length(head) = 40),
     name TEXT NOT NULL CHECK (name <> ''),
     PRIMARY KEY (pull, name)
 ) STRICT;

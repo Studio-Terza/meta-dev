@@ -1,49 +1,23 @@
 use grammar::logos::Logos;
 use grammar::{Ignoring, Unlexed};
 
+use super::Prefixed;
+
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
 pub(super) enum Lexeme<'text> {
     #[regex(r"[ \t]+")]
     #[token("\\\n")]
-    Blank,
     #[regex(r"#[^\n]*", allow_greedy = true)]
-    Comment,
-    #[token("\n")]
-    Newline,
+    Blank,
     #[token(";")]
-    #[token("&")]
     #[token("&&")]
     #[token("||")]
     #[token("|")]
-    #[token("|&")]
     Separator,
-    #[token(";;")]
-    #[token(";&")]
-    #[token(";;&")]
-    CaseEnd,
-    #[token("(")]
-    Open,
-    #[regex(r"\([ \t]*\)")]
-    Parens,
-    #[token(")")]
-    Close,
-    #[token("((")]
-    #[token("$((")]
-    Arithmetic,
-    #[token("))")]
-    Closes,
-    #[token("$(")]
-    #[token("<(")]
-    #[token(">(")]
-    Substitution,
-    #[token("`")]
-    Backtick,
-    #[regex(r"[0-9]*<<")]
-    Heredoc,
-    #[regex(r"[0-9]*<<-")]
-    Stripped,
-    #[regex(r"[0-9]*(<|<<<)")]
+    #[token("\n")]
+    Newline,
+    #[regex(r"[0-9]*<")]
     Input,
     #[regex(r"[0-9]*(>|>>|>\||<>)")]
     #[token("&>")]
@@ -51,44 +25,87 @@ pub(super) enum Lexeme<'text> {
     Output,
     #[regex(r"[0-9]*[<>]&([0-9]+-?|-)")]
     Duplicate,
+    #[regex(r"[0-9]*<<")]
+    Heredoc,
+    #[regex(r"[0-9]*<<-")]
+    Stripped,
     #[token("\"")]
     Quote,
-    #[regex(r"[A-Za-z_][A-Za-z0-9_]*\+?=\(")]
-    #[token("${(")]
-    Unreadable,
     #[regex(r"'[^']*'", |lexer| Lexeme::inner(lexer.slice(), 1))]
     #[regex(r"\$'(\\(.|\n)|[^'\\])*'", |lexer| Lexeme::inner(lexer.slice(), 2))]
-    Single(&'text str),
     #[regex(r"\\[^\n]", |lexer| lexer.slice().get(1..))]
-    Escaped(&'text str),
-    #[regex(r"\$\{([^(}][^}]*)?\}", |lexer| lexer.slice())]
-    #[regex(r"\$([A-Za-z_][A-Za-z0-9_]*|[0-9@*#?$!-])", |lexer| lexer.slice())]
-    Expansion(&'text str),
-    #[regex(r#"[^ \t\n;&|()<>'"`$\\#][^ \t\n;&|()<>'"`$\\]*"#, |lexer| lexer.slice())]
+    Quoted(&'text str),
+    #[regex(r"\$[A-Za-z_][A-Za-z0-9_]*", |lexer| lexer.slice().get(1..))]
+    #[regex(r"\$\{[A-Za-z_][A-Za-z0-9_]*\}", |lexer| Lexeme::inner(lexer.slice(), 2))]
+    Variable(&'text str),
+    #[regex(r"\$\{(#[A-Za-z_][A-Za-z0-9_]*|[A-Za-z_][A-Za-z0-9_]*[^}A-Za-z0-9_$`(][^}$`(]*)\}", |lexer| lexer.slice())]
+    #[regex(r"\$[0-9@*#?$!-]", |lexer| lexer.slice())]
+    Opaque(&'text str),
+    #[regex(r#"[^ \t\n;&|()<>'"`$\\#~][^ \t\n;&|()<>'"`$\\]*"#, |lexer| lexer.slice())]
     #[token("$", |lexer| lexer.slice())]
     Literal(&'text str),
+    #[regex(r#"~[^ \t\n;&|()<>'"`$\\]*"#, |lexer| lexer.slice())]
+    Tilde(&'text str),
+    #[token("$(")]
+    Substitution,
+    #[token("`")]
+    Backtick,
+    #[token(")")]
+    Close,
+    #[token("(")]
+    #[token("$((")]
+    #[token("${")]
+    #[regex(r"[0-9]*<<<")]
+    #[token("<(")]
+    #[token(">(")]
+    #[token("&")]
+    #[token("|&")]
+    #[token(";;")]
+    Unplain,
 }
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
-pub(super) enum Quoted<'text> {
+pub(super) enum Inside<'text> {
     #[token("\"")]
     End,
-    #[token("$(")]
-    Substitution,
-    #[token("$((")]
-    Arithmetic,
-    #[token("`")]
-    Backtick,
-    #[token("${(")]
-    Unreadable,
     #[regex(r"\\(.|\n)", |lexer| lexer.slice().get(1..))]
-    Escaped(&'text str),
-    #[regex(r"\$\{([^(}][^}]*)?\}", |lexer| lexer.slice())]
-    #[regex(r"\$([A-Za-z_][A-Za-z0-9_]*|[0-9@*#?$!-])", |lexer| lexer.slice())]
     #[regex(r#"[^"\\$`]+"#, |lexer| lexer.slice())]
     #[token("$", |lexer| lexer.slice())]
     Text(&'text str),
+    #[regex(r"\$[A-Za-z_][A-Za-z0-9_]*", |lexer| lexer.slice().get(1..))]
+    #[regex(r"\$\{[A-Za-z_][A-Za-z0-9_]*\}", |lexer| Lexeme::inner(lexer.slice(), 2))]
+    Variable(&'text str),
+    #[regex(r"\$\{(#[A-Za-z_][A-Za-z0-9_]*|[A-Za-z_][A-Za-z0-9_]*[^}A-Za-z0-9_$`(][^}$`(]*)\}", |lexer| lexer.slice())]
+    #[regex(r"\$[0-9@*#?$!-]", |lexer| lexer.slice())]
+    Opaque(&'text str),
+    #[token("$(")]
+    Substitution,
+    #[token("`")]
+    Backtick,
+    #[token("$((")]
+    #[token("${")]
+    Unplain,
+}
+
+#[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
+#[logos(crate = grammar::logos)]
+pub(super) enum Here {
+    #[regex(r"\\(.|\n)")]
+    #[regex(r"[^\\$`]+")]
+    #[token("$")]
+    #[regex(r"\$[A-Za-z_][A-Za-z0-9_]*")]
+    #[regex(r"\$\{[A-Za-z_][A-Za-z0-9_]*\}")]
+    #[regex(r"\$\{(#[A-Za-z_][A-Za-z0-9_]*|[A-Za-z_][A-Za-z0-9_]*[^}A-Za-z0-9_$`(][^}$`(]*)\}")]
+    #[regex(r"\$[0-9@*#?$!-]")]
+    Text,
+    #[token("$(")]
+    Substitution,
+    #[token("`")]
+    Backtick,
+    #[token("$((")]
+    #[token("${")]
+    Unplain,
 }
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
@@ -104,44 +121,48 @@ pub(super) enum Line<'text> {
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
+pub(super) enum Assigning<'text> {
+    #[regex(r"[A-Za-z_][A-Za-z0-9_]*=", |lexer| lexer.slice().get(..lexer.slice().len().saturating_sub(1)))]
+    Name(&'text str),
+}
+
+#[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
+#[logos(crate = grammar::logos)]
 pub(super) enum Spelling {
     #[token("for")]
     #[token("select")]
-    For,
     #[token("while")]
     #[token("until")]
-    While,
     #[token("if")]
-    If,
-    #[token("case")]
-    Case,
-    #[token("do")]
     #[token("then")]
-    #[token("else")]
     #[token("elif")]
-    #[token("!")]
-    #[token("time")]
-    Lead,
-    #[token("{")]
-    Brace,
-    #[token("}")]
-    Unbrace,
-    #[token("done")]
-    Done,
+    #[token("else")]
     #[token("fi")]
-    Fi,
+    #[token("do")]
+    #[token("done")]
+    #[token("case")]
     #[token("esac")]
-    Esac,
     #[token("function")]
-    Function,
+    #[token("coproc")]
+    #[token("time")]
+    #[token("!")]
+    #[token("{")]
+    #[token("}")]
     #[token("[[")]
-    Test,
+    #[token("]]")]
+    Keyword,
     #[regex(r"[A-Za-z_][A-Za-z0-9_]*\+?=[^\x00]*", allow_greedy = true, priority = 100)]
     Assignment,
+    #[token("export")]
+    Export,
     #[regex(r"([^/\x00]*/)*rm", allow_greedy = true)]
     Rm,
     #[regex(r"([^/\x00]*/)*rmdir", allow_greedy = true)]
     Rmdir,
+    #[regex(r"([^/\x00]*/)*cargo", allow_greedy = true)]
+    Cargo,
+    #[regex(r"([^/\x00]*/)*git", allow_greedy = true)]
+    Git,
     #[regex(r"([^/\x00]*/)*(bash|sh|zsh|dash|ksh)", allow_greedy = true)]
     Shell,
     #[regex(r"([^/\x00]*/)*xargs", allow_greedy = true)]
@@ -192,8 +213,8 @@ pub(super) enum Argued {
     #[token(";")]
     #[token("+")]
     Terminator,
-    #[token("in")]
-    In,
+    #[token("clean")]
+    Clean,
     #[token("-I")]
     #[token("-J")]
     #[token("-L")]
@@ -215,6 +236,9 @@ pub(super) enum Argued {
 #[derive(Debug)]
 pub(super) struct Whole;
 
+#[derive(Debug)]
+pub(super) struct Prefix;
+
 impl<'text> Lexeme<'text> {
     fn inner(slice: &'text str, opening: usize) -> Option<&'text str> {
         slice.get(opening..slice.len().saturating_sub(1))
@@ -228,5 +252,16 @@ impl Whole {
         let mut lexer = Token::lexer(text);
         let first = lexer.next().and_then(|lexed| lexed.ignoring(Unlexed::NotThisGrammar));
         first.filter(|_token| lexer.span() == (0..text.len()))
+    }
+}
+
+impl Prefix {
+    pub(super) fn read<'text, Token: Logos<'text, Source = str, Extras = ()> + Copy>(
+        text: &'text str,
+    ) -> Option<Prefixed<'text, Token>> {
+        let mut lexer = Token::lexer(text);
+        let first = lexer.next().and_then(|lexed| lexed.ignoring(Unlexed::NotThisGrammar))?;
+        let rest = text.get(lexer.span().end..)?;
+        Some(Prefixed { token: first, rest })
     }
 }
