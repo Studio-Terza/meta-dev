@@ -33,12 +33,6 @@ impl From<String> for CacheFile {
     }
 }
 
-impl AsRef<str> for CacheFile {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
 impl fmt::Display for CacheFile {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.0)

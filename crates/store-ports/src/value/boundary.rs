@@ -13,14 +13,11 @@ pub enum Value {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Argument {
-    Null,
     Integer(i64),
     Text(String),
 }
 
 pub trait Bind {
-    fn null(&mut self) -> Result<(), StoreFailure>;
-
     fn integer(&mut self, integer: i64) -> Result<(), StoreFailure>;
 
     fn text(&mut self, text: String) -> Result<(), StoreFailure>;
@@ -37,7 +34,6 @@ pub trait FromValue: Sized {
 impl Argument {
     pub fn bound(self, bind: &mut impl Bind) -> Result<(), StoreFailure> {
         match self {
-            Argument::Null => bind.null(),
             Argument::Integer(integer) => bind.integer(integer),
             Argument::Text(text) => bind.text(text),
         }
@@ -53,12 +49,6 @@ impl IntoArgument for i64 {
 impl IntoArgument for String {
     fn into_argument(self) -> Argument {
         Argument::Text(self)
-    }
-}
-
-impl<Inner: IntoArgument> IntoArgument for Option<Inner> {
-    fn into_argument(self) -> Argument {
-        self.map_or(Argument::Null, IntoArgument::into_argument)
     }
 }
 

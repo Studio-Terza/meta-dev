@@ -28,4 +28,5 @@
         ),
     ],
     [],
+    "{\n  \"query\": \"UPDATE r SET body = ?1 WHERE id = ?2\",\n  \"describe\": {\n    \"columns\": [],\n    \"parameters\": {\n      \"Right\": 2\n    },\n    \"nullable\": []\n  }\n}\n",
 )

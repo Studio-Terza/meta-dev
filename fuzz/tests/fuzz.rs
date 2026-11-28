@@ -12,7 +12,7 @@ fn no_input_panics_the_runner_or_breaks_its_promises() -> Result<(), Failed> {
             let mut err = Vec::new();
             let verdict = Cli::from_args([Campaign::root().into_os_string()]).verdict(
                 input.files(),
-                Stopped,
+                Stopped::default(),
                 &mut Vec::new(),
                 &mut err,
             );

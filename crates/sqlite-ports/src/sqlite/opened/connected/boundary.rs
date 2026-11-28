@@ -6,11 +6,6 @@ use super::super::super::failed::Unexecuted;
 use super::{Bound, Connected};
 
 impl Bind for Bound {
-    fn null(&mut self) -> Result<(), StoreFailure> {
-        self.0.push(Stored::Null);
-        Ok(())
-    }
-
     fn integer(&mut self, integer: i64) -> Result<(), StoreFailure> {
         self.0.push(Stored::Integer(integer));
         Ok(())

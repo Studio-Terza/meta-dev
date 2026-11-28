@@ -3,7 +3,7 @@ use std::fmt::Display;
 use std::num::{NonZeroU32, TryFromIntError};
 use std::str::FromStr;
 
-use newtype::{Guarded, Inner, Newtype, Optional, Spelled, Stored, Validated};
+use newtype::{Guarded, Inner, Newtype, Spelled, Stored, Validated};
 
 use crate::Cause;
 
@@ -74,18 +74,6 @@ impl<Value: Display + FromStr<Err: Error + Send + Sync + 'static>> Encoding<Valu
 
     fn from_raw(raw: String) -> Result<Value, ColumnFailure> {
         raw.parse().map_err(|unknown| ColumnFailure::Misspelled(Cause::told(&unknown)))
-    }
-}
-
-impl<Value: Column> Encoding<Option<Value>> for Optional {
-    type Raw = Option<Value::Raw>;
-
-    fn raw(value: &Option<Value>) -> Option<Value::Raw> {
-        value.as_ref().map(Value::raw)
-    }
-
-    fn from_raw(raw: Option<Value::Raw>) -> Result<Option<Value>, ColumnFailure> {
-        raw.map(Value::from_raw).transpose()
     }
 }
 

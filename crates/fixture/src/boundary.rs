@@ -58,7 +58,7 @@ pub struct Drift {
     printed: String,
 }
 
-#[derive(Clone, Default, PartialEq, Eq, PartialOrd, Ord, serde::Deserialize)]
+#[derive(Clone, Default, PartialEq, Eq, PartialOrd, Ord, serde::Deserialize, serde::Serialize)]
 #[serde(transparent)]
 pub struct Spelled(String);
 

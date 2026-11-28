@@ -49,4 +49,5 @@
             },
         ),
     ],
+    "{\n  \"query\": \"SELECT a, b, c FROM t\",\n  \"describe\": {\n    \"columns\": [\n      {\n        \"name\": \"a\",\n        \"type_info\": \"Text\"\n      },\n      {\n        \"name\": \"b\",\n        \"type_info\": \"Integer\"\n      },\n      {\n        \"name\": \"c\",\n        \"type_info\": \"Null\"\n      }\n    ],\n    \"parameters\": {\n      \"Right\": 0\n    },\n    \"nullable\": [\n      true,\n      false\n    ]\n  }\n}\n",
 )

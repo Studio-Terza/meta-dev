@@ -9,7 +9,6 @@ use invariants::{Ignoring, ignored};
 use newtype::Counter;
 use port_core::Run;
 use proptest::collection::vec;
-use proptest::option;
 use proptest::prelude::{any, prop_assert_eq, proptest};
 use proptest::sample::Index;
 use proptest::strategy::{Strategy, ValueTree};
@@ -101,13 +100,12 @@ proptest! {
     #![proptest_config(Properties::settled())]
 
     #[test]
-    fn every_column_reads_back_what_it_wrote(uuid in any::<Uuid>(), session in any::<SessionId>(), instant in any::<Instant>(), body in any::<Body>(), offset in any::<Offset>(), optional in option::of(any::<Body>()), task in any::<TaskId>(), pull in any::<NonZeroU32>()) {
+    fn every_column_reads_back_what_it_wrote(uuid in any::<Uuid>(), session in any::<SessionId>(), instant in any::<Instant>(), body in any::<Body>(), offset in any::<Offset>(), task in any::<TaskId>(), pull in any::<NonZeroU32>()) {
         prop_assert_eq!(Uuid::from_raw(uuid.raw()).ignoring(Ignored::Unread), Some(uuid));
         prop_assert_eq!(SessionId::from_raw(session.raw()).ignoring(Ignored::Unread), Some(session));
         prop_assert_eq!(Instant::from_raw(instant.raw()).ignoring(Ignored::Unread), Some(instant));
         prop_assert_eq!(Body::from_raw(body.raw()).ignoring(Ignored::Unread), Some(body));
         prop_assert_eq!(Offset::from_raw(offset.raw()).ignoring(Ignored::Unread), Some(offset));
-        prop_assert_eq!(<Option<Body>>::from_raw(optional.raw()).ignoring(Ignored::Unread), Some(optional));
         prop_assert_eq!(TaskId::from_raw(task.raw()).ignoring(Ignored::Unread), Some(task));
         prop_assert_eq!(PullNumber::from_raw(PullNumber::new(pull).raw()).ignoring(Ignored::Unread), Some(PullNumber::new(pull)));
     }

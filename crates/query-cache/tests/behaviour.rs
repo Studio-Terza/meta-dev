@@ -34,6 +34,22 @@ struct Workspace {
     root: PathBuf,
 }
 
+#[derive(Fixture, Deserialize, Debug)]
+struct Found {
+    sql: Spelled,
+}
+
+#[test]
+fn a_query_reads_its_cache_file_from_a_sqlx_directory_above_its_crate() -> Result<(), Failed> {
+    let drifted = Cases::<Found>::drifted(|case| {
+        let run = Run::root();
+        let found = Entry::<Spelled>::found(&run.port(Disk), case.row().sql.as_str());
+        Ok(Debugged(found).to_string())
+    })?;
+    assert_eq!(drifted, Vec::new());
+    Ok(())
+}
+
 #[test]
 fn every_cached_query_binds_what_it_takes_and_every_record_table_spells_its_statements() -> Result<(), Failed> {
     let drifted = Cases::<Cached>::drifted(|case| {
@@ -51,13 +67,14 @@ fn every_cached_query_binds_what_it_takes_and_every_record_table_spells_its_stat
                 (table.statements(), table.overwrite(named.overwritten.as_str()))
             })
             .collect();
+        let written = cached.entry.written()?;
         let columns: Vec<_> = cached
             .entry
             .columns()
             .into_iter()
             .map(|column| (column.storage().spelled(), column.nullable().possible(), column))
             .collect();
-        Ok(Debugged((bound, refused, tables, columns)).to_string())
+        Ok(Debugged((bound, refused, tables, columns, written)).to_string())
     })?;
     assert_eq!(drifted, Vec::new());
     Ok(())

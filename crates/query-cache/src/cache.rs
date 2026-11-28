@@ -53,7 +53,7 @@ impl Cache {
     pub fn recorded(&self, files: &impl Files, described: &impl Describe) -> Result<Drift, Uncached> {
         let Compared { wanted, drift } = self.compared(files, described)?;
         drift.drifted.iter().try_for_each(|name| {
-            let path = self.directory().join(name.as_ref());
+            let path = self.directory().join(name.to_string());
             let rewritten =
                 wanted.get(name).map_or_else(|| files.remove(&path), |text| files.write(&path, Bytes::from(text)));
             rewritten.map_err(|source| Uncached::Unrewritten { path, source })

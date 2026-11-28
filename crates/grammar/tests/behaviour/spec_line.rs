@@ -20,9 +20,8 @@ struct Steady {
 
 #[test]
 fn every_exact_shape_reads_as_a_line_and_shows_back_as_written() -> Result<(), Failed> {
-    let mut runner = TestRunner::new(Properties::settled());
     Rows::<Exact>::read()?.iter().try_for_each(|exact| {
-        runner.run(&string_regex(exact.shape.as_str())?, |text| {
+        TestRunner::new(Properties::settled()).run(&string_regex(exact.shape.as_str())?, |text| {
             let line = text.parse::<Line>().ignoring(Unlexed::NotThisGrammar);
             prop_assert_eq!(line.as_ref().map(ToString::to_string), Some(text));
             Ok(())
@@ -33,16 +32,15 @@ fn every_exact_shape_reads_as_a_line_and_shows_back_as_written() -> Result<(), F
 
 #[test]
 fn any_text_the_lexer_accepts_reads_back_from_its_rendering() -> Result<(), Failed> {
-    let mut runner = TestRunner::new(Properties::settled());
     let steady = |text: String| {
         let line = text.parse::<Line>().ignoring(Unlexed::NotThisGrammar);
         let again = line.as_ref().and_then(|read| read.to_string().parse::<Line>().ignoring(Unlexed::NotThisGrammar));
         prop_assert_eq!(again, line);
         Ok::<(), TestCaseError>(())
     };
-    runner.run(&any::<String>(), steady)?;
+    TestRunner::new(Properties::settled()).run(&any::<String>(), steady)?;
     Rows::<Steady>::read()?.iter().try_for_each(|shaped| {
-        runner.run(&string_regex(shaped.shape.as_str())?, steady)?;
+        TestRunner::new(Properties::settled()).run(&string_regex(shaped.shape.as_str())?, steady)?;
         Ok(())
     })
 }

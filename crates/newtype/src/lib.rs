@@ -8,7 +8,7 @@ pub use enumerated::Enumerated;
 pub use ignored::Ignored;
 pub use invariants::Ignoring;
 pub use newtype_derive::{Arbitrary, CheckedDeserialize, Deserialize, Display, Newtype, Serialize, Spelled};
-pub use stored::{Inner, Optional, Spelled, Stored, Validated};
+pub use stored::{Inner, Spelled, Stored, Validated};
 
 pub use proptest;
 pub use serde;

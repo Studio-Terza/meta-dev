@@ -31,12 +31,13 @@ struct Paused {
 fn a_monotonic_clock_moves_on_across_a_pause_and_a_stopped_clock_stands_still() -> Result<(), Failed> {
     let run = Run::root();
     let monotonic = run.port(Monotonic::default());
-    let stopped = run.port(Stopped);
     Rows::<Paused>::read()?.iter().for_each(|paused| {
+        let at = Moment::from(paused.pause);
+        let stopped = run.port(Stopped::from(at));
         let first = monotonic.now();
         thread::sleep(paused.pause);
         assert!(monotonic.now() > first);
-        assert_eq!(stopped.now(), Moment::default());
+        assert_eq!(stopped.now(), at);
     });
     Ok(())
 }

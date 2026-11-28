@@ -1,0 +1,12 @@
+Ok(
+    Entry {
+        query: "\nINSERT\n  OR IGNORE INTO ended (task)\nVALUES\n  (?1)\n",
+        describe: Describe {
+            columns: [],
+            parameters: Right(
+                1,
+            ),
+            nullable: [],
+        },
+    },
+)
