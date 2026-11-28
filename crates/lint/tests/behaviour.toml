@@ -719,6 +719,69 @@ name = "user"
 use exporter::Used;
 """
 
+[Lint.port_model]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.port_model.files]
+"Cargo.toml" = """
+[workspace]
+members = ["clock-ports", "derived", "reader", "tested"]
+"""
+"clock-ports/Cargo.toml" = """
+[package]
+name = "clock-ports"
+
+[dependencies]
+chrono = "1"
+once = "1"
+"""
+"clock-ports/src/lib.rs" = """
+pub(crate) struct Moment(chrono::DateTime);
+
+pub(crate) struct Single(once::Cell);
+"""
+"derived/Cargo.toml" = """
+[package]
+name = "derived"
+
+[dependencies]
+chrono = "1"
+clock-ports = { path = "../clock-ports" }
+"""
+"derived/src/lib.rs" = """
+#[derive(chrono::Stamped)]
+pub(crate) struct Stamped(clock_ports::Moment);
+"""
+"reader/Cargo.toml" = """
+[package]
+name = "reader"
+
+[dependencies]
+chrono-tz = "1"
+chrono = "1"
+"""
+"reader/src/lib.rs" = """
+use chrono::Utc;
+
+pub(crate) struct Zoned(chrono_tz::Tz);
+
+pub(in crate::chrono) struct Hidden;
+"""
+"tested/Cargo.toml" = """
+[package]
+name = "tested"
+
+[dev-dependencies]
+chrono = "1"
+"""
+"tested/src/lib.rs" = """
+pub(crate) struct Plain;
+"""
+"tested/tests/clock.rs" = """
+use chrono::Utc;
+"""
+
 [Lint.starters]
 arguments = ["."]
 verdict = "Violations"

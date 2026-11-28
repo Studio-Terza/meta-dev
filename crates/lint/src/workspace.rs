@@ -72,12 +72,40 @@ impl Feature {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Needed {
+    Shipped,
+    Tests,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Dependency {
+    name: Name,
+    needed: Needed,
+    line: Line,
+}
+
+impl Dependency {
+    pub(crate) fn name(&self) -> &Name {
+        &self.name
+    }
+
+    pub(crate) fn needed(&self) -> Needed {
+        self.needed
+    }
+
+    pub(crate) fn line(&self) -> Line {
+        self.line
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct Package {
     directory: PathBuf,
     name: Name,
     manifest: Arc<Path>,
     features: Vec<Feature>,
+    dependencies: Vec<Dependency>,
     testing: Option<()>,
     test_features: BTreeSet<Name>,
 }
@@ -117,6 +145,10 @@ impl Package {
 
     pub(crate) fn features(&self) -> &[Feature] {
         &self.features
+    }
+
+    pub(crate) fn dependencies(&self) -> &[Dependency] {
+        &self.dependencies
     }
 }
 
@@ -254,6 +286,7 @@ impl Workspace {
             name: named,
             manifest: tree.shown(manifest),
             features: Workspace::features(text.as_ref(), &table),
+            dependencies: Workspace::dependencies(text.as_ref(), &table),
             testing: None,
             test_features: BTreeSet::new(),
         });

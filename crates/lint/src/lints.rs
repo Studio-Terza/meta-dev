@@ -8,6 +8,7 @@ mod no_comments;
 mod no_dyn;
 mod no_free_fns;
 mod no_test_only_api;
+mod port_model;
 mod primitive_boundary;
 mod process_starters;
 mod public_api_tests;
@@ -35,6 +36,7 @@ use no_comments::NoComments;
 pub(crate) use no_dyn::NoDyn;
 pub(crate) use no_free_fns::NoFreeFns;
 pub(crate) use no_test_only_api::NoTestOnlyApi;
+pub(crate) use port_model::{ForeignFact, PortModel};
 pub(crate) use primitive_boundary::PrimitiveBoundary;
 pub(crate) use process_starters::ProcessStarters;
 pub(crate) use public_api_tests::{ApiFact, Emitters, PublicApiTests};
@@ -48,6 +50,7 @@ pub(crate) struct Facts {
     test_only: Vec<Finding>,
     dead: Vec<DeadFact>,
     modules: Vec<ModuleFact>,
+    foreign: Vec<ForeignFact>,
 }
 
 #[derive(Debug, Default)]
@@ -84,6 +87,7 @@ impl<'run> Lints<'run> {
             test_shape: lints.style(),
             dead_code: lints.graph(),
             module_cycles: Pausable::admitted(ModuleCycles::new(source), Some(())),
+            port_model: lints.graph(),
         };
         let Lineup {
             no_free_fns,
@@ -103,6 +107,7 @@ impl<'run> Lints<'run> {
             test_shape,
             dead_code,
             module_cycles,
+            port_model,
         } = Walker::walked(lineup, file);
         let found = [
             lints.found(lints.style::<NoComments>()),
@@ -124,6 +129,7 @@ impl<'run> Lints<'run> {
             test_only: Lints::facts(no_test_only_api),
             dead: Lints::facts(dead_code),
             modules: Lints::facts(module_cycles),
+            foreign: Lints::facts(port_model),
         };
         let budget = Budget::of_file(source, &test_scan.woken().unwrap_or_default(), gate);
         Linted { found: found.into_iter().flatten().collect(), facts, budget }
@@ -156,6 +162,7 @@ impl Facts {
             test_only: self.test_only.into_iter().chain(later.test_only).collect(),
             dead: self.dead.into_iter().chain(later.dead).collect(),
             modules: self.modules.into_iter().chain(later.modules).collect(),
+            foreign: self.foreign.into_iter().chain(later.foreign).collect(),
         }
     }
 
@@ -164,6 +171,7 @@ impl Facts {
         let test_only = NoTestOnlyApi::reduce(self.test_only, packages);
         let dead = DeadCode::reduce(self.dead, packages);
         let modules = ModuleCycles::reduce(self.modules, packages);
-        api.into_iter().chain(test_only).chain(dead).chain(modules).collect()
+        let foreign = PortModel::reduce(self.foreign, packages);
+        api.into_iter().chain(test_only).chain(dead).chain(modules).chain(foreign).collect()
     }
 }

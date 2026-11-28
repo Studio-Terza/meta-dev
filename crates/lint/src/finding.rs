@@ -25,6 +25,7 @@ pub(crate) enum Rule {
     TestShape,
     DeadCode,
     ModuleCycles,
+    PortModel,
 }
 
 impl fmt::Display for Rule {
@@ -56,6 +57,7 @@ impl fmt::Display for Rule {
             }
             Rule::DeadCode => "every pub item is named by another workspace crate",
             Rule::ModuleCycles => "modules inside a crate never import each other in a cycle",
+            Rule::PortModel => "a foreign crate named in code lives in exactly one port crate",
         })
     }
 }

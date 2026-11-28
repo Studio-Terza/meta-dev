@@ -11,7 +11,7 @@ use crate::expansion::Expansion;
 use crate::hooks::{Descent, Expanded, Hooks, nodes};
 use crate::lints::{
     BoolMethods, DeadCode, Emitters, ExpressionFlow, ManualIteration, ModuleCycles, NamedLifetimes, NoDyn, NoFreeFns,
-    NoTestOnlyApi, PrimitiveBoundary, ProcessStarters, PublicApiTests, TestShape, TypeShape, VecOutParams,
+    NoTestOnlyApi, PortModel, PrimitiveBoundary, ProcessStarters, PublicApiTests, TestShape, TypeShape, VecOutParams,
 };
 use crate::terms::Depth;
 
@@ -215,5 +215,6 @@ nodes!(walker {
         test_shape: TestShape,
         dead_code: DeadCode<'file>,
         module_cycles: ModuleCycles<'file>,
+        port_model: PortModel<'file>,
     ]
 });

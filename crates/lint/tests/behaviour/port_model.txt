@@ -1,0 +1,4 @@
+test budget: 1 of 12 lines are tests, at most 18% may be
+a foreign crate named in code lives in exactly one port crate:
+clock-ports/Cargo.toml:5: chrono is a foreign interface named in the code of clock-ports, reader; confine it to one port crate that wraps it in our own types, and depend on that crate
+reader/Cargo.toml:6: chrono is a foreign interface named in the code of clock-ports, reader; confine it to one port crate that wraps it in our own types, and depend on that crate
