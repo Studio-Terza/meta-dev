@@ -527,16 +527,18 @@ Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 +60 gh pr view 12 --json headRefOid -R o/r
 +60 gh pr view 12 --json mergeable -R o/r
 
-## a done right after opening waits for checks to appear, watches them, and stops on green clearing its escalations
+## a done right after opening asks for mutants, waits for checks to appear, watches them, and stops on green clearing its escalations
 $ hook subagent-stop < {"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"\nDONE #12 0123456789ABCDEF0123456789ABCDEF01234567\n","session_id":"s","stop_hook_active":false}
 Ok(Hooked(SubagentStop)) ExitCode(unix_exit_status(0)) ""
 +60 gh pr view 12 --json headRefOid -R o/r
 +60 gh pr view 12 --json mergeable -R o/r
 +60 gh pr checks 12 --json name,bucket,link -R o/r
++60 gh pr edit 12 --remove-label mutants -R o/r
++60 gh pr edit 12 --add-label mutants -R o/r
++60 gh pr checks 12 --json name,bucket,link -R o/r
 +1200 gh pr checks 12 --watch --fail-fast -R o/r
-+70 gh pr checks 12 --json name,bucket,link -R o/r
 +1210 gh pr checks 12 --watch --fail-fast -R o/r
-  ...and 3 more calls repeating those above, the last:
+  ...and 4 more calls repeating those above, the last:
 +90 gh pr checks 12 --json name,bucket,link -R o/r
 queue:
 [[item]]
@@ -558,6 +560,7 @@ Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 +60 gh pr view 12 --json headRefOid -R o/r
 +60 gh pr view 12 --json mergeable -R o/r
 +60 gh pr checks 12 --json name,bucket,link -R o/r
++60 gh pr checks 12 --json name,bucket,link -R o/r
 +60 gh run view --job 456 --log-failed -R o/r
 +60 gh run view --job 458 --log-failed -R o/r
 $ hook subagent-stop < {"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}
@@ -565,11 +568,13 @@ Ok(Hooked(SubagentStop)) ExitCode(unix_exit_status(0)) ""
 +60 gh pr view 12 --json headRefOid -R o/r
 +60 gh pr view 12 --json mergeable -R o/r
 +60 gh pr checks 12 --json name,bucket,link -R o/r
++60 gh pr checks 12 --json name,bucket,link -R o/r
 $ hook subagent-stop < {"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}
 {"decision":"block","reason":"CI failed on #12 at 0123456789abcdef0123456789abcdef01234567. Fix these jobs, push, then end with DONE #12 <full sha>.\n\ntest (job 456):\ntest step line 3\ntest step line 4\ntest step line 5\ntest step line 6\ntest step line 7\ntest step line 8\ntest step line 9\ntest step line 10\ntest step line 11\ntest step line 12\ntest step line 13\ntest step line 14\ntest step line 15\ntest step line 16\ntest step line 17\ntest step line 18\ntest step line 19\ntest step line 20\ntest step line 21\ntest step line 22\ntest step line 23\ntest step line 24\ntest step line 25\ntest step line 26\ntest step line 27\ntest step line 28\ntest step line 29\ntest step line 30\ntest step line 31\ntest step line 32\ntest step line 33\ntest step line 34\ntest step line 35\ntest step line 36\ntest step line 37\ntest step line 38\ntest step line 39\ntest step line 40\ntest step line 41\ntest step line 42\n\nbuild (job 458):\n(the log could not be read)\n"}
 Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 +60 gh pr view 12 --json headRefOid -R o/r
 +60 gh pr view 12 --json mergeable -R o/r
++60 gh pr checks 12 --json name,bucket,link -R o/r
 +60 gh pr checks 12 --json name,bucket,link -R o/r
 +60 gh run view --job 456 --log-failed -R o/r
 +60 gh run view --job 458 --log-failed -R o/r
@@ -577,6 +582,7 @@ $ hook subagent-stop < {"cwd":"/work/agent","hook_event_name":"SubagentStop","la
 Ok(Escalated) ExitCode(unix_exit_status(0)) ""
 +60 gh pr view 12 --json headRefOid -R o/r
 +60 gh pr view 12 --json mergeable -R o/r
++60 gh pr checks 12 --json name,bucket,link -R o/r
 +60 gh pr checks 12 --json name,bucket,link -R o/r
 queue:
 [[item]]
@@ -611,15 +617,23 @@ Ok(Escalated) ExitCode(unix_exit_status(0)) ""
 +60 gh pr view 12 --json headRefOid -R o/r
 +60 gh pr view 12 --json mergeable -R o/r
 +60 gh pr checks 12 --json name,bucket,link -R o/r
++60 gh pr edit 12 --remove-label mutants -R o/r
++60 gh pr edit 12 --add-label mutants -R o/r
 $ hook subagent-stop < {"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}
 Ok(Escalated) ExitCode(unix_exit_status(0)) ""
 +60 gh pr view 12 --json headRefOid -R o/r
 +60 gh pr view 12 --json mergeable -R o/r
 +60 gh pr checks 12 --json name,bucket,link -R o/r
++60 gh pr checks 12 --json name,bucket,link -R o/r
+$ hook subagent-stop < {"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}
+Ok(Escalated) ExitCode(unix_exit_status(0)) ""
++60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable -R o/r
++60 gh pr checks 12 --json name,bucket,link -R o/r
++60 gh pr checks 12 --json name,bucket,link -R o/r
 +1200 gh pr checks 12 --watch --fail-fast -R o/r
-+70 gh pr checks 12 --json name,bucket,link -R o/r
 +1210 gh pr checks 12 --watch --fail-fast -R o/r
-  ...and 236 more calls repeating those above, the last:
+  ...and 237 more calls repeating those above, the last:
 +2390 gh pr checks 12 --watch --fail-fast -R o/r
 queue:
 [[item]]
@@ -684,6 +698,17 @@ from = "/work/agent"
 pull = 12
 
 [item.escalation.cause]
+unread = "label"
+
+[[item]]
+
+[item.escalation]
+from = "/work/agent"
+
+[item.escalation.at]
+pull = 12
+
+[item.escalation.cause]
 unread = "checks"
 
 [[item]]
@@ -708,6 +733,9 @@ Ok(Hooked(SubagentStop)) ExitCode(unix_exit_status(0)) ""
 +60 gh pr view design/open-pr --json number -R o/r
 +60 gh pr view 12 --json headRefOid -R o/r
 +60 gh pr view 12 --json mergeable -R o/r
++60 gh pr checks 12 --json name,bucket,link -R o/r
++60 gh pr edit 12 --remove-label mutants -R o/r
++60 gh pr edit 12 --add-label mutants -R o/r
 +60 gh pr checks 12 --json name,bucket,link -R o/r
 queue:
 
