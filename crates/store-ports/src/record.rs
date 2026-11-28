@@ -9,9 +9,6 @@ pub trait Record: Columns + Sized {
 
     fn key(&self) -> &Self::Key;
 
-    #[must_use]
-    fn revised(&self, new: &Self::New) -> Self;
-
     fn created(new: &Self::New) -> Prepared<Self>;
 
     fn fetched(key: &Self::Key) -> Prepared<Self>;

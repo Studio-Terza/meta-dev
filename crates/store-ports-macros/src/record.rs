@@ -35,16 +35,6 @@ impl Expanding for Record {
         let given_names: Vec<&Ident> = given.iter().map(|field| field.name()).collect();
         let given_types: Vec<&Type> = given.iter().map(|field| field.column()).collect();
         let inserted = given.iter().map(|field| bound(field));
-        let revised_fields: Vec<TokenStream> = fields
-            .iter()
-            .map(|field| {
-                let name = field.name();
-                Some(field.origin()).filter(|origin| *origin == Origin::Given).map_or_else(
-                    || quote!(#name: ::core::clone::Clone::clone(&self.#name)),
-                    |_| quote!(#name: ::core::clone::Clone::clone(&new.#name)),
-                )
-            })
-            .collect();
         let assigned = fields.iter().filter(|field| Origin::ASSIGNED.contains(&field.origin())).map(bound);
         let key_name = key.name();
         let key_type = key.column();
@@ -75,10 +65,6 @@ impl Expanding for Record {
 
                 fn key(&self) -> &#key_type {
                     &self.#key_name
-                }
-
-                fn revised(&self, new: &#fresh) -> #row {
-                    #row { #(#revised_fields,)* }
                 }
 
                 fn created(new: &#fresh) -> #prepared<Self> {
