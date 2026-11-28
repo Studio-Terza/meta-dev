@@ -1,18 +1,10 @@
 {
-  "db_name": "SQLite",
   "query": "\nSELECT\n  task\nFROM\n  ended\n",
   "describe": {
     "columns": [
       {
         "name": "task",
-        "ordinal": 0,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "ended",
-            "name": "task"
-          }
-        }
+        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -21,6 +13,5 @@
     "nullable": [
       false
     ]
-  },
-  "hash": "88221406c90d2582050bedbb9245c72e7580eeefa4934bc76ce752d07e4f1969"
+  }
 }

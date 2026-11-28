@@ -627,10 +627,13 @@ version = "0.1.0"
 dependencies = [
  "fixture",
  "hex",
+ "proc-macro2",
+ "rusqlite",
  "serde",
  "serde_json",
  "sha2",
  "strum",
+ "syn",
  "thiserror",
 ]
 

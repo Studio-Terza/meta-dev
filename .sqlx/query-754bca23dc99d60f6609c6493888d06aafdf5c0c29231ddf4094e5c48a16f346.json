@@ -1,5 +1,4 @@
 {
-  "db_name": "SQLite",
   "query": "DELETE FROM cursors WHERE session = ?1",
   "describe": {
     "columns": [],
@@ -7,6 +6,5 @@
       "Right": 1
     },
     "nullable": []
-  },
-  "hash": "754bca23dc99d60f6609c6493888d06aafdf5c0c29231ddf4094e5c48a16f346"
+  }
 }

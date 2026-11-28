@@ -1,18 +1,10 @@
 {
-  "db_name": "SQLite",
   "query": "\nSELECT\n  name\nFROM\n  failed_checks\nWHERE\n  pull = ?1\nORDER BY\n  name\n",
   "describe": {
     "columns": [
       {
         "name": "name",
-        "ordinal": 0,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "failed_checks",
-            "name": "name"
-          }
-        }
+        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -21,6 +13,5 @@
     "nullable": [
       false
     ]
-  },
-  "hash": "420c057b2eceb14f347cfae19f36b5e8e313469fa5c5e6c84cdf5516a875037c"
+  }
 }
