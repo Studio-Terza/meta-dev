@@ -48,7 +48,7 @@ impl Rule {
                 "no dyn: every type is known at compile time, so code takes a generic, returns impl Trait or names an enum instead of a trait object"
             }
             Rule::RealAdapters => {
-                "a port's real adapter is named only in a binary's main.rs and in its own port crate's tests; everything else builds over doubles"
+                "a port's real adapter is named only in a binary's main.rs and in its own port crate's tests, and only that crate's tests implement its traits"
             }
             Rule::ModuleCycles => "modules inside a crate never import each other in a cycle",
             Rule::HandMeasures => {

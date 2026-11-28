@@ -1,3 +1,8 @@
+#[port_core::port]
+pub trait Clock {}
+
+pub trait Files {}
+
 #[derive(Debug)]
 pub struct SystemClock;
 
