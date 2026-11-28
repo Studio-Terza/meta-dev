@@ -14,10 +14,10 @@ code = 0
 out = "::warning::lint: above warn 0 s, within block 99999999999 s, took 1"
 
 [[case]]
-arguments = ["timed", "limits.toml", "lint", "--since", "mark", "true"]
-files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 0\n", "mark" = "0\n" }
+arguments = ["timed", "limits.toml", "lint", "sleep", "0.1"]
+files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 0\n" }
 code = 1
-out = "::error::lint: above block 0 s, took 1"
+out = "::error::lint: above block 0 s, took 0."
 
 [[case]]
 arguments = ["timed", "limits.toml", "lint", "false"]
