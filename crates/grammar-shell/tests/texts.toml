@@ -140,5 +140,6 @@ shell = [
     "cat <<<x",
     "echo $((1 + 2))",
     "cat <<A\nx",
+    "cat <<A",
     "cat <<A >out\nx\nA\necho $(cd /w && echo b > c)",
 ]
