@@ -159,10 +159,11 @@ impl Fact for SurfaceFacts {
                 SurfaceFact::Export { .. } => None,
             })
             .collect();
-        let named: Edges<&str, &str> = Edges::total(sightings.iter().map(|(crate_name, reached, _)| match reached {
-            Reached::Named(name) => Edges::edge(*crate_name, name.as_str()),
-            Reached::Glob => Edges::node(*crate_name),
-        }));
+        let named: Edges<&str, &str> =
+            Edges::total(sightings.iter().filter_map(|(crate_name, reached, _)| match reached {
+                Reached::Named(name) => Some(Edges::edge(*crate_name, name.as_str())),
+                Reached::Glob => None,
+            }));
         let used =
             sightings.iter().fold(BTreeMap::new(), |mut used: BTreeMap<&str, Used>, (crate_name, reached, reader)| {
                 let entry = used.entry(crate_name).or_default();
