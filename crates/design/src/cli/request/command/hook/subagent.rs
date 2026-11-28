@@ -160,7 +160,10 @@ impl Pushed {
         if held == self.head() {
             match hub.mergeable(self.pull())? {
                 Mergeability::Conflicting => Ok(Ending::Conflicting),
-                Mergeability::Clean | Mergeability::Unknown => Ok(self.judged(hub.settled(self.pull())?, store)),
+                Mergeability::Clean | Mergeability::Unknown => {
+                    hub.requested(self.pull())?;
+                    Ok(self.judged(hub.settled(self.pull())?, store))
+                }
             }
         } else {
             Ok(Ending::Unpushed { held })

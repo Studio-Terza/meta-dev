@@ -1,6 +1,5 @@
 use std::fmt;
 use std::iter;
-use std::ops::Not;
 use std::path::Path;
 
 use design_messages::{CheckName, PullNumber};
@@ -223,12 +222,26 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
         None
     }
 
-    fn checks(&self, pull: PullNumber) -> Result<Option<Verdict>, UnreadStep> {
+    pub fn requested(&self, pull: PullNumber) -> Result<(), UnreadStep> {
+        let listed = self.listed(pull).unwrap_or_default();
+        let number = pull.to_string();
+        let label = |change: &str| self.ran(&["pr", "edit", &number, change, Check::GATE], Self::QUICK);
+        let relabeled = Check::gate(&listed).is_none().then(|| {
+            label("--remove-label");
+            label("--add-label")
+        });
+        let added = relabeled.is_none_or(|ran| ran.as_ref().and_then(Ran::succeeded).is_some());
+        added.then_some(()).ok_or(UnreadStep::Label)
+    }
+
+    fn listed(&self, pull: PullNumber) -> Option<Vec<Check>> {
         let ran = self.ran(&["pr", "checks", &pull.to_string(), "--json", "name,bucket,link"], Self::QUICK);
         let printed = ran.as_ref().and_then(Ran::printed);
-        let listed: Option<Vec<Check>> =
-            printed.and_then(|read| serde_json::from_str(read.as_ref()).ignoring(Ignored::Unlisted));
-        listed.map_or(Ok(None), |checks| Verdict::read(&checks))
+        printed.and_then(|read| serde_json::from_str(read.as_ref()).ignoring(Ignored::Unlisted))
+    }
+
+    fn checks(&self, pull: PullNumber) -> Result<Option<Verdict>, UnreadStep> {
+        self.listed(pull).map_or(Ok(None), |checks| Verdict::read(&checks))
     }
 
     pub fn log(&self, job: JobId) -> String {
@@ -245,7 +258,7 @@ impl Verdict {
             .map(Check::failed)
             .collect::<Option<Vec<FailedJob>>>()
             .ok_or(UnreadStep::Checks)?;
-        let settled = checks.is_empty().not() && checks.iter().all(|check| check.bucket.state() == State::Passed);
+        let settled = Check::gate(checks).is_some() && checks.iter().all(|check| check.bucket.state() == State::Passed);
         Ok(match failed.first() {
             Some(_first) => Some(Verdict::Red(failed)),
             None => settled.then_some(Verdict::Green),
@@ -261,6 +274,12 @@ impl Verdict {
 }
 
 impl Check {
+    const GATE: &'static str = "mutants";
+
+    fn gate(checks: &[Check]) -> Option<&Check> {
+        checks.iter().find(|check| check.name.to_string() == Check::GATE)
+    }
+
     fn failed(&self) -> Option<FailedJob> {
         self.link.0.map(|job| FailedJob::new(self.name.clone(), job))
     }
