@@ -75,9 +75,7 @@ impl Cache {
         Ok(nested.into_iter().flatten().collect())
     }
 
-    fn regenerated(&self) -> Result<BTreeMap<String, String>, Failed> {
-        let connection = Connection::open_in_memory()?;
-        connection.execute_batch(&fs::read_to_string(self.root.join(Cache::SCHEMA))?)?;
+    fn queries(&self) -> Result<Vec<String>, Failed> {
         let queries = Cache::sources(&self.root.join(Cache::CRATES))?.iter().try_fold(
             Queries::default(),
             |mut found, path| {
@@ -86,9 +84,14 @@ impl Cache {
             },
         )?;
         let found = queries.0.into_iter().collect::<syn::Result<Vec<Vec<String>>>>()?;
-        found
+        Ok(found.into_iter().flatten().collect())
+    }
+
+    fn regenerated(&self, queries: &[String]) -> Result<BTreeMap<String, String>, Failed> {
+        let connection = Connection::open_in_memory()?;
+        connection.execute_batch(&fs::read_to_string(self.root.join(Cache::SCHEMA))?)?;
+        queries
             .iter()
-            .flatten()
             .map(|query| {
                 let describe = Description::of(&connection.prepare(query)?)?;
                 let text = serde_json::to_string_pretty(&Written { query, describe })?;
@@ -207,7 +210,8 @@ impl<'ast> Visit<'ast> for Queries {
 #[test]
 fn every_cached_query_is_what_the_schema_describes_and_no_other_is_cached() -> Result<(), Failed> {
     let cache = Cache::found();
-    let wanted = cache.regenerated()?;
+    let queries = cache.queries()?;
+    let wanted = cache.regenerated(&queries)?;
     let held = cache.held()?;
     let drifted: BTreeSet<&String> =
         wanted.keys().chain(held.keys()).filter(|name| wanted.get(*name) != held.get(*name)).collect();
@@ -219,6 +223,7 @@ fn every_cached_query_is_what_the_schema_describes_and_no_other_is_cached() -> R
         BTreeSet::new(),
         "the .sqlx cache drifted from the schema; rewrite it with FIXTURE_RECORD=1 cargo test -p query-cache"
     );
+    queries.iter().try_for_each(|query| Entry::<String>::found(query).map(|_entry| ()))?;
     Ok(())
 }
 
