@@ -1,6 +1,8 @@
+use newtype::Arbitrary;
+
 use crate::{ColumnFailure, StoreFailure};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Arbitrary, Clone, Debug, PartialEq)]
 pub enum Value {
     Null,
     Integer(i64),

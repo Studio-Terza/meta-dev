@@ -3,213 +3,6 @@
         0,
     ),
     Discriminant(
-        2,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
         4,
     ),
     Discriminant(
@@ -225,22 +18,25 @@
         0,
     ),
     Discriminant(
-        1,
+        3,
     ),
     Discriminant(
-        0,
+        3,
+    ),
+    Discriminant(
+        4,
     ),
     Discriminant(
         4,
     ),
     Discriminant(
-        1,
+        0,
     ),
     Discriminant(
         0,
     ),
     Discriminant(
-        4,
+        0,
     ),
     Discriminant(
         4,
@@ -255,142 +51,7 @@
         3,
     ),
     Discriminant(
-        2,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
         4,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        3,
     ),
     Discriminant(
         3,
@@ -405,10 +66,70 @@
         3,
     ),
     Discriminant(
+        4,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
         0,
     ),
     Discriminant(
         4,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        3,
     ),
     Discriminant(
         2,
@@ -426,123 +147,6 @@
         0,
     ),
     Discriminant(
-        3,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        0,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
         0,
     ),
     Discriminant(
@@ -555,10 +159,37 @@
         0,
     ),
     Discriminant(
-        4,
+        0,
     ),
     Discriminant(
-        1,
+        3,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        0,
     ),
     Discriminant(
         3,
@@ -567,7 +198,43 @@
         4,
     ),
     Discriminant(
+        3,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
         0,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        3,
     ),
     Discriminant(
         0,
@@ -585,10 +252,157 @@
         2,
     ),
     Discriminant(
+        1,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
         2,
     ),
     Discriminant(
         2,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        4,
     ),
     Discriminant(
         1,
@@ -600,12 +414,138 @@
         2,
     ),
     Discriminant(
+        4,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
         1,
     ),
     Discriminant(
         4,
     ),
     Discriminant(
+        1,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
         2,
     ),
     Discriminant(
@@ -613,6 +553,126 @@
     ),
     Discriminant(
         4,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        3,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        4,
+    ),
+    Discriminant(
+        3,
     ),
     Discriminant(
         0,
@@ -627,37 +687,16 @@
         3,
     ),
     Discriminant(
-        4,
+        0,
+    ),
+    Discriminant(
+        0,
     ),
     Discriminant(
         1,
     ),
     Discriminant(
-        2,
-    ),
-    Discriminant(
         1,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
-        2,
     ),
     Discriminant(
         3,
@@ -678,88 +717,49 @@
         0,
     ),
     Discriminant(
-        0,
-    ),
-    Discriminant(
         4,
     ),
     Discriminant(
         2,
     ),
     Discriminant(
-        0,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
-        4,
+        1,
     ),
     Discriminant(
         3,
     ),
     Discriminant(
-        4,
-    ),
-    Discriminant(
         2,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        2,
-    ),
-    Discriminant(
-        3,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        4,
-    ),
-    Discriminant(
-        1,
-    ),
-    Discriminant(
-        4,
     ),
     Discriminant(
         0,
     ),
     Discriminant(
-        4,
+        1,
+    ),
+    Discriminant(
+        1,
     ),
     Discriminant(
         2,
     ),
     Discriminant(
-        1,
-    ),
-    Discriminant(
-        1,
+        3,
     ),
     Discriminant(
         3,
+    ),
+    Discriminant(
+        2,
+    ),
+    Discriminant(
+        0,
+    ),
+    Discriminant(
+        1,
+    ),
+    Discriminant(
+        2,
     ),
     Discriminant(
         1,

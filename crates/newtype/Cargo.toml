@@ -23,7 +23,6 @@ file-ports = { path = "../file-ports" }
 fixture = { path = "../fixture" }
 grammar-spec-line = { path = "../grammar-spec-line" }
 serde_json.workspace = true
-shapes = { path = "../shapes" }
 store-ports = { path = "../store-ports" }
 transcript-ports = { path = "../transcript-ports" }
 

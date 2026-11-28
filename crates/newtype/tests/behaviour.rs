@@ -11,7 +11,6 @@ use proptest::strategy::{Strategy, ValueTree};
 use proptest::test_runner::{Config, TestRunner};
 use serde::Deserialize;
 use serde_json::Value;
-use shapes::Input;
 use store_ports::Written;
 use transcript_ports::Body;
 
@@ -79,7 +78,7 @@ fn an_enum_generator_draws_the_values_its_golden_lists() -> Result<(), Failed> {
         let cases = usize::try_from(settled.cases)?;
         let mut runner = TestRunner::new(settled);
         let drawn =
-            iter::repeat_with(|| any::<Input>().new_tree(&mut runner).map(|tree| mem::discriminant(&tree.current())))
+            iter::repeat_with(|| any::<store_ports::Value>().new_tree(&mut runner).map(|tree| mem::discriminant(&tree.current())))
                 .take(cases)
                 .collect::<Result<Vec<_>, _>>()?;
         Ok(Debugged(drawn).to_string())

@@ -625,7 +625,6 @@ dependencies = [
  "proptest",
  "serde",
  "serde_json",
- "shapes",
  "store-ports",
  "strum",
  "transcript-ports",
