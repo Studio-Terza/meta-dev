@@ -7,14 +7,14 @@ mod projects;
 mod queue;
 
 use std::ffi::OsString;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use console_ports::Environment;
+use console_ports::Variables;
 use store_ports::Opens;
 
 use super::failure::Failure;
 use command::Command;
-pub use command::Crew;
+pub use command::{Answer, Asked, Crew, Tape};
 pub use ground::Ground;
 pub use local::{Local, Repository, Rooted};
 use projects::Projects;
@@ -25,46 +25,49 @@ pub use queue::{Cause, Held, InstallStep, Item, Landed, Named, Queue, Target, Un
 pub struct Request {
     command: Command,
     workspace: Option<PathBuf>,
+    harness: Option<PathBuf>,
 }
 
 #[derive(Debug)]
 struct Words {
     spoken: Vec<OsString>,
-    workspace: Option<PathBuf>,
+    flagged: Option<PathBuf>,
 }
 
 impl Request {
     pub fn parsed(arguments: impl Iterator<Item = OsString>) -> Result<Request, Failure> {
-        let words = Words::heard(&arguments.collect::<Vec<OsString>>())?;
-        let spoken = words.spoken.iter().map(|word| word.to_str()).collect::<Option<Vec<&str>>>();
+        let workspace = Words::heard(&arguments.collect::<Vec<OsString>>(), Words::WORKSPACE)?;
+        let harness = Words::heard(&workspace.spoken, Words::HARNESS)?;
+        let spoken = harness.spoken.iter().map(|word| word.to_str()).collect::<Option<Vec<&str>>>();
         let command = spoken.ok_or(Failure::Usage).and_then(|said| Command::spoken(&said))?;
-        Ok(Request { command, workspace: words.workspace })
+        Ok(Request { command, workspace: workspace.flagged, harness: harness.flagged })
     }
 
-    pub fn located(&self, environment: &impl Environment) -> Result<Located, Failure> {
-        Projects::located(environment, self.workspace.as_deref().map(Path::new))
+    pub fn located(&self, variables: &Variables) -> Result<Located, Failure> {
+        Projects::located(variables, self.workspace.as_deref(), self.harness.as_deref())
     }
 
     pub fn opened<O: Opens>(&self, located: &Located, opens: &O) -> O::Store {
         self.command.opened(located.kept(Kept::Store), opens)
     }
 
-    pub fn command(self) -> Command {
+    pub fn command(&self) -> Command {
         self.command
     }
 }
 
 impl Words {
     const WORKSPACE: &'static str = "--workspace";
+    const HARNESS: &'static str = "--harness";
 
-    fn heard(given: &[OsString]) -> Result<Words, Failure> {
-        let flagged = given.iter().position(|word| word == Self::WORKSPACE);
-        flagged.map_or(Ok(Words { spoken: given.to_vec(), workspace: None }), |at| {
+    fn heard(given: &[OsString], flag: &str) -> Result<Words, Failure> {
+        let found = given.iter().position(|word| word == flag);
+        found.map_or(Ok(Words { spoken: given.to_vec(), flagged: None }), |at| {
             let (before, after) = given.split_at(at);
             match after {
                 [_flag, path, rest @ ..] => Ok(Words {
                     spoken: before.iter().chain(rest).cloned().collect(),
-                    workspace: Some(PathBuf::from(path)),
+                    flagged: Some(PathBuf::from(path)),
                 }),
                 [] | [_] => Err(Failure::Usage),
             }

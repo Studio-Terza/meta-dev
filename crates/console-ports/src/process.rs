@@ -5,7 +5,7 @@ use std::io::{self, Stderr, Stdout, Write};
 use std::process::ExitCode;
 
 use crate::process::ignored::Ignored;
-use crate::{Answer, Complaint, Environment, Heard, Inherited, Shown};
+use crate::{Answer, Complaint, Environment, Heard, Inherited, Shown, Variables};
 use invariants::Ignoring;
 use port_core::Real;
 
@@ -36,6 +36,10 @@ impl Process {
 impl Environment for Process {
     fn variable(&self, name: &OsStr) -> Option<OsString> {
         Inherited.variable(name)
+    }
+
+    fn variables(&self) -> Variables {
+        Inherited.variables()
     }
 
     fn input(&self) -> io::Result<Heard> {

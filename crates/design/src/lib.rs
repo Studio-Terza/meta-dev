@@ -4,5 +4,5 @@ mod cli;
 mod hook_event;
 
 use cli::outcome::Outcome;
-pub use cli::{Agents, Cli, Failure};
+pub use cli::{Agents, Answer, Asked, Cli, Failure};
 use hook_event::HookEvent;

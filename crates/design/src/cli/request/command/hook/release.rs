@@ -3,31 +3,30 @@ mod install;
 
 use std::path::{Path, PathBuf};
 
-use console_ports::Heard;
 use design_messages::PullNumber;
-use dispatch_ports::{Ran, Shell};
+use dispatch_ports::Ran;
 use file_ports::Files;
 use grammar::git::Worktrees;
 use newtype::Wrapping;
 use store_ports::Store;
-use timer_ports::{Clock, Timeout};
+use timer_ports::Timeout;
 
 use super::super::Ground;
-use super::super::crew::Crew;
+use super::super::crew::{Asked, Cut, Tape};
+use super::reply::{Hook, Reply};
 use super::subagent::Hub;
 use crate::cli::failure::Failure;
 use crate::cli::request::{Held, InstallStep, Item, Local, Queue};
-use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
 pub use boundary::Used;
 use boundary::{Checkout, Landed, State};
 use install::Installing;
 
 #[derive(Debug)]
-struct Releasing<'used, 'crew, C: Clock, G: Shell> {
-    crew: &'crew Crew<'crew, C, G>,
+struct Releasing<'used, 'run, F: Files, S: Store> {
     directory: &'used Path,
     pull: PullNumber,
+    ground: &'used Ground<'run, F, S>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -49,39 +48,38 @@ struct Holding {
     worktree: Option<PathBuf>,
 }
 
-impl Used {
-    pub fn heard(heard: Heard) -> Result<Used, Failure> {
-        json_ports::Json::read(&heard.into_inner()).map_err(Failure::Unheard)
-    }
-
-    pub fn answered<F: Files, S: Store, C: Clock, G: Shell>(
+impl Hook for Used {
+    fn answered<F: Files + Clone, S: Store>(
         &self,
         ground: &Ground<'_, F, S>,
-        crew: &Crew<'_, C, G>,
-    ) -> Result<Uttered, Failure> {
-        let untouched = || Ok(Uttered::silent(Ok(Outcome::Hooked(HookEvent::PostToolUse))));
-        self.merged().map_or_else(untouched, |pull| self.released(pull, ground, crew))
+        tape: &Tape<'_>,
+    ) -> Result<Reply<'_>, Failure> {
+        let untouched = || Ok(Reply::Pass(Outcome::Hooked(HookEvent::PostToolUse)));
+        self.merged().map_or_else(untouched, |pull| self.released(pull, ground, tape))
     }
+}
 
-    fn released<F: Files, S: Store, C: Clock, G: Shell>(
+impl Used {
+    fn released<F: Files, S: Store>(
         &self,
         pull: PullNumber,
         ground: &Ground<'_, F, S>,
-        crew: &Crew<'_, C, G>,
-    ) -> Result<Uttered, Failure> {
+        tape: &Tape<'_>,
+    ) -> Result<Reply<'static>, Failure> {
         let local = ground.local();
-        let releasing = Releasing { crew, directory: self.directory(), pull };
-        let landing = match releasing.landed(&local) {
+        let directory = ground.resolved(self.directory());
+        let releasing = Releasing { directory: &directory, pull, ground };
+        let landing = match Cut::settled(releasing.landed(tape, &local))? {
             Ok(landed) => match landed.state() {
                 State::Merged => Landing::Merged {
-                    released: releasing.released(&landed),
-                    installed: Installing::new(crew, self.directory(), pull).installed(ground),
+                    released: Cut::settled(releasing.released(tape, &landed))?,
+                    installed: Installing::new(pull).installed(ground, tape)?,
                 },
                 State::Open | State::Closed => Landing::Unmerged,
             },
             Err(holding) => Landing::Unviewed(holding),
         };
-        let escalated = landing.escalated(self.directory(), pull);
+        let escalated = landing.escalated(ground.rendered(&directory), pull);
         match local.queue() {
             Some(file) => {
                 let read = ground.queue(file)?;
@@ -91,7 +89,7 @@ impl Used {
             }
             None => escalated.first().map_or(Ok(()), |_escalated| Err(Failure::Unplaced)),
         }?;
-        Ok(Uttered::silent(Ok(landing.outcome())))
+        Ok(Reply::Pass(landing.outcome()))
     }
 }
 
@@ -137,45 +135,52 @@ impl Landing {
     }
 }
 
-impl<C: Clock, G: Shell> Releasing<'_, '_, C, G> {
+impl<F: Files, S: Store> Releasing<'_, '_, F, S> {
     const PROGRAM: &'static str = "git";
     const QUICK: Timeout = Timeout::new(60);
+    const HERE: &'static str = ".";
 
-    fn landed(&self, local: &Local) -> Result<Landed, Holding> {
-        let repository = local.repository().ok_or(Holding::from(Held::NoRepository))?;
-        let hub = Hub::new(self.crew, self.directory, repository);
-        Ok(hub.viewed(self.pull, "state,headRefName,headRefOid").ok_or(Held::Unviewed)?)
+    fn landed(&self, tape: &Tape<'_>, local: &Local) -> Result<Landed, Cut<Holding>> {
+        let repository = local.repository().ok_or(Cut::from(Held::NoRepository))?;
+        let hub = Hub::new(self.directory, repository);
+        hub.viewed(tape, self.pull, "state,headRefName,headRefOid", Holding::from(Held::Unviewed))
     }
 
-    fn released(&self, landed: &Landed) -> Result<Released, Holding> {
-        self.checkout(landed)?.map_or(Ok(Released::Untouched), |found| self.freed(landed, &found))
+    fn released(&self, tape: &Tape<'_>, landed: &Landed) -> Result<Released, Cut<Holding>> {
+        self.checkout(tape, landed)?.map_or(Ok(Released::Untouched), |found| self.freed(tape, landed, &found))
     }
 
-    fn checkout(&self, landed: &Landed) -> Result<Option<Checkout>, Holding> {
-        let ran = self.git(&["worktree", "list", "--porcelain"], self.directory);
-        let printed = ran.as_ref().and_then(Ran::succeeded).ok_or(Held::Unlisted)?;
+    fn checkout(&self, tape: &Tape<'_>, landed: &Landed) -> Result<Option<Checkout>, Cut<Holding>> {
+        let ran = Self::git(tape, &["worktree", "list", "--porcelain"], self.directory)?;
+        let printed = ran.as_ref().and_then(Ran::succeeded).ok_or(Cut::from(Held::Unlisted))?;
         let listed = Worktrees::from(printed.as_ref());
-        Ok(landed.found(listed.listed().iter().map(Checkout::from)))
+        Ok(landed.found(listed.listed().iter().map(|worktree| Checkout::new(worktree, self.ground))))
     }
 
-    fn freed(&self, landed: &Landed, checkout: &Checkout) -> Result<Released, Holding> {
-        let held = |held: Held| Holding { held, worktree: Some(checkout.as_ref().to_path_buf()) };
-        let status = self.git(&["status", "--short"], checkout.as_ref());
+    fn freed(&self, tape: &Tape<'_>, landed: &Landed, checkout: &Checkout) -> Result<Released, Cut<Holding>> {
+        let worktree = self.ground.rendered(checkout.as_ref());
+        let held = |held: Held| Cut::Failed(Holding { held, worktree: Some(worktree.to_path_buf()) });
+        let status = Self::git(tape, &["status", "--short"], checkout.as_ref())?;
         let printed = status.as_ref().and_then(Ran::succeeded).ok_or_else(|| held(Held::Unstatused))?;
         printed.as_ref().is_empty().then_some(()).ok_or_else(|| held(Held::Dirty))?;
         let pushed = landed.pushed(checkout).ok_or_else(|| held(Held::Unpushed))?;
-        let path = pushed.as_ref().to_string_lossy();
-        let removed = self.git(&["worktree", "remove", &path], self.directory);
+        let removed = Self::git(tape, &["worktree", "remove", Self::HERE], pushed.as_ref())?;
         removed.as_ref().and_then(Ran::succeeded).map(|_removed| Released::Removed).ok_or_else(|| held(Held::Unremoved))
     }
 
-    fn git(&self, arguments: &[&str], directory: &Path) -> Option<Ran> {
-        self.crew.spoke(Self::PROGRAM, arguments, directory, Self::QUICK)
+    fn git(tape: &Tape<'_>, arguments: &[&str], directory: &Path) -> Result<Option<Ran>, Asked> {
+        tape.spoke(Self::PROGRAM, arguments, directory, Self::QUICK)
     }
 }
 
 impl From<Held> for Holding {
     fn from(held: Held) -> Holding {
         Holding { held, worktree: None }
+    }
+}
+
+impl From<Held> for Cut<Holding> {
+    fn from(held: Held) -> Cut<Holding> {
+        Cut::Failed(Holding::from(held))
     }
 }

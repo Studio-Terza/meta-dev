@@ -1,9 +1,12 @@
 Violations
 --- out
-test budget: 2 of 15 lines are tests, at most 18% may be
+test budget: 3 of 21 lines are tests, at most 18% may be
 --- err
-a port's real adapter is named only in a binary's main.rs and in its own port crate's tests; everything else builds over doubles:
+a port's real adapter is named only in a binary's main.rs and in its own port crate's tests, and only that crate's tests implement its traits:
 app/src/lib.rs:1: names clock_ports::SystemClock, a port's real adapter; build over a double here, and wire the real adapter in a binary's main.rs
 app/src/lib.rs:3: names clock_ports::SystemClock, a port's real adapter; build over a double here, and wire the real adapter in a binary's main.rs
 app/src/lib.rs:3: names clock_ports::SystemClock, a port's real adapter; build over a double here, and wire the real adapter in a binary's main.rs
 app/tests/story.rs:1: names clock_ports::SystemClock, a port's real adapter; build over a double here, and wire the real adapter in a binary's main.rs
+app/tests/story.rs:2: a test implements clock_ports::ClockFiller, a port's trait, outside its crate; record the input and feed it through the production pipeline
+app/tests/story.rs:2: a test implements clock_ports::Files, a port's trait, outside its crate; record the input and feed it through the production pipeline
+app/tests/story.rs:2: a test implements clock_ports::Clock, a port's trait, outside its crate; record the input and feed it through the production pipeline

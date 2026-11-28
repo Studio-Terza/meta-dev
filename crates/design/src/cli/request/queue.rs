@@ -88,6 +88,8 @@ pub enum UnreadStep {
     Open,
     Runs,
     Attempt,
+    Landed,
+    Lacking,
 }
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]

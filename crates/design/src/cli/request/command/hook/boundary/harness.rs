@@ -13,16 +13,16 @@ use boundary::{Output, Task};
 #[derive(Debug)]
 pub struct Harness<'files, F: Files> {
     files: &'files F,
+    root: Option<&'files Path>,
     now: Wall,
 }
 
 impl<'files, F: Files> Harness<'files, F> {
-    const TEMPORARY: &'static str = "/private/tmp";
     const TASKS: &'static str = "tasks";
     const SUBAGENTS: &'static str = "subagents";
 
-    pub fn new(files: &'files F, now: Wall) -> Harness<'files, F> {
-        Harness { files, now }
+    pub fn new(files: &'files F, root: Option<&'files Path>, now: Wall) -> Harness<'files, F> {
+        Harness { files, root, now }
     }
 
     pub fn tasks(&self, transcript: &Path) -> Tasks {
@@ -46,10 +46,11 @@ impl<'files, F: Files> Harness<'files, F> {
     fn folders(&self, transcript: &Path) -> Vec<PathBuf> {
         let stem = transcript.file_stem();
         let slug = transcript.parent().and_then(Path::file_name);
-        let roots = self.files.entries(Path::new(Self::TEMPORARY)).ignoring(Ignored::Untasked).unwrap_or_default();
-        let tasks: Vec<PathBuf> = slug.zip(stem).map_or_default(|(project, session)| {
-            roots.iter().map(|root| root.join(project).join(session).join(Self::TASKS)).collect()
-        });
+        let tasks = self
+            .root
+            .zip(slug)
+            .zip(stem)
+            .map(|((root, project), session)| root.join(project).join(session).join(Self::TASKS));
         let subagents = transcript.with_extension("").join(Self::SUBAGENTS);
         tasks.into_iter().chain([subagents]).filter(|folder| self.files.kind(folder) == Kind::Directory).collect()
     }

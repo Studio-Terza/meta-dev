@@ -9,15 +9,15 @@ invariants::ignored! {
         Untyped => "a last message that does not parse as DONE or BLOCKED is untyped and is sent back once",
         Unrun => "a gh or git call that cannot be started leaves its step unread, and an unread step is escalated",
         Unheaded => "a worktree head that does not read as a full commit sha counts as unpushed, so the worktree is kept",
-        Unviewed => "a pull request view that does not parse as the asked fields leaves its step unread, and that is escalated",
         Unconfigured => "a missing or unreadable workspace local.toml key names nothing, so a step that needs it is escalated",
         Unspecified => "a first commit without a well-formed Spec trailer leaves the pull request unopened, and that is escalated",
         Unlisted => "a check list that cannot be read counts as no checks yet, so the hook polls again until its cap",
         Untitled => "a spec file that cannot be read gives no detail heading, so the pull request is unopened and that is escalated",
         Unremembered =>"a failed-check record that cannot be read or written counts no repeat failure",
         Unanswered =>"a failed transcript lookup or model call never blocks a stop; the stop proceeds as before",
-        Unattempted => "a run list or run attempt that does not parse as the asked fields leaves its step unread, and that is escalated",
         Unlacked => "a comparison with main that cannot be read names no lacking merges; the agent is still sent back to merge main",
         Unhooked => "a workspace settings file that cannot be read, parsed or written keeps its old hooks, and the install is escalated",
+        Unidentified => "an id -u line that does not read as a number names no harness folder, so the settings are not printed",
+        Outside => "a path outside home has no home-relative form, so it is shown as given",
     }
 }

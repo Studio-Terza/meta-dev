@@ -35,6 +35,7 @@ impl SystemShell {
     const POLL: Duration = Duration::from_millis(50);
     const KILL: &'static str = "kill";
     const SIGNAL: [&'static str; 2] = ["-KILL", "--"];
+    const CURRENT: &'static str = "PWD";
 
     fn started(call: &Call) -> Result<Running, DispatchFailure> {
         let input = call.input().map_or_else(Stdio::null, |_fed| Stdio::piped());
@@ -45,6 +46,7 @@ impl SystemShell {
         let mut child = Command::new(call.program())
             .args(call.arguments())
             .current_dir(call.directory())
+            .env(SystemShell::CURRENT, call.directory())
             .process_group(0)
             .stdin(input)
             .stdout(stdout)

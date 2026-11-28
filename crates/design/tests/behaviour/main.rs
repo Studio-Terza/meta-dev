@@ -2,277 +2,30 @@
 
 use std::ffi::OsString;
 use std::fs::{self, File};
-use std::io::{self, Write};
+use std::io::Write;
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::thread;
 use std::time::{Duration, SystemTime};
 use test_failure::{Cases, Failed, Golden};
 
 use console_ports::{Complaint, Heard, Shown, Variables};
-use design::{Agents, Cli, Failure};
-use dispatch_ports::{Call, DispatchFailure, Printed, Ran, ShellFiller, shell_ops};
-use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Offset, Size, Stamps, Text};
+use design::{Answer, Asked, Cli, Failure};
 use grammar::letters::Letters;
-use invariants::{Unpoisoned, invariant, invariants};
 use newtype::Wrapping;
-use port_core::Pass;
 use serde::Deserialize;
-use serde_json::{Value, json};
-use sqlite_ports::SqliteOpener;
-use store_ports::{Opens, Schema};
 use tempfile::TempDir;
-use timer_ports::{ClockFiller, Elapsed, Pause, Wall, clock_ops};
+use timer_ports::Wall;
 
 use ports::Design;
 
 const STORIES: &str = "tests/behaviour/stories.toml";
 const GOLDEN: &str = "tests/behaviour/stories.txt";
-const AGENT: &str = "/work/agent";
-const TEMPORARY: &str = "/private/tmp";
-const ROOT: &str = "/home";
-const TEMPORARY_REAL: &str = "tmp";
-const LOCAL: &str = "queue = \"/home/placed/queue.toml\"\nspecs = \"/home/placed/specs\"\nrepository = \"o/r\"\n";
-const READS: i64 = 10_000;
-
-invariants! {
-    enum Invariant {
-        Endless => "a story step reads the fixed test clock fewer than ten thousand times",
-    }
-}
-
-#[derive(Debug)]
-struct Stepping {
-    now: Wall,
-    slept: AtomicU64,
-    reads: AtomicI64,
-}
-
-impl Stepping {
-    fn wall(&self) -> Wall {
-        self.now.after(Elapsed::from(Duration::from_secs(self.slept.load(Ordering::Relaxed))))
-    }
-}
-
-impl ClockFiller for Stepping {
-    fn now(&self, _pass: Pass<'_, clock_ops::Now>) -> Wall {
-        invariant!(self.reads.fetch_add(1, Ordering::Relaxed) < READS, Invariant::Endless);
-        self.wall()
-    }
-
-    fn paused(&self, _pass: Pass<'_, clock_ops::Paused>, pause: Pause) -> Wall {
-        self.slept.fetch_add(u64::from(pause.into_inner()), Ordering::Relaxed);
-        self.wall()
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize)]
-#[serde(rename_all = "lowercase")]
-enum Tool {
-    #[default]
-    Gh,
-    Git,
-    Cargo,
-    Design,
-    Claude,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize)]
-enum Answered {
-    Succeeded,
-    Failed,
-    Overdue,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-struct Scripted {
-    #[serde(default)]
-    tool: Tool,
-    asked: String,
-    ran: Answered,
-    #[serde(default)]
-    printed: String,
-}
-
-#[derive(Debug)]
-struct Script<'story> {
-    answers: Vec<&'story Scripted>,
-    asked: Mutex<Vec<Asked>>,
-    at: Wall,
-    files: Rerooted,
-}
-
-#[derive(Debug)]
-struct Asked {
-    spoken: String,
-    line: String,
-}
-
-impl Scripted {
-    fn ran(&self) -> Ran {
-        let printed = Printed::new(self.printed.clone());
-        match self.ran {
-            Answered::Succeeded => Ran::Succeeded(printed),
-            Answered::Failed => Ran::Failed(printed),
-            Answered::Overdue => Ran::Overdue,
-        }
-    }
-
-    fn answers(&self, call: &Call, spoken: &str) -> Option<()> {
-        match self.tool {
-            Tool::Gh | Tool::Git | Tool::Cargo | Tool::Design => {
-                (spoken == format!("{} {}", self.tool.program(), self.asked)).then_some(())
-            }
-            Tool::Claude => (call.program() == Tool::Claude.program()
-                && call.input().is_some_and(|fed| fed.contains(&self.asked)))
-            .then_some(()),
-        }
-    }
-}
-
-impl Tool {
-    fn program(self) -> &'static str {
-        match self {
-            Tool::Gh => "gh",
-            Tool::Git => "git",
-            Tool::Cargo => "cargo",
-            Tool::Design => "design",
-            Tool::Claude => "claude",
-        }
-    }
-}
-
-impl Script<'_> {
-    fn answered(&self, call: &Call) -> Result<Ran, DispatchFailure> {
-        let spoken = [call.program().to_owned()]
-            .into_iter()
-            .chain(call.arguments().iter().cloned())
-            .collect::<Vec<_>>()
-            .join(" ");
-        let ahead = Duration::from(call.deadline().into_inner().since(self.at)).as_secs();
-        let elsewhere = Some(call.directory()).filter(|directory| *directory != Path::new(AGENT));
-        let place = elsewhere.map_or_else(String::new, |directory| format!(" in {}", directory.display()));
-        let fed = call.input().map_or_else(String::new, |prompt| format!(" fed:\n{prompt}\n"));
-        let line = format!("+{ahead} {spoken}{place}{fed}\n");
-        let mut log = self.asked.lock().unpoisoned();
-        let matching: Vec<&&Scripted> =
-            self.answers.iter().filter(|answer| answer.answers(call, &spoken).is_some()).collect();
-        let key = format!("{spoken}{fed}");
-        let earlier = log.iter().filter(|before| before.spoken == key).count();
-        log.push(Asked { spoken: key, line });
-        let homeless = call.input().filter(|_fed| self.files.kind(call.directory()) == Kind::Missing);
-        homeless.map_or(Ok(()), |_fed| Err(DispatchFailure::Spawn(io::Error::from(io::ErrorKind::NotFound))))?;
-        matching.get(earlier).or(matching.last()).map(|answer| answer.ran()).ok_or(DispatchFailure::Unjoined)
-    }
-
-    fn timeline(&self) -> String {
-        let log = self.asked.lock().unpoisoned();
-        let shown: Vec<&Asked> = log
-            .iter()
-            .enumerate()
-            .filter(|(at, asked)| log.iter().take(*at).filter(|before| before.spoken == asked.spoken).count() < 2)
-            .map(|(_at, asked)| asked)
-            .collect();
-        let hidden = log.len() - shown.len();
-        let lines: String = shown.iter().map(|asked| asked.line.as_str()).collect();
-        let repeated = log.last().filter(|_last| hidden > 0).map_or_else(String::new, |last| {
-            format!("  ...and {hidden} more calls repeating those above, the last:\n{}", last.line)
-        });
-        format!("{lines}{repeated}")
-    }
-}
-
-impl ShellFiller for &Script<'_> {
-    fn ran(&self, _pass: Pass<'_, shell_ops::Ran>, call: &Call) -> Result<Ran, DispatchFailure> {
-        self.answered(call)
-    }
-
-    fn fanned(&self, _pass: Pass<'_, shell_ops::Fanned>, calls: &[Call]) -> Vec<Result<Ran, DispatchFailure>> {
-        calls.iter().map(|call| self.answered(call)).collect()
-    }
-}
-
-#[derive(Clone, Debug)]
-struct Rerooted {
-    root: PathBuf,
-}
-
-#[derive(Debug)]
-struct Rehomed(Rerooted);
-
-impl Rerooted {
-    fn real(&self, path: &Path) -> PathBuf {
-        let temporary = path.strip_prefix(TEMPORARY).map(|below| self.root.join(TEMPORARY_REAL).join(below));
-        let homed = path.strip_prefix(ROOT).map(|below| self.root.join(below));
-        match (temporary, homed) {
-            (Ok(real), _) | (Err(_), Ok(real)) => real,
-            (Err(_), Err(_)) => path.to_path_buf(),
-        }
-    }
-}
-
-impl Opens for Rehomed {
-    type Store = <SqliteOpener as Opens>::Store;
-
-    fn file<S: Schema>(&self, path: PathBuf) -> Self::Store {
-        SqliteOpener.file::<S>(self.0.real(&path))
-    }
-
-    fn in_memory<S: Schema>(&self) -> Self::Store {
-        SqliteOpener.in_memory::<S>()
-    }
-}
-
-impl Files for Rerooted {
-    fn read(&self, path: &Path) -> Result<Bytes, FileFailure> {
-        Disk.read(&self.real(path))
-    }
-
-    fn read_text(&self, path: &Path) -> Result<Text, FileFailure> {
-        Disk.read_text(&self.real(path))
-    }
-
-    fn read_from(&self, path: &Path, offset: Offset) -> Result<Bytes, FileFailure> {
-        Disk.read_from(&self.real(path), offset)
-    }
-
-    fn write(&self, path: &Path, bytes: Bytes) -> Result<(), FileFailure> {
-        Disk.write(&self.real(path), bytes)
-    }
-
-    fn append(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure> {
-        Disk.append(&self.real(path), bytes)
-    }
-
-    fn create_directories(&self, path: &Path) -> Result<(), FileFailure> {
-        Disk.create_directories(&self.real(path))
-    }
-
-    fn copy(&self, from: &Path, to: &Path) -> Result<(), FileFailure> {
-        Disk.copy(&self.real(from), &self.real(to))
-    }
-
-    fn entries(&self, directory: &Path) -> Result<Vec<PathBuf>, FileFailure> {
-        Disk.entries(&self.real(directory))
-    }
-
-    fn canonical(&self, path: &Path) -> Result<PathBuf, FileFailure> {
-        Disk.canonical(&self.real(path))
-    }
-
-    fn kind(&self, path: &Path) -> Kind {
-        Disk.kind(&self.real(path))
-    }
-
-    fn size(&self, path: &Path) -> Result<Size, FileFailure> {
-        Disk.size(&self.real(path))
-    }
-
-    fn stamps(&self, path: &Path) -> Result<Stamps, FileFailure> {
-        Disk.stamps(&self.real(path))
-    }
-}
+const WORKSPACE: &str = "work";
+const HARNESS: &str = "tmp";
+const AGENT: &str = "work/agent";
+const PLACED: &str = "placed";
+const LOCAL: &str = "queue = \"placed/queue.toml\"\nspecs = \"placed/specs\"\nrepository = \"o/r\"\n";
 
 #[derive(Debug, Deserialize)]
 struct Stories {
@@ -287,8 +40,6 @@ struct Story {
     settings: Option<String>,
     spec: Option<String>,
     #[serde(default)]
-    transcript: Vec<[String; 3]>,
-    #[serde(default)]
     records: Vec<String>,
     #[serde(default)]
     shells: Vec<Task>,
@@ -296,8 +47,6 @@ struct Story {
     agents: Vec<Task>,
     #[serde(default)]
     repositories: Vec<PathBuf>,
-    #[serde(default)]
-    answers: Vec<Scripted>,
     step: Vec<Step>,
 }
 
@@ -311,56 +60,13 @@ struct Task {
 
 #[derive(Debug, Deserialize)]
 struct Step {
-    #[serde(flatten)]
-    hooked: Hooked,
+    words: Vec<String>,
     #[serde(default)]
-    answers: Vec<Scripted>,
+    input: String,
     #[serde(default)]
-    append: Vec<[String; 3]>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-enum Hooked {
-    Words {
-        words: Vec<String>,
-        #[serde(default)]
-        input: String,
-    },
-    Stop {
-        stop: Stopped,
-    },
-    Finish {
-        finish: String,
-        #[serde(default)]
-        reminded: Option<Reminded>,
-    },
-    Ran {
-        ran: String,
-    },
-    Used {
-        used: String,
-    },
-    Briefed {
-        brief: String,
-    },
-    Sent {
-        sent: Value,
-    },
-}
-
-#[derive(Debug, Default, Deserialize)]
-struct Stopped {
-    said: Option<String>,
+    heard: Vec<Answer>,
     #[serde(default)]
-    active: Option<Reminded>,
-    #[serde(default)]
-    untranscribed: Option<Reminded>,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize)]
-enum Reminded {
-    Yes,
+    append: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -372,65 +78,42 @@ struct Home {
 impl Home {
     fn new() -> Result<Home, Failed> {
         let home = Home { directory: TempDir::new()?, at: Wall::now() };
-        fs::create_dir_all(home.real(&Home::workspace().join(".meta")))?;
-        fs::create_dir_all(home.real(&Home::placed()))?;
+        fs::create_dir_all(home.root().join(WORKSPACE).join(".meta"))?;
+        fs::create_dir_all(home.root().join(PLACED))?;
         Ok(home)
     }
 
-    fn files(&self) -> Rerooted {
-        Rerooted { root: self.directory.path().to_path_buf() }
+    fn root(&self) -> &Path {
+        self.directory.path()
     }
 
-    fn real(&self, path: &Path) -> PathBuf {
-        self.files().real(path)
+    fn settings(&self) -> PathBuf {
+        self.root().join(WORKSPACE).join(".claude/settings.local.json")
     }
 
-    fn workspace() -> PathBuf {
-        Path::new(ROOT).join("work")
+    fn slug(&self) -> String {
+        Letters::slugged(&self.root().join(WORKSPACE).to_string_lossy())
     }
 
-    fn placed() -> PathBuf {
-        Path::new(ROOT).join("placed")
+    fn transcript(&self) -> PathBuf {
+        self.root().join(".claude/projects").join(self.slug()).join("s.jsonl")
     }
 
-    fn settings() -> PathBuf {
-        Home::workspace().join(".claude/settings.local.json")
-    }
-
-    fn slug() -> String {
-        Letters::slugged(&Home::workspace().to_string_lossy())
-    }
-
-    fn transcript() -> PathBuf {
-        Path::new(ROOT).join(".claude/projects").join(Home::slug()).join("s.jsonl")
-    }
-
-    fn line([kind, uuid, text]: &[String; 3]) -> String {
-        let content = match kind.as_str() {
-            "user" => Value::from(text.as_str()),
-            _ => json!([{"type": "text", "text": text}]),
-        };
-        let origin = match kind.as_str() {
-            "user" => json!({"kind": "human"}),
-            _ => Value::Null,
-        };
-        let line = json!({"type": kind, "uuid": uuid, "parentUuid": null, "sessionId": "s", "timestamp": "2026-01-01T00:00:00Z", "origin": origin, "message": {"model": "claude", "content": content}});
-        format!("{line}\n")
-    }
-
-    fn appended(&self, lines: &[String]) -> Result<(), Failed> {
-        let transcript = self.real(&Home::transcript());
+    fn appended(&self, records: &[String]) -> Result<(), Failed> {
+        let transcript = self.transcript();
         fs::create_dir_all(transcript.with_file_name(""))?;
-        File::options().create(true).append(true).open(transcript)?.write_all(lines.concat().as_bytes())?;
+        let lines: String = records.iter().flat_map(|record| [record.as_str(), "\n"]).collect();
+        File::options().create(true).append(true).open(transcript)?.write_all(lines.as_bytes())?;
         Ok(())
     }
 
     fn set(&self, story: &Story) -> Result<(), Failed> {
-        let placed = self.real(&Home::placed());
-        fs::write(self.real(&Home::workspace().join(".meta/local.toml")), story.local.as_deref().unwrap_or(LOCAL))?;
+        let placed = self.root().join(PLACED);
+        let local = self.root().join(WORKSPACE).join(".meta/local.toml");
+        fs::write(local, story.local.as_deref().unwrap_or(LOCAL))?;
         story.queue.as_ref().map_or(Ok(()), |queue| fs::write(placed.join("queue.toml"), queue))?;
         story.settings.as_ref().map_or(Ok(()), |settings| {
-            let file = self.real(&Home::settings());
+            let file = self.settings();
             fs::create_dir_all(file.with_file_name(""))?;
             fs::write(file, settings)
         })?;
@@ -438,16 +121,17 @@ impl Home {
             fs::create_dir_all(placed.join("specs"))?;
             fs::write(placed.join("specs/tools-retirement.md"), spec)
         })?;
-        let said: Vec<String> = story.transcript.iter().map(Home::line).collect();
-        let records: Vec<String> = story.records.iter().map(|record| format!("{record}\n")).collect();
-        self.appended(&[said, records].concat())?;
-        story.repositories.iter().try_for_each(|repository| fs::create_dir_all(self.real(&repository.join(".git"))))?;
+        self.appended(&story.records)?;
+        story
+            .repositories
+            .iter()
+            .try_for_each(|repository| fs::create_dir_all(self.root().join(repository).join(".git")))?;
         story.agents.iter().try_for_each(|agent| self.agent_task(agent))?;
         story.shells.iter().try_for_each(|shell| self.shell_task(shell))
     }
 
     fn agent_task(&self, task: &Task) -> Result<(), Failed> {
-        let folder = self.real(&Home::transcript().with_extension("").join("subagents"));
+        let folder = self.transcript().with_extension("").join("subagents");
         fs::create_dir_all(&folder)?;
         let written = folder.join(&task.file);
         fs::write(&written, &task.text)?;
@@ -459,76 +143,49 @@ impl Home {
     }
 
     fn shell_task(&self, task: &Task) -> Result<(), Failed> {
-        let folder = self.real(&Path::new(TEMPORARY).join("claude-501").join(Home::slug()).join("s/tasks"));
+        let folder = self.root().join(HARNESS).join(self.slug()).join("s/tasks");
         fs::create_dir_all(&folder)?;
         fs::write(folder.join(&task.file), &task.text)?;
         Ok(())
     }
 
-    fn heard(&self, words: &[String], input: &str, script: &Script<'_>) -> String {
-        let environment: Variables =
-            [(OsString::from("HOME"), OsString::from(ROOT)), (OsString::from("PWD"), OsString::from(ROOT))]
-                .into_iter()
-                .collect::<Variables>()
-                .hearing(Heard::new(input.to_owned()));
-        let spoken =
-            ["--workspace", "work"].map(str::to_owned).into_iter().chain(words.iter().cloned()).map(OsString::from);
-        let clock = Stepping { now: self.at, slept: AtomicU64::default(), reads: AtomicI64::default() };
-        let uttered =
-            Cli::new(&environment, self.files(), Rehomed(self.files()), Agents::new(clock, script)).rooted(spoken);
+    fn heard(&self, step: &Step) -> String {
+        let root = OsString::from(self.root());
+        let environment: Variables = [(OsString::from("HOME"), root.clone()), (OsString::from("PWD"), root)]
+            .into_iter()
+            .collect::<Variables>()
+            .hearing(Heard::new(step.input.clone()));
+        let rooted = ["--workspace", WORKSPACE, "--harness", HARNESS].map(str::to_owned);
+        let spoken = rooted.into_iter().chain(step.words.iter().cloned()).map(OsString::from);
+        let start = self.at;
+        let uttered = Cli::new(&environment).recorded(spoken, start, &step.heard);
         let shown = AsRef::<Shown>::as_ref(&uttered).clone();
+        let calls: String = AsRef::<[Asked]>::as_ref(&uttered).iter().map(|asked| self.call(start, asked)).collect();
         let ended = uttered.ended().map_err(|failure: Failure| failure.to_string());
         let answer = console_ports::Answer::reported(ended.as_ref()).showing(&shown);
         let complaint: &Complaint = answer.as_ref();
-        format!("{shown}{ended:?} {:?} {:?}\n", answer.code(), AsRef::<str>::as_ref(complaint))
+        format!("{shown}{ended:?} {:?} {:?}\n{calls}", answer.code(), AsRef::<str>::as_ref(complaint))
     }
-}
 
-#[derive(Debug)]
-struct Spoken {
-    words: Vec<String>,
-    input: String,
-}
-
-impl Spoken {
-    fn hook(event: &str, input: &Value) -> Spoken {
-        Spoken { words: vec!["hook".to_owned(), event.to_owned()], input: input.to_string() }
-    }
-}
-
-impl Step {
-    fn spoken(&self) -> Spoken {
-        match &self.hooked {
-            Hooked::Words { words, input } => Spoken { words: words.clone(), input: input.clone() },
-            Hooked::Stop { stop } => {
-                let transcript = stop
-                    .untranscribed
-                    .map_or_else(|| Some(Home::transcript().to_string_lossy().into_owned()), |_| None);
-                Spoken::hook(
-                    "stop",
-                    &json!({"session_id": "s", "hook_event_name": "Stop", "stop_hook_active": stop.active.is_some(), "transcript_path": transcript, "last_assistant_message": stop.said}),
-                )
-            }
-            Hooked::Finish { finish, reminded } => Spoken::hook(
-                "subagent-stop",
-                &json!({"session_id": "s", "hook_event_name": "SubagentStop", "stop_hook_active": reminded.is_some(), "cwd": AGENT, "last_assistant_message": finish}),
-            ),
-            Hooked::Ran { ran } => Spoken::hook(
-                "pre-tool-use",
-                &json!({"session_id": "s", "hook_event_name": "PreToolUse", "cwd": AGENT, "tool_name": "Bash", "tool_input": {"command": ran}}),
-            ),
-            Hooked::Used { used } => Spoken::hook(
-                "post-tool-use",
-                &json!({"session_id": "s", "hook_event_name": "PostToolUse", "cwd": AGENT, "tool_name": "Bash", "tool_input": {"command": used}, "tool_response": {"stdout": ""}}),
-            ),
-            Hooked::Briefed { brief } => Spoken::hook(
-                "pre-tool-use",
-                &json!({"session_id": "s", "hook_event_name": "PreToolUse", "cwd": AGENT, "tool_name": "Agent", "tool_input": {"description": "d", "prompt": brief, "subagent_type": "worker"}}),
-            ),
-            Hooked::Sent { sent } => Spoken::hook(
-                "pre-tool-use",
-                &json!({"session_id": "s", "hook_event_name": "PreToolUse", "cwd": AGENT, "tool_name": "SendMessage", "tool_input": {"to": "worker", "summary": "s", "message": sent}}),
-            ),
+    fn call(&self, start: Wall, asked: &Asked) -> String {
+        match asked {
+            Asked::Paused(pause) => format!("pause {}\n", pause.into_inner()),
+            Asked::Ran(calls) => calls
+                .iter()
+                .map(|call| {
+                    let spoken = [call.program().to_owned()].into_iter().chain(call.arguments().iter().cloned());
+                    let shown = match call.directory().strip_prefix(self.root()) {
+                        Ok(relative) => relative,
+                        Err(_outside) => call.directory(),
+                    };
+                    let elsewhere = Some(shown).filter(|directory| *directory != Path::new(AGENT));
+                    let place = elsewhere.map_or_else(String::new, |directory| format!(" in {}", directory.display()));
+                    let fed = call.input().map_or_else(String::new, |prompt| format!(" fed:\n{prompt}\n"));
+                    let after = Duration::from(call.deadline().into_inner().since(start)).as_secs();
+                    format!("+{after} {}{place}{fed}\n", spoken.collect::<Vec<_>>().join(" "))
+                })
+                .collect::<Vec<String>>()
+                .concat(),
         }
     }
 }
@@ -565,23 +222,16 @@ impl Story {
             .step
             .iter()
             .map(|step| {
-                home.appended(&step.append.iter().map(Home::line).collect::<Vec<_>>())?;
-                let Spoken { words, input } = step.spoken();
-                let script = Script {
-                    answers: step.answers.iter().chain(&self.answers).collect(),
-                    asked: Mutex::default(),
-                    at: home.at,
-                    files: home.files(),
-                };
-                let said = home.heard(&words, &input, &script);
-                Ok(format!("$ {} < {input}\n{said}{}", words.join(" "), script.timeline()))
+                home.appended(&step.append)?;
+                let said = home.heard(step);
+                Ok(format!("$ {} < {}\n{said}", step.words.join(" "), step.input))
             })
             .collect::<Result<_, Failed>>()?;
-        let queue = match fs::read_to_string(home.real(&Home::placed().join("queue.toml"))) {
+        let queue = match fs::read_to_string(home.root().join(PLACED).join("queue.toml")) {
             Ok(queued) => format!("queue:\n{queued}"),
             Err(_absent) => String::new(),
         };
-        let settings = match fs::read_to_string(home.real(&Home::settings())) {
+        let settings = match fs::read_to_string(home.settings()) {
             Ok(written) => format!("settings:\n{written}"),
             Err(_absent) => String::new(),
         };
@@ -622,6 +272,7 @@ mod ports {
         pub fn fed(home: &Path, arguments: &[&str], input: &str) -> Result<Output, Failed> {
             let mut child = Command::new(env!("CARGO_BIN_EXE_design"))
                 .env("HOME", home)
+                .env("PWD", home)
                 .current_dir(home)
                 .args(arguments)
                 .stdin(Stdio::piped())
@@ -637,13 +288,19 @@ mod ports {
 #[test]
 fn the_design_binary_wires_the_real_ports_and_reads_its_event_from_standard_input() -> Result<(), Failed> {
     let home = TempDir::new()?;
-    let workspace = home.path().join("work");
-    let slug = Letters::slugged(&workspace.to_string_lossy());
+    let slug = Letters::slugged(&home.path().join(WORKSPACE).to_string_lossy());
     fs::create_dir_all(home.path().join(".claude/projects").join(slug))?;
-    let rooted = ["--workspace", &workspace.to_string_lossy(), "hook", "stop"].map(str::to_owned);
-    let words: Vec<&str> = rooted.iter().map(String::as_str).collect();
-    let unreadable = Design::fed(home.path(), &words, "not json")?;
-    assert_eq!((unreadable.status.code(), unreadable.stdout), (Some(1_i32), Vec::new()));
-    assert!(String::from_utf8(unreadable.stderr)?.contains("cannot read the hook input: "));
+    fs::create_dir_all(home.path().join(WORKSPACE))?;
+    let edit = r#"{"cwd":"work","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"sed -i x y"},"tool_name":"Bash"}"#;
+    let ran = ["--workspace", WORKSPACE, "hook", "pre-tool-use"];
+    let [fed_edit, fed_garbage] = [edit, "not json"].map(|input| Design::fed(home.path(), &ran, input));
+    let [denied, unreadable] = [fed_edit?, fed_garbage?];
+    assert_eq!(
+        (denied.status.code(), denied.stdout.is_empty(), unreadable.status.code(), unreadable.stdout.is_empty()),
+        (Some(0_i32), false, Some(1_i32), true)
+    );
+    let settings = Design::fed(home.path(), &["--workspace", WORKSPACE, "hook", "--settings"], "")?;
+    let user = fs::metadata(home.path())?.uid();
+    assert!(String::from_utf8(settings.stdout)?.contains(&format!("--harness \\\"/private/tmp/claude-{user}\\\"")));
     Ok(())
 }

@@ -5,6 +5,10 @@ use grammar::Grammar;
 use grammar::git::{MergeCommand, Worktree};
 use invariants::Ignoring;
 
+use file_ports::Files;
+use store_ports::Store;
+
+use super::super::super::Ground;
 use super::super::subagent::Branch;
 use crate::cli::request::ignored::Ignored;
 
@@ -81,10 +85,10 @@ impl Landed {
     }
 }
 
-impl From<&Worktree<'_>> for Checkout {
-    fn from(listed: &Worktree<'_>) -> Checkout {
+impl Checkout {
+    pub fn new<F: Files, S: Store>(listed: &Worktree<'_>, ground: &Ground<'_, F, S>) -> Checkout {
         Checkout {
-            path: PathBuf::from(listed.path()),
+            path: ground.resolved(Path::new(listed.path())),
             head: listed.head().and_then(|head| head.parse().ignoring(Ignored::Unheaded)),
             branch: listed.branch().map(Branch::from),
         }

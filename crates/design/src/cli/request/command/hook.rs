@@ -2,61 +2,46 @@ mod answers;
 mod boundary;
 mod brief;
 mod release;
+mod reply;
 mod subagent;
 mod unroll;
 
-use console_ports::Environment;
-use design_messages::EndedTasks;
-use dispatch_ports::Shell;
+use console_ports::Heard;
 use file_ports::Files;
 use newtype::Enumerated;
 use store_ports::Store;
-use timer_ports::Clock;
 
 use super::Ground;
-use super::crew::Crew;
-use super::ingest::Ingest;
+use super::crew::Tape;
 use crate::HookEvent;
 use crate::cli::failure::Failure;
 use crate::cli::uttered::Uttered;
-use boundary::{Observed, Settings, Stopped, Stopping};
+use boundary::{Settings, Stopping};
 use release::Used;
+use reply::Hook;
 use subagent::Finishing;
 use unroll::Running;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Hook {
+pub enum Hooked {
     Settings,
     On(HookEvent),
 }
 
-impl Hook {
-    pub fn answered<F: Files + Clone, S: Store, C: Clock, G: Shell>(
+impl Hooked {
+    pub fn answered<F: Files + Clone, S: Store>(
         self,
-        environment: &impl Environment,
+        heard: Option<&Heard>,
         ground: &Ground<'_, F, S>,
-        crew: &Crew<'_, C, G>,
+        tape: &Tape<'_>,
     ) -> Result<Uttered, Failure> {
-        let heard = || environment.input().map_err(Failure::Deaf);
+        let input = || heard.cloned().ok_or(Failure::Usage);
         match self {
-            Hook::Settings => Settings::listed(HookEvent::VARIANTS).written(),
-            Hook::On(HookEvent::Stop) => Hook::stopped(&Stopping::heard(heard()?)?, ground, crew),
-            Hook::On(HookEvent::SubagentStop) => Finishing::heard(heard()?)?.answered(ground, crew),
-            Hook::On(HookEvent::PreToolUse) => Running::heard(heard()?)?.answered(environment, ground, crew),
-            Hook::On(HookEvent::PostToolUse) => Used::heard(heard()?)?.answered(ground, crew),
+            Hooked::Settings => Settings::listed(HookEvent::VARIANTS, &Settings::harness(ground, tape)?).written(),
+            Hooked::On(HookEvent::Stop) => Stopping::heard(input()?)?.answered(ground, tape)?.uttered(),
+            Hooked::On(HookEvent::SubagentStop) => Finishing::heard(input()?)?.answered(ground, tape)?.uttered(),
+            Hooked::On(HookEvent::PreToolUse) => Running::heard(input()?)?.answered(ground, tape)?.uttered(),
+            Hooked::On(HookEvent::PostToolUse) => Used::heard(input()?)?.answered(ground, tape)?.uttered(),
         }
-    }
-
-    fn stopped<F: Files + Clone, S: Store, C: Clock, G: Shell>(
-        stopping: &Stopping,
-        ground: &Ground<'_, F, S>,
-        crew: &Crew<'_, C, G>,
-    ) -> Result<Uttered, Failure> {
-        let store = ground.store();
-        ground.prepared(crew.scratch())?;
-        Ingest::read(store, &ground.transcripts())?;
-        let stopped = Stopped::from(store.read(EndedTasks)?);
-        let tasks = stopping.tasks(ground, crew.now()).map(|tasks| tasks.unstopped(&stopped));
-        stopping.decided(crew, &Observed::new(ground, tasks))
     }
 }
