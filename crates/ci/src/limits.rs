@@ -3,50 +3,32 @@ use std::fmt;
 use std::path::Path;
 use std::time::Duration;
 
+use pipeline::{Limit, Verdict};
 use serde::Deserialize;
 
 use crate::failure::Failure;
 use crate::ports::Disk;
 
 #[derive(Debug, Deserialize)]
-struct Limits(BTreeMap<String, Limit>);
+struct Limits(BTreeMap<String, Stage>);
 
 #[derive(Clone, Copy, Debug, Deserialize)]
-pub(crate) struct Limit {
-    warn: f64,
+#[serde(deny_unknown_fields)]
+pub(crate) struct Stage {
     block: f64,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Verdict {
-    Within,
-    Warned,
-    Blocked,
-}
-
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub(crate) struct Tenths(Duration);
 
-impl Limit {
-    pub(crate) fn read(path: &Path, stage: &str) -> Result<Limit, Failure> {
+impl Stage {
+    pub(crate) fn read(path: &Path, stage: &str) -> Result<Stage, Failure> {
         let Limits(stages) = toml::from_str(&Disk::read(path)?)?;
         stages.get(stage).copied().ok_or_else(|| Failure::Unlimited(stage.to_owned()))
     }
 
     pub(crate) fn judged(self, spent: Tenths) -> Result<Verdict, Failure> {
-        let warn = Duration::try_from_secs_f64(self.warn)?;
-        let block = Duration::try_from_secs_f64(self.block)?;
-        Ok(if spent.0 > block {
-            Verdict::Blocked
-        } else if spent.0 > warn {
-            Verdict::Warned
-        } else {
-            Verdict::Within
-        })
-    }
-
-    pub(crate) fn warn(self) -> f64 {
-        self.warn
+        Ok(Limit::at(Tenths(Duration::try_from_secs_f64(self.block)?)).judged(&spent))
     }
 
     pub(crate) fn block(self) -> f64 {

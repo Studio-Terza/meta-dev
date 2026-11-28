@@ -3,37 +3,37 @@
 
 [[case]]
 arguments = ["timed", "limits.toml", "lint", "true"]
-files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 0\n" }
+files = { "limits.toml" = "[lint]\nblock = 0\n" }
 code = 0
-out = "lint: within warn 0 s and block 0 s, took 0.0 s\n"
+out = "lint: within block 0 s, took 0.0 s\n"
 
 [[case]]
 arguments = ["timed", "limits.toml", "lint", "--since", "mark", "true"]
-files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 99999999999\n", "mark" = "0\n" }
+files = { "limits.toml" = "[lint]\nblock = 99999999999\n", "mark" = "0\n" }
 code = 0
-out = "::warning::lint: above warn 0 s, within block 99999999999 s, took 1"
+out = "lint: within block 99999999999 s, took 1"
 
 [[case]]
 arguments = ["timed", "limits.toml", "lint", "sleep", "0.15"]
-files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 0\n" }
+files = { "limits.toml" = "[lint]\nblock = 0\n" }
 code = 1
 out = "::error::lint: above block 0 s, took 0.1 s\n"
 
 [[case]]
 arguments = ["timed", "limits.toml", "lint", "false"]
-files = { "limits.toml" = "[lint]\nwarn = 0.5\nblock = 3.5\n" }
+files = { "limits.toml" = "[lint]\nblock = 3.5\n" }
 code = 1
-out = "::error::lint failed: exit status: 1\nlint: within warn 0.5 s and block 3.5 s, took "
+out = "::error::lint failed: exit status: 1\nlint: within block 3.5 s, took "
 
 [[case]]
 arguments = ["timed", "limits.toml", "lint", "absent-program"]
-files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 0\n" }
+files = { "limits.toml" = "[lint]\nblock = 0\n" }
 code = 1
 err = "cannot start absent-program: No such file or directory"
 
 [[case]]
 arguments = ["timed", "limits.toml", "lint", "true"]
-files = { "limits.toml" = "[lint]\nwarn = -1\nblock = 0\n" }
+files = { "limits.toml" = "[lint]\nblock = -1\n" }
 code = 1
 err = "a limit is not a number of seconds: "
 
@@ -45,7 +45,7 @@ err = "cannot read the limits: "
 
 [[case]]
 arguments = ["timed", "limits.toml", "lint", "true"]
-files = { "limits.toml" = "[clippy]\nwarn = 0\nblock = 0\n" }
+files = { "limits.toml" = "[clippy]\nblock = 0\n" }
 code = 1
 err = "the limits hold no stage named lint\n"
 
@@ -56,25 +56,25 @@ err = "cannot read limits.toml: "
 
 [[case]]
 arguments = ["timed", "limits.toml", "lint", "sh", "-c", "exit 0"]
-files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 0\n" }
+files = { "limits.toml" = "[lint]\nblock = 0\n" }
 code = 0
-out = "lint: within warn 0 s and block 0 s, took 0.0 s\n"
+out = "lint: within block 0 s, took 0.0 s\n"
 
 [[case]]
 arguments = ["timed", "limits.toml", "lint", "--since", "mark", "true"]
-files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 1000\n", "mark" = "0\n" }
+files = { "limits.toml" = "[lint]\nblock = 1000\n", "mark" = "0\n" }
 code = 1
 out = "::error::lint: above block 1000 s, took 1"
 
 [[case]]
 arguments = ["timed", "limits.toml", "lint", "--since", "mark", "true"]
-files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 0\n", "mark" = "99999999999\n" }
+files = { "limits.toml" = "[lint]\nblock = 0\n", "mark" = "99999999999\n" }
 code = 1
 err = "mark does not hold a start time in seconds since 1970, before now\n"
 
 [[case]]
 arguments = ["timed", "limits.toml", "lint", "--since", "mark", "true"]
-files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 0\n", "mark" = "soon" }
+files = { "limits.toml" = "[lint]\nblock = 0\n", "mark" = "soon" }
 code = 1
 err = "mark does not hold a start time in seconds since 1970, before now\n"
 

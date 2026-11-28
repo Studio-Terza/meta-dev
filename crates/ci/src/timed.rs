@@ -1,10 +1,12 @@
 use std::ffi::OsString;
-use std::io::Write;
 use std::path::PathBuf;
+use std::process::ExitCode;
 
-use crate::exit::Exit;
+use console_ports::Answer;
+use pipeline::Verdict;
+
 use crate::failure::Failure;
-use crate::limits::{Limit, Tenths, Verdict};
+use crate::limits::{Stage, Tenths};
 use crate::ports::{Mark, Ran};
 
 #[derive(Debug)]
@@ -32,26 +34,19 @@ impl Timed {
         }
     }
 
-    pub(crate) fn run(&self, out: &mut impl Write) -> Result<Exit, Failure> {
-        let limit = Limit::read(&self.limits, &self.stage)?;
+    pub(crate) fn answered(&self) -> Result<Answer, Failure> {
+        let limit = Stage::read(&self.limits, &self.stage)?;
         let ran = Ran::started(&self.program, &self.arguments)?;
         let spent = Tenths::from(self.since.as_deref().map_or(Ok(ran.spent()), Mark::elapsed)?);
         let verdict = limit.judged(spent)?;
-        let stage = &self.stage;
-        let (warn, block) = (limit.warn(), limit.block());
-        let status = ran.status();
-        let exit = match (status.success(), verdict) {
-            (true, Verdict::Within | Verdict::Warned) => Exit::Passed,
-            (true, Verdict::Blocked) => Exit::Failed,
-            (false, _) => writeln!(out, "::error::{stage} failed: {status}").map(|()| Exit::Failed)?,
+        let (stage, block, status) = (&self.stage, limit.block(), ran.status());
+        let failed = (!status.success()).then(|| format!("::error::{stage} failed: {status}\n"));
+        let judged = match verdict {
+            Verdict::Within => format!("{stage}: within block {block} s, took {spent}\n"),
+            Verdict::Over => format!("::error::{stage}: above block {block} s, took {spent}\n"),
         };
-        match verdict {
-            Verdict::Within => writeln!(out, "{stage}: within warn {warn} s and block {block} s, took {spent}"),
-            Verdict::Warned => {
-                writeln!(out, "::warning::{stage}: above warn {warn} s, within block {block} s, took {spent}")
-            }
-            Verdict::Blocked => writeln!(out, "::error::{stage}: above block {block} s, took {spent}"),
-        }?;
-        Ok(exit)
+        let passed = status.success() && verdict == Verdict::Within;
+        let code = if passed { ExitCode::SUCCESS } else { ExitCode::FAILURE };
+        Ok(Answer::new(code).showing(failed.unwrap_or_default()).showing(judged))
     }
 }
