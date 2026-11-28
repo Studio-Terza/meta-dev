@@ -190,6 +190,21 @@ Reply with JSON only, no prose and no code fence: a list of {"uuid": the full uu
 [o1 2026-01-01T00:00:00Z] Merge only when CI is green.
 
 
+## agents that stopped on a stop sequence, were let stop by SubagentStop or went silent an hour ago do not overrun, and agents told to go on do
+$ hook stop < {"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}
+{"decision":"block","reason":"OVERRUN: these background tasks ran 20 minutes without finishing or writing output; check and stop them: agent-blocked, agent-checked"}
+Ok(Blocked) ExitCode(unix_exit_status(0)) ""
++120 claude -p --output-format json --setting-sources user --strict-mcp-config --tools  --model haiku in /home/work/.meta/agents fed:
+An AI agent just ended its turn with this message to its owner:
+Understood.
+
+Below are earlier messages from the owner, each headed by [uuid timestamp].
+List every passage that bears on the message: an earlier answer to anything it asks, a decision, rule, preference or instruction it should follow, or the next step the owner set. A missed passage costs far more than an extra one, so when unsure, include it.
+Reply with JSON only, no prose and no code fence: a list of {"uuid": the full uuid from the header, "quote": an excerpt of that message copied exactly, character for character, one or two sentences}. Reply [] if none bear on it.
+
+[o1 2026-01-01T00:00:00Z] Merge only when CI is green.
+
+
 ## owner words bearing on a question are quoted and block once
 $ hook stop < {"hook_event_name":"Stop","last_assistant_message":"Shall I merge the branch now?","session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}
 {"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\nEarlier owner words bearing on this:\no1 2026-01-01T00:00:00Z: \"Merge only when CI is green.\"\n"}

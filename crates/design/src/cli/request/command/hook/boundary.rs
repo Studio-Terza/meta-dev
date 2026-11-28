@@ -206,8 +206,8 @@ impl<'ground, 'run, F: Files, S: Store> Observed<'ground, 'run, F, S> {
             .and_then(|said| Answering::new(store, crew).searched(said).ignoring(Ignored::Unanswered))
             .flatten();
         let reported: Vec<Body> = store.read(Overruns).ignoring(Ignored::Unanswered).unwrap_or_default();
-        let hung = self.tasks.as_ref().map_or_default(Tasks::hung);
-        let fresh: Vec<Body> = hung.iter().filter(|task| reported.contains(task).not()).cloned().collect();
+        let fresh: Vec<Body> =
+            self.tasks.iter().flat_map(Tasks::hung).filter(|task| reported.contains(task).not()).cloned().collect();
         let halt =
             fresh.first().map_or_else(|| self.tasks.as_ref().map_or(Halt::Live, Halt::from), |_first| Halt::Overrun);
         let queued = (halt == Halt::Stalled).then(|| self.queued(crew)).flatten();
