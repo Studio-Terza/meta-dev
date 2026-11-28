@@ -1,0 +1,7 @@
+[package]
+name = "corpus"
+[features]
+test-utils = []
+fast = []
+
+[workspace]

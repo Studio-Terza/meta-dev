@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use invariants::Ignoring;
 
+use crate::gate::Gate;
 use crate::ignored::Ignored;
 use crate::workspace::{CrateKind, Package};
 
@@ -23,6 +24,7 @@ struct Location {
 pub(crate) struct ModulePath {
     root: Arc<Path>,
     names: Vec<String>,
+    gate: Gate,
 }
 
 #[derive(Debug)]
@@ -59,11 +61,16 @@ impl Location {
 
 impl ModulePath {
     pub(crate) fn root(root: Arc<Path>) -> ModulePath {
-        ModulePath { root, names: Vec::new() }
+        ModulePath { root, names: Vec::new(), gate: Gate::Entered }
     }
 
-    pub(crate) fn child(&self, names: impl IntoIterator<Item = String>) -> ModulePath {
-        ModulePath { root: Arc::clone(&self.root), names: self.names.iter().cloned().chain(names).collect() }
+    pub(crate) fn child(&self, below: impl IntoIterator<Item = String>, gate: Gate) -> ModulePath {
+        let names = self.names.iter().cloned().chain(below).collect();
+        ModulePath { root: Arc::clone(&self.root), names, gate }
+    }
+
+    pub(crate) fn gate(&self) -> Gate {
+        self.gate
     }
 
     pub(crate) fn crate_root(&self) -> &Arc<Path> {
@@ -93,6 +100,10 @@ impl Source {
 
     pub(crate) fn module(&self) -> &ModulePath {
         &self.module
+    }
+
+    pub(crate) fn gate(&self) -> Gate {
+        self.module.gate
     }
 
     pub(crate) fn real(&self) -> &Path {

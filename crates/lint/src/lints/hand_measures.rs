@@ -1,9 +1,9 @@
 use syn::ItemImpl;
 
-use crate::finding::{Found, Rule};
+use crate::finding::{Findings, Found};
 use crate::hooks::{Descent, Hooks};
+use crate::lint::{Lint, Reads};
 use crate::source::Source;
-use crate::style::{Reads, Style};
 
 #[derive(Debug)]
 pub(crate) struct HandMeasures {
@@ -31,16 +31,18 @@ impl Hooks for HandMeasures {
     }
 }
 
-impl<'file> Style<'file> for HandMeasures {
-    const RULE: Rule = Rule::HandMeasures;
+impl<'file> Lint<'file> for HandMeasures {
+    const HEADLINE: &'static str = "a Measure is derived, so its join is fieldwise and lawful by construction; only pipeline joins std types by hand";
     const READS: Reads = Reads::Every;
+
+    type Fact = Findings;
 
     fn new(source: &'file Source) -> HandMeasures {
         let home = (source.package().name() == HandMeasures::HOME).then_some(());
         HandMeasures { found: Vec::new(), home }
     }
 
-    fn found(self) -> Vec<Found> {
-        self.found
+    fn fact(self, source: &'file Source) -> Findings {
+        Findings::found(HandMeasures::HEADLINE, source.shown(), self.found)
     }
 }

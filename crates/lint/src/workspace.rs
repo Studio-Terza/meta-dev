@@ -1,47 +1,16 @@
 mod manifest;
 
 use std::ffi::OsStr;
-use std::iter;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use file_ports::{Files, Kind};
 use invariants::Ignoring;
 use toml::de::{DeTable, DeValue};
 
 use crate::failure::Failure;
 use crate::ignored::Ignored;
+use crate::tree::Tree;
 use manifest::Manifest;
-
-#[derive(Debug)]
-pub(crate) struct Tree {
-    given: PathBuf,
-    canonical: PathBuf,
-}
-
-impl Tree {
-    const CURRENT: &'static str = ".";
-
-    pub(crate) fn opened(files: &impl Files, given: &Path) -> Result<Tree, Failure> {
-        let canonical = files.canonical(given).map_err(|source| Failure::Read { path: given.to_path_buf(), source })?;
-        Ok(Tree { given: given.to_path_buf(), canonical })
-    }
-
-    pub(crate) fn shown(&self, real: &Path) -> Arc<Path> {
-        let inside = real.strip_prefix(&self.canonical).ignoring(Ignored::Outside);
-        let shown = inside.map_or_else(
-            || real.to_path_buf(),
-            |relative| {
-                if self.given == Path::new(Tree::CURRENT) { relative.to_path_buf() } else { self.given.join(relative) }
-            },
-        );
-        Arc::from(shown)
-    }
-
-    pub(crate) fn empty(&self) -> Failure {
-        Failure::NoSources { path: self.given.clone() }
-    }
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum CrateKind {
@@ -69,12 +38,19 @@ impl Feature {
     }
 }
 
+#[derive(Clone, Debug)]
+struct Target {
+    path: PathBuf,
+    kind: CrateKind,
+}
+
 #[derive(Debug)]
 pub(crate) struct Package {
     directory: PathBuf,
     name: String,
     manifest: Arc<Path>,
     features: Vec<Feature>,
+    declared: Vec<Target>,
 }
 
 impl Package {
@@ -101,22 +77,17 @@ impl Package {
 
 #[derive(Debug)]
 pub(crate) struct CrateRoot {
-    path: PathBuf,
-    kind: CrateKind,
+    target: Target,
     package: Arc<Package>,
 }
 
 impl CrateRoot {
-    fn new(path: PathBuf, kind: CrateKind, package: &Arc<Package>) -> CrateRoot {
-        CrateRoot { path, kind, package: Arc::clone(package) }
-    }
-
     pub(crate) fn path(&self) -> &Path {
-        &self.path
+        &self.target.path
     }
 
     pub(crate) fn kind(&self) -> CrateKind {
-        self.kind
+        self.target.kind
     }
 
     pub(crate) fn package(&self) -> &Arc<Package> {
@@ -137,9 +108,6 @@ pub(crate) struct Workspace {
 }
 
 impl Workspace {
-    const MANIFEST: &'static str = "Cargo.toml";
-    const BUILD_OUTPUT: &'static str = "target";
-    const HIDDEN: u8 = b'.';
     const SOURCE_EXTENSION: &'static str = "rs";
     const MAIN: &'static str = "main.rs";
     const FIXED: [(&'static str, CrateKind); 3] =
@@ -158,25 +126,21 @@ impl Workspace {
         ("bench", CrateKind::Benches),
     ];
 
-    pub(crate) fn found(files: &impl Files, tree: &Tree) -> Result<Workspace, Failure> {
-        let manifests: Vec<PathBuf> = Workspace::directories(files, &tree.canonical)
-            .into_iter()
-            .map(|directory| directory.join(Workspace::MANIFEST))
-            .filter(|manifest| files.kind(manifest) == Kind::File)
-            .collect();
+    pub(crate) fn found(tree: &Tree) -> Result<Workspace, Failure> {
+        let (inside, above): (Vec<&Path>, Vec<&Path>) =
+            tree.manifests().partition(|manifest| manifest.starts_with(tree.root()));
         let read: Vec<Listed> =
-            manifests.iter().map(|manifest| Workspace::listed(files, tree, manifest)).collect::<Result<_, _>>()?;
-        let above = tree.canonical.ancestors().skip(1).filter_map(|directory| {
-            let text = files.read_text(&directory.join(Workspace::MANIFEST)).ignoring(Ignored::Unlisted)?;
-            let table = DeTable::parse(text.as_ref()).ignoring(Ignored::Unparsed)?;
-            Some(Manifest::new(directory.to_path_buf(), table.get_ref()))
+            inside.into_iter().map(|manifest| Workspace::listed(tree, manifest)).collect::<Result<_, _>>()?;
+        let outer = above.into_iter().filter_map(|manifest| {
+            let table = DeTable::parse(tree.text(manifest)?).ignoring(Ignored::Unparsed)?;
+            Some(Manifest::new(Workspace::directory(manifest), table.get_ref()))
         });
         let (found, listed): (Vec<Option<Package>>, Vec<Manifest>) =
             read.into_iter().map(|entry| (entry.package, entry.manifest)).unzip();
-        let admitted = Manifest::admitted(&listed.into_iter().chain(above).collect::<Vec<Manifest>>());
+        let admitted = Manifest::admitted(&listed.into_iter().chain(outer).collect::<Vec<Manifest>>());
         let packages: Vec<Arc<Package>> =
             found.into_iter().flatten().filter(|package| admitted.contains(&package.directory)).map(Arc::new).collect();
-        let roots: Vec<CrateRoot> = packages.iter().flat_map(|package| Workspace::roots(files, package)).collect();
+        let roots: Vec<CrateRoot> = packages.iter().flat_map(|package| Workspace::roots(tree, package)).collect();
         match roots.first() {
             Some(_) => Ok(Workspace { packages, roots }),
             None => Err(tree.empty()),
@@ -191,35 +155,23 @@ impl Workspace {
         self.roots
     }
 
-    fn directories(files: &impl Files, directory: &Path) -> Vec<PathBuf> {
-        let mut entries = files.entries(directory).ignoring(Ignored::Unlisted).unwrap_or_default();
-        entries.sort();
-        let manifested = files.kind(&directory.join(Workspace::MANIFEST));
-        let below = entries
-            .into_iter()
-            .filter(|entry| files.kind(entry) == Kind::Directory)
-            .filter(|entry| {
-                entry.file_name().and_then(|name| name.as_encoded_bytes().first().copied()) != Some(Workspace::HIDDEN)
-            })
-            .filter(|entry| manifested != Kind::File || entry.file_name() != Some(OsStr::new(Workspace::BUILD_OUTPUT)));
-        iter::once(directory.to_path_buf())
-            .chain(below.flat_map(|entry| Workspace::directories(files, &entry)))
-            .collect()
+    fn directory(manifest: &Path) -> PathBuf {
+        manifest.parent().map_or_default(Path::to_path_buf)
     }
 
-    fn listed(files: &impl Files, tree: &Tree, manifest: &Path) -> Result<Listed, Failure> {
-        let text =
-            files.read_text(manifest).map_err(|source| Failure::Read { path: manifest.to_path_buf(), source })?;
-        let table = DeTable::parse(text.as_ref())
-            .map_err(|source| Failure::Manifest { path: manifest.to_path_buf(), source })?
+    fn listed(tree: &Tree, manifest: &Path) -> Result<Listed, Failure> {
+        let text = tree.text(manifest).unwrap_or_default();
+        let table = DeTable::parse(text)
+            .map_err(|source| Failure::Manifest { path: tree.shown(manifest).to_path_buf(), source })?
             .into_inner();
-        let directory = manifest.parent().map_or_default(Path::to_path_buf);
+        let directory = Workspace::directory(manifest);
         let name = table.get("package").and_then(|package| Workspace::string(package.get_ref(), "name"));
         let package = name.map(|named| Package {
-            directory: directory.clone(),
             name: named.to_owned(),
             manifest: tree.shown(manifest),
-            features: Workspace::features(text.as_ref(), &table),
+            features: Workspace::features(text, &table),
+            declared: Workspace::declared(&directory, &table),
+            directory: directory.clone(),
         });
         Ok(Listed { package, manifest: Manifest::new(directory, &table) })
     }
@@ -241,49 +193,45 @@ impl Workspace {
         })
     }
 
-    fn roots(files: &impl Files, package: &Arc<Package>) -> Vec<CrateRoot> {
+    fn declared(directory: &Path, table: &DeTable<'_>) -> Vec<Target> {
+        Workspace::DECLARED
+            .iter()
+            .flat_map(|(section, kind)| {
+                let value = table.get(*section).map(toml::Spanned::get_ref);
+                let tables: Vec<&DeValue<'_>> = match value {
+                    Some(DeValue::Array(listed)) => listed.iter().map(toml::Spanned::get_ref).collect(),
+                    Some(single) => vec![single],
+                    None => Vec::new(),
+                };
+                tables
+                    .into_iter()
+                    .filter_map(|target| Workspace::string(target, "path"))
+                    .map(|path| Target { path: directory.join(path), kind: *kind })
+                    .collect::<Vec<Target>>()
+            })
+            .collect()
+    }
+
+    fn roots(tree: &Tree, package: &Arc<Package>) -> Vec<CrateRoot> {
         let directory = &package.directory;
-        let declared = Workspace::declared(files, package);
-        let fixed = Workspace::FIXED.iter().map(|(file, kind)| CrateRoot::new(directory.join(file), *kind, package));
+        let fixed = Workspace::FIXED.iter().map(|(file, kind)| Target { path: directory.join(file), kind: *kind });
         let targets = Workspace::TARGETS.iter().flat_map(|(folder, kind)| {
-            let mut entries = files.entries(&directory.join(folder)).ignoring(Ignored::Unlisted).unwrap_or_default();
-            entries.sort();
-            let roots = entries.into_iter().filter_map(|entry| Workspace::target_root(files, entry));
-            roots.map(|root| CrateRoot::new(root, *kind, package)).collect::<Vec<CrateRoot>>()
+            let inside = directory.join(folder);
+            let roots = tree.below(&inside).filter(|path| Workspace::target_root(&inside, path).is_some());
+            roots.map(|path| Target { path: path.to_path_buf(), kind: *kind }).collect::<Vec<Target>>()
         });
-        declared.into_iter().chain(fixed).chain(targets).filter(|root| files.kind(&root.path) == Kind::File).collect()
+        let all = package.declared.iter().cloned().chain(fixed).chain(targets);
+        all.filter(|target| tree.text(&target.path).is_some())
+            .map(|target| CrateRoot { target, package: Arc::clone(package) })
+            .collect()
     }
 
-    fn target_root(files: &impl Files, entry: PathBuf) -> Option<PathBuf> {
-        match files.kind(&entry) {
-            Kind::Directory => Some(entry.join(Workspace::MAIN)),
-            Kind::File | Kind::Link | Kind::Missing => {
-                Some(entry).filter(|file| file.extension() == Some(OsStr::new(Workspace::SOURCE_EXTENSION)))
-            }
+    fn target_root(folder: &Path, path: &Path) -> Option<()> {
+        let parts: Vec<&OsStr> = path.strip_prefix(folder).ignoring(Ignored::Outside)?.iter().collect();
+        match parts.as_slice() {
+            [file] => (Path::new(file).extension() == Some(OsStr::new(Workspace::SOURCE_EXTENSION))).then_some(()),
+            [_, main] => (*main == Workspace::MAIN).then_some(()),
+            _ => None,
         }
-    }
-
-    fn declared(files: &impl Files, package: &Arc<Package>) -> Vec<CrateRoot> {
-        let manifest = package.directory.join(Workspace::MANIFEST);
-        let text = files.read_text(&manifest).ignoring(Ignored::Unlisted).unwrap_or_default();
-        let table = DeTable::parse(text.as_ref()).ignoring(Ignored::Unparsed).map(toml::Spanned::into_inner);
-        table.map_or_default(|parsed| {
-            Workspace::DECLARED
-                .iter()
-                .flat_map(|(section, kind)| {
-                    let value = parsed.get(*section).map(toml::Spanned::get_ref);
-                    let tables: Vec<&DeValue<'_>> = match value {
-                        Some(DeValue::Array(listed)) => listed.iter().map(toml::Spanned::get_ref).collect(),
-                        Some(single) => vec![single],
-                        None => Vec::new(),
-                    };
-                    tables
-                        .into_iter()
-                        .filter_map(|target| Workspace::string(target, "path"))
-                        .map(|path| CrateRoot::new(package.directory.join(path), *kind, package))
-                        .collect::<Vec<CrateRoot>>()
-                })
-                .collect()
-        })
     }
 }

@@ -4,12 +4,13 @@ use std::iter;
 use std::path::Path;
 use std::sync::Arc;
 
+use pipeline::Measure;
 use proc_macro2::Ident;
 use syn::{ItemMod, ItemUse, Macro, VisRestricted};
 
-use crate::finding::{Finding, Found, Rule};
-use crate::graph::Graph;
+use crate::finding::{Finding, Found};
 use crate::hooks::{Descent, Expanded, Hooks};
+use crate::lint::{Fact, Lint, Reads};
 use crate::source::Source;
 use crate::use_leaf::UseLeaf;
 use crate::workspace::Package;
@@ -19,6 +20,9 @@ pub(crate) enum ModuleFact {
     Declared { root: Arc<Path>, module: Vec<String> },
     Named(Naming),
 }
+
+#[derive(Debug, Measure)]
+pub(crate) struct ModuleFacts(Vec<ModuleFact>);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Anchor {
@@ -211,7 +215,7 @@ impl Edges {
             .collect();
         inside.first().map(|(_, spot)| {
             let problem = format_args!("modules {} import each other: {}", modules.join(", "), uses.join(", "));
-            Found::at(spot.line, problem, ModuleCycles::FIX).in_file(Rule::ModuleCycles, &spot.path)
+            Found::at(spot.line, problem, ModuleCycles::FIX).in_file(ModuleCycles::HEADLINE, &spot.path)
         })
     }
 }
@@ -279,8 +283,11 @@ impl Hooks for ModuleCycles<'_> {
     }
 }
 
-impl<'file> Graph<'file> for ModuleCycles<'file> {
-    type Fact = ModuleFact;
+impl<'file> Lint<'file> for ModuleCycles<'file> {
+    const HEADLINE: &'static str = "modules inside a crate never import each other in a cycle";
+    const READS: Reads = Reads::All;
+
+    type Fact = ModuleFacts;
 
     fn new(source: &'file Source) -> ModuleCycles<'file> {
         let module = source.module();
@@ -288,14 +295,16 @@ impl<'file> Graph<'file> for ModuleCycles<'file> {
         ModuleCycles { source, open: vec![module.names().to_vec()], facts: vec![declared] }
     }
 
-    fn facts(self) -> Vec<ModuleFact> {
-        self.facts
+    fn fact(self, _: &'file Source) -> ModuleFacts {
+        ModuleFacts(self.facts)
     }
+}
 
-    fn reduce(facts: Vec<ModuleFact>, _: &[Arc<Package>]) -> Vec<Finding> {
+impl Fact for ModuleFacts {
+    fn findings(self, _: &[Arc<Package>]) -> Vec<Finding> {
         let mut crates: BTreeMap<Arc<Path>, Crate> = BTreeMap::new();
         let (declared, named): (Vec<ModuleFact>, Vec<ModuleFact>) =
-            facts.into_iter().partition(|fact| matches!(fact, ModuleFact::Declared { .. }));
+            self.0.into_iter().partition(|fact| matches!(fact, ModuleFact::Declared { .. }));
         declared.into_iter().chain(named).for_each(|fact| match fact {
             ModuleFact::Declared { root, module } => {
                 crates.entry(root).or_default().modules.insert(module);

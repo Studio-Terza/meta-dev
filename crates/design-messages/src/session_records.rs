@@ -12,7 +12,7 @@ pub struct SessionRecords {
     cursor: CursorRow,
 }
 
-#[derive(Debug, Default, Measure)]
+#[derive(Debug, Measure)]
 struct Lifted {
     messages: Vec<MessageRow>,
     ended: Vec<EndedRow>,
