@@ -8,7 +8,7 @@ use port_core::Pass;
 use sqlite_ports::SqliteOpener;
 use store_ports::{Opens, Schema};
 
-use crate::Ignored;
+use crate::ignored::Ignored;
 
 #[derive(Clone, Debug)]
 pub struct Rerooted {

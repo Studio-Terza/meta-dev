@@ -2,15 +2,24 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 
 use console_ports::{Heard, Shown};
-use grammar_shell::{Construct, Editor, Flagged};
+use grammar_shell::{Construct, Editor, Flagged, Nested};
 use newtype::Wrapping;
 use serde::{Deserialize, Serialize};
 
 use super::super::brief::Brief;
-use super::Refusal;
 use crate::cli::failure::Failure;
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum Refusal {
+    Unreadable,
+    Unroll(Nested),
+    InPlace { editor: Editor, within: Option<Construct> },
+    Wrote { path: PathBuf, repository: PathBuf, within: Option<Construct> },
+    Moved { path: PathBuf, repository: PathBuf, within: Option<Construct> },
+    Unresolved { written: PathBuf, within: Option<Construct> },
+}
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Running {

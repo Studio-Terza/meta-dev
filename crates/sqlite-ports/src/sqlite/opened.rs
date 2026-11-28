@@ -42,6 +42,10 @@ impl Opened {
         Opened::configured(Connection::open_in_memory().map_err(Unopened::from)?)?.stamped(schema)
     }
 
+    pub(super) fn connection(&self) -> &Connection {
+        &self.connection
+    }
+
     pub(super) fn read<Q: Query>(&self, query: Q) -> Result<Q::Rows, StoreFailure> {
         query.rows(&mut Connected::over(&self.connection))
     }

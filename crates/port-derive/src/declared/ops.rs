@@ -2,9 +2,10 @@ use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 
 use super::boundary::Spelling;
+use super::definition::{Declared, Rendered};
 use super::method::Method;
 use super::names::CallerName;
-use super::{Declared, Rendered};
+use super::scripted::Scripted;
 
 pub(crate) struct Ops;
 
@@ -17,7 +18,7 @@ impl Rendered for Ops {
             .as_ref()
             .iter()
             .filter_map(|method| method.op_struct().map(|op| Self::op_declaration(&op, caller, method)));
-        let laws = declared.laws();
+        let laws = Scripted::named(declared);
         quote! {
             #visibility mod #module {
                 #(#declarations)*

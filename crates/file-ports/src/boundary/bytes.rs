@@ -4,7 +4,7 @@ use std::io::Write;
 use invariants::Ignoring;
 use newtype::{Arbitrary, Newtype};
 
-use crate::Ignored;
+use crate::ignored::Ignored;
 
 #[derive(Newtype, Arbitrary, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "laws", derive(newtype::Deserialize))]

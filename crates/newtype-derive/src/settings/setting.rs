@@ -1,11 +1,15 @@
 use syn::parse::{Parse, ParseStream};
 use syn::{Expr, Token};
 
-use super::Checking;
-
 mod keyword {
     syn::custom_keyword!(checked);
     syn::custom_keyword!(strategy);
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Checking {
+    Unchecked,
+    Checked,
 }
 
 pub(crate) enum Setting {

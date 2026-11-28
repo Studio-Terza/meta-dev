@@ -17,14 +17,14 @@ use syn::{
 use crate::finding::{Finding, Found, Rule};
 use crate::gate::Gate;
 use crate::graph::Graph;
+use crate::hooks::{Descent, Expanded, Hooks};
 use crate::ignored::Ignored;
 use crate::source::{Place, Source};
 use crate::terms::{Fix, Line, Name};
 use crate::use_leaf::UseLeaf;
-use crate::walk::{Descent, Expanded, Hooks};
 use crate::workspace::Package;
-use boundary::{At, Indexed};
-use surface::{Surface, SurfaceFact};
+use boundary::{At, Indexed, Numbered};
+use surface::{Spot, Surface, SurfaceFact};
 
 #[derive(Debug)]
 pub(crate) enum DeadFact {
@@ -32,13 +32,6 @@ pub(crate) enum DeadFact {
     Attachment(Attachment),
     Reading(Reading),
     Surface(SurfaceFact),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct Spot {
-    path: Arc<Path>,
-    line: Line,
-    name: Name,
 }
 
 #[derive(Debug)]
@@ -99,16 +92,10 @@ struct Read(BTreeMap<Reader, Names>);
 
 #[derive(Debug, Default)]
 struct Graphed {
-    exports: Vec<Export>,
+    exports: Numbered<Export>,
     attachments: Vec<Attachment>,
     read: Read,
     surface: Vec<SurfaceFact>,
-}
-
-impl Spot {
-    fn new(path: Arc<Path>, line: Line, name: Name) -> Spot {
-        Spot { path, line, name }
-    }
 }
 
 impl DeadCode<'_> {
@@ -266,13 +253,17 @@ impl Graphed {
     }
 
     fn alive(&self) -> BTreeSet<At> {
-        let named = self.indexed().filter(|indexed| self.read.named(indexed.export()).is_some());
+        let named = self.exports.indexed().filter(|indexed| self.read.named(indexed.item()).is_some());
         self.grown(named.map(Indexed::at).collect())
     }
 
     fn grown(&self, alive: BTreeSet<At>) -> BTreeSet<At> {
-        let used: BTreeSet<At> =
-            self.indexed().filter(|indexed| self.used(&alive, indexed.export()).is_some()).map(Indexed::at).collect();
+        let used: BTreeSet<At> = self
+            .exports
+            .indexed()
+            .filter(|indexed| self.used(&alive, indexed.item()).is_some())
+            .map(Indexed::at)
+            .collect();
         let reached: Vec<At> = used.difference(&alive).copied().collect();
         match reached.first() {
             Some(_) => self.grown(alive.into_iter().chain(reached).collect()),
@@ -282,8 +273,11 @@ impl Graphed {
 
     fn used(&self, alive: &BTreeSet<At>, export: &Export) -> Option<()> {
         let directory = export.owner.directory();
-        let living: Vec<&Export> =
-            alive.iter().filter_map(|at| self.at(*at)).filter(|user| user.owner.directory() == directory).collect();
+        let living: Vec<&Export> = alive
+            .iter()
+            .filter_map(|at| self.exports.at(*at))
+            .filter(|user| user.owner.directory() == directory)
+            .collect();
         let interfaced = living.iter().find(|user| user.exported.interface.0.contains(&export.exported.name));
         let attached =
             self.attachments.iter().filter(|attachment| attachment.owner.directory() == directory).find(|attachment| {
@@ -479,7 +473,7 @@ impl<'file> Graph<'file> for DeadCode<'file> {
             graphed
         });
         let alive = graphed.alive();
-        let dead: Vec<&Export> = graphed.dead(&alive).collect();
+        let dead: Vec<&Export> = graphed.exports.dead(&alive).collect();
         let spots: BTreeSet<Spot> = dead
             .iter()
             .map(|export| Spot::new(Arc::clone(&export.path), export.exported.line, export.exported.name.clone()))

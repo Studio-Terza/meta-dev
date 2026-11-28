@@ -5,6 +5,7 @@ use std::process::ExitCode;
 
 use invariants::Ignoring;
 
+use crate::exit::Exit;
 use crate::failure::Failure;
 use crate::ignored::Ignored;
 use crate::kills::Kills;
@@ -19,12 +20,6 @@ pub enum Cli {
     Queries(Queries),
     Kills(Kills),
     Usage,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Exit {
-    Passed,
-    Failed,
 }
 
 impl Cli {

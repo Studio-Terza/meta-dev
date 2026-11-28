@@ -14,8 +14,13 @@ use invariants::Ignoring;
 use newtype::{Display, Newtype};
 use serde::Deserialize;
 
-use super::{FailedJob, Logged};
 use crate::cli::request::ignored::Ignored;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct FailedJob {
+    check: CheckName,
+    job: JobId,
+}
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Finishing {
@@ -353,13 +358,29 @@ pub(crate) struct Excerpt {
 #[serde(from = "String")]
 pub(crate) struct Link(Option<JobId>);
 
+impl FailedJob {
+    pub(crate) fn new(check: CheckName, job: JobId) -> FailedJob {
+        FailedJob { check, job }
+    }
+
+    pub(crate) fn check(&self) -> &CheckName {
+        &self.check
+    }
+
+    pub(crate) fn job(&self) -> JobId {
+        self.job
+    }
+}
+
 impl Excerpt {
+    const LINES: usize = 40;
+
     pub(crate) fn tailed(failed: FailedJob, log: &Printed) -> Excerpt {
         let whole: Vec<String> = match log.as_ref().parse::<Lines>() {
             Ok(lines) => lines.into_iter().collect(),
             Err(unsplit) => match unsplit {},
         };
-        let skipped = whole.len().saturating_sub(Logged::LINES);
+        let skipped = whole.len().saturating_sub(Excerpt::LINES);
         Excerpt { failed, lines: whole.into_iter().skip(skipped).collect() }
     }
 }

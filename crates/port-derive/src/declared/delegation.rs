@@ -1,8 +1,8 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
+use super::definition::{Declared, Rendered};
 use super::method::{Method, Parameter};
-use super::{Declared, Rendered};
 
 pub(crate) struct Delegation;
 

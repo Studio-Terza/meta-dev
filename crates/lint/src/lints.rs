@@ -2,6 +2,7 @@ mod bool_methods;
 mod dead_code;
 mod expression_flow;
 mod manual_iteration;
+mod module_cycles;
 mod named_lifetimes;
 mod no_comments;
 mod no_dyn;
@@ -28,6 +29,7 @@ pub(crate) use bool_methods::BoolMethods;
 pub(crate) use dead_code::{DeadCode, DeadFact};
 pub(crate) use expression_flow::ExpressionFlow;
 pub(crate) use manual_iteration::ManualIteration;
+pub(crate) use module_cycles::{ModuleCycles, ModuleFact};
 pub(crate) use named_lifetimes::NamedLifetimes;
 use no_comments::NoComments;
 pub(crate) use no_dyn::NoDyn;
@@ -45,6 +47,7 @@ pub(crate) struct Facts {
     api: Vec<ApiFact>,
     test_only: Vec<Finding>,
     dead: Vec<DeadFact>,
+    modules: Vec<ModuleFact>,
 }
 
 #[derive(Debug, Default)]
@@ -80,6 +83,7 @@ impl<'run> Lints<'run> {
             primitive_boundary: lints.style(),
             test_shape: lints.style(),
             dead_code: lints.graph(),
+            module_cycles: Pausable::admitted(ModuleCycles::new(source), Some(())),
         };
         let Lineup {
             no_free_fns,
@@ -98,6 +102,7 @@ impl<'run> Lints<'run> {
             primitive_boundary,
             test_shape,
             dead_code,
+            module_cycles,
         } = Walker::walked(lineup, file);
         let found = [
             lints.found(lints.style::<NoComments>()),
@@ -114,8 +119,12 @@ impl<'run> Lints<'run> {
             lints.found(test_shape),
         ];
         let api = Lints::facts(public_api_tests).into_iter().chain(emitters.woken().map_or_default(Emitters::facts));
-        let facts =
-            Facts { api: api.collect(), test_only: Lints::facts(no_test_only_api), dead: Lints::facts(dead_code) };
+        let facts = Facts {
+            api: api.collect(),
+            test_only: Lints::facts(no_test_only_api),
+            dead: Lints::facts(dead_code),
+            modules: Lints::facts(module_cycles),
+        };
         let budget = Budget::of_file(source, &test_scan.woken().unwrap_or_default(), gate);
         Linted { found: found.into_iter().flatten().collect(), facts, budget }
     }
@@ -146,6 +155,7 @@ impl Facts {
             api: self.api.into_iter().chain(later.api).collect(),
             test_only: self.test_only.into_iter().chain(later.test_only).collect(),
             dead: self.dead.into_iter().chain(later.dead).collect(),
+            modules: self.modules.into_iter().chain(later.modules).collect(),
         }
     }
 
@@ -153,6 +163,7 @@ impl Facts {
         let api = PublicApiTests::reduce(self.api, packages);
         let test_only = NoTestOnlyApi::reduce(self.test_only, packages);
         let dead = DeadCode::reduce(self.dead, packages);
-        api.into_iter().chain(test_only).chain(dead).collect()
+        let modules = ModuleCycles::reduce(self.modules, packages);
+        api.into_iter().chain(test_only).chain(dead).chain(modules).collect()
     }
 }

@@ -13,7 +13,7 @@ use port_core::Pass;
 
 use file_ports::{Bytes, FileFailure, FilesFiller, Kind, Offset, Size, Stamps, Text, files_ops};
 
-use crate::Ignored;
+use crate::ignored::Ignored;
 use locked::Locked;
 use resolved::Resolved;
 

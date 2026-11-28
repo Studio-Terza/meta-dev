@@ -2,11 +2,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-use file_ports::{Bytes, FileFailure, Files, Text};
+use file_ports::{Bytes, Files, Text};
 use query_cache::CacheFile;
 
+use crate::Describe;
 use crate::sources::Sources;
-use crate::{Describe, Undescribed};
+use crate::uncached::Uncached;
 
 #[derive(Debug)]
 pub struct Cache {
@@ -22,20 +23,6 @@ pub struct Drift {
 struct Compared {
     wanted: BTreeMap<CacheFile, Text>,
     drift: Drift,
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum Uncached {
-    #[error("cannot read {}: {source}", path.display())]
-    Unread { path: PathBuf, source: FileFailure },
-    #[error("cannot parse {}: {source}", path.display())]
-    Unparsed { path: PathBuf, source: syn::Error },
-    #[error(transparent)]
-    Undescribed(#[from] Undescribed),
-    #[error("cannot write a cached query: {0}")]
-    Unwritten(#[from] serde_json::Error),
-    #[error("cannot rewrite {}: {source}", path.display())]
-    Unrewritten { path: PathBuf, source: FileFailure },
 }
 
 impl Cache {

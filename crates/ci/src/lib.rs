@@ -1,5 +1,6 @@
 mod boundary;
 mod cli;
+mod exit;
 mod failure;
 mod ignored;
 mod kills;

@@ -5,7 +5,7 @@ use query_cache::{Invoked, Recorded};
 use syn::visit::Visit;
 use syn::{ItemStruct, LitStr, Macro};
 
-use crate::cache::Uncached;
+use crate::uncached::Uncached;
 
 #[derive(Debug, Default)]
 pub(crate) struct Sources {

@@ -7,10 +7,10 @@ use syn::{
 
 use crate::finding::{Found, Rule};
 use crate::gate::Gate;
+use crate::hooks::{Descent, Expanded, Hooks};
 use crate::source::Source;
 use crate::style::{Reads, Style};
 use crate::terms::{Count, Fix};
-use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Debug, Default)]
 pub(crate) struct ManualIteration {

@@ -2,7 +2,7 @@ use invariants::Ignoring;
 use serde::{Deserialize, Serialize};
 use strum::EnumString;
 
-use crate::Ignored;
+use crate::ignored::Ignored;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Column<Name> {

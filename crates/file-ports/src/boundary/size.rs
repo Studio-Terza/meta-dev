@@ -1,7 +1,8 @@
 use invariants::Ignoring;
 use newtype::{Arbitrary, Newtype};
 
-use crate::{Bytes, Ignored};
+use crate::Bytes;
+use crate::ignored::Ignored;
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Size(u64);

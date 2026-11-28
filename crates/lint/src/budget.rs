@@ -7,9 +7,9 @@ use syn::spanned::Spanned;
 use syn::{Attribute, Field, ImplItemConst, ImplItemFn, ImplItemType, Item, Macro, TraitItemFn, TraitItemType};
 
 use crate::gate::Gate;
+use crate::hooks::{Descent, Expanded, Hooks};
 use crate::source::{Place, Source};
 use crate::terms::{Count, Depth, Name};
-use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Budget {

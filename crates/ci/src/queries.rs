@@ -7,7 +7,7 @@ use query_ports::Cache;
 use sqlite_ports::SqliteOpener;
 use store_ports::{Opens, Parses};
 
-use crate::cli::Exit;
+use crate::exit::Exit;
 use crate::failure::Failure;
 
 #[derive(Debug)]

@@ -24,6 +24,7 @@ pub(crate) enum Rule {
     PrimitiveBoundary,
     TestShape,
     DeadCode,
+    ModuleCycles,
 }
 
 impl fmt::Display for Rule {
@@ -54,6 +55,7 @@ impl fmt::Display for Rule {
                 "tests run production code paths: no literals in a test body and no test helpers beyond a test table"
             }
             Rule::DeadCode => "every pub item is named by another workspace crate",
+            Rule::ModuleCycles => "modules inside a crate never import each other in a cycle",
         })
     }
 }

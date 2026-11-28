@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 
 use crate::boundary::MutantName;
-use crate::cli::Exit;
+use crate::exit::Exit;
 use crate::failure::Failure;
 use crate::ports::Disk;
 use boundary::{Changed, Shards};

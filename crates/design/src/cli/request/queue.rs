@@ -9,7 +9,7 @@ use design_messages::CheckName;
 use file_ports::Kind;
 use serde::{Deserialize, Serialize};
 
-use boundary::{Cited, MessageRef};
+use boundary::{Cited, Closed, MessageRef};
 pub(crate) use boundary::{HeadRef, Landed, Named};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -119,8 +119,12 @@ pub(crate) struct Ruling {
     ruled: Option<MessageRef>,
 }
 
-#[derive(Clone, Copy, Debug)]
-struct Closed;
+#[derive(Debug)]
+pub(crate) struct Shown<'shown, N: Named> {
+    item: &'shown Item,
+    landed: &'shown [Landed],
+    named: &'shown N,
+}
 
 impl Queue {
     pub(crate) fn items(&self) -> &[Item] {
@@ -170,6 +174,14 @@ impl Item {
         Item::Uninstalled(Uninstalled { merged, step })
     }
 
+    pub(crate) fn shown<'shown, N: Named>(
+        &'shown self,
+        landed: &'shown [Landed],
+        named: &'shown N,
+    ) -> Shown<'shown, N> {
+        Shown { item: self, landed, named }
+    }
+
     fn closed(&self, landed: &[Landed], kind: impl Fn(&Path) -> Kind) -> Option<Closed> {
         match self {
             Item::Spec(cited) => landed.iter().find(|pull| pull.merged(cited).is_some()).map(|_merged| Closed),
@@ -195,6 +207,50 @@ impl fmt::Display for Cause {
             Cause::RepeatFailure(check) => write!(formatter, "repeat failure of {check}"),
             Cause::GatedRerun(check) => write!(formatter, "green only on a rerun after {check} failed a gate"),
             Cause::Unread(step) => write!(formatter, "unread {step}"),
+        }
+    }
+}
+
+impl<N: Named> fmt::Display for Shown<'_, N> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Shown { item, landed, named } = self;
+        match item {
+            Item::Spec(cited) => {
+                let attachment = cited.attachment();
+                let line = named.spec(attachment).unwrap_or_else(|| attachment.to_string());
+                write!(formatter, "- {attachment} {line} (closes when its pull request merges)")
+            }
+            Item::Pull(pull) => {
+                write!(formatter, "- {} (closes when it merges or closes)", Landed::titled(landed, *pull))
+            }
+            Item::Escalation(Escalated { at, cause, from }) => {
+                write!(formatter, "- agent outcome: {cause}")?;
+                match at {
+                    Some(Target::Pull(pull)) => write!(formatter, " on {}", Landed::titled(landed, *pull)),
+                    Some(Target::Branch(branch)) => write!(formatter, " on {branch}"),
+                    None => Ok(()),
+                }?;
+                let closes = at.as_ref().map_or_else(
+                    || format!("{} is removed", from.display()),
+                    |target| format!("a DONE on {target} passes, or it merges or closes"),
+                );
+                write!(formatter, ", from {} (closes when {closes})", from.display())
+            }
+            Item::Worktree(Kept { path, held, merged }) => write!(
+                formatter,
+                "- worktree {} kept ({held}) after {} merged (closes when it is removed)",
+                path.display(),
+                Landed::titled(landed, *merged)
+            ),
+            Item::Ruling(Ruling { asked, .. }) => {
+                let said = named.owner(asked.as_ref()).map_or_else(String::new, |text| format!(": \"{text}\""));
+                write!(formatter, "- owner ruling asked in {asked}{said} (closes when ruling.ruled names the answer)")
+            }
+            Item::Uninstalled(Uninstalled { merged, step }) => write!(
+                formatter,
+                "- design not installed after {} merged: the {step} step failed (closes when a later merge installs)",
+                Landed::titled(landed, *merged)
+            ),
         }
     }
 }

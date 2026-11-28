@@ -8,11 +8,11 @@ use syn::{
 };
 
 use crate::finding::{Found, Rule};
+use crate::hooks::{Descent, Expanded, Hooks};
 use crate::reached::Reached;
 use crate::source::Source;
 use crate::style::{Reads, Style};
 use crate::terms::Fix;
-use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Debug)]
 pub(crate) struct PrimitiveBoundary {

@@ -27,4 +27,12 @@ impl Ran {
             Ran::Failed(_) | Ran::Overdue => None,
         }
     }
+
+    #[must_use]
+    pub fn printed(&self) -> Option<&Printed> {
+        match self {
+            Ran::Succeeded(printed) | Ran::Failed(printed) => Some(printed),
+            Ran::Overdue => None,
+        }
+    }
 }

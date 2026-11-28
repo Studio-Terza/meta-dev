@@ -3,7 +3,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use crate::boundary::Stage;
-use crate::cli::Exit;
+use crate::exit::Exit;
 use crate::failure::Failure;
 use crate::limits::{Limit, Tenths, Verdict};
 use crate::ports::{Mark, Ran};

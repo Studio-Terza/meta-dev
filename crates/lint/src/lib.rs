@@ -5,6 +5,7 @@ mod failure;
 mod finding;
 mod gate;
 mod graph;
+mod hooks;
 mod ignored;
 mod lints;
 mod reached;

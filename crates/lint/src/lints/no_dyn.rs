@@ -2,10 +2,10 @@ use proc_macro2::{TokenStream, TokenTree};
 use syn::{Macro, TypeTraitObject};
 
 use crate::finding::{Found, Rule};
+use crate::hooks::{Descent, Expanded, Hooks};
 use crate::source::Source;
 use crate::style::{Reads, Style};
 use crate::terms::Fix;
-use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Debug, Default)]
 pub(crate) struct NoDyn {

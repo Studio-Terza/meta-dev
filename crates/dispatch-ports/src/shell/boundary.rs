@@ -2,7 +2,6 @@ use std::path::{Path, PathBuf};
 
 use newtype::{Display, Newtype};
 
-use super::Ran;
 use crate::Deadline;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -51,16 +50,6 @@ impl Call {
     #[must_use]
     pub fn input(&self) -> Option<&str> {
         self.fed.as_deref()
-    }
-}
-
-impl Ran {
-    #[must_use]
-    pub fn printed(&self) -> Option<&Printed> {
-        match self {
-            Ran::Succeeded(printed) | Ran::Failed(printed) => Some(printed),
-            Ran::Overdue => None,
-        }
     }
 }
 

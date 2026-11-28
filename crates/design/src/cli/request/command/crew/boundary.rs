@@ -5,8 +5,17 @@ use dispatch_ports::{Call, Deadline, Printed};
 use invariants::Ignoring;
 use serde::Deserialize;
 
-use super::Program;
 use crate::cli::request::ignored::Ignored;
+
+#[derive(strum::IntoStaticStr, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "lowercase")]
+pub(crate) enum Program {
+    Git,
+    Gh,
+    Cargo,
+    Design,
+    Claude,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Prompt(String);

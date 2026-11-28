@@ -17,8 +17,13 @@ pub(crate) enum Place {
 #[derive(Debug)]
 struct Location {
     kind: CrateKind,
-    module: Vec<Name>,
     library: Option<()>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ModulePath {
+    root: Arc<Path>,
+    names: Vec<Name>,
 }
 
 #[derive(Debug)]
@@ -28,14 +33,13 @@ pub(crate) struct Source {
     text: Text,
     package: Arc<Package>,
     location: Location,
+    module: ModulePath,
     reached: CrateKind,
 }
 
 impl Location {
     const SOURCE: &'static str = "src";
     const LIBRARY: &'static str = "lib.rs";
-    const MODULE: &'static str = "mod";
-    const EXTENSION: &'static str = "rs";
     const TARGETS: [(&'static str, CrateKind); 3] =
         [("tests", CrateKind::Tests), ("examples", CrateKind::Examples), ("benches", CrateKind::Benches)];
 
@@ -47,25 +51,29 @@ impl Location {
         match (parts.as_slice(), target) {
             ([source, rest @ ..], _) if source == Location::SOURCE => Location {
                 kind: CrateKind::Library,
-                module: Location::modules(rest),
                 library: matches!(rest, [only] if only == Location::LIBRARY).then_some(()),
             },
-            ([_, rest @ ..], Some((_, kind))) => {
-                Location { kind: *kind, module: Location::modules(rest.get(1..).unwrap_or_default()), library: None }
-            }
-            _ => Location { kind: fallback, module: Vec::new(), library: None },
+            (_, Some((_, kind))) => Location { kind: *kind, library: None },
+            _ => Location { kind: fallback, library: None },
         }
     }
+}
 
-    fn modules(parts: &[Name]) -> Vec<Name> {
-        let named = parts.iter().map(|part| {
-            let path = Path::new(part.text());
-            let source = path.extension().filter(|extension| *extension == Location::EXTENSION);
-            source
-                .and_then(|_| path.file_stem())
-                .map_or_else(|| part.clone(), |stem| Name::spelled(&stem.to_string_lossy()))
-        });
-        named.filter(|name| name != Location::MODULE).collect()
+impl ModulePath {
+    pub(crate) fn root(root: Arc<Path>) -> ModulePath {
+        ModulePath { root, names: Vec::new() }
+    }
+
+    pub(crate) fn child(&self, names: impl IntoIterator<Item = Name>) -> ModulePath {
+        ModulePath { root: Arc::clone(&self.root), names: self.names.iter().cloned().chain(names).collect() }
+    }
+
+    pub(crate) fn crate_root(&self) -> &Arc<Path> {
+        &self.root
+    }
+
+    pub(crate) fn names(&self) -> &[Name] {
+        &self.names
     }
 }
 
@@ -74,18 +82,23 @@ impl Source {
     const BOUNDARY: &'static str = "boundary";
 
     pub(crate) fn bounded(&self) -> Option<()> {
-        self.location.module.iter().any(|segment| segment == Source::BOUNDARY).then_some(())
+        self.module.names.iter().any(|segment| segment == Source::BOUNDARY).then_some(())
     }
 
     pub(crate) fn new(
         package: Arc<Package>,
         real: Arc<Path>,
         shown: Arc<Path>,
+        module: ModulePath,
         reached: CrateKind,
         text: Text,
     ) -> Source {
         let location = Location::of(&package, &real, reached);
-        Source { real, shown, text, package, location, reached }
+        Source { real, shown, text, package, location, module, reached }
+    }
+
+    pub(crate) fn module(&self) -> &ModulePath {
+        &self.module
     }
 
     pub(crate) fn real(&self) -> &Path {
@@ -131,7 +144,7 @@ impl Source {
             .take_while(|letter| letter.is_alphanumeric())
             .flat_map(char::to_lowercase);
         let named = self.place() == Place::Shipped && last_word.eq(Source::PORTS.chars().rev());
-        let module = self.location.module.iter().any(|segment| segment == Source::PORTS);
+        let module = self.module.names.iter().any(|segment| segment == Source::PORTS);
         (named || module).then_some(())
     }
 }

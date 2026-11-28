@@ -6,7 +6,8 @@ use std::path::{Path, PathBuf};
 use invariants::Ignoring;
 use port_core::Pass;
 
-use crate::{Bytes, Epoch, FileFailure, FilesFiller, Ignored, Kind, Offset, Size, Stamps, Text, files_ops};
+use crate::ignored::Ignored;
+use crate::{Bytes, Epoch, FileFailure, FilesFiller, Kind, Offset, Size, Stamps, Text, files_ops};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Disk;

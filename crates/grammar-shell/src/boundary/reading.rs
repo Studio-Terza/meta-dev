@@ -5,7 +5,7 @@ use grammar::logos::{Lexer, Logos};
 use grammar::{Ignoring, Unlexed};
 
 use super::lexeme::{Argued, Lexeme, Line, PerlFlag, Quoted, SedFlag, Spelling, Whole};
-use super::{Changed, Construct, Edit, Editor, Flagged, Occurrence, Spotted};
+use super::occurrence::{Changed, Construct, Edit, Editor, Flagged, Occurrence, Spotted};
 
 enum Lexing<'text> {
     Command(Lexer<'text, Lexeme<'text>>),
@@ -391,8 +391,7 @@ impl State {
     }
 
     fn noted(self, spotted: Spotted) -> State {
-        let within = self.within();
-        let occurrence = Occurrence { spotted, within };
+        let occurrence = Occurrence::new(spotted, self.within());
         State { found: self.found.into_iter().chain(iter::once(occurrence)).collect(), ..self }
     }
 
@@ -626,7 +625,7 @@ impl State {
 
     fn flagged(self, flagged: Flagged, construct: Option<Construct>) -> State {
         let within = self.within().into_iter().chain(construct).collect();
-        let occurrence = Occurrence { spotted: Spotted::Flagged(flagged), within };
+        let occurrence = Occurrence::new(Spotted::Flagged(flagged), within);
         State { found: self.found.into_iter().chain(iter::once(occurrence)).collect(), ..self }
     }
 

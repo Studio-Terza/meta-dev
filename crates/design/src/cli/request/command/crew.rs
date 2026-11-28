@@ -8,23 +8,13 @@ use dispatch_ports::{Clock, Deadline, Pause, Ran, Shell, Timeout, Wall};
 use invariants::Ignoring;
 
 use crate::cli::request::ignored::Ignored;
-pub(crate) use boundary::{Prompt, Reply};
+pub(crate) use boundary::{Program, Prompt, Reply};
 
 #[derive(Debug)]
 pub(crate) struct Crew<'ports, C: Clock, G: Shell> {
     clock: &'ports C,
     shell: &'ports G,
     scratch: PathBuf,
-}
-
-#[derive(strum::IntoStaticStr, Clone, Copy, Debug, PartialEq, Eq)]
-#[strum(serialize_all = "lowercase")]
-pub(crate) enum Program {
-    Git,
-    Gh,
-    Cargo,
-    Design,
-    Claude,
 }
 
 impl<'ports, C: Clock, G: Shell> Crew<'ports, C, G> {

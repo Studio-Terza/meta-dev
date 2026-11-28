@@ -5,7 +5,6 @@ use std::sync::Arc;
 use proc_macro2::Ident;
 use syn::{Item, ItemUse, Visibility};
 
-use super::Spot;
 use crate::finding::{Finding, Found, Rule};
 use crate::source::{Place, Source};
 use crate::terms::{Fix, Line, Name};
@@ -16,6 +15,13 @@ use crate::workspace::Package;
 pub(crate) enum SurfaceFact {
     Export { crate_name: Name, name: Name, path: Arc<Path>, line: Line },
     Sighting { crate_name: Name, reached: Reached, reader: Reader },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) struct Spot {
+    path: Arc<Path>,
+    line: Line,
+    name: Name,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -52,6 +58,12 @@ pub(super) struct Surface<'file> {
     reader: Reader,
     own_crate: Option<Name>,
     facts: Vec<SurfaceFact>,
+}
+
+impl Spot {
+    pub(super) fn new(path: Arc<Path>, line: Line, name: Name) -> Spot {
+        Spot { path, line, name }
+    }
 }
 
 impl Reach {

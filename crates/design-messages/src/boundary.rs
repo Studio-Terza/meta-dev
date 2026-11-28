@@ -1,27 +1,15 @@
 pub(crate) mod ignored;
 
-use std::collections::BTreeMap;
-
 use file_ports::Offset;
 use newtype::Wrapping;
 use store_ports::Record as _;
 use store_ports::{Columns, Done, Execute, Prepared, StoreFailure};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Uuid};
 
-use crate::Said;
-
 #[derive(Debug)]
 pub(crate) struct MessageRow {
     uuid: Uuid,
     session: SessionId,
-    at: Instant,
-    author: Authorship,
-    body: Body,
-}
-
-#[derive(Debug, Columns)]
-pub(crate) struct SaidRow {
-    uuid: Uuid,
     at: Instant,
     author: Authorship,
     body: Body,
@@ -44,83 +32,6 @@ impl From<&Record> for MessageRow {
             author: record.author(),
             body: record.text().clone(),
         }
-    }
-}
-
-#[derive(Debug, Default)]
-struct Exchanges {
-    lead: Option<Body>,
-    owned: Vec<Said>,
-}
-
-impl From<SaidRow> for Said {
-    fn from(row: SaidRow) -> Said {
-        Said::new(row.uuid, row.at, row.body, None)
-    }
-}
-
-impl Exchanges {
-    fn heard(self, row: SaidRow) -> Exchanges {
-        match row.author {
-            Authorship::Lead => Exchanges { lead: Some(row.body), ..self },
-            Authorship::Owner => {
-                let said = Said::new(row.uuid, row.at, row.body, self.lead.as_ref());
-                let mut owned = self.owned;
-                owned.push(said);
-                Exchanges { owned, ..self }
-            }
-        }
-    }
-}
-
-impl SaidRow {
-    pub(crate) fn last_in(
-        session: &SessionId,
-        author: Authorship,
-        statements: &mut impl Execute,
-    ) -> Result<Vec<SaidRow>, StoreFailure> {
-        statements.rows(store_ports::query!(
-            SaidRow,
-            r#"
-SELECT
-  uuid,
-  at,
-  author,
-  body
-FROM
-  messages
-WHERE
-  session = ?1
-  AND author = ?2
-ORDER BY
-  at DESC
-LIMIT
-  1
-"#,
-            session: SessionId,
-            author: Authorship
-        ))
-    }
-
-    pub(crate) fn owned(statements: &mut impl Execute) -> Result<Vec<Said>, StoreFailure> {
-        let ordered: BTreeMap<(Instant, Uuid), SaidRow> =
-            SaidRow::all(statements)?.into_iter().map(|row| ((row.at.clone(), row.uuid.clone()), row)).collect();
-        Ok(ordered.into_values().fold(Exchanges::default(), Exchanges::heard).owned)
-    }
-
-    fn all(statements: &mut impl Execute) -> Result<Vec<SaidRow>, StoreFailure> {
-        statements.rows(store_ports::query!(
-            SaidRow,
-            r#"
-SELECT
-  uuid,
-  at,
-  author,
-  body
-FROM
-  messages
-"#
-        ))
     }
 }
 

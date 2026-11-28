@@ -378,6 +378,60 @@ fn f(items: Vec<u8>) {
 }
 """
 
+[Lint.module_cycles]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.module_cycles.files]
+"Cargo.toml" = """
+[package]
+name = "corpus"
+"""
+"src/lib.rs" = """
+mod facade;
+mod left;
+mod looped;
+mod parent;
+mod right;
+
+pub(crate) use facade::Shared;
+pub(crate) use left::Left;
+"""
+"src/facade.rs" = """
+pub(crate) struct Shared;
+
+pub(in crate::left) struct Only;
+"""
+"src/left.rs" = """
+use std::fmt;
+
+pub(crate) struct Left(crate::Shared, crate::facade::Only);
+
+mod inner {
+    pub(super) struct Inner(super::Left);
+}
+"""
+"src/looped.rs" = """
+pub(crate) struct Loop(super::right::Right);
+"""
+"src/right.rs" = """
+use crate::looped::Loop;
+
+pub(crate) struct Right;
+"""
+"src/parent.rs" = """
+mod child;
+
+pub(crate) use child::Child;
+
+pub(crate) struct Parent;
+"""
+"src/parent/child.rs" = """
+use super::Parent;
+
+pub(crate) struct Child(Parent);
+"""
+
 [Lint.named_lifetimes]
 arguments = ["."]
 verdict = "Violations"

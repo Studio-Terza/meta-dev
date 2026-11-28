@@ -1,13 +1,14 @@
 mod boundary;
 
+use std::fmt;
 use std::sync::Mutex;
 
 use dispatch_ports::{Call, DispatchFailure, Ran, ShellFiller, Wall, shell_ops};
 use invariants::Unpoisoned;
 use port_core::Pass;
 
-use boundary::Asked;
 pub use boundary::Scripted;
+use boundary::{Asked, Log};
 
 pub struct Answering {
     scripted: Vec<Scripted>,
@@ -39,5 +40,12 @@ impl ShellFiller for &Answering {
 
     fn fanned(&self, _pass: Pass<'_, shell_ops::Fanned>, calls: &[Call]) -> Vec<Result<Ran, DispatchFailure>> {
         calls.iter().map(|call| self.answered(call)).collect()
+    }
+}
+
+impl fmt::Debug for Answering {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let log = self.asked.lock().unpoisoned();
+        fmt::Debug::fmt(&Log::from(log.as_slice()), formatter)
     }
 }

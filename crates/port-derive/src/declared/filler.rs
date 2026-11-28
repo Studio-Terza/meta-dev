@@ -1,9 +1,9 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
+use super::definition::{Declared, Rendered};
 use super::method::Method;
 use super::names::OpsName;
-use super::{Declared, Rendered};
 
 pub(crate) struct Filler;
 

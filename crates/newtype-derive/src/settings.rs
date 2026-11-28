@@ -3,14 +3,8 @@ mod setting;
 use syn::punctuated::Punctuated;
 use syn::{Attribute, Expr, Stmt, Token, Type, WherePredicate, parse_quote};
 
-pub(crate) use setting::Expressed;
 use setting::Setting;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Checking {
-    Unchecked,
-    Checked,
-}
+pub(crate) use setting::{Checking, Expressed};
 
 pub(crate) struct Settings {
     checking: Checking,

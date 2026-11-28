@@ -2,11 +2,9 @@ use std::fmt;
 use std::path::PathBuf;
 
 use dispatch_ports::{Call, Printed, Ran, Wall};
-use invariants::Unpoisoned;
 use newtype::Wrapping;
 use serde::Deserialize;
 
-use super::Answering;
 use crate::Count;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -46,6 +44,8 @@ pub(crate) struct Asked {
     directory: PathBuf,
     fed: Option<String>,
 }
+
+pub(crate) struct Log<'asked>(&'asked [Asked]);
 
 impl Scripted {
     const SPACE: &'static str = " ";
@@ -90,9 +90,15 @@ impl Asked {
     }
 }
 
-impl fmt::Debug for Answering {
+impl<'asked> From<&'asked [Asked]> for Log<'asked> {
+    fn from(log: &'asked [Asked]) -> Log<'asked> {
+        Log(log)
+    }
+}
+
+impl fmt::Debug for Log<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let log = self.asked.lock().unpoisoned();
+        let log = self.0;
         let shown: Vec<&Asked> = log
             .iter()
             .enumerate()

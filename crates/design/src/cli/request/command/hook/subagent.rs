@@ -21,7 +21,7 @@ use crate::cli::request::ignored::Ignored;
 use crate::cli::request::{Cause as Escalation, HeadRef, Item, Local, Target};
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
-use boundary::{At, Branched, Excerpt, JobId, Lacking, Pushed, Reminder, Report, Said};
+use boundary::{At, Branched, Excerpt, FailedJob, Lacking, Pushed, Reminder, Report, Said};
 pub(crate) use boundary::{Branch, CommitSha, Finishing};
 pub(crate) use hub::Hub;
 use hub::{Merge, Unopened, Verdict};
@@ -33,12 +33,6 @@ pub(crate) enum Ending {
     MergeMain { lacking: Lacking },
     Failing(Vec<FailedJob>),
     Escalate(Escalation),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct FailedJob {
-    check: CheckName,
-    job: JobId,
 }
 
 #[derive(Debug)]
@@ -176,28 +170,20 @@ impl Pushed {
         let before: Vec<CheckName> =
             store.read(FailedBefore::from(self.pull())).ignoring(Ignored::Unremembered).unwrap_or_default();
         let jobs = verdict.failed();
-        let names = jobs.iter().map(|job| job.check.clone()).collect();
+        let names = jobs.iter().map(|job| job.check().clone()).collect();
         store.write(Failing::new(self.pull(), names)).ignoring(Ignored::Unremembered);
-        let repeated = jobs.iter().find(|job| before.contains(&job.check));
+        let repeated = jobs.iter().find(|job| before.contains(job.check()));
         match (repeated, jobs.first()) {
-            (Some(job), _first) => Ending::Escalate(Escalation::RepeatFailure(job.check.clone())),
+            (Some(job), _first) => Ending::Escalate(Escalation::RepeatFailure(job.check().clone())),
             (None, Some(_first)) => Ending::Failing(jobs),
             (None, None) => Ending::Stop,
         }
     }
 }
 
-impl FailedJob {
-    pub(crate) fn new(check: CheckName, job: JobId) -> FailedJob {
-        FailedJob { check, job }
-    }
-}
-
 impl Logged {
-    const LINES: usize = 40;
-
     fn fetched<C: Clock, G: Shell>(pushed: Pushed, failed: &[FailedJob], hub: &Hub<'_, C, G>) -> Logged {
-        let jobs = failed.iter().map(|job| Excerpt::tailed(job.clone(), &hub.log(job.job))).collect();
+        let jobs = failed.iter().map(|job| Excerpt::tailed(job.clone(), &hub.log(job.job()))).collect();
         Logged { pushed, jobs }
     }
 }

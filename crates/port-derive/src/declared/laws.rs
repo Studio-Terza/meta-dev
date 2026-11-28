@@ -3,8 +3,8 @@ use quote::{format_ident, quote};
 use syn::{GenericArgument, PathArguments, ReturnType, Type, TypePath, TypeReference};
 
 use super::boundary::Spelling;
+use super::definition::{Declared, Rendered};
 use super::method::{Method, Parameter};
-use super::{Declared, Rendered};
 
 pub(crate) struct Laws;
 

@@ -4,7 +4,7 @@ use std::path::{Component, Path, PathBuf};
 
 use dispatch_ports::{Clock, Shell};
 use file_ports::{Files, Kind};
-use grammar_shell::{Construct, Directory, Edit, Edited, Editor, Nested, Unreadable};
+use grammar_shell::{Directory, Edit, Edited, Nested, Unreadable};
 use store_ports::Store;
 
 use super::super::Ground;
@@ -13,17 +13,7 @@ use crate::cli::failure::Failure;
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
 pub(crate) use boundary::Running;
-use boundary::{Input, Tool};
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum Refusal {
-    Unreadable,
-    Unroll(Nested),
-    InPlace { editor: Editor, within: Option<Construct> },
-    Wrote { path: PathBuf, repository: PathBuf, within: Option<Construct> },
-    Moved { path: PathBuf, repository: PathBuf, within: Option<Construct> },
-    Unresolved { written: PathBuf, within: Option<Construct> },
-}
+use boundary::{Input, Refusal, Tool};
 
 #[derive(Debug)]
 struct Judging<'ground, 'run, F: Files, S: Store> {

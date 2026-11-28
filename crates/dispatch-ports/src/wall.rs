@@ -15,6 +15,11 @@ pub enum Due {
 
 impl Deadline {
     #[must_use]
+    pub fn after(start: Wall, timeout: Timeout) -> Deadline {
+        Deadline(start.after(timeout))
+    }
+
+    #[must_use]
     pub fn due(self, now: Wall) -> Due {
         match now.cmp(&self.0) {
             std::cmp::Ordering::Less => Due::Pending,
