@@ -5,11 +5,12 @@ use std::process::{Child, ChildStdin, ChildStdout, Command, ExitStatus, Stdio};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, SystemTime};
 
-use dispatch_ports::{Call, Deadline, DispatchFailure, Due, Printed, Ran, ShellFiller, Wall, shell_ops};
 use invariants::Ignoring;
 use port_core::Pass;
 
-#[derive(Debug)]
+use crate::{Call, Deadline, DispatchFailure, Due, Ignored, Printed, Ran, ShellFiller, Wall, shell_ops};
+
+#[derive(Clone, Copy, Debug, Default)]
 pub struct SystemShell;
 
 #[derive(Debug)]
@@ -23,12 +24,6 @@ struct Running {
 enum Waited {
     Exited(ExitStatus),
     Overdue,
-}
-
-invariants::ignored! {
-    enum Ignored {
-        Unfed => "a program that exits before reading all its input is judged by its exit and output alone",
-    }
 }
 
 impl SystemShell {
