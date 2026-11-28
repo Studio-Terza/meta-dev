@@ -26,12 +26,8 @@ impl Rendered for Laws {
         let named = &declared.sealed_trait().ident;
         let call = format_ident!("{named}Call");
         let reply = format_ident!("{named}Reply");
-        let replayed: Vec<Replayed> = declared
-            .as_ref()
-            .iter()
-            .filter(|method| method.op_struct().is_some() && method.returned().replayable().is_some())
-            .map(|method| Laws::replayed(method, &call, &reply, caller))
-            .collect();
+        let replayed: Vec<Replayed> =
+            declared.as_ref().iter().map(|method| Laws::replayed(method, &call, &reply, caller)).collect();
         let variants = replayed.iter().map(|each| &each.variant);
         let replies = replayed.iter().map(|each| &each.reply);
         let arms = replayed.iter().map(|each| &each.arm);

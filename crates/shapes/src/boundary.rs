@@ -260,7 +260,7 @@ impl Damage {
             Damage::Kept => bytes.to_vec(),
             Damage::Cut => kept.collect(),
             Damage::Flipped => kept
-                .chain(bytes.get(at).map(|found| found ^ (byte | 1)))
+                .chain(bytes.get(at).map(|found| found ^ byte))
                 .chain(bytes.iter().skip(at.saturating_add(1)).copied())
                 .collect(),
             Damage::Inserted => kept.chain([byte]).chain(bytes.iter().skip(at).copied()).collect(),

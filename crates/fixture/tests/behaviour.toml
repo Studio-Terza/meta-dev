@@ -1,0 +1,8 @@
+# A paired case prints exactly its golden beside this file; an unpaired one has no golden, and the
+# cases it belongs to are refused rather than passed.
+
+[Paired.matching]
+printed = "shown\n"
+
+[Unpaired.goldenless]
+printed = "shown\n"

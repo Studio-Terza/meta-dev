@@ -1930,12 +1930,19 @@ members = ["provider", "consumer"]
 name = "provider"
 """
 "provider/src/lib.rs" = """
-pub struct Used;
+pub struct Used {
+    pub held: Held,
+    hidden: Hidden,
+}
+
+pub struct Held;
+
+pub struct Hidden;
 
 pub struct Unused;
 
 pub fn spoken() -> Used {
-    Used
+    Used { held: Held, hidden: Hidden }
 }
 
 pub(crate) fn kept() {}
