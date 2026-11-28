@@ -141,5 +141,8 @@ shell = [
     "echo $((1 + 2))",
     "cat <<A\nx",
     "cat <<A",
+    "cat <<''\nx\n",
+    "echo a > $(echo x)",
+    "find . -exec rm {}",
     "cat <<A >out\nx\nA\necho $(cd /w && echo b > c)",
 ]

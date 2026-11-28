@@ -6,8 +6,10 @@ use port_core::{Pass, Real};
 
 use crate::{ClockFiller, Pause, Wall, clock_ops};
 
-#[derive(Real, Debug)]
+#[derive(Debug)]
 pub struct SystemClock;
+
+impl Real for SystemClock {}
 
 impl ClockFiller for SystemClock {
     fn now(&self, _pass: Pass<'_, clock_ops::Now>) -> Wall {

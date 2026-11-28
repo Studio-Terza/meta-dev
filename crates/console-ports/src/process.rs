@@ -10,8 +10,10 @@ use crate::{Answer, Complaint, Environment, Heard, Shown};
 use invariants::Ignoring;
 use port_core::Real;
 
-#[derive(Real, Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Process;
+
+impl Real for Process {}
 
 impl Process {
     pub fn stream<Ended>(respond: impl FnOnce(Vec<OsString>, &mut Stdout, &mut Stderr) -> Ended) -> Ended {

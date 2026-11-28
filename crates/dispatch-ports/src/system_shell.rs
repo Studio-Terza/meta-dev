@@ -10,8 +10,10 @@ use port_core::{Pass, Real};
 
 use crate::{Call, Deadline, DispatchFailure, Due, Ignored, Printed, Ran, ShellFiller, Wall, shell_ops};
 
-#[derive(Real, Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct SystemShell;
+
+impl Real for SystemShell {}
 
 #[derive(Debug)]
 struct Running {

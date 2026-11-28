@@ -2,8 +2,8 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::Arc;
 
-use proc_macro2::{Ident, TokenTree};
-use syn::{Attribute, ItemStruct, ItemUse, Macro, Meta};
+use proc_macro2::Ident;
+use syn::{ItemImpl, ItemUse, Macro, Type};
 
 use crate::finding::{Finding, Found, Rule};
 use crate::graph::Graph;
@@ -33,21 +33,16 @@ enum Admitted {
 }
 
 impl RealAdapters<'_> {
-    const DERIVE: &'static str = "derive";
     const MARK: &'static str = "Real";
     const FIX: &'static str = "build over a double here, and wire the real adapter in a binary's main.rs";
 
-    fn marked(attribute: &Attribute) -> Option<()> {
-        let list = match &attribute.meta {
-            Meta::List(list) if list.path.is_ident(RealAdapters::DERIVE) => Some(list),
-            Meta::List(_) | Meta::Path(_) | Meta::NameValue(_) => None,
-        }?;
-        let mark = list
-            .tokens
-            .clone()
-            .into_iter()
-            .find(|tree| matches!(tree, TokenTree::Ident(ident) if ident == RealAdapters::MARK));
-        mark.map(|_mark| ())
+    fn marked(item: &ItemImpl) -> Option<&Ident> {
+        let (_negated, trait_path, _for) = item.trait_.as_ref()?;
+        trait_path.segments.last().filter(|mark| mark.ident == RealAdapters::MARK)?;
+        match item.self_ty.as_ref() {
+            Type::Path(adapter) => adapter.path.segments.last().map(|segment| &segment.ident),
+            _ => None,
+        }
     }
 
     fn named(&self, first: Option<&Ident>, name: &Ident) -> Option<AdapterFact> {
@@ -67,11 +62,11 @@ impl RealAdapters<'_> {
 }
 
 impl Hooks for RealAdapters<'_> {
-    fn item_struct(&mut self, item: &ItemStruct) -> Descent {
-        let real = self.source.ported().and(item.attrs.iter().find_map(RealAdapters::marked));
-        let fact = real.map(|()| AdapterFact::Real {
+    fn item_impl(&mut self, item: &ItemImpl) -> Descent {
+        let real = self.source.ported().and_then(|()| RealAdapters::marked(item));
+        let fact = real.map(|adapter| AdapterFact::Real {
             crate_name: self.source.package().crate_name(),
-            name: item.ident.to_string(),
+            name: adapter.to_string(),
         });
         self.facts.extend(fact);
         Descent::Into
