@@ -1,2 +1,7 @@
 [package]
 name = "clock-ports"
+
+[lib]
+test = false
+doctest = false
+bench = false

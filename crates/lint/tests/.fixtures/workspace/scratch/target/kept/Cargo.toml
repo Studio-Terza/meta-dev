@@ -1,2 +1,7 @@
 [package]
 name = "kept"
+
+[lib]
+test = false
+doctest = false
+bench = false

@@ -1,0 +1,9 @@
+Violations
+--- out
+test budget: 0 of 6 lines are tests, at most 18% may be
+--- err
+every lib and bin target opts out of test, doctest and bench:
+bare/Cargo.toml:1: src/lib.rs is built with no [lib] section; declare the target with test = false, doctest = false and bench = false
+binned/Cargo.toml:1: src/bin/extra.rs is built with no [[bin]] section; declare the target with test = false, doctest = false and bench = false
+binned/Cargo.toml:10: [[bin]] target without test, doctest and bench set false; declare the target with test = false, doctest = false and bench = false
+partial/Cargo.toml:5: [lib] target without test, doctest and bench set false; declare the target with test = false, doctest = false and bench = false
