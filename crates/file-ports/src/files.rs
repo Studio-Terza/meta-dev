@@ -16,6 +16,8 @@ pub trait Files {
 
     fn append(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure>;
 
+    fn remove(&self, path: &Path) -> Result<(), FileFailure>;
+
     fn create_directories(&self, path: &Path) -> Result<(), FileFailure>;
 
     fn entries(&self, directory: &Path) -> Result<Vec<PathBuf>, FileFailure>;

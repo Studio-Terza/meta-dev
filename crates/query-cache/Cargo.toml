@@ -10,18 +10,23 @@ test = false
 doctest = false
 
 [dependencies]
+file-ports = { path = "../file-ports" }
 hex.workspace = true
+invariants = { path = "../invariants" }
+port-core = { path = "../port-core" }
+proc-macro2.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 strum.workspace = true
+syn.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+design-messages = { path = "../design-messages" }
 fixture = { path = "../fixture" }
-proc-macro2.workspace = true
-rusqlite = { version = "0.37.0", default-features = false, features = ["column_metadata"] }
-syn.workspace = true
+sqlite-ports = { path = "../sqlite-ports" }
+store-ports = { path = "../store-ports" }
 
 [lints]
 workspace = true

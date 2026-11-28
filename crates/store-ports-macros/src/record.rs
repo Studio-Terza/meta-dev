@@ -1,66 +1,58 @@
-mod boundary;
-
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::{Error, Ident, LitStr, Type, Visibility};
+use syn::parse::{Parse, ParseStream};
+use syn::{Error, Ident, Type, Visibility};
 
 use crate::expanded::Expanding;
-use query_cache::Origin;
+use query_cache::{Origin, Placed, Recorded};
 
 #[derive(Debug)]
-pub(crate) struct Record {
-    visibility: Visibility,
-    row: Ident,
-    table: LitStr,
-    fields: Vec<Placed>,
-}
+pub(crate) struct Record(Recorded);
 
-#[derive(Debug)]
-struct Placed {
-    name: Ident,
-    column: Type,
-    origin: Origin,
-}
-
-impl Placed {
-    fn bound(&self) -> TokenStream {
-        let Placed { name, column, .. } = self;
-        quote!(#name: #column)
+impl Parse for Record {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Record> {
+        input.parse().map(Record)
     }
 }
 
 impl Expanding for Record {
     fn expansion(self) -> syn::Result<TokenStream> {
-        let Record { visibility, row, table, fields } = self;
+        let Record(recorded) = self;
+        let (row, table, fields) = (recorded.row(), recorded.table(), recorded.fields());
+        let bound = |field: &Placed| {
+            let (name, column) = (field.name(), field.column());
+            quote!(#name: #column)
+        };
         let key = fields
             .iter()
-            .find(|field| Origin::KEYS.contains(&field.origin))
-            .ok_or_else(|| Error::new(table.span(), Record::KEYLESS))?;
-        let [create, fetch, update, delete, list] = Record::statements(&table, &fields);
-        let overwrites = fields.iter().map(|field| field.overwrite(&table));
-        let names: Vec<&Ident> = fields.iter().map(|field| &field.name).collect();
+            .find(|field| Origin::KEYS.contains(&field.origin()))
+            .ok_or_else(|| Error::new(table.span(), Recorded::KEYLESS))?;
+        let [create, fetch, update, delete, list] = recorded.statements();
+        let overwrites = fields.iter().map(|field| field.overwrite(table));
+        let names: Vec<&Ident> = fields.iter().map(Placed::name).collect();
         let fresh = format_ident!("{}New", row);
-        let given: Vec<&Placed> = fields.iter().filter(|field| Origin::INSERTED.contains(&field.origin)).collect();
-        let given_names: Vec<&Ident> = given.iter().map(|field| &field.name).collect();
-        let given_types: Vec<&Type> = given.iter().map(|field| &field.column).collect();
-        let inserted = given.iter().map(|field| field.bound());
+        let given: Vec<&Placed> = fields.iter().filter(|field| Origin::INSERTED.contains(&field.origin())).collect();
+        let given_names: Vec<&Ident> = given.iter().map(|field| field.name()).collect();
+        let given_types: Vec<&Type> = given.iter().map(|field| field.column()).collect();
+        let inserted = given.iter().map(|field| bound(field));
         let revised_fields: Vec<TokenStream> = fields
             .iter()
             .map(|field| {
-                let name = &field.name;
-                Some(field.origin).filter(|origin| *origin == Origin::Given).map_or_else(
+                let name = field.name();
+                Some(field.origin()).filter(|origin| *origin == Origin::Given).map_or_else(
                     || quote!(#name: ::core::clone::Clone::clone(&self.#name)),
                     |_| quote!(#name: ::core::clone::Clone::clone(&new.#name)),
                 )
             })
             .collect();
-        let assigned = fields.iter().filter(|field| Origin::ASSIGNED.contains(&field.origin)).map(Placed::bound);
-        let key_name = &key.name;
-        let key_type = &key.column;
-        let keyed = key.bound();
+        let assigned = fields.iter().filter(|field| Origin::ASSIGNED.contains(&field.origin())).map(bound);
+        let key_name = key.name();
+        let key_type = key.column();
+        let keyed = bound(key);
         let query = quote!(::store_ports::query!);
         let prepared = quote!(::store_ports::Prepared);
-        let reachable = match &visibility {
+        let visibility = recorded.visibility();
+        let reachable = match visibility {
             Visibility::Inherited => TokenStream::new(),
             Visibility::Public(_) | Visibility::Restricted(_) => quote!(pub),
         };

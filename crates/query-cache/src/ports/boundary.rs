@@ -1,24 +1,13 @@
 use std::env;
-use std::fs;
-use std::io;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct Disk;
+pub(crate) struct Manifest;
 
-impl Disk {
-    const MANIFEST: &'static str = "CARGO_MANIFEST_DIR";
+impl Manifest {
+    const DIRECTORY: &'static str = "CARGO_MANIFEST_DIR";
 
-    pub(crate) fn manifest() -> PathBuf {
-        env::var_os(Self::MANIFEST).map_or_default(PathBuf::from)
-    }
-
-    pub(crate) fn text(path: &Path) -> io::Result<String> {
-        fs::read_to_string(path)
-    }
-
-    #[must_use]
-    pub(crate) fn held(path: PathBuf) -> Option<PathBuf> {
-        Some(path).filter(|candidate| candidate.is_file())
+    pub(crate) fn directory() -> PathBuf {
+        env::var_os(Self::DIRECTORY).map_or_default(PathBuf::from)
     }
 }

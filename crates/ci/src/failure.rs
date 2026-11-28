@@ -7,9 +7,11 @@ use crate::boundary::{Said, Stage};
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum Failure {
     #[error(
-        "usage: ci timed <limits> <stage> [--since <mark>] <program> [<argument>...]\n       ci mutants-plan <workspace> <diff> <changed> <unselected> <output>"
+        "usage: ci timed <limits> <stage> [--since <mark>] <program> [<argument>...]\n       ci mutants-plan <workspace> <diff> <changed> <unselected> <output>\n       ci queries <workspace> [--record]"
     )]
     Usage,
+    #[error("cannot check the query cache: {0}")]
+    Queries(#[from] query_cache::Uncached),
     #[error("cannot read {}: {source}", path.display())]
     Unreadable { path: PathBuf, source: io::Error },
     #[error("cannot write {}: {source}", path.display())]

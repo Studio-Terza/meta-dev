@@ -41,6 +41,10 @@ impl FilesFiller for Disk {
         Ok(OpenOptions::new().append(true).create(true).open(path)?.write_all(bytes.as_ref())?)
     }
 
+    fn remove(&self, _pass: Pass<'_, files_ops::Remove>, path: &Path) -> Result<(), FileFailure> {
+        Ok(fs::remove_file(path)?)
+    }
+
     fn create_directories(
         &self,
         _pass: Pass<'_, files_ops::CreateDirectories>,

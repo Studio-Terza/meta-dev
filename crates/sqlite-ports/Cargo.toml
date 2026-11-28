@@ -12,7 +12,8 @@ doctest = false
 [dependencies]
 invariants = { path = "../invariants" }
 port-core = { path = "../port-core" }
-rusqlite = { version = "0.37.0", default-features = false, features = ["serialize"] }
+query-cache = { path = "../query-cache" }
+rusqlite = { version = "0.37.0", default-features = false, features = ["column_metadata", "serialize"] }
 sha2.workspace = true
 store-ports = { path = "../store-ports" }
 

@@ -54,11 +54,17 @@ name = "ci"
 version = "0.1.0"
 dependencies = [
  "console-ports",
+ "design-messages",
+ "file-ports",
  "fixture",
  "grammar",
  "invariants",
+ "port-core",
+ "query-cache",
  "serde",
  "serde_json",
+ "sqlite-ports",
+ "store-ports",
  "tempfile",
  "thiserror",
  "toml",
@@ -625,13 +631,18 @@ dependencies = [
 name = "query-cache"
 version = "0.1.0"
 dependencies = [
+ "design-messages",
+ "file-ports",
  "fixture",
  "hex",
+ "invariants",
+ "port-core",
  "proc-macro2",
- "rusqlite",
  "serde",
  "serde_json",
  "sha2",
+ "sqlite-ports",
+ "store-ports",
  "strum",
  "syn",
  "thiserror",
@@ -837,6 +848,7 @@ version = "0.1.0"
 dependencies = [
  "invariants",
  "port-core",
+ "query-cache",
  "rusqlite",
  "sha2",
  "store-ports",
@@ -864,7 +876,8 @@ dependencies = [
 name = "store-ports-macros"
 version = "0.1.0"
 dependencies = [
- "invariants",
+ "file-ports",
+ "port-core",
  "proc-macro2",
  "query-cache",
  "quote",

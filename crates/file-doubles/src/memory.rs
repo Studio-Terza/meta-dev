@@ -106,6 +106,10 @@ impl FilesFiller for Memory {
         self.put(path, Bytes::new(joined))
     }
 
+    fn remove(&self, _pass: Pass<'_, files_ops::Remove>, path: &Path) -> Result<(), FileFailure> {
+        self.files.held().remove(path).map(|_removed| ()).ok_or_else(Self::missing)
+    }
+
     fn create_directories(
         &self,
         _pass: Pass<'_, files_ops::CreateDirectories>,

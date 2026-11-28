@@ -1,32 +1,32 @@
 mod bound;
-mod ignored;
 mod typed;
 
+use file_ports::Disk;
+use port_core::Run;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::parse::{Parse, ParseStream};
+use syn::parse::{Parse, ParseStream, Parser};
 use syn::punctuated::Punctuated;
-use syn::{LitStr, Token, Type};
+use syn::{LitStr, Token};
 
 use crate::expanded::Expanding;
-use crate::query::ignored::Ignored;
 use bound::Bound;
-use invariants::Ignoring;
-use query_cache::{Entry, Unexpanded};
+use query_cache::{Entry, Invoked, Unexpanded};
 use typed::{ColumnName, Typed};
 
 #[derive(Debug)]
 pub(crate) struct Query {
-    row: Option<Type>,
-    source: LitStr,
+    invoked: Invoked,
     bounds: Punctuated<Bound, Token![,]>,
 }
 
 impl Expanding for Query {
     fn expansion(self) -> syn::Result<TokenStream> {
-        let Query { row, source, bounds } = self;
+        let Query { invoked, bounds } = self;
+        let (row, source) = (invoked.row(), invoked.source());
         let failed = |unexpanded: Unexpanded| syn::Error::new(source.span(), unexpanded);
-        let entry: Entry<ColumnName> = Entry::found(&source.value()).map_err(failed)?;
+        let run = Run::root();
+        let entry: Entry<ColumnName> = Entry::found(&run.port(Disk), &source.value()).map_err(failed)?;
         entry.bound(bounds.len()).map_err(failed)?;
         let sql = LitStr::new(&source.value(), source.span());
         let arguments: Vec<TokenStream> = bounds.iter().map(Bound::encoded).collect();
@@ -58,25 +58,10 @@ impl Expanding for Query {
     }
 }
 
-impl Query {
-    fn row(input: ParseStream<'_>) -> syn::Result<Option<Type>> {
-        input.fork().parse::<LitStr>().ignoring(Ignored::RowTypeFirst).map_or_else(
-            || {
-                let row = input.parse::<Type>()?;
-                input.parse::<Token![,]>()?;
-                Ok(Some(row))
-            },
-            |_| Ok(None),
-        )
-    }
-}
-
 impl Parse for Query {
     fn parse(input: ParseStream<'_>) -> syn::Result<Query> {
-        let row = Query::row(input)?;
-        let source = input.parse()?;
-        input.parse::<Option<Token![,]>>()?;
-        let bounds = Punctuated::parse_terminated(input)?;
-        Ok(Query { row, source, bounds })
+        let invoked = input.parse::<Invoked>()?;
+        let bounds = Punctuated::parse_terminated.parse2(invoked.rest().clone())?;
+        Ok(Query { invoked, bounds })
     }
 }

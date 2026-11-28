@@ -75,6 +75,10 @@ impl FilesFiller for Rerooted {
         Disk.append(pass, &self.real(path), bytes)
     }
 
+    fn remove(&self, pass: Pass<'_, files_ops::Remove>, path: &Path) -> Result<(), FileFailure> {
+        Disk.remove(pass, &self.real(path))
+    }
+
     fn create_directories(&self, pass: Pass<'_, files_ops::CreateDirectories>, path: &Path) -> Result<(), FileFailure> {
         Disk.create_directories(pass, &self.real(path))
     }

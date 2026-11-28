@@ -1,3 +1,4 @@
+mod boundary;
 mod failed;
 mod opened;
 mod place;

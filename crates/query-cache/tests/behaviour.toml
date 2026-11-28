@@ -1,3 +1,9 @@
+[Workspace.whole]
+root = "../.."
+
+[Cached.described.entry]
+query = "SELECT a, b, c FROM t"
+
 [Cached.described.entry.describe]
 columns = [
     { name = "a", type_info = "Text" },
@@ -6,6 +12,9 @@ columns = [
 ]
 parameters = { Right = 0 }
 nullable = [true, false]
+
+[Cached.spelled.entry]
+query = "UPDATE r SET body = ?1 WHERE id = ?2"
 
 [Cached.spelled.entry.describe]
 columns = []

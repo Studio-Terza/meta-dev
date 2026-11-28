@@ -11,7 +11,8 @@ test = false
 doctest = false
 
 [dependencies]
-invariants = { path = "../invariants" }
+file-ports = { path = "../file-ports" }
+port-core = { path = "../port-core" }
 query-cache = { path = "../query-cache" }
 proc-macro2.workspace = true
 quote.workspace = true
