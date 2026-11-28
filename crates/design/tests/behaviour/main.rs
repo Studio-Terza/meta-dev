@@ -187,8 +187,6 @@ impl Home {
     }
 }
 
-type Told = Result<String, Untold>;
-
 #[derive(Debug, thiserror::Error)]
 enum Untold {
     #[error("story {story:?} failed: {failed}")]
@@ -198,7 +196,7 @@ enum Untold {
 }
 
 impl Story {
-    fn joined(running: Vec<thread::ScopedJoinHandle<'_, Told>>) -> Vec<Told> {
+    fn joined(running: Vec<thread::ScopedJoinHandle<'_, Result<String, Untold>>>) -> Vec<Result<String, Untold>> {
         running
             .into_iter()
             .map(|handle| match handle.join() {
@@ -239,8 +237,8 @@ impl Story {
 #[test]
 fn every_story_says_what_its_golden_says() -> Result<(), Failed> {
     let stories = Story::all()?;
-    let told: Vec<Told> = thread::scope(|scope| {
-        let running: Vec<thread::ScopedJoinHandle<'_, Told>> = stories
+    let told: Vec<Result<String, Untold>> = thread::scope(|scope| {
+        let running: Vec<thread::ScopedJoinHandle<'_, Result<String, Untold>>> = stories
             .iter()
             .map(|story| {
                 scope.spawn(move || {

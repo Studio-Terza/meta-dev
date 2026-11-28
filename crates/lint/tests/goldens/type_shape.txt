@@ -26,3 +26,6 @@ src/variants.rs:3: tuple in a signature or field; values that travel together ar
 src/variants.rs:4: Result with a String error; errors are an enum with thiserror
 tests go through public APIs:
 src/fine.rs:5: test code in src; move it to the package's tests directory and call the public API from there
+no hidden types: a type stays in the compiler's view, never erased to Any, renamed by an alias or carried as untyped data:
+src/spellings.rs:3: type R renames a type; name the type itself, or make the alias a newtype
+src/spellings.rs:4: type P renames a type; name the type itself, or make the alias a newtype

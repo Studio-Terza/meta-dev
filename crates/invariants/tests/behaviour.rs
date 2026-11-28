@@ -1,5 +1,5 @@
 use std::panic;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use invariants::{Ignoring, Rejoined, Unpoisoned, ignored, invariant, invariants};
 
@@ -19,9 +19,18 @@ ignored! {
 const POISONED: &str =
     "no thread panics while it holds a lock, so no lock is poisoned; were one, its state may be half-written";
 
-struct Caught;
+struct Caught(Arc<Mutex<Vec<String>>>);
 
 impl Caught {
+    fn heard() -> Caught {
+        let heard: Arc<Mutex<Vec<String>>> = Arc::default();
+        let kept = Arc::clone(&heard);
+        panic::set_hook(Box::new(move |panicked| {
+            kept.lock().unpoisoned().extend(panicked.payload_as_str().map(str::to_owned));
+        }));
+        Caught(heard)
+    }
+
     fn narrowed(count: u16) -> u8 {
         match u8::try_from(count) {
             Ok(narrow) => narrow,
@@ -29,16 +38,17 @@ impl Caught {
         }
     }
 
-    fn said(outcome: std::thread::Result<u8>) -> String {
+    fn said(&self, outcome: std::thread::Result<u8>) -> String {
         match outcome {
             Ok(value) => format!("gave {value}"),
-            Err(payload) => payload.downcast::<String>().into_iter().map(|text| *text).collect(),
+            Err(_panicked) => self.0.lock().unpoisoned().pop().unwrap_or_default(),
         }
     }
 }
 
 #[test]
 fn invariants_hold_quietly_and_break_loudly_with_their_text_and_detail() {
+    let caught = Caught::heard();
     let lock = Mutex::new(7_u8);
     let cases: [(fn() -> u8, String); 4] = [
         (|| Caught::narrowed(30), "gave 30".to_owned()),
@@ -55,25 +65,24 @@ fn invariants_hold_quietly_and_break_loudly_with_their_text_and_detail() {
             "broken invariant: the count fits a byte: number too large to fit in target type".to_owned(),
         ),
     ];
-    let said: Vec<String> = cases.iter().map(|(run, _)| Caught::said(panic::catch_unwind(run))).collect();
+    let said: Vec<String> = cases.iter().map(|(run, _)| caught.said(panic::catch_unwind(run))).collect();
     assert_eq!(said, cases.map(|(_, want)| want));
     let checked = [2_u8 > 1, 1_u8 > 2].map(|holds| {
-        Caught::said(panic::catch_unwind(|| {
+        caught.said(panic::catch_unwind(|| {
             invariant!(holds, Invariant::Positive);
             1
         }))
     });
     assert_eq!(checked, ["gave 1", "broken invariant: the count is positive"]);
-    let held = Caught::said(panic::catch_unwind(|| invariant!(holding u8::try_from(30_u16), Invariant::Narrow)));
-    let poisoning = Caught::said(panic::catch_unwind(|| {
+    let held = caught.said(panic::catch_unwind(|| invariant!(holding u8::try_from(30_u16), Invariant::Narrow)));
+    let poisoning = caught.said(panic::catch_unwind(|| {
         let _held = lock.lock().unpoisoned();
         invariant!(broken Invariant::Positive)
     }));
-    let poisoned = Caught::said(panic::catch_unwind(|| *lock.lock().unpoisoned()));
-    let joined = Caught::said(panic::catch_unwind(|| std::thread::spawn(|| 5_u8).join().rejoined()));
-    let carried = Caught::said(panic::catch_unwind(|| {
-        std::thread::spawn(|| invariant!(broken Invariant::Narrow)).join().rejoined()
-    }));
+    let poisoned = caught.said(panic::catch_unwind(|| *lock.lock().unpoisoned()));
+    let joined = caught.said(panic::catch_unwind(|| std::thread::spawn(|| 5_u8).join().rejoined()));
+    let carried = caught
+        .said(panic::catch_unwind(|| std::thread::spawn(|| invariant!(broken Invariant::Narrow)).join().rejoined()));
     assert_eq!(
         [held, poisoning, poisoned, joined, carried],
         [

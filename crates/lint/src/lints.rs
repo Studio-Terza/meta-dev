@@ -1,6 +1,7 @@
 mod bool_methods;
 mod expression_flow;
 mod hand_measures;
+mod hidden_types;
 mod manual_iteration;
 mod module_cycles;
 mod named_lifetimes;
@@ -19,6 +20,7 @@ mod vec_out_params;
 pub(crate) use bool_methods::BoolMethods;
 pub(crate) use expression_flow::ExpressionFlow;
 pub(crate) use hand_measures::HandMeasures;
+pub(crate) use hidden_types::HiddenTypes;
 pub(crate) use manual_iteration::ManualIteration;
 pub(crate) use module_cycles::{ModuleCycles, ModuleFacts};
 pub(crate) use named_lifetimes::NamedLifetimes;

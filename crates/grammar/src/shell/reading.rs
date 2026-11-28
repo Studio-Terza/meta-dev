@@ -31,8 +31,6 @@ struct Enclosed {
     length: usize,
 }
 
-type Step<'text> = ControlFlow<Result<Enclosed, Unreadable>, Reading<'text>>;
-
 #[derive(Debug, Default)]
 struct Words {
     read: Vec<Simple>,
@@ -114,7 +112,7 @@ impl<'text> Reading<'text> {
         }
     }
 
-    fn step(self) -> Step<'text> {
+    fn step(self) -> ControlFlow<Result<Enclosed, Unreadable>, Reading<'text>> {
         let Reading { lexing, words, closer } = self;
         match lexing {
             Lexing::Bare(mut lexer) => match lexer.next() {
@@ -141,11 +139,16 @@ impl Words {
     const UNAIMED: &'static str = "a redirection with no target";
     const GLOBS: [char; 3] = ['*', '?', '['];
 
-    fn refused<'text>(span: &str) -> Step<'text> {
+    fn refused<'text>(span: &str) -> ControlFlow<Result<Enclosed, Unreadable>, Reading<'text>> {
         ControlFlow::Break(Err(Unreadable { span: span.to_owned() }))
     }
 
-    fn bare<'text>(self, lexeme: Lexeme<'text>, mut lexer: Lexer<'text, Lexeme<'text>>, closer: Closer) -> Step<'text> {
+    fn bare<'text>(
+        self,
+        lexeme: Lexeme<'text>,
+        mut lexer: Lexer<'text, Lexeme<'text>>,
+        closer: Closer,
+    ) -> ControlFlow<Result<Enclosed, Unreadable>, Reading<'text>> {
         let slice = lexer.slice();
         match lexeme {
             Lexeme::Blank | Lexeme::Duplicate => self.worded().barely(lexer, closer),
@@ -206,7 +209,7 @@ impl Words {
         inside: Inside<'text>,
         mut lexer: Lexer<'text, Inside<'text>>,
         closer: Closer,
-    ) -> Step<'text> {
+    ) -> ControlFlow<Result<Enclosed, Unreadable>, Reading<'text>> {
         let slice = lexer.slice();
         match inside {
             Inside::End => self.barely(lexer.morph(), closer),
@@ -233,11 +236,19 @@ impl Words {
         }
     }
 
-    fn barely<'text>(self, lexer: Lexer<'text, Lexeme<'text>>, closer: Closer) -> Step<'text> {
+    fn barely<'text>(
+        self,
+        lexer: Lexer<'text, Lexeme<'text>>,
+        closer: Closer,
+    ) -> ControlFlow<Result<Enclosed, Unreadable>, Reading<'text>> {
         ControlFlow::Continue(Reading { lexing: Lexing::Bare(lexer), words: self, closer })
     }
 
-    fn inwardly<'text>(self, lexer: Lexer<'text, Inside<'text>>, closer: Closer) -> Step<'text> {
+    fn inwardly<'text>(
+        self,
+        lexer: Lexer<'text, Inside<'text>>,
+        closer: Closer,
+    ) -> ControlFlow<Result<Enclosed, Unreadable>, Reading<'text>> {
         ControlFlow::Continue(Reading { lexing: Lexing::Inside(lexer), words: self, closer })
     }
 
@@ -261,7 +272,12 @@ impl Words {
         Words { word: Some(begun.extended(text, quoting, expanding, part)), ..self }
     }
 
-    fn redirected<'text>(self, redirect: Redirect, lexer: Lexer<'text, Lexeme<'text>>, closer: Closer) -> Step<'text> {
+    fn redirected<'text>(
+        self,
+        redirect: Redirect,
+        lexer: Lexer<'text, Lexeme<'text>>,
+        closer: Closer,
+    ) -> ControlFlow<Result<Enclosed, Unreadable>, Reading<'text>> {
         match self.redirect {
             Some(_pending) => Words::refused(lexer.slice()),
             None => Words { redirect: Some(redirect), ..self }.barely(lexer, closer),
@@ -307,7 +323,7 @@ impl Words {
         Ok(Words { read: kept, simple: Simple::default(), word, redirect: None, pending })
     }
 
-    fn finished<'text>(self, length: usize) -> Step<'text> {
+    fn finished<'text>(self, length: usize) -> ControlFlow<Result<Enclosed, Unreadable>, Reading<'text>> {
         match self.worded().separated() {
             Ok(words) if words.pending.is_empty() => ControlFlow::Break(Ok(Enclosed { simples: words.read, length })),
             Ok(_unbodied) => Words::refused(Words::UNBODIED),
@@ -315,7 +331,11 @@ impl Words {
         }
     }
 
-    fn bodied<'text>(self, mut lexer: Lexer<'text, Lexeme<'text>>, closer: Closer) -> Step<'text> {
+    fn bodied<'text>(
+        self,
+        mut lexer: Lexer<'text, Lexeme<'text>>,
+        closer: Closer,
+    ) -> ControlFlow<Result<Enclosed, Unreadable>, Reading<'text>> {
         let rest = lexer.source().get(lexer.span().end..).unwrap_or_default();
         let Words { read, pending, .. } = self;
         let fed = pending.iter().try_fold(Feeding { read, length: 0 }, |feeding, awaited| feeding.fed(awaited, rest));

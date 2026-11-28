@@ -1,0 +1,12 @@
+Violations
+--- out
+test budget: 0 of 28 lines are tests, at most 18% may be
+--- err
+no dyn: every type is known at compile time, so code takes a generic, returns impl Trait or names an enum instead of a trait object:
+src/erased.rs:3: dyn trait object; take a generic, return impl Trait, or list the known types in an enum
+no hidden types: a type stays in the compiler's view, never erased to Any, renamed by an alias or carried as untyped data:
+src/erased.rs:3: Any erases a type; take a generic or name an enum of the known types
+src/erased.rs:6: TypeId erases a type; take a generic or name an enum of the known types
+src/erased.rs:7: type_id erases a type; take a generic or name an enum of the known types
+src/erased.rs:11: downcast erases a type; take a generic or name an enum of the known types
+src/renamed.rs:1: type Count renames a type; name the type itself, or make the alias a newtype

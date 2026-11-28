@@ -1,14 +1,14 @@
 use syn::{ItemTrait, Token, TraitItem, TraitItemFn, TypeParamBound, Visibility, parse_quote};
 
 use super::method::Method;
-use super::names::{CallerName, FillerName, OpsName};
+use super::names::{CallerRole, FillerRole, Name, OpsRole};
 
 #[derive(Debug)]
 pub struct Declared {
     item: ItemTrait,
-    caller: CallerName,
-    filler: FillerName,
-    ops: OpsName,
+    caller: Name<CallerRole>,
+    filler: Name<FillerRole>,
+    ops: Name<OpsRole>,
     methods: Vec<Method>,
 }
 
@@ -27,15 +27,15 @@ impl Declared {
         &self.item.vis
     }
 
-    pub(crate) fn caller_name(&self) -> &CallerName {
+    pub(crate) fn caller_name(&self) -> &Name<CallerRole> {
         &self.caller
     }
 
-    pub(crate) fn filler_name(&self) -> &FillerName {
+    pub(crate) fn filler_name(&self) -> &Name<FillerRole> {
         &self.filler
     }
 
-    pub(crate) fn ops_name(&self) -> &OpsName {
+    pub(crate) fn ops_name(&self) -> &Name<OpsRole> {
         &self.ops
     }
 
@@ -43,9 +43,9 @@ impl Declared {
         let mut item = Self::sealed(declared);
         let methods = item.items.iter_mut().filter_map(Self::required).map(Method::declared).collect();
         Declared {
-            caller: CallerName::from(&item.ident),
-            filler: FillerName::from(&item.ident),
-            ops: OpsName::from(&item.ident),
+            caller: Name::from(&item.ident),
+            filler: Name::from(&item.ident),
+            ops: Name::from(&item.ident),
             methods,
             item,
         }

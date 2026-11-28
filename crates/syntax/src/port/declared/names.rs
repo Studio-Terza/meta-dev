@@ -24,10 +24,6 @@ pub struct Name<Of: Role> {
     role: PhantomData<Of>,
 }
 
-pub type CallerName = Name<CallerRole>;
-pub type FillerName = Name<FillerRole>;
-pub type OpsName = Name<OpsRole>;
-
 impl Role for CallerRole {
     fn spelled(caller: &Ident) -> Ident {
         caller.clone()
