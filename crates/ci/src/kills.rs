@@ -3,10 +3,13 @@ mod outcomes;
 mod report;
 
 use std::ffi::OsString;
-use std::io::Write;
 use std::path::PathBuf;
+use std::process::ExitCode;
 
-use crate::exit::Exit;
+use console_ports::Answer;
+use json_ports::Json;
+use pipeline::Pipeline;
+
 use crate::failure::Failure;
 use crate::kills::outcomes::{Ran, Shard};
 use crate::kills::report::{Matrix, Report};
@@ -18,16 +21,44 @@ pub struct Kills {
     shards: Vec<PathBuf>,
 }
 
+#[derive(Debug)]
+struct KillMatrix;
+
+#[derive(Debug)]
+struct Reported {
+    json: String,
+    summary: String,
+}
+
 impl Kills {
     pub(crate) fn new(report: &OsString, shards: &[OsString]) -> Kills {
         Kills { report: PathBuf::from(report), shards: shards.iter().map(PathBuf::from).collect() }
     }
 
-    pub(crate) fn run(&self, out: &mut impl Write) -> Result<Exit, Failure> {
+    pub(crate) fn answered(&self) -> Result<Answer, Failure> {
         let shards = self.shards.iter().map(|shard| Shard::read(shard)).collect::<Result<Vec<Vec<Ran>>, Failure>>()?;
-        let report = Report::from(shards.iter().flatten().fold(Matrix::default(), Matrix::with));
-        Disk::write(&self.report, &report.json()?)?;
-        writeln!(out, "{report}")?;
-        Ok(Exit::Passed)
+        let reported = KillMatrix.run(shards.into_iter().flatten())?;
+        Disk::write(&self.report, &reported.json)?;
+        Ok(Answer::new(ExitCode::SUCCESS).showing(reported.summary))
+    }
+}
+
+impl Pipeline for KillMatrix {
+    type Unit = Ran;
+    type Parsed = Matrix;
+    type Measured = Report;
+    type Act = Result<Reported, Failure>;
+
+    fn parsed(&self, ran: Ran) -> Matrix {
+        Matrix::of(&ran)
+    }
+
+    fn measured(&self, matrix: Matrix) -> Report {
+        Report::from(matrix)
+    }
+
+    fn act(&self, report: Report) -> Result<Reported, Failure> {
+        let json = Json::pretty(&report).map_err(Failure::Unserialized)?;
+        Ok(Reported { json: [json.as_str(), "\n"].concat(), summary: format!("{report}\n") })
     }
 }
