@@ -5,6 +5,7 @@ use std::process::ExitCode;
 use std::{env, fs};
 
 use ci::Cli;
+use dispatch_ports::{Call, Clock, Deadline, Shell, SystemClock, SystemShell, Timeout};
 use fixture::{Failed, Fixture, Rows, Spelled};
 use serde::Deserialize;
 use tempfile::TempDir;
@@ -23,10 +24,35 @@ struct Run {
     written: BTreeMap<PathBuf, Spelled>,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug)]
+#[derive(Fixture, Deserialize, Debug)]
+struct Binary {
+    program: Spelled,
+    arguments: Vec<Spelled>,
+    exit: Exit,
+    timeout: Timeout,
+}
+
+#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 enum Exit {
     Passed,
     Failed,
+}
+
+#[test]
+fn the_ci_binary_exits_as_its_command_line_does() -> Result<(), Failed> {
+    Rows::<Binary>::read()?.iter().try_for_each(|binary| {
+        let directory = TempDir::new()?;
+        let run = port_core::Run::root();
+        let clock = run.port(SystemClock);
+        let shell = run.port(SystemShell);
+        let arguments = binary.arguments.iter().map(ToString::to_string).collect();
+        let program: &'static str = Box::leak(env::var(binary.program.as_str())?.into_boxed_str());
+        let call =
+            Call::new(program, arguments, directory.path().to_path_buf(), Deadline::after(clock.now(), binary.timeout));
+        let exit = shell.ran(&call)?.succeeded().map_or(Exit::Failed, |_printed| Exit::Passed);
+        assert_eq!((&binary.arguments, exit), (&binary.arguments, binary.exit));
+        Ok(())
+    })
 }
 
 #[test]

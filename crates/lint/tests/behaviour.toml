@@ -1,3 +1,15 @@
+[[Binary]]
+program = "CARGO_BIN_EXE_lint"
+arguments = []
+exit = "Failed"
+timeout = 60
+
+[[Binary]]
+program = "CARGO_BIN_EXE_lint"
+arguments = ["absent"]
+exit = "Failed"
+timeout = 60
+
 [Lint.bad_manifest]
 arguments = ["."]
 verdict = "Refused"
@@ -2008,6 +2020,8 @@ union Overlay {
 type Alias = u8;
 
 const PLAIN: Option<Alias> = None;
+
+static SHARED: Option<Alias> = None;
 
 impl Unmarked {
     const AFTER: usize = 2;

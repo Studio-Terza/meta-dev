@@ -30,7 +30,6 @@ struct Counting {
 enum Reading {
     Waiting,
     Inside,
-    Read,
 }
 
 impl ManualIteration {
@@ -76,9 +75,8 @@ impl ManualIteration {
         }
     }
 
-    fn read(&mut self, expr: &Expr, reading: Reading) {
-        let current = self.counting.last_mut().filter(|counting| ptr::eq(counting.init, expr));
-        current.map_or_default(|counting| counting.reached(reading));
+    fn entered(&mut self, expr: &Expr) {
+        self.counting.last_mut().filter(|counting| ptr::eq(counting.init, expr)).map_or_default(Counting::reached);
     }
 
     fn mutable_init(local: &Local) -> Option<&Expr> {
@@ -145,12 +143,8 @@ impl Hooks for ManualIteration {
     }
 
     fn expr(&mut self, expr: &Expr) -> Descent {
-        self.read(expr, Reading::Inside);
+        self.entered(expr);
         Descent::Into
-    }
-
-    fn left_expr(&mut self, expr: &Expr) {
-        self.read(expr, Reading::Read);
     }
 
     fn expr_method_call(&mut self, call: &ExprMethodCall) -> Descent {
@@ -161,8 +155,8 @@ impl Hooks for ManualIteration {
 }
 
 impl Counting {
-    fn reached(&mut self, reading: Reading) {
-        self.reading = reading;
+    fn reached(&mut self) {
+        self.reading = Reading::Inside;
     }
 
     fn counted(&mut self, constructs: Option<()>) {

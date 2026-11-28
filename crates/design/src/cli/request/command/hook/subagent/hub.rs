@@ -220,7 +220,7 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
         None
     }
 
-    pub fn requested(&self, pull: PullNumber) -> Result<(), UnreadStep> {
+    pub(crate) fn requested(&self, pull: PullNumber) -> Result<(), UnreadStep> {
         let listed = self.listed(pull).unwrap_or_default();
         let number = pull.to_string();
         let label = |change: &str| self.ran(&["pr", "edit", &number, change, Check::GATE], Self::QUICK);

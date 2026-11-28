@@ -1,5 +1,12 @@
 # Each run starts the ci command line in a fresh directory holding `files`, then expects its exit, the
-# start of its standard output and error, and the whole of every file in `written`.
+# start of its standard output and error, and the whole of every file in `written`. Each binary runs the
+# built ci program the same way and expects only its exit.
+
+[[Binary]]
+program = "CARGO_BIN_EXE_ci"
+arguments = ["timed"]
+exit = "Failed"
+timeout = 60
 
 [[Run]]
 arguments = ["timed", "limits.toml", "lint", "true"]
@@ -85,6 +92,26 @@ err = "usage: ci timed "
 
 [[Run]]
 arguments = ["plan", "a", "b", "c", "d", "e"]
+exit = "Failed"
+err = "usage: ci timed "
+
+[[Run]]
+arguments = ["timed", "limits.toml"]
+exit = "Failed"
+err = "usage: ci timed "
+
+[[Run]]
+arguments = ["queries", "."]
+exit = "Failed"
+err = "cannot check the query cache: cannot read ./crates: "
+
+[[Run]]
+arguments = ["queries", ".", "--record"]
+exit = "Failed"
+err = "cannot check the query cache: cannot read ./crates: "
+
+[[Run]]
+arguments = ["queries", ".", "--check"]
 exit = "Failed"
 err = "usage: ci timed "
 
