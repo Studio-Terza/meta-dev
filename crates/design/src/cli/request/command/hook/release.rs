@@ -50,7 +50,7 @@ struct Holding {
 
 impl Used {
     pub fn heard(heard: Heard) -> Result<Used, Failure> {
-        serde_json::from_str(&heard.into_inner()).map_err(Failure::Unheard)
+        json_ports::Json::read(&heard.into_inner()).map_err(Failure::Unheard)
     }
 
     pub fn answered<F: Files, S: Store, C: Clock, G: Shell>(

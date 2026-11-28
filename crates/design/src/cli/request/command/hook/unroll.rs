@@ -6,8 +6,8 @@ use console_ports::{Environment, Heard, Shown};
 use dispatch_ports::{Clock, Shell};
 use file_ports::{Files, Kind};
 use grammar::shell::{Deletion, Directory, Edit, Edited, Editor, Plain, Target, Unreadable};
+use json_ports::Json;
 use newtype::Wrapping;
-use serde::{Deserialize, Serialize};
 use store_ports::Store;
 
 use super::super::Ground;
@@ -17,7 +17,7 @@ use crate::cli::failure::Failure;
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct Running {
     #[serde(default)]
     cwd: PathBuf,
@@ -25,7 +25,7 @@ pub struct Running {
     tool: Tool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 #[serde(tag = "tool_name", content = "tool_input")]
 enum Tool {
     Bash(Input),
@@ -33,7 +33,7 @@ enum Tool {
     SendMessage(Brief),
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, serde::Deserialize)]
 struct Input {
     #[serde(default)]
     command: Option<String>,
@@ -56,13 +56,13 @@ struct Judging<'ground, 'run, F: Files, S: Store, E: Environment> {
     cwd: &'ground Path,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 struct Denial {
     #[serde(rename = "hookSpecificOutput")]
     output: Specific,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 struct Specific {
     #[serde(rename = "hookEventName")]
     event: HookEvent,
@@ -72,7 +72,7 @@ struct Specific {
     reason: String,
 }
 
-#[derive(Clone, Copy, Debug, Serialize)]
+#[derive(Clone, Copy, Debug, serde::Serialize)]
 enum Permission {
     #[serde(rename = "deny")]
     Deny,
@@ -80,7 +80,7 @@ enum Permission {
 
 impl Running {
     pub fn heard(heard: Heard) -> Result<Running, Failure> {
-        serde_json::from_str(&heard.into_inner()).map_err(Failure::Unheard)
+        Json::read(&heard.into_inner()).map_err(Failure::Unheard)
     }
 
     pub fn answered<F: Files + Clone, S: Store, C: Clock, G: Shell>(
@@ -178,7 +178,7 @@ impl Refusal {
         let denial = Denial {
             output: Specific { event: HookEvent::PreToolUse, decision: Permission::Deny, reason: self.to_string() },
         };
-        let json = serde_json::to_string(&denial).map_err(Failure::Render)?;
+        let json = Json::written(&denial).map_err(Failure::Render)?;
         Ok(Uttered::new(Shown::said(format_args!("{json}\n")), Ok(Outcome::Blocked)))
     }
 

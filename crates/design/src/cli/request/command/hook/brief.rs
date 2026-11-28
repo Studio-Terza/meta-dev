@@ -2,8 +2,7 @@ use console_ports::Shown;
 use dispatch_ports::{Clock, Shell};
 use file_ports::Files;
 use invariants::Ignoring;
-use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
+use json_ports::{Fields, Json, Lenient};
 use store_ports::Store;
 use transcript_ports::Body;
 
@@ -16,32 +15,28 @@ use crate::cli::request::ignored::Ignored;
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct Brief {
     #[serde(flatten)]
     said: Said,
     #[serde(flatten)]
-    rest: Map<String, Value>,
+    rest: Fields,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 enum Said {
     Prompt(Body),
-    Message(Message),
+    Message(Lenient<Body>),
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(from = "Value")]
-struct Message(Option<Body>);
-
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 struct Rewrite<'brief> {
     #[serde(rename = "hookSpecificOutput")]
     output: Rewritten<'brief>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 struct Rewritten<'brief> {
     #[serde(rename = "hookEventName")]
     event: HookEvent,
@@ -49,15 +44,15 @@ struct Rewritten<'brief> {
     input: Told<'brief>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 struct Told<'brief> {
     #[serde(flatten)]
     said: Telling,
     #[serde(flatten)]
-    rest: &'brief Map<String, Value>,
+    rest: &'brief Fields,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 enum Telling {
     Prompt(String),
@@ -85,7 +80,7 @@ impl Brief {
     fn rewritten(&self, said: Telling) -> Result<Uttered, Failure> {
         let rewrite =
             Rewrite { output: Rewritten { event: HookEvent::PreToolUse, input: Told { said, rest: &self.rest } } };
-        let json = serde_json::to_string(&rewrite).map_err(Failure::Render)?;
+        let json = Json::written(&rewrite).map_err(Failure::Render)?;
         Ok(Uttered::new(Shown::said(format_args!("{json}\n")), Ok(Outcome::Briefed)))
     }
 }
@@ -94,7 +89,7 @@ impl Said {
     fn body(&self) -> Option<&Body> {
         match self {
             Said::Prompt(body) => Some(body),
-            Said::Message(Message(body)) => body.as_ref(),
+            Said::Message(body) => body.read(),
         }
     }
 
@@ -103,11 +98,5 @@ impl Said {
             Said::Prompt(_) => Telling::Prompt(text),
             Said::Message(_) => Telling::Message(text),
         }
-    }
-}
-
-impl From<Value> for Message {
-    fn from(message: Value) -> Message {
-        Message(serde_json::from_value(message).ignoring(Ignored::Structured))
     }
 }

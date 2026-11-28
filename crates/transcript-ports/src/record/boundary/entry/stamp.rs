@@ -1,15 +1,13 @@
-use serde::Deserialize;
-
 use crate::{Authorship, Body, Instant, Line, Record, SessionId, Skipped, Unrecognised, Uuid};
 
 #[derive(Clone, Copy, Debug)]
 struct Side;
 
-#[derive(Clone, Copy, Debug, Default, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, serde::Deserialize)]
 #[serde(from = "bool")]
 struct Chain(Option<Side>);
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct Stamp {
     uuid: Uuid,
     #[serde(rename = "parentUuid")]
@@ -24,7 +22,7 @@ pub struct Stamp {
 #[derive(Debug)]
 struct Main(Stamp);
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct Passing {
     uuid: Option<Uuid>,
     #[serde(rename = "parentUuid")]

@@ -1,8 +1,8 @@
 use grammar::Grammar;
 use grammar::notice::TaskNotice;
 use invariants::Ignoring;
+use json_ports::{JsonFailure, Object};
 
-use super::object::Object;
 use super::said::Hears;
 use super::stamp::Stamp;
 use crate::{Authorship, Body, Ignored, Line, Skipped, TaskId, Unrecognised};
@@ -47,7 +47,7 @@ impl Source {
 impl Origin {
     const KIND: &'static str = "kind";
 
-    pub fn read(origin: Object<'_>) -> Result<Origin, serde_json::Error> {
+    pub fn read(origin: Object<'_>) -> Result<Origin, JsonFailure> {
         let source = origin.tag(Self::KIND).and_then(|kind| kind.parse::<Source>().ignoring(Ignored::NotKnown));
         source.map_or_else(|| origin.whole().map(Origin::Unknown), |known| Ok(Origin::Known(known)))
     }

@@ -10,11 +10,10 @@ use grammar::repository::SpecTrailer;
 use grammar::spec_line::Attachment;
 use invariants::Ignoring;
 use newtype::{Display, Newtype};
-use serde::Deserialize;
 
 use crate::cli::request::ignored::Ignored;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct Finishing {
     #[serde(rename = "stop_hook_active", default)]
     reminder: Reminder,
@@ -23,7 +22,7 @@ pub struct Finishing {
     cwd: PathBuf,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(serde::Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(from = "bool")]
 pub enum Reminder {
     #[default]
@@ -31,7 +30,7 @@ pub enum Reminder {
     Repeated,
 }
 
-#[derive(Deserialize, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(serde::Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 #[serde(from = "Option<String>")]
 pub enum Said {
     Typed(Report),
@@ -63,7 +62,7 @@ pub struct Branched {
     head: CommitSha,
 }
 
-#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(serde::Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(try_from = "String")]
 pub struct Branch(String);
 
@@ -71,29 +70,29 @@ pub struct Branch(String);
 #[error("not a branch name of the form area/topic")]
 pub struct Unbranched;
 
-#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(serde::Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(from = "String")]
 pub struct First {
     spec: Option<Attachment>,
     title: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct Compared {
     commits: Vec<Committed>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Committed {
     commit: Message,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Message {
     message: First,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct Opened {
     number: NonZeroU32,
 }

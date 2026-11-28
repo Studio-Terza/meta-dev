@@ -1,7 +1,6 @@
 use newtype::Spelled;
-use strum::{Display, EnumString};
 
-#[derive(Spelled, Display, EnumString, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Spelled, strum::Display, strum::EnumString, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[strum(serialize_all = "snake_case", parse_err_ty = Unvoiced, parse_err_fn = Unvoiced::from)]
 pub enum Authorship {
     Owner,

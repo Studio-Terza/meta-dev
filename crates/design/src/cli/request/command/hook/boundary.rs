@@ -11,8 +11,8 @@ use dispatch_ports::{Clock, Shell, Wall};
 use file_ports::{Epoch, Files};
 use grammar::lines::Lines;
 use grammar::spec_line::Attachment;
+use json_ports::Json;
 use newtype::Wrapping;
-use serde::{Deserialize, Serialize};
 use store_ports::Store;
 use transcript_ports::{Body, SessionId, Uuid};
 
@@ -29,26 +29,26 @@ pub use harness::Stopped;
 use harness::{Halt, Harness, Tasks};
 use invariants::Ignoring;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 pub struct Settings {
     hooks: BTreeMap<HookEvent, Vec<Matcher>>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 struct Matcher {
     #[serde(skip_serializing_if = "Option::is_none")]
     matcher: Option<Tool>,
     hooks: [Handler; 1],
 }
 
-#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 enum Tool {
     Bash,
     #[serde(rename = "Agent|SendMessage")]
     Briefs,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 struct Handler {
     #[serde(rename = "type")]
     kind: &'static str,
@@ -56,7 +56,7 @@ struct Handler {
     timeout: u32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct Stopping {
     #[serde(rename = "stop_hook_active")]
     continuation: Continuation,
@@ -91,17 +91,17 @@ struct Naming<'ground, 'run, F: Files, S: Store> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Continuing;
 
-#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(from = "bool")]
 struct Continuation(Option<Continuing>);
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 pub struct Decision {
     decision: Verdict,
     reason: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 pub enum Verdict {
     #[serde(rename = "block")]
     Block,
@@ -154,14 +154,14 @@ impl Settings {
     }
 
     pub fn written(&self) -> Result<Uttered, Failure> {
-        let json = serde_json::to_string_pretty(self).map_err(Failure::Render)?;
+        let json = Json::pretty(self).map_err(Failure::Render)?;
         Ok(Uttered::new(Shown::said(format_args!("{json}\n")), Ok(Outcome::Settings)))
     }
 }
 
 impl Stopping {
     pub fn heard(heard: Heard) -> Result<Stopping, Failure> {
-        serde_json::from_str(&heard.into_inner()).map_err(Failure::Unheard)
+        Json::read(&heard.into_inner()).map_err(Failure::Unheard)
     }
 
     const STALLED: &'static str =
@@ -289,7 +289,7 @@ impl Decision {
     }
 
     pub fn blocked(reason: String) -> Result<Uttered, Failure> {
-        let json = serde_json::to_string(&Decision { decision: Verdict::Block, reason }).map_err(Failure::Render)?;
+        let json = Json::written(&Decision { decision: Verdict::Block, reason }).map_err(Failure::Render)?;
         Ok(Uttered::new(Shown::said(format_args!("{json}\n")), Ok(Outcome::Blocked)))
     }
 }

@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use console_ports::Answer;
+use json_ports::Json;
 use pipeline::Pipeline;
 
 use crate::failure::Failure;
@@ -57,7 +58,7 @@ impl Pipeline for KillMatrix {
     }
 
     fn act(&self, report: Report) -> Result<Reported, Failure> {
-        let json = serde_json::to_string_pretty(&report).map_err(Failure::Unserialized)?;
+        let json = Json::pretty(&report).map_err(Failure::Unserialized)?;
         Ok(Reported { json: [json.as_str(), "\n"].concat(), summary: format!("{report}\n") })
     }
 }

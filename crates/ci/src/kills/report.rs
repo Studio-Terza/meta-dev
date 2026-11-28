@@ -2,7 +2,6 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 use pipeline::{Edges, Measure};
-use serde::Serialize;
 
 use crate::kills::log::{Kind, Test};
 use crate::kills::outcomes::{Fate, Mutant, Ran};
@@ -15,7 +14,7 @@ pub(crate) struct Matrix {
     unviable: BTreeSet<Mutant>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 pub(crate) struct Report {
     caught: usize,
     unviable: usize,
@@ -28,7 +27,7 @@ pub(crate) struct Report {
     kills: Vec<Row>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 struct Row {
     test: Test,
     killed: Vec<Mutant>,

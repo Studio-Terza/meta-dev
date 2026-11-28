@@ -1,19 +1,17 @@
-use serde::Deserialize;
-
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct Column<Name> {
     name: Name,
     type_info: Storage,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, serde::Deserialize)]
 #[serde(from = "Option<bool>")]
 pub enum Nullable {
     Never,
     Possible,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, serde::Deserialize)]
 pub enum Storage {
     Integer,
     Int4,

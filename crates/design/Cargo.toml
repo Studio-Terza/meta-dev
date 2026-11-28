@@ -23,19 +23,21 @@ design-messages = { path = "../design-messages" }
 dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports" }
 grammar = { path = "../grammar" }
+json-ports = { path = "../json-ports" }
 newtype = { path = "../newtype" }
 pipeline = { path = "../pipeline" }
 port-core = { path = "../port-core" }
+proptest.workspace = true
 serde.workspace = true
-serde_json.workspace = true
 sqlite-ports = { path = "../sqlite-ports" }
 store-ports = { path = "../store-ports" }
 strum.workspace = true
 thiserror.workspace = true
-toml.workspace = true
+toml-ports = { path = "../toml-ports" }
 transcript-ports = { path = "../transcript-ports" }
 
 [dev-dependencies]
+serde_json.workspace = true
 test-failure = { path = "../test-failure" }
 tempfile.workspace = true
 

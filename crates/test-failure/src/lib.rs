@@ -2,7 +2,8 @@ use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use serde::de::DeserializeOwned;
+use json_ports::Decode;
+use toml_ports::Toml;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Failed(String);
@@ -41,7 +42,7 @@ impl Golden {
 pub struct Cases;
 
 impl Cases {
-    pub fn read<Read: DeserializeOwned>(path: &Path) -> Result<Read, Failed> {
-        Ok(toml::from_str(&fs::read_to_string(path)?)?)
+    pub fn read<Read: Decode>(path: &Path) -> Result<Read, Failed> {
+        Ok(Toml::read(&fs::read_to_string(path)?)?)
     }
 }

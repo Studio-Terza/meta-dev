@@ -1,6 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{DeriveInput, Generics, Ident};
+use variant_ports::Enumerated;
 
 use super::declared::{Constant, Spelling};
 use crate::{Expansion, Input};
@@ -36,7 +37,7 @@ impl Derived {
     fn constants(self) -> &'static [Constant] {
         match self {
             Derived::Op => &Self::OP,
-            Derived::Resource => <Constant as strum::VariantArray>::VARIANTS,
+            Derived::Resource => <Constant as Enumerated>::VARIANTS,
         }
     }
 }
