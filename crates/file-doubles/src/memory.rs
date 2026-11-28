@@ -25,16 +25,11 @@ pub struct Memory {
 
 impl Memory {
     fn missing() -> FileFailure {
-        FileFailure::Missing(io::Error::from(io::ErrorKind::NotFound))
+        FileFailure::from(io::Error::from(io::ErrorKind::NotFound))
     }
 
     fn stored(&self, path: &Path) -> Result<Bytes, FileFailure> {
-        let found = self.files.held().get(path).cloned();
-        found.ok_or_else(|| {
-            Some(self.found(path))
-                .filter(|kind| *kind == Kind::Directory)
-                .map_or_else(Self::missing, |_| FileFailure::Failed(io::Error::from(io::ErrorKind::IsADirectory)))
-        })
+        self.files.held().get(path).cloned().ok_or_else(Self::missing)
     }
 
     fn placed<'path>(&self, path: &'path Path) -> Result<&'path Path, FileFailure> {
@@ -118,7 +113,7 @@ impl FilesFiller for Memory {
         let blocked = path.ancestors().any(|ancestor| self.files.held().contains_key(ancestor));
         Some(())
             .filter(|()| !blocked)
-            .ok_or_else(|| FileFailure::Failed(io::Error::from(io::ErrorKind::NotADirectory)))?;
+            .ok_or_else(|| FileFailure::from(io::Error::from(io::ErrorKind::NotADirectory)))?;
         self.directories.held().insert(path.to_path_buf());
         Ok(())
     }
@@ -160,6 +155,6 @@ impl FilesFiller for Memory {
 
     fn stamps(&self, _pass: Pass<'_, files_ops::Stamps>, path: &Path) -> Result<Stamps, FileFailure> {
         self.stored(path)?;
-        Err(FileFailure::Failed(io::Error::from(io::ErrorKind::Unsupported)))
+        Err(FileFailure::from(io::Error::from(io::ErrorKind::Unsupported)))
     }
 }

@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::ffi::OsString;
-use std::io::{self, ErrorKind};
+use std::io;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{env, fmt, fs};
@@ -137,7 +137,7 @@ impl Story {
 
     pub(crate) fn rows<Row: DeserializeOwned>(&self) -> Result<BTreeMap<CaseName, Row>, Failed> {
         let table = self.path()?.with_extension(Story::TABLE);
-        let text = fs::read_to_string(&table).or_else(Story::absent)?;
+        let text = fs::read_to_string(&table)?;
         let mut parsed: toml::Table = toml::from_str(&text)?;
         let rows: BTreeMap<String, Row> = match parsed.remove(self.name) {
             Some(toml::Value::Array(listed)) => listed
@@ -167,10 +167,6 @@ impl Story {
             entry.placed(path);
             entries
         }))
-    }
-
-    fn absent(failure: io::Error) -> Result<String, io::Error> {
-        (failure.kind() == ErrorKind::NotFound).then(String::new).ok_or(failure)
     }
 }
 

@@ -8,6 +8,6 @@ impl Properties {
 
     #[must_use]
     pub fn settled() -> Config {
-        Config { failure_persistence: None, rng_seed: RngSeed::Fixed(Properties::SEED), ..Config::default() }
+        Config { rng_seed: RngSeed::Fixed(Properties::SEED), ..Config::default() }
     }
 }

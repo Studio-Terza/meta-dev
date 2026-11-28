@@ -42,12 +42,8 @@ fn the_lint_binary_exits_as_its_verdict_says() -> Result<(), Failed> {
         let shell = run.port(SystemShell);
         let arguments = binary.arguments.iter().map(ToString::to_string).collect();
         let program: &'static str = Box::leak(env::var(binary.program.as_str())?.into_boxed_str());
-        let call = Call::new(
-            program,
-            arguments,
-            directory.path().to_path_buf(),
-            Deadline::after(clock.now(), binary.timeout),
-        );
+        let call =
+            Call::new(program, arguments, directory.path().to_path_buf(), Deadline::after(clock.now(), binary.timeout));
         let exit = shell.ran(&call)?.succeeded().map_or(Exit::Failed, |_printed| Exit::Passed);
         assert_eq!((&binary.arguments, exit), (&binary.arguments, binary.exit));
         Ok(())

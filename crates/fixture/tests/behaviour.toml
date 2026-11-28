@@ -1,8 +1,15 @@
 # A paired case prints exactly its golden beside this file; an unpaired one has no golden, and the
-# cases it belongs to are refused rather than passed.
+# cases it belongs to are refused rather than passed. A drifting case prints other than its golden.
+# Asked rows are replayed on an implementor that agrees with its reference and on one that does not.
 
 [Paired.matching]
 printed = "shown\n"
 
 [Unpaired.goldenless]
 printed = "shown\n"
+
+[Drifting.differing]
+printed = "other\n"
+
+[[Asked]]
+calls = ["lower"]

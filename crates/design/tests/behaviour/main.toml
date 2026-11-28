@@ -112,7 +112,7 @@ input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s
 {"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}
 {"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}
 '''
-"/private/tmp/claude-501/-home-work/s/tasks/b1.output" = "building\n"
+"/private/tmp/claude-501/-home-work/s/tasks/b1.output" = "a step it ran long ago printed [killed]\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nbuilding\n"
 
 [[Story.shell-running.step]]
 words = ["hook", "stop"]

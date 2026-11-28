@@ -37,6 +37,23 @@ calls = [
     { Write = ["absent/inside.txt", [120]] },
     { Kind = "absent/inside.txt" },
     { Append = ["absent/log.txt", [120]] },
+    { Remove = "absent.txt" },
+    { Canonical = "absent.txt" },
+]
+
+[Script.directories]
+calls = [
+    { CreateDirectories = "made/deep" },
+    { Kind = "made/deep" },
+    { CreateDirectories = "made/deep" },
+    { Write = ["made/note.txt", [120]] },
+    { Entries = "made" },
+    { CreateDirectories = "made/note.txt/below" },
+    { Read = "made" },
+    { Remove = "made/note.txt" },
+    { Kind = "made/note.txt" },
+    { Read = "made/note.txt" },
+    { Remove = "made/note.txt" },
 ]
 canonical = ["absent.txt"]
 

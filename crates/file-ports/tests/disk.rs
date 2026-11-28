@@ -1,7 +1,7 @@
 use std::env;
 use std::path::PathBuf;
 
-use file_doubles::Memory;
+use file_doubles::{Memory, Rerooted};
 use file_ports::Disk;
 use file_ports::files_ops::{Call, Reply};
 use fixture::{Failed, Fixture, Laws, Rows};
@@ -39,6 +39,11 @@ fn disk_answers_every_script_as_memory_does_and_resolves_a_canonical_path_to_its
         let unsettled: Vec<&(Reply, Reply)> = resolved.iter().filter(|(again, once)| again != once).collect();
         assert_eq!(unsettled, Vec::<&(Reply, Reply)>::new());
         drop(memory);
+        let rerooted_scratch = TempDir::new()?;
+        env::set_current_dir(rerooted_scratch.path())?;
+        let (rerooted, fresh) = (run.port(Rerooted::from_iter([])), run.port(Memory::default()));
+        Laws::agreed(&script.calls, |call| call.replayed(&rerooted), |call| call.replayed(&fresh))?;
+        drop(fresh);
         run.finish();
         Ok(())
     })

@@ -209,7 +209,7 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
             .find(|resolved| self.files.kind(resolved) == Kind::File)
             .ok_or_else(|| Failure::Read {
                 path: candidates.first().map_or_default(|first| self.tree.shown(first).to_path_buf()),
-                source: FileFailure::Missing(io::Error::from(io::ErrorKind::NotFound)),
+                source: FileFailure::from(io::Error::from(io::ErrorKind::NotFound)),
             })?;
         let nesting = if chosen.file_name() == Some(OsStr::new(Reader::<F, T>::MODULE_FILE)) {
             Nesting::Beside
