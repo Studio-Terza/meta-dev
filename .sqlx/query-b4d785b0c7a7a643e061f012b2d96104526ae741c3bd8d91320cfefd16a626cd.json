@@ -1,0 +1,10 @@
+{
+  "query": "\nINSERT INTO\n  cursors (session, read_to)\nVALUES\n  (?1, ?2)\nON CONFLICT (session) DO UPDATE\nSET\n  read_to = excluded.read_to\nWHERE\n  read_to != excluded.read_to\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  }
+}

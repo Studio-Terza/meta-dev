@@ -5,7 +5,7 @@ use std::path::{Component, Path, PathBuf};
 use console_ports::Environment;
 use dispatch_ports::{Clock, Shell};
 use file_ports::{Files, Kind};
-use grammar_shell::{Deletion, Directory, Edit, Edited, Editor, Plain, Target, Unreadable};
+use grammar::shell::{Deletion, Directory, Edit, Edited, Editor, Plain, Target, Unreadable};
 use serde::Deserialize;
 use store_ports::Store;
 

@@ -1,2 +1,0 @@
-# Texts the lines lexer reads; tests/lexed.txt holds what it reads them as.
-lines = ["", "a\tb\n\nc\r\nd", "\t\tx\t\n"]

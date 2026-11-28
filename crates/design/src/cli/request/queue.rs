@@ -2,17 +2,14 @@ use std::fmt;
 use std::num::NonZeroU32;
 use std::ops::Not;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 
 use design_messages::CheckName;
 use file_ports::Kind;
-use grammar_detail::Cited as Detail;
-use grammar_lines::Lines;
-use grammar_spec_line::{Attachment, Line};
-use invariants::Ignoring;
+use grammar::Grammar;
+use grammar::detail::Cited as Detail;
+use grammar::lines::Lines;
+use grammar::spec_line::{Attachment, Line};
 use serde::{Deserialize, Serialize};
-
-use super::ignored::Ignored;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Queue {
@@ -250,12 +247,8 @@ impl Landed {
     }
 
     fn merged(&self, cited: &Cited) -> Option<Closed> {
-        let lines = match self.body.parse::<Lines>() {
-            Ok(lines) => lines,
-            Err(unsplit) => match unsplit {},
-        };
-        let first = lines.into_iter().next()?;
-        let line = Line::from_str(&first).ignoring(Ignored::Unbodied)?;
+        let first = Lines::from(self.body.as_str()).into_iter().next()?;
+        let line = Line::read(&first)?;
         let attached = line.spec()?.attachment()?.to_string();
         let wanted = cited.0.to_string();
         let asked = Detail::each(&wanted);

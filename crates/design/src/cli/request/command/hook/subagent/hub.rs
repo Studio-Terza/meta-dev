@@ -5,7 +5,7 @@ use std::path::Path;
 
 use design_messages::{CheckName, CommitSha, PullNumber};
 use dispatch_ports::{Deadline, Due, Pause, Ran, Timeout};
-use grammar_spec_line::Attachment;
+use grammar::spec_line::Attachment;
 use invariants::Ignoring;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;

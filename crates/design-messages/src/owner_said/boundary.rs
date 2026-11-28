@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
-use grammar_prose::Prose;
+use grammar::prose::Prose;
 use invariants::Ignoring;
 use port_core::Op;
 use store_ports::{Columns, Execute, Query, StoreFailure};
@@ -156,8 +156,8 @@ impl Asked {
 
     fn answered(lead: Option<&Body>, reply: &Body) -> Option<Asked> {
         let replied: &str = reply.as_ref();
-        lead.filter(|_said| Prose::read(replied).words() < Asked::SHORT)
-            .and_then(|said| Prose::read(said.as_ref()).answered().map(str::to_owned))
+        lead.filter(|_said| Prose::from(replied).words() < Asked::SHORT)
+            .and_then(|said| Prose::from(said.as_ref()).answered().map(str::to_owned))
             .and_then(|sentence| Body::try_new(sentence).ignoring(Ignored::Unasked))
             .map(Asked)
     }

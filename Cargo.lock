@@ -54,8 +54,7 @@ name = "ci"
 version = "0.1.0"
 dependencies = [
  "console-ports",
- "grammar-lines",
- "grammar-test-log",
+ "grammar",
  "invariants",
  "serde",
  "serde_json",
@@ -142,15 +141,6 @@ dependencies = [
  "dispatch-ports",
  "file-ports",
  "grammar",
- "grammar-detail",
- "grammar-git",
- "grammar-letters",
- "grammar-lines",
- "grammar-notice",
- "grammar-report",
- "grammar-repository",
- "grammar-shell",
- "grammar-spec-line",
  "invariants",
  "newtype",
  "pipeline",
@@ -172,7 +162,7 @@ name = "design-messages"
 version = "0.1.0"
 dependencies = [
  "file-ports",
- "grammar-prose",
+ "grammar",
  "hex",
  "invariants",
  "newtype",
@@ -308,110 +298,11 @@ version = "0.1.0"
 dependencies = [
  "invariants",
  "logos",
- "thiserror",
-]
-
-[[package]]
-name = "grammar-bare"
-version = "0.1.0"
-dependencies = [
- "grammar",
- "serde",
- "test-failure",
-]
-
-[[package]]
-name = "grammar-detail"
-version = "0.1.0"
-dependencies = [
- "grammar",
- "serde",
- "test-failure",
-]
-
-[[package]]
-name = "grammar-git"
-version = "0.1.0"
-dependencies = [
- "grammar",
- "grammar-report",
-]
-
-[[package]]
-name = "grammar-letters"
-version = "0.1.0"
-dependencies = [
- "grammar",
- "serde",
- "test-failure",
-]
-
-[[package]]
-name = "grammar-lines"
-version = "0.1.0"
-dependencies = [
- "grammar",
- "serde",
- "test-failure",
- "thiserror",
-]
-
-[[package]]
-name = "grammar-notice"
-version = "0.1.0"
-dependencies = [
- "grammar",
- "serde",
- "test-failure",
-]
-
-[[package]]
-name = "grammar-prose"
-version = "0.1.0"
-dependencies = [
- "grammar",
-]
-
-[[package]]
-name = "grammar-report"
-version = "0.1.0"
-dependencies = [
- "grammar",
-]
-
-[[package]]
-name = "grammar-repository"
-version = "0.1.0"
-dependencies = [
- "grammar",
-]
-
-[[package]]
-name = "grammar-shell"
-version = "0.1.0"
-dependencies = [
- "grammar",
- "serde",
- "test-failure",
-]
-
-[[package]]
-name = "grammar-spec-line"
-version = "0.1.0"
-dependencies = [
- "grammar",
  "newtype",
  "proptest",
- "thiserror",
-]
-
-[[package]]
-name = "grammar-test-log"
-version = "0.1.0"
-dependencies = [
- "grammar",
  "serde",
  "test-failure",
+ "thiserror",
 ]
 
 [[package]]
@@ -657,7 +548,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "strum",
  "syn",
  "test-failure",
  "thiserror",
@@ -1016,9 +906,7 @@ name = "transcript-ports"
 version = "0.1.0"
 dependencies = [
  "file-ports",
- "grammar-bare",
- "grammar-lines",
- "grammar-notice",
+ "grammar",
  "invariants",
  "newtype",
  "port-core",

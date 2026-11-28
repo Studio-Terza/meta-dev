@@ -9,8 +9,8 @@ use console_ports::{Environment, Shown};
 use design_messages::{EndedTasks, LastSaid, Overran, Overruns, OwnerHistory, Said};
 use dispatch_ports::{Clock, Shell, Wall};
 use file_ports::{Epoch, Files};
-use grammar_lines::Lines;
-use grammar_spec_line::Attachment;
+use grammar::lines::Lines;
+use grammar::spec_line::Attachment;
 use newtype::Wrapping;
 use serde::{Deserialize, Serialize};
 use store_ports::Store;
@@ -301,11 +301,7 @@ impl<F: Files, S: Store> Named for Naming<'_, '_, F, S> {
             uuid.get(..message.len()) == Some(message)
         })?;
         let body: &Body = said.as_ref();
-        let lines = match body.as_ref().parse::<Lines>() {
-            Ok(lines) => lines,
-            Err(unsplit) => match unsplit {},
-        };
-        lines.into_iter().next()
+        Lines::from(body.as_ref()).into_iter().next()
     }
 }
 
