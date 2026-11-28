@@ -2,11 +2,11 @@ mod answers;
 mod boundary;
 mod brief;
 mod release;
+mod reply;
 mod subagent;
 mod unroll;
 
 use console_ports::Environment;
-use design_messages::EndedTasks;
 use dispatch_ports::{Clock, Shell};
 use file_ports::Files;
 use newtype::Enumerated;
@@ -14,22 +14,22 @@ use store_ports::Store;
 
 use super::Ground;
 use super::crew::Crew;
-use super::ingest::Ingest;
 use crate::HookEvent;
 use crate::cli::failure::Failure;
 use crate::cli::uttered::Uttered;
-use boundary::{Observed, Settings, Stopped, Stopping};
+use boundary::{Settings, Stopping};
 use release::Used;
+use reply::Hook;
 use subagent::Finishing;
 use unroll::Running;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Hook {
+pub enum Hooked {
     Settings,
     On(HookEvent),
 }
 
-impl Hook {
+impl Hooked {
     pub fn answered<F: Files + Clone, S: Store, C: Clock, G: Shell>(
         self,
         environment: &impl Environment,
@@ -38,24 +38,15 @@ impl Hook {
     ) -> Result<Uttered, Failure> {
         let heard = || environment.input().map_err(Failure::Deaf);
         match self {
-            Hook::Settings => Settings::listed(HookEvent::VARIANTS).written(),
-            Hook::On(HookEvent::Stop) => Hook::stopped(&Stopping::heard(heard()?)?, ground, crew),
-            Hook::On(HookEvent::SubagentStop) => Finishing::heard(heard()?)?.answered(ground, crew),
-            Hook::On(HookEvent::PreToolUse) => Running::heard(heard()?)?.answered(environment, ground, crew),
-            Hook::On(HookEvent::PostToolUse) => Used::heard(heard()?)?.answered(ground, crew),
+            Hooked::Settings => Settings::listed(HookEvent::VARIANTS).written(),
+            Hooked::On(HookEvent::Stop) => Stopping::heard(heard()?)?.answered(environment, ground, crew)?.uttered(),
+            Hooked::On(HookEvent::SubagentStop) => {
+                Finishing::heard(heard()?)?.answered(environment, ground, crew)?.uttered()
+            }
+            Hooked::On(HookEvent::PreToolUse) => {
+                Running::heard(heard()?)?.answered(environment, ground, crew)?.uttered()
+            }
+            Hooked::On(HookEvent::PostToolUse) => Used::heard(heard()?)?.answered(environment, ground, crew)?.uttered(),
         }
-    }
-
-    fn stopped<F: Files + Clone, S: Store, C: Clock, G: Shell>(
-        stopping: &Stopping,
-        ground: &Ground<'_, F, S>,
-        crew: &Crew<'_, C, G>,
-    ) -> Result<Uttered, Failure> {
-        let store = ground.store();
-        ground.prepared(crew.scratch())?;
-        Ingest::read(store, &ground.transcripts())?;
-        let stopped = Stopped::from(store.read(EndedTasks)?);
-        let tasks = stopping.tasks(ground, crew.now()).map(|tasks| tasks.unstopped(&stopped));
-        stopping.decided(crew, &Observed::new(ground, tasks))
     }
 }

@@ -5,8 +5,8 @@ use std::fmt;
 use std::ops::Not;
 use std::path::PathBuf;
 
-use console_ports::{Heard, Shown};
-use design_messages::{LastSaid, Overran, Overruns, OwnerHistory, Said};
+use console_ports::{Environment, Shown};
+use design_messages::{EndedTasks, LastSaid, Overran, Overruns, OwnerHistory, Said};
 use dispatch_ports::{Clock, Shell, Wall};
 use file_ports::{Epoch, Files};
 use grammar_lines::Lines;
@@ -18,7 +18,9 @@ use transcript_ports::{Body, SessionId, Uuid};
 
 use super::super::Ground;
 use super::super::crew::Crew;
+use super::super::ingest::Ingest;
 use super::answers::{Answering, Answers, Moment};
+use super::reply::{Hook, Reply};
 use super::subagent::Hub;
 use crate::cli::failure::Failure;
 use crate::cli::request::ignored::Ignored;
@@ -95,18 +97,6 @@ struct Continuing;
 #[serde(from = "bool")]
 struct Continuation(Option<Continuing>);
 
-#[derive(Debug, Serialize)]
-pub struct Decision {
-    decision: Verdict,
-    reason: String,
-}
-
-#[derive(Debug, Serialize)]
-pub enum Verdict {
-    #[serde(rename = "block")]
-    Block,
-}
-
 impl Settings {
     const KIND: &'static str = "command";
 
@@ -159,11 +149,23 @@ impl Settings {
     }
 }
 
-impl Stopping {
-    pub fn heard(heard: Heard) -> Result<Stopping, Failure> {
-        serde_json::from_str(&heard.into_inner()).map_err(Failure::Unheard)
+impl Hook for Stopping {
+    fn answered<F: Files + Clone, S: Store, C: Clock, G: Shell>(
+        &self,
+        _environment: &impl Environment,
+        ground: &Ground<'_, F, S>,
+        crew: &Crew<'_, C, G>,
+    ) -> Result<Reply<'_>, Failure> {
+        let store = ground.store();
+        ground.prepared(crew.scratch())?;
+        Ingest::read(store, &ground.transcripts())?;
+        let stopped = Stopped::from(store.read(EndedTasks)?);
+        let tasks = self.tasks(ground, crew.now()).map(|tasks| tasks.unstopped(&stopped));
+        Ok(self.decided(crew, &Observed::new(ground, tasks)))
     }
+}
 
+impl Stopping {
     const STALLED: &'static str =
         "Nothing is running: no background shell or agent will wake you, so the turn has stalled.";
     const OVERRUN: &'static str =
@@ -174,15 +176,18 @@ impl Stopping {
         self.transcript.as_deref().map(|transcript| harness.tasks(transcript))
     }
 
-    pub fn decided<F: Files, S: Store, C: Clock, G: Shell>(
+    fn decided<F: Files, S: Store, C: Clock, G: Shell>(
         &self,
         crew: &Crew<'_, C, G>,
         observed: &Observed<'_, '_, F, S>,
-    ) -> Result<Uttered, Failure> {
-        match self.continuation.0 {
-            Some(Continuing) => Ok(Uttered::silent(Ok(Outcome::Hooked(HookEvent::Stop)))),
-            None => Decision::told(&observed.blocking(crew, self)),
-        }
+    ) -> Reply<'static> {
+        let stopped = match self.continuation.0 {
+            Some(Continuing) => Vec::new(),
+            None => observed.blocking(crew, self),
+        };
+        stopped
+            .first()
+            .map_or(Reply::Pass(Outcome::Hooked(HookEvent::Stop)), |_first| Reply::Block { reason: stopped.join("\n") })
     }
 
     fn stored(&self, store: &impl Store) -> Option<Body> {
@@ -282,18 +287,5 @@ impl<F: Files, S: Store> fmt::Display for Queued<'_, '_, '_, F, S> {
 impl From<bool> for Continuation {
     fn from(active: bool) -> Continuation {
         Continuation(active.then_some(Continuing))
-    }
-}
-
-impl Decision {
-    fn told(stopped: &[String]) -> Result<Uttered, Failure> {
-        stopped.first().map_or(Ok(Uttered::silent(Ok(Outcome::Hooked(HookEvent::Stop)))), |_first| {
-            Decision::blocked(stopped.join("\n"))
-        })
-    }
-
-    pub fn blocked(reason: String) -> Result<Uttered, Failure> {
-        let json = serde_json::to_string(&Decision { decision: Verdict::Block, reason }).map_err(Failure::Render)?;
-        Ok(Uttered::new(Shown::said(format_args!("{json}\n")), Ok(Outcome::Blocked)))
     }
 }

@@ -4,7 +4,7 @@ mod hub;
 use std::fmt;
 use std::path::Path;
 
-use console_ports::Heard;
+use console_ports::Environment;
 use design_messages::{CheckName, CommitSha, FailedBefore, Failing};
 use dispatch_ports::{Clock, Shell};
 use file_ports::Files;
@@ -16,12 +16,11 @@ use store_ports::Store;
 
 use super::super::Ground;
 use super::super::crew::Crew;
-use super::boundary::Decision;
+use super::reply::{Hook, Reply};
 use crate::cli::failure::Failure;
 pub use crate::cli::request::UnreadStep;
 use crate::cli::request::ignored::Ignored;
 use crate::cli::request::{Cause as Escalation, Item, Local, Target};
-use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
 use boundary::{At, Branched, FailedJob, Pushed, Reminder, Report, Said};
 pub use boundary::{Branch, Finishing};
@@ -77,16 +76,13 @@ struct Excerpt {
     lines: Vec<String>,
 }
 
-impl Finishing {
-    pub fn heard(heard: Heard) -> Result<Finishing, Failure> {
-        serde_json::from_str(&heard.into_inner()).map_err(Failure::Unheard)
-    }
-
-    pub fn answered<F: Files, S: Store, C: Clock, G: Shell>(
+impl Hook for Finishing {
+    fn answered<F: Files + Clone, S: Store, C: Clock, G: Shell>(
         &self,
+        _environment: &impl Environment,
         ground: &Ground<'_, F, S>,
         crew: &Crew<'_, C, G>,
-    ) -> Result<Uttered, Failure> {
+    ) -> Result<Reply<'_>, Failure> {
         let local = ground.local();
         let desk = Desk { ground, local: &local, directory: self.directory() };
         match (self.said(), self.reminder()) {
@@ -95,19 +91,19 @@ impl Finishing {
                 Some(repository) => desk.landed(at, &Hub::new(crew, self.directory(), repository)),
                 None => desk.escalated(Some(at), Escalation::Unread(UnreadStep::NoRepository)),
             },
-            (Said::Untyped, Reminder::First) => Decision::blocked(Untyped.to_string()),
+            (Said::Untyped, Reminder::First) => Ok(Reply::Block { reason: Untyped.to_string() }),
             (Said::Untyped, Reminder::Repeated) => desk.escalated(None, Escalation::Unread(UnreadStep::Ending)),
         }
     }
 }
 
 impl<F: Files, S: Store> Desk<'_, '_, F, S> {
-    fn landed<C: Clock, G: Shell>(&self, at: &At, hub: &Hub<'_, C, G>) -> Result<Uttered, Failure> {
+    fn landed<C: Clock, G: Shell>(&self, at: &At, hub: &Hub<'_, C, G>) -> Result<Reply<'static>, Failure> {
         match at {
             At::Pull(pushed) => self.done(*pushed, &[Target::from(pushed)], hub),
             At::Branch(branched) => match hub.opened(branched, self.ground, self.local) {
                 Ok(pushed) => self.done(pushed, &[Target::from(&pushed), Target::from(branched)], hub),
-                Err(Unopened::Unpushed(held)) => Decision::blocked(Stale { branched, held }.to_string()),
+                Err(Unopened::Unpushed(held)) => Ok(Reply::Block { reason: Stale { branched, held }.to_string() }),
                 Err(Unopened::Unread(step)) => self.escalated(Some(at), Escalation::Unread(step)),
             },
         }
@@ -118,19 +114,19 @@ impl<F: Files, S: Store> Desk<'_, '_, F, S> {
         pushed: Pushed,
         passed: &[Target],
         hub: &Hub<'_, C, G>,
-    ) -> Result<Uttered, Failure> {
+    ) -> Result<Reply<'static>, Failure> {
         let at = At::Pull(pushed);
         match pushed.checked(hub, self.ground.store()) {
             Ok(Ending::Stop) => self.cleared(passed),
-            Ok(Ending::Unpushed { held }) => Decision::blocked(Unpushed { pushed, held }.to_string()),
-            Ok(Ending::MergeMain { lacking }) => Decision::blocked(Stalled { pushed, lacking }.to_string()),
-            Ok(Ending::Failing(jobs)) => Decision::blocked(Logged::fetched(pushed, &jobs, hub).to_string()),
+            Ok(Ending::Unpushed { held }) => Ok(Reply::Block { reason: Unpushed { pushed, held }.to_string() }),
+            Ok(Ending::MergeMain { lacking }) => Ok(Reply::Block { reason: Stalled { pushed, lacking }.to_string() }),
+            Ok(Ending::Failing(jobs)) => Ok(Reply::Block { reason: Logged::fetched(pushed, &jobs, hub).to_string() }),
             Ok(Ending::Escalate(escalation)) => self.escalated(Some(&at), escalation),
             Err(step) => self.escalated(Some(&at), Escalation::Unread(step)),
         }
     }
 
-    fn cleared(&self, passed: &[Target]) -> Result<Uttered, Failure> {
+    fn cleared(&self, passed: &[Target]) -> Result<Reply<'static>, Failure> {
         let queued = self.local.queue().map(|file| self.ground.queue(file).map(|queue| (file, queue))).transpose()?;
         queued
             .and_then(|(file, queue)| {
@@ -138,15 +134,15 @@ impl<F: Files, S: Store> Desk<'_, '_, F, S> {
                 (cleared != queue).then(|| self.ground.queued(file, &cleared))
             })
             .transpose()?;
-        Ok(Uttered::silent(Ok(Outcome::Hooked(HookEvent::SubagentStop))))
+        Ok(Reply::Pass(Outcome::Hooked(HookEvent::SubagentStop)))
     }
 
-    fn escalated(&self, at: Option<&At>, escalation: Escalation) -> Result<Uttered, Failure> {
+    fn escalated(&self, at: Option<&At>, escalation: Escalation) -> Result<Reply<'static>, Failure> {
         let file = self.local.queue().ok_or(Failure::Unplaced)?;
         let item = Item::escalated(at.map(Target::from), escalation, self.directory);
         let queue = self.ground.queue(file)?.with(item);
         self.ground.queued(file, &queue)?;
-        Ok(Uttered::silent(Ok(Outcome::Escalated)))
+        Ok(Reply::Pass(Outcome::Escalated))
     }
 }
 

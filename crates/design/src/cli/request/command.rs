@@ -16,13 +16,13 @@ use crate::cli::failure::Failure;
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
 pub use crew::Crew;
-use hook::Hook;
+use hook::Hooked;
 use ingest::Ingest;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Command {
     Ingest(Persistence),
-    Hook(Hook),
+    Hook(Hooked),
 }
 
 impl Command {
@@ -35,8 +35,8 @@ impl Command {
         match words {
             [Self::INGEST] => Ok(Command::Ingest(Persistence::File)),
             [Self::INGEST, Self::DRY_RUN] => Ok(Command::Ingest(Persistence::DryRun)),
-            [Self::HOOK, Self::SETTINGS] => Ok(Command::Hook(Hook::Settings)),
-            [Self::HOOK, event] => Hook::named(event).map(Command::Hook),
+            [Self::HOOK, Self::SETTINGS] => Ok(Command::Hook(Hooked::Settings)),
+            [Self::HOOK, event] => Hooked::named(event).map(Command::Hook),
             _ => Err(Failure::Usage),
         }
     }
@@ -62,12 +62,12 @@ impl Command {
     }
 }
 
-impl Hook {
-    fn named(event: &str) -> Result<Hook, Failure> {
+impl Hooked {
+    fn named(event: &str) -> Result<Hooked, Failure> {
         HookEvent::VARIANTS
             .iter()
             .find(|known| <&str>::from(**known) == event)
-            .map(|known| Hook::On(*known))
+            .map(|known| Hooked::On(*known))
             .ok_or(Failure::Usage)
     }
 }

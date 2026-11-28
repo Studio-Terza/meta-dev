@@ -3,7 +3,7 @@ mod install;
 
 use std::path::{Path, PathBuf};
 
-use console_ports::Heard;
+use console_ports::Environment;
 use design_messages::PullNumber;
 use dispatch_ports::{Clock, Ran, Shell, Timeout};
 use file_ports::Files;
@@ -13,10 +13,10 @@ use store_ports::Store;
 
 use super::super::Ground;
 use super::super::crew::Crew;
+use super::reply::{Hook, Reply};
 use super::subagent::Hub;
 use crate::cli::failure::Failure;
 use crate::cli::request::{Held, InstallStep, Item, Local, Queue};
-use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
 pub use boundary::Used;
 use boundary::{Checkout, Landed, State};
@@ -48,26 +48,25 @@ struct Holding {
     worktree: Option<PathBuf>,
 }
 
-impl Used {
-    pub fn heard(heard: Heard) -> Result<Used, Failure> {
-        serde_json::from_str(&heard.into_inner()).map_err(Failure::Unheard)
-    }
-
-    pub fn answered<F: Files, S: Store, C: Clock, G: Shell>(
+impl Hook for Used {
+    fn answered<F: Files + Clone, S: Store, C: Clock, G: Shell>(
         &self,
+        _environment: &impl Environment,
         ground: &Ground<'_, F, S>,
         crew: &Crew<'_, C, G>,
-    ) -> Result<Uttered, Failure> {
-        let untouched = || Ok(Uttered::silent(Ok(Outcome::Hooked(HookEvent::PostToolUse))));
+    ) -> Result<Reply<'_>, Failure> {
+        let untouched = || Ok(Reply::Pass(Outcome::Hooked(HookEvent::PostToolUse)));
         self.merged().map_or_else(untouched, |pull| self.released(pull, ground, crew))
     }
+}
 
+impl Used {
     fn released<F: Files, S: Store, C: Clock, G: Shell>(
         &self,
         pull: PullNumber,
         ground: &Ground<'_, F, S>,
         crew: &Crew<'_, C, G>,
-    ) -> Result<Uttered, Failure> {
+    ) -> Result<Reply<'static>, Failure> {
         let local = ground.local();
         let releasing = Releasing { crew, directory: self.directory(), pull };
         let landing = match releasing.landed(&local) {
@@ -90,7 +89,7 @@ impl Used {
             }
             None => escalated.first().map_or(Ok(()), |_escalated| Err(Failure::Unplaced)),
         }?;
-        Ok(Uttered::silent(Ok(landing.outcome())))
+        Ok(Reply::Pass(landing.outcome()))
     }
 }
 
