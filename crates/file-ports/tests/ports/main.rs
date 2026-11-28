@@ -4,9 +4,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use test_failure::Failed;
 
-use file_ports::{
-    Absent, Bytes, Cached, Disk, FileFailure, Files, Kind, Memory, Offset, Size, Stamp, Stamps, Tail, Text,
-};
+use file_ports::{Absent, Bytes, Disk, FileFailure, Files, Kind, Memory, Offset, Size, Stamp, Stamps, Text};
 use invariants::Ignoring;
 use newtype::Wrapping;
 
@@ -131,49 +129,10 @@ impl Checks {
 }
 
 #[test]
-fn disk_the_fake_and_caches_over_both_keep_the_contract_and_answer_batches_path_by_path() -> Result<(), FileFailure> {
-    let [disk, cached] = [(); 2].map(|()| tempfile::tempdir().map_err(FileFailure::from));
-    let [memory, under_cache] = [(); 2].map(|()| Memory::default());
-    Checks::kept(&Disk, disk?.path())?;
-    Checks::kept(&memory, Path::new("/scratch"))?;
-    Checks::kept(&Cached::new(&Disk), cached?.path())?;
-    Checks::kept(&Cached::new(&under_cache), Path::new("/scratch"))
-}
-
-#[test]
-fn cached_reads_each_path_once_until_something_is_written_through_it() -> Result<(), FileFailure> {
-    let memory: Memory = [(PathBuf::from("/a.txt"), Bytes::from("first"))].into_iter().collect();
-    let cached = Cached::new(&memory);
-    let first = cached.read_text(Path::new("/a.txt"))?;
-    let listed_first = cached.entries(Path::new("/"))?;
-    memory.write(Path::new("/a.txt"), Bytes::from("second"))?;
-    memory.write(Path::new("/b.txt"), Bytes::from("b"))?;
-    let remembered = (cached.read_text(Path::new("/a.txt"))?, cached.read(Path::new("/a.txt"))?);
-    let listed = cached.entries(Path::new("/"))?;
-    cached.write(Path::new("/c.txt"), Bytes::from("c"))?;
-    let reread = cached.read_text(Path::new("/a.txt"))?;
-    assert_eq!([first, reread], [Text::new("first".to_owned()), Text::new("second".to_owned())]);
-    assert_eq!(remembered, (Text::new("first".to_owned()), Bytes::from("first")));
-    assert_eq!([listed_first, listed], [[PathBuf::from("/a.txt")], [PathBuf::from("/a.txt")]]);
-    assert_eq!(cached.entries(Path::new("/"))?.len(), 3);
-    Ok(())
-}
-
-#[test]
-fn cached_remembers_a_disk_failure_with_its_message_until_something_is_written_through_it() -> Result<(), FileFailure> {
-    let scratch = tempfile::tempdir().map_err(FileFailure::from)?;
-    let later = scratch.path().join("later.txt");
-    let cached = Cached::new(&Disk);
-    let first = cached.canonical(&later).map_err(|failure| failure.to_string());
-    Disk.write(&later, Bytes::from("now here"))?;
-    let remembered = cached.canonical(&later).map_err(|failure| failure.to_string());
-    let missing = matches!(cached.read_text(&later), Err(FileFailure::Missing(_)));
-    cached.write(&scratch.path().join("other.txt"), Bytes::from("other"))?;
-    assert_eq!(first, remembered);
-    let fresh = Disk.canonical(&scratch.path().join("absent"));
-    assert!(matches!((first, fresh), (Err(said), Err(failure)) if said == failure.to_string()));
-    assert_eq!((missing, cached.read_text(&later)?.as_ref().to_owned()), (false, "now here".to_owned()));
-    Ok(())
+fn disk_and_the_fake_keep_the_contract_and_answer_path_by_path() -> Result<(), FileFailure> {
+    let disk = tempfile::tempdir().map_err(FileFailure::from)?;
+    Checks::kept(&Disk, disk.path())?;
+    Checks::kept(&Memory::default(), Path::new("/scratch"))
 }
 
 #[test]
@@ -231,58 +190,9 @@ struct Batches;
 
 impl Batches {
     fn on(files: &impl Files, root: &Path) -> Result<(), FileFailure> {
-        let [a, b, absent] = ["a.txt", "copies/a.txt", "absent.txt"].map(|name| root.join(name));
-        files.write(&a, Bytes::from("a"))?;
-        files.create_directories(&root.join("copies"))?;
-        files.copy_into(std::slice::from_ref(&a), &root.join("copies"))?;
-        let both = [a.clone(), b.clone()];
-        assert_eq!(
-            files.read_many(&both).into_iter().collect::<Result<Vec<_>, _>>()?,
-            [Bytes::from("a"), Bytes::from("a")]
-        );
-        let texts = files.read_text_many(&both).into_iter().collect::<Result<Vec<_>, _>>()?;
-        assert_eq!(texts.iter().map(AsRef::as_ref).collect::<Vec<&str>>(), ["a", "a"]);
-        assert_eq!(files.kinds(&[a.clone(), absent.clone()]), [Kind::File, Kind::Missing]);
-        let canonical = files.canonical_many(&[a, absent.clone()]);
-        assert!(matches!(canonical.as_slice(), [Ok(_), Err(FileFailure::Missing(_))]));
-        let listed = files.entries_many(&[root.join("copies"), absent]);
-        assert!(matches!(listed.as_slice(), [Ok(_), Err(FileFailure::Missing(_))]));
-        assert_eq!(listed.into_iter().next().unwrap_or_else(|| Ok(Vec::new()))?, [b]);
-        files.write(&root.join("c.txt"), Bytes::from("c"))?;
-        let copied = files.copy_each_into(&[root.join("none"), root.join("c.txt")], &root.join("copies"));
-        assert!(matches!(copied.as_slice(), [Err(FileFailure::Missing(_)), Ok(())]));
-        assert_eq!(files.read_text(&root.join("copies/c.txt"))?.as_ref(), "c");
-        assert!(matches!(files.copy_into(&[root.join("none")], &root.join("copies")), Err(FileFailure::Missing(_))));
-        let mirrored = Memory::default();
-        files.mirror(root, &mirrored)?;
-        assert_eq!(
-            mirrored.entries(root)?,
-            files.entries(root).map(|mut entries| {
-                entries.sort();
-                entries
-            })?
-        );
-        assert_eq!(mirrored.read_text(&root.join("copies/c.txt"))?.as_ref(), "c");
-        assert!(matches!(files.mirror(&root.join("none"), &Memory::default()), Err(FileFailure::Missing(_))));
-        files.write(&root.join("copies/deep.txt"), Bytes::from("12345"))?;
-        assert_eq!(files.size(&root.join("copies/deep.txt"))?, Size::new(5));
-        assert_eq!(files.bytes_below(&root.join("copies"))?, Size::new(7));
-        assert!(matches!(files.bytes_below(&root.join("nothing-here")), Err(FileFailure::Missing(_))));
+        files.write(&root.join("deep.txt"), Bytes::from("12345"))?;
+        assert_eq!(files.size(&root.join("deep.txt"))?, Size::new(5));
         assert!(matches!(files.size(&root.join("nothing-here")), Err(FileFailure::Missing(_))));
-        let [deep, single] = ["copies/deep.txt", "copies/c.txt"].map(|name| root.join(name));
-        let sized = files.sizes(&[deep.clone(), root.join("nothing-here"), single]);
-        assert!(
-            matches!(sized.as_slice(), [Ok(five), Err(FileFailure::Missing(_)), Ok(one)] if *five == Size::new(5) && *one == Size::new(1))
-        );
-        let tails: Vec<Tail> = [3, 1]
-            .into_iter()
-            .filter_map(|at| Offset::try_new(at).ignoring(Ignored::Negative))
-            .map(|at| Tail::new(deep.clone(), at))
-            .collect();
-        assert_eq!(
-            files.read_tails(&tails).into_iter().collect::<Result<Vec<Bytes>, _>>()?,
-            [Bytes::from("45"), Bytes::from("2345")]
-        );
         Ok(())
     }
 }
@@ -294,7 +204,7 @@ fn disk_stamps_each_file_with_the_time_it_was_written_and_misses_an_absent_one()
     let scratch = tempfile::tempdir().map_err(FileFailure::from)?;
     let written = scratch.path().join("stamped.txt");
     Disk.write(&written, Bytes::from("now"))?;
-    let stamped = Disk.stamps_many(&[written, scratch.path().join("absent.txt")]);
+    let stamped = [Disk.stamps(&written), Disk.stamps(&scratch.path().join("absent.txt"))];
     let dated =
         |stamps: &Stamps| [Stamp::Born, Stamp::Touched].map(|stamp| stamps.dated(stamp).into_inner() > WRITTEN_AFTER);
     assert!(matches!(stamped.as_slice(), [Ok(stamps), Err(FileFailure::Missing(_))] if dated(stamps) == [true, true]));

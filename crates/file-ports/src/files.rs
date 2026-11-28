@@ -1,10 +1,9 @@
 use std::path::{Path, PathBuf};
 
 use invariants::Ignoring;
-use pipeline::Measure;
 
 use crate::ignored::Ignored;
-use crate::{Bytes, FileFailure, Kind, Offset, Size, Stamps, Tail, Text};
+use crate::{Bytes, FileFailure, Kind, Offset, Size, Stamps, Text};
 
 pub trait Files {
     fn read(&self, path: &Path) -> Result<Bytes, FileFailure>;
@@ -33,75 +32,4 @@ pub trait Files {
     fn size(&self, path: &Path) -> Result<Size, FileFailure>;
 
     fn stamps(&self, path: &Path) -> Result<Stamps, FileFailure>;
-
-    fn read_many(&self, paths: &[impl AsRef<Path>]) -> Vec<Result<Bytes, FileFailure>> {
-        paths.iter().map(|path| self.read(path.as_ref())).collect()
-    }
-
-    fn read_text_many(&self, paths: &[impl AsRef<Path>]) -> Vec<Result<Text, FileFailure>> {
-        paths.iter().map(|path| self.read_text(path.as_ref())).collect()
-    }
-
-    fn copy_into(&self, paths: &[impl AsRef<Path>], directory: &Path) -> Result<(), FileFailure> {
-        paths
-            .iter()
-            .map(AsRef::as_ref)
-            .try_for_each(|path| self.copy(path, &directory.join(path.file_name().unwrap_or_default())))
-    }
-
-    fn copy_each_into(&self, paths: &[impl AsRef<Path>], directory: &Path) -> Vec<Result<(), FileFailure>> {
-        paths
-            .iter()
-            .map(AsRef::as_ref)
-            .map(|path| self.copy(path, &directory.join(path.file_name().unwrap_or_default())))
-            .collect()
-    }
-
-    fn entries_many(&self, directories: &[impl AsRef<Path>]) -> Vec<Result<Vec<PathBuf>, FileFailure>> {
-        directories.iter().map(|directory| self.entries(directory.as_ref())).collect()
-    }
-
-    fn canonical_many(&self, paths: &[impl AsRef<Path>]) -> Vec<Result<PathBuf, FileFailure>> {
-        paths.iter().map(|path| self.canonical(path.as_ref())).collect()
-    }
-
-    fn kinds(&self, paths: &[impl AsRef<Path>]) -> Vec<Kind> {
-        paths.iter().map(|path| self.kind(path.as_ref())).collect()
-    }
-
-    fn sizes(&self, paths: &[impl AsRef<Path>]) -> Vec<Result<Size, FileFailure>> {
-        paths.iter().map(|path| self.size(path.as_ref())).collect()
-    }
-
-    fn stamps_many(&self, paths: &[impl AsRef<Path>]) -> Vec<Result<Stamps, FileFailure>> {
-        paths.iter().map(|path| self.stamps(path.as_ref())).collect()
-    }
-
-    fn read_tails(&self, tails: &[Tail]) -> Vec<Result<Bytes, FileFailure>> {
-        tails.iter().map(|tail| self.read_from(tail.as_ref(), tail.offset())).collect()
-    }
-
-    fn bytes_below(&self, root: &Path) -> Result<Size, FileFailure> {
-        self.entries(root)?.iter().map(|path| self.counted(path)).collect::<Result<Vec<Size>, _>>().map(Size::total)
-    }
-
-    fn counted(&self, path: &Path) -> Result<Size, FileFailure> {
-        match self.kind(path) {
-            Kind::File => self.size(path),
-            Kind::Directory => self.bytes_below(path),
-            Kind::Link | Kind::Missing => Ok(Size::default()),
-        }
-    }
-
-    fn mirror(&self, root: &Path, into: &impl Files) -> Result<(), FileFailure>
-    where
-        Self: Sized,
-    {
-        into.create_directories(root)?;
-        self.entries(root)?.iter().try_for_each(|path| {
-            Some(path)
-                .filter(|candidate| self.kind(candidate) == Kind::Directory)
-                .map_or_else(|| into.write(path, self.read(path)?), |directory| self.mirror(directory, into))
-        })
-    }
 }
