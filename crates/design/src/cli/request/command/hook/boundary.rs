@@ -7,13 +7,14 @@ use std::path::PathBuf;
 
 use console_ports::{Heard, Shown};
 use design_messages::{LastSaid, Overran, Overruns, OwnerHistory, Said};
-use dispatch_ports::{Clock, Shell, Wall};
-use file_ports::{Epoch, Files};
+use dispatch_ports::Shell;
+use file_ports::Files;
 use grammar::lines::Lines;
 use grammar::spec_line::Attachment;
 use json_ports::Json;
 use newtype::Wrapping;
 use store_ports::Store;
+use timer_ports::{Clock, Wall};
 use transcript_ports::{Body, SessionId, Uuid};
 
 use super::super::Ground;
@@ -170,7 +171,7 @@ impl Stopping {
         "OVERRUN: these background tasks ran 20 minutes without finishing or writing output; check and stop them:";
 
     pub fn tasks<F: Files, S: Store>(&self, ground: &Ground<'_, F, S>, now: Wall) -> Option<Tasks> {
-        let harness = Harness::new(ground.files(), Epoch::new(now.into_inner()));
+        let harness = Harness::new(ground.files(), now);
         self.transcript.as_deref().map(|transcript| harness.tasks(transcript))
     }
 

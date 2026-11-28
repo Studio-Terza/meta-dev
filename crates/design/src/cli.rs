@@ -7,10 +7,11 @@ pub(crate) mod uttered;
 use std::ffi::OsString;
 
 use console_ports::Environment;
-use dispatch_ports::{ClockFiller, ShellFiller};
+use dispatch_ports::ShellFiller;
 use file_ports::Files;
 use port_core::Run;
 use store_ports::Opens;
+use timer_ports::ClockFiller;
 
 pub use count::Count;
 pub use failure::Failure;

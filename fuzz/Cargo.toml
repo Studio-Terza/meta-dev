@@ -23,7 +23,6 @@ file-ports = { path = "../crates/file-ports" }
 invariants = { path = "../crates/invariants" }
 lint = { path = "../crates/lint" }
 proptest.workspace = true
-timer-ports = { path = "../crates/timer-ports" }
 
 [lints]
 workspace = true

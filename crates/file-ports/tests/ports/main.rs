@@ -197,7 +197,7 @@ impl Batches {
     }
 }
 
-const WRITTEN_AFTER: i64 = 1_767_225_600;
+const WRITTEN_AFTER: i64 = 1_767_225_600_000_000_000;
 
 #[test]
 fn disk_stamps_each_file_with_the_time_it_was_written_and_misses_an_absent_one() -> Result<(), FileFailure> {

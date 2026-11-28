@@ -12,9 +12,7 @@ use test_failure::{Cases, Failed, Golden};
 
 use console_ports::{Complaint, Heard, Shown, Variables};
 use design::{Agents, Cli, Failure};
-use dispatch_ports::{
-    Call, ClockFiller, DispatchFailure, Pause, Printed, Ran, ShellFiller, Wall, clock_ops, shell_ops,
-};
+use dispatch_ports::{Call, DispatchFailure, Printed, Ran, ShellFiller, shell_ops};
 use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Offset, Size, Stamps, Text};
 use grammar::letters::Letters;
 use invariants::{Unpoisoned, invariant, invariants};
@@ -25,6 +23,7 @@ use serde_json::{Value, json};
 use sqlite_ports::SqliteOpener;
 use store_ports::{Opens, Schema};
 use tempfile::TempDir;
+use timer_ports::{ClockFiller, Elapsed, Pause, Wall, clock_ops};
 
 use ports::Design;
 
@@ -45,14 +44,14 @@ invariants! {
 
 #[derive(Debug)]
 struct Stepping {
-    now: SystemTime,
+    now: Wall,
     slept: AtomicU64,
     reads: AtomicI64,
 }
 
 impl Stepping {
     fn wall(&self) -> Wall {
-        Wall::from(self.now + Duration::from_secs(self.slept.load(Ordering::Relaxed)))
+        self.now.after(Elapsed::from(Duration::from_secs(self.slept.load(Ordering::Relaxed))))
     }
 }
 
@@ -100,7 +99,7 @@ struct Scripted {
 struct Script<'story> {
     answers: Vec<&'story Scripted>,
     asked: Mutex<Vec<Asked>>,
-    at: SystemTime,
+    at: Wall,
     files: Rerooted,
 }
 
@@ -151,11 +150,11 @@ impl Script<'_> {
             .chain(call.arguments().iter().cloned())
             .collect::<Vec<_>>()
             .join(" ");
-        let start = Wall::from(self.at).into_inner();
+        let ahead = Duration::from(call.deadline().into_inner().since(self.at)).as_secs();
         let elsewhere = Some(call.directory()).filter(|directory| *directory != Path::new(AGENT));
         let place = elsewhere.map_or_else(String::new, |directory| format!(" in {}", directory.display()));
         let fed = call.input().map_or_else(String::new, |prompt| format!(" fed:\n{prompt}\n"));
-        let line = format!("+{} {spoken}{place}{fed}\n", call.deadline().into_inner().into_inner() - start);
+        let line = format!("+{ahead} {spoken}{place}{fed}\n");
         let mut log = self.asked.lock().unpoisoned();
         let matching: Vec<&&Scripted> =
             self.answers.iter().filter(|answer| answer.answers(call, &spoken).is_some()).collect();
@@ -367,12 +366,12 @@ enum Reminded {
 #[derive(Debug)]
 struct Home {
     directory: TempDir,
-    at: SystemTime,
+    at: Wall,
 }
 
 impl Home {
     fn new() -> Result<Home, Failed> {
-        let home = Home { directory: TempDir::new()?, at: SystemTime::now() };
+        let home = Home { directory: TempDir::new()?, at: Wall::now() };
         fs::create_dir_all(home.real(&Home::workspace().join(".meta")))?;
         fs::create_dir_all(home.real(&Home::placed()))?;
         Ok(home)
@@ -452,7 +451,10 @@ impl Home {
         fs::create_dir_all(&folder)?;
         let written = folder.join(&task.file);
         fs::write(&written, &task.text)?;
-        File::options().write(true).open(&written)?.set_modified(self.at - Duration::from_mins(task.quiet))?;
+        File::options()
+            .write(true)
+            .open(&written)?
+            .set_modified(SystemTime::from(self.at) - Duration::from_mins(task.quiet))?;
         Ok(())
     }
 

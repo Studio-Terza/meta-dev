@@ -21,6 +21,7 @@ invariants = { path = "../invariants" }
 console-ports = { path = "../console-ports" }
 design-messages = { path = "../design-messages" }
 dispatch-ports = { path = "../dispatch-ports" }
+timer-ports = { path = "../timer-ports" }
 file-ports = { path = "../file-ports" }
 grammar = { path = "../grammar" }
 json-ports = { path = "../json-ports" }

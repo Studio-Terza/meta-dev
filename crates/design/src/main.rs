@@ -4,9 +4,10 @@ use std::process::ExitCode;
 
 use console_ports::{Answer, Process, Shown};
 use design::{Agents, Cli};
-use dispatch_ports::{SystemClock, SystemShell};
+use dispatch_ports::SystemShell;
 use file_ports::Disk;
 use sqlite_ports::SqliteOpener;
+use timer_ports::SystemClock;
 
 fn main() -> ExitCode {
     Process::tell(|arguments| {

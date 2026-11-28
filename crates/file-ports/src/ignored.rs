@@ -5,6 +5,5 @@ invariants::ignored! {
         Unreadable => "metadata that cannot be read reads as a missing path",
         Unstored => "appending to a path with nothing stored starts from empty",
         Outside => "a held path outside the directory is not one of its entries",
-        BeforeEpoch => "a file time before 1970 reads as the epoch itself",
     }
 }

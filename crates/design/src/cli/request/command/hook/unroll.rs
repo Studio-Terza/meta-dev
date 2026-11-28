@@ -3,12 +3,13 @@ use std::fmt;
 use std::path::{Component, Path, PathBuf};
 
 use console_ports::{Environment, Heard, Shown};
-use dispatch_ports::{Clock, Shell};
+use dispatch_ports::Shell;
 use file_ports::{Files, Kind};
 use grammar::shell::{Deletion, Directory, Edit, Edited, Editor, Plain, Target, Unreadable};
 use json_ports::Json;
 use newtype::Wrapping;
 use store_ports::Store;
+use timer_ports::Clock;
 
 use super::super::Ground;
 use super::super::crew::Crew;

@@ -21,6 +21,6 @@ pub use kind::Kind;
 pub use memory::Memory;
 pub use offset::Offset;
 pub use size::Size;
-pub use stamps::{Epoch, Stamp, Stamps};
+pub use stamps::{Stamp, Stamps};
 pub use tail::Tail;
 pub use text::Text;

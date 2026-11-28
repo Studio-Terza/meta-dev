@@ -14,8 +14,8 @@ bench = false
 invariants = { path = "../invariants" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
-proptest.workspace = true
 thiserror.workspace = true
+timer-ports = { path = "../timer-ports" }
 
 [dev-dependencies]
 serde.workspace = true

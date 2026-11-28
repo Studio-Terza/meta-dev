@@ -3,13 +3,14 @@ use std::iter;
 use std::os::unix::process::CommandExt;
 use std::process::{Child, ChildStdin, ChildStdout, Command, ExitStatus, Stdio};
 use std::thread::{self, JoinHandle};
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use invariants::Ignoring;
 use port_core::{Pass, Real};
+use timer_ports::{Deadline, Due, Wall};
 
 use crate::ignored::Ignored;
-use crate::{Call, Deadline, DispatchFailure, Due, Printed, Ran, ShellFiller, Wall, shell_ops};
+use crate::{Call, DispatchFailure, Printed, Ran, ShellFiller, shell_ops};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SystemShell;
@@ -79,7 +80,7 @@ impl SystemShell {
     }
 
     fn waited(child: &mut Child, deadline: Deadline) -> Result<Waited, DispatchFailure> {
-        iter::repeat_with(|| Wall::from(SystemTime::now()))
+        iter::repeat_with(Wall::now)
             .take_while(|now| deadline.due(*now) == Due::Pending)
             .find_map(|_| SystemShell::checked(child).transpose())
             .unwrap_or(Ok(Waited::Overdue))

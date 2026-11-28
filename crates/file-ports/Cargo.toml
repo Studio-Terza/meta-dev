@@ -16,6 +16,7 @@ newtype = { path = "../newtype" }
 pipeline = { path = "../pipeline" }
 proptest.workspace = true
 thiserror.workspace = true
+timer-ports = { path = "../timer-ports" }
 
 [dev-dependencies]
 test-failure = { path = "../test-failure" }

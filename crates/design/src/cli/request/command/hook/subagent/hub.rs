@@ -4,12 +4,13 @@ use std::num::{NonZeroU32, NonZeroU64};
 use std::path::Path;
 
 use design_messages::{CheckName, CommitSha, PullNumber};
-use dispatch_ports::{Clock, Deadline, Due, Pause, Ran, Shell, Timeout};
+use dispatch_ports::{Ran, Shell};
 use file_ports::Files;
 use grammar::spec_line::Attachment;
 use invariants::Ignoring;
 use json_ports::{Decode, Json};
 use store_ports::Store;
+use timer_ports::{Clock, Deadline, Due, Pause, Timeout};
 
 use super::super::super::Ground;
 use super::super::super::crew::Crew;

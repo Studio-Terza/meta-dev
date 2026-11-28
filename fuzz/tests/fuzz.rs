@@ -11,7 +11,6 @@ use proptest::collection::vec;
 use proptest::prelude::{BoxedStrategy, Strategy, any, prop_assert_eq, prop_oneof};
 use proptest::sample::{Index, select};
 use proptest::test_runner::{Config, TestCaseError, TestError, TestRunner};
-use timer_ports::Monotonic;
 
 ignored! {
     enum Ignored {
@@ -141,13 +140,7 @@ impl Input {
         .into_iter()
         .collect();
         let mut err = Vec::new();
-        let verdict = Cli::from_args([OsString::from(ROOT)]).verdict(
-            &files,
-            Path::new(""),
-            Monotonic::default(),
-            &mut Vec::new(),
-            &mut err,
-        );
+        let verdict = Cli::from_args([OsString::from(ROOT)]).verdict(&files, Path::new(""), &mut Vec::new(), &mut err);
         Run { verdict, err }
     }
 

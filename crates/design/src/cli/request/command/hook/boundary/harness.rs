@@ -2,8 +2,9 @@ mod boundary;
 
 use std::path::{Path, PathBuf};
 
-use file_ports::{Epoch, Files, Kind};
+use file_ports::{Files, Kind};
 use invariants::Ignoring;
+use timer_ports::Wall;
 
 use crate::cli::request::ignored::Ignored;
 pub use boundary::{Halt, Stopped, Tasks};
@@ -12,7 +13,7 @@ use boundary::{Output, Task};
 #[derive(Debug)]
 pub struct Harness<'files, F: Files> {
     files: &'files F,
-    now: Epoch,
+    now: Wall,
 }
 
 impl<'files, F: Files> Harness<'files, F> {
@@ -20,7 +21,7 @@ impl<'files, F: Files> Harness<'files, F> {
     const TASKS: &'static str = "tasks";
     const SUBAGENTS: &'static str = "subagents";
 
-    pub fn new(files: &'files F, now: Epoch) -> Harness<'files, F> {
+    pub fn new(files: &'files F, now: Wall) -> Harness<'files, F> {
         Harness { files, now }
     }
 

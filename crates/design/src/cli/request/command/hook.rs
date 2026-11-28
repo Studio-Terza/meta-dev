@@ -7,10 +7,11 @@ mod unroll;
 
 use console_ports::Environment;
 use design_messages::EndedTasks;
-use dispatch_ports::{Clock, Shell};
+use dispatch_ports::Shell;
 use file_ports::Files;
 use newtype::Enumerated;
 use store_ports::Store;
+use timer_ports::Clock;
 
 use super::Ground;
 use super::crew::Crew;

@@ -2,9 +2,10 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 use std::slice;
 
-use dispatch_ports::{Call, Clock, Deadline, Pause, Ran, Shell, Timeout, Wall};
+use dispatch_ports::{Call, Ran, Shell};
 use invariants::Ignoring;
 use json_ports::Json;
+use timer_ports::{Clock, Deadline, Pause, Timeout, Wall};
 
 use crate::cli::request::ignored::Ignored;
 

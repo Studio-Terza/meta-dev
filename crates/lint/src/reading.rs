@@ -9,7 +9,6 @@ use invariants::Unpoisoned;
 use pipeline::Measure;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use syn::Item;
-use timer_ports::Timer;
 
 use crate::failure::Failure;
 use crate::gate::Gate;
@@ -56,17 +55,16 @@ struct Declared {
 }
 
 #[derive(Debug)]
-pub(crate) struct Reader<'run, T> {
-    timer: &'run T,
+pub(crate) struct Reader<'run> {
     tree: &'run Tree,
     seen: Mutex<BTreeSet<Arc<Path>>>,
 }
 
-impl<'run, T: Timer + Sync> Reader<'run, T> {
+impl<'run> Reader<'run> {
     const MODULE_FILE: &'static str = "mod.rs";
 
-    pub(crate) fn new(timer: &'run T, tree: &'run Tree) -> Reader<'run, T> {
-        Reader { timer, tree, seen: Mutex::default() }
+    pub(crate) fn new(tree: &'run Tree) -> Reader<'run> {
+        Reader { tree, seen: Mutex::default() }
     }
 
     pub(crate) fn read(&self, roots: Vec<CrateRoot>) -> Read {
@@ -97,10 +95,10 @@ impl<'run, T: Timer + Sync> Reader<'run, T> {
         let shown = self.tree.shown(&module.real);
         let text = self.tree.text(&module.real).unwrap_or_default().to_owned();
         let mut spent = Spent::default();
-        let parsed = spent.timed(self.timer, Stage::Parse, || syn::parse_file(&text));
+        let parsed = spent.timed(Stage::Parse, || syn::parse_file(&text));
         match parsed {
             Ok(file) => {
-                let declared = Reader::<T>::declared(&file.items, &[], module.path.gate());
+                let declared = Reader::declared(&file.items, &[], module.path.gate());
                 let children: Vec<Result<Module, Failure>> =
                     declared.iter().map(|declaration| self.child(module, declaration)).collect();
                 let source = Source::new(
@@ -111,7 +109,7 @@ impl<'run, T: Timer + Sync> Reader<'run, T> {
                     module.kind,
                     text,
                 );
-                let facts = spent.timed(self.timer, Stage::Visit, || Walker::walked(&source, &file));
+                let facts = spent.timed(Stage::Visit, || Walker::walked(&source, &file));
                 self.below(Read { failures: Vec::new(), facts, spent }, children)
             }
             Err(source) => {
@@ -143,7 +141,7 @@ impl<'run, T: Timer + Sync> Reader<'run, T> {
                 match &module.content {
                     Some((_, inner)) => {
                         let deeper: Vec<String> = inline.iter().cloned().chain([name]).collect();
-                        Reader::<T>::declared(inner, &deeper, gated)
+                        Reader::declared(inner, &deeper, gated)
                     }
                     None => vec![Declared {
                         name,
@@ -169,7 +167,7 @@ impl<'run, T: Timer + Sync> Reader<'run, T> {
             Some(path) => vec![nested.join(path)],
             None => vec![
                 nested.join(format!("{}.rs", declared.name)),
-                nested.join(&declared.name).join(Reader::<T>::MODULE_FILE),
+                nested.join(&declared.name).join(Reader::MODULE_FILE),
             ],
         };
         let chosen = candidates
@@ -180,11 +178,8 @@ impl<'run, T: Timer + Sync> Reader<'run, T> {
                 path: candidates.first().map_or_default(|first| self.tree.shown(first).to_path_buf()),
                 source: FileFailure::Missing(io::Error::from(io::ErrorKind::NotFound)),
             })?;
-        let nesting = if chosen.file_name() == Some(OsStr::new(Reader::<T>::MODULE_FILE)) {
-            Nesting::Beside
-        } else {
-            Nesting::Below
-        };
+        let nesting =
+            if chosen.file_name() == Some(OsStr::new(Reader::MODULE_FILE)) { Nesting::Beside } else { Nesting::Below };
         Ok(Module {
             real: Arc::from(chosen),
             path: parent.path.child(declared.inline.iter().cloned().chain([declared.name.clone()]), declared.gate),

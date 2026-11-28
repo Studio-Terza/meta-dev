@@ -1,8 +1,9 @@
 mod boundary;
 
 use design_messages::{OwnerHistory, Quote, Said};
-use dispatch_ports::{Clock, Shell, Timeout};
+use dispatch_ports::Shell;
 use store_ports::Store;
+use timer_ports::{Clock, Timeout};
 use transcript_ports::Body;
 
 use super::super::crew::{Crew, Prompt};

@@ -1,9 +1,10 @@
 use console_ports::Shown;
-use dispatch_ports::{Clock, Shell};
+use dispatch_ports::Shell;
 use file_ports::Files;
 use invariants::Ignoring;
 use json_ports::{Fields, Json, Lenient};
 use store_ports::Store;
+use timer_ports::Clock;
 use transcript_ports::Body;
 
 use super::super::Ground;

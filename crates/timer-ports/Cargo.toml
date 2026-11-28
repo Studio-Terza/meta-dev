@@ -11,8 +11,12 @@ doctest = false
 bench = false
 
 [dependencies]
+chrono = { version = "0.4.45", default-features = false, features = ["std", "clock"] }
+invariants = { path = "../invariants" }
+newtype = { path = "../newtype" }
 pipeline = { path = "../pipeline" }
 port-core = { path = "../port-core" }
+proptest.workspace = true
 
 [lints]
 workspace = true
