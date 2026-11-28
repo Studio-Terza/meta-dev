@@ -14,16 +14,16 @@ bench = false
 file-ports = { path = "../file-ports" }
 grammar = { path = "../grammar" }
 invariants = { path = "../invariants" }
+json-ports = { path = "../json-ports" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
+proptest.workspace = true
 serde.workspace = true
-serde_json.workspace = true
 strum.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
 test-failure = { path = "../test-failure" }
-proptest.workspace = true
 
 [lints]
 workspace = true

@@ -1,9 +1,8 @@
 use invariants::Ignoring;
-use serde::Deserialize;
+use json_ports::{JsonFailure, Object};
 
 use super::classified::Classified;
 use super::closing::Closing;
-use super::object::Object;
 use super::said::{Hears, Said};
 use super::stamp::Stamp;
 use crate::{Authorship, Body, Ignored, Line, Skipped, TaskId, Unrecognised};
@@ -14,11 +13,11 @@ struct Failed;
 #[derive(Clone, Copy, Debug)]
 struct Synthetic;
 
-#[derive(Clone, Copy, Debug, Default, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, serde::Deserialize)]
 #[serde(from = "bool")]
 struct Delivery(Option<Failed>);
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, serde::Deserialize)]
 #[serde(from = "String")]
 struct Model(Option<Synthetic>);
 
@@ -29,7 +28,7 @@ enum Written {
     ToolUse { stopped: Option<TaskId> },
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 #[serde(tag = "name")]
 enum Used {
     TaskStop {
@@ -39,7 +38,7 @@ enum Used {
     Other,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Stopping {
     task_id: TaskId,
 }
@@ -58,7 +57,7 @@ enum Block {
     Unknown(Unrecognised),
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, serde::Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 enum Reason {
     EndTurn,
@@ -93,7 +92,7 @@ impl Assistant {
     const DELIVERY: &'static str = "isApiErrorMessage";
     const MESSAGE: &'static str = "message";
 
-    pub fn read(entry: Object<'_>) -> Result<Assistant, serde_json::Error> {
+    pub fn read(entry: Object<'_>) -> Result<Assistant, JsonFailure> {
         let delivery = entry.present(Self::DELIVERY).map_or_else(|| Ok(Delivery::default()), Object::whole)?;
         Ok(Assistant { stamp: entry.whole()?, delivery, message: Message::read(entry.required(Self::MESSAGE)?)? })
     }
@@ -111,7 +110,7 @@ impl Message {
     const CONTENT: &'static str = "content";
     const REASON: &'static str = "stop_reason";
 
-    fn read(message: Object<'_>) -> Result<Message, serde_json::Error> {
+    fn read(message: Object<'_>) -> Result<Message, JsonFailure> {
         let content: Vec<Block> =
             message.required(Self::CONTENT)?.each()?.into_iter().map(Block::read).collect::<Result<_, _>>()?;
         let reason = message.field(Self::REASON).ignoring(Ignored::NotKnown).flatten();
@@ -120,7 +119,7 @@ impl Message {
 }
 
 impl Block {
-    fn read(block: Object<'_>) -> Result<Block, serde_json::Error> {
+    fn read(block: Object<'_>) -> Result<Block, JsonFailure> {
         Written::read(block).map_or_else(|| block.whole().map(Block::Unknown), |written| Ok(Block::Known(written)))
     }
 }

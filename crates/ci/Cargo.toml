@@ -20,10 +20,10 @@ bench = false
 console-ports = { path = "../console-ports" }
 grammar = { path = "../grammar" }
 invariants = { path = "../invariants" }
+json-ports = { path = "../json-ports" }
 serde.workspace = true
-serde_json.workspace = true
 thiserror.workspace = true
-toml.workspace = true
+toml-ports = { path = "../toml-ports" }
 
 [dev-dependencies]
 tempfile.workspace = true

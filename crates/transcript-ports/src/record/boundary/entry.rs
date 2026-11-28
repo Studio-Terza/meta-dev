@@ -2,21 +2,19 @@ mod assistant;
 mod attachment;
 mod classified;
 mod closing;
-mod object;
 mod said;
 mod stamp;
 mod user;
 mod voice;
 
 use invariants::Ignoring;
-use serde_json::Value;
+use json_ports::{JsonFailure, Object};
 
 use crate::{Ignored, Line, Unrecognised};
 use assistant::Assistant;
 use attachment::Attached;
 use classified::Classified;
 pub use closing::Closing;
-use object::Object;
 use stamp::Passing;
 use user::User;
 
@@ -109,8 +107,7 @@ impl Known {
 }
 
 impl Entry {
-    pub fn read(value: &Value) -> Result<Entry, serde_json::Error> {
-        let entry = Object::new(value);
+    pub fn read(entry: Object<'_>) -> Result<Entry, JsonFailure> {
         Known::read(entry).map_or_else(|| entry.whole().map(Entry::Unknown), |known| Ok(Entry::Known(known)))
     }
 }

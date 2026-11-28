@@ -66,10 +66,10 @@ impl Strategy {
     fn mapped(checking: Checking) -> TokenStream {
         match checking {
             Checking::Unchecked => quote! {
-                ::newtype::proptest::strategy::Strategy::prop_map(inner, <Self as ::newtype::Newtype>::new)
+                ::proptest::strategy::Strategy::prop_map(inner, <Self as ::newtype::Newtype>::new)
             },
             Checking::Checked => quote! {
-                ::newtype::proptest::strategy::Strategy::prop_filter_map(
+                ::proptest::strategy::Strategy::prop_filter_map(
                     inner,
                     "the check refuses this value",
                     |value| ::newtype::Ignoring::ignoring(Self::try_new(value), ::newtype::Ignored::Refused),
@@ -92,15 +92,15 @@ impl Deserializing {
         let mut borrowing = generics;
         borrowing.params.insert(0, GenericParam::Lifetime(LifetimeParam::new(parse_quote!('newtype))));
         let predicates = &mut borrowing.make_where_clause().predicates;
-        predicates.push(parse_quote!(#inner: ::newtype::serde::Deserialize<'newtype>));
+        predicates.push(parse_quote!(#inner: ::serde::Deserialize<'newtype>));
         predicates.extend(required);
         let (implemented, _, bounds) = borrowing.split_for_impl();
         quote! {
-            impl #implemented ::newtype::serde::Deserialize<'newtype> for #named #bounds {
-                fn deserialize<Arriving: ::newtype::serde::Deserializer<'newtype>>(
+            impl #implemented ::serde::Deserialize<'newtype> for #named #bounds {
+                fn deserialize<Arriving: ::serde::Deserializer<'newtype>>(
                     arriving: Arriving,
                 ) -> ::core::result::Result<Self, Arriving::Error> {
-                    let read = <#inner as ::newtype::serde::Deserialize<'newtype>>::deserialize(arriving);
+                    let read = <#inner as ::serde::Deserialize<'newtype>>::deserialize(arriving);
                     #built
                 }
             }
@@ -187,13 +187,13 @@ impl Expansion for Input<Strategy> {
         let parameters = wrapped.settings.parameters(inner);
         let source = wrapped.settings.source(inner);
         Ok(quote! {
-            impl #implemented ::newtype::proptest::arbitrary::Arbitrary for #name #arguments #bounds {
+            impl #implemented ::proptest::arbitrary::Arbitrary for #name #arguments #bounds {
                 type Parameters = #parameters;
-                type Strategy = ::newtype::proptest::strategy::BoxedStrategy<Self>;
+                type Strategy = ::proptest::strategy::BoxedStrategy<Self>;
 
                 fn arbitrary_with(parameters: Self::Parameters) -> Self::Strategy {
                     #(#source)*
-                    ::newtype::proptest::strategy::Strategy::boxed(#mapped)
+                    ::proptest::strategy::Strategy::boxed(#mapped)
                 }
             }
         })
@@ -238,7 +238,7 @@ impl Expansion for Input<CheckedDeserializing> {
                 ::core::result::Result::and_then(read, |inner| {
                     ::core::result::Result::map_err(
                         <Self as ::newtype::Guarded>::try_new(inner),
-                        <Arriving::Error as ::newtype::serde::de::Error>::custom,
+                        <Arriving::Error as ::serde::de::Error>::custom,
                     )
                 })
             },
@@ -253,15 +253,15 @@ impl Expansion for Input<Serializing> {
         let inner = wrapped.field.inner();
         let member = wrapped.field.member();
         let mut generics = wrapped.generics;
-        generics.make_where_clause().predicates.push(parse_quote!(#inner: ::newtype::serde::Serialize));
+        generics.make_where_clause().predicates.push(parse_quote!(#inner: ::serde::Serialize));
         let (implemented, arguments, bounds) = generics.split_for_impl();
         Ok(quote! {
-            impl #implemented ::newtype::serde::Serialize for #name #arguments #bounds {
-                fn serialize<Leaving: ::newtype::serde::Serializer>(
+            impl #implemented ::serde::Serialize for #name #arguments #bounds {
+                fn serialize<Leaving: ::serde::Serializer>(
                     &self,
                     leaving: Leaving,
                 ) -> ::core::result::Result<Leaving::Ok, Leaving::Error> {
-                    ::newtype::serde::Serialize::serialize(&self.#member, leaving)
+                    ::serde::Serialize::serialize(&self.#member, leaving)
                 }
             }
         })

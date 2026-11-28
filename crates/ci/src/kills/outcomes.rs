@@ -1,12 +1,12 @@
 use std::path::{Path, PathBuf};
 
-use serde::{Deserialize, Serialize};
+use json_ports::Json;
 
 use crate::failure::Failure;
 use crate::kills::log::Log;
 use crate::ports::Disk;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, serde::Deserialize, serde::Serialize)]
 #[serde(transparent)]
 pub(crate) struct Mutant(String);
 
@@ -28,30 +28,30 @@ pub(crate) enum Fate<'outcome> {
     Unviable(&'outcome Mutant),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Outcomes {
     outcomes: Vec<Outcome>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Outcome {
     scenario: Scenario,
     summary: Summary,
     log_path: PathBuf,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 enum Scenario {
     Baseline,
     Mutant(Named),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Named {
     name: Mutant,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, serde::Deserialize)]
 enum Summary {
     Success,
     CaughtMutant,
@@ -67,7 +67,7 @@ impl Shard {
     pub(crate) fn read(directory: &Path) -> Result<Vec<Ran>, Failure> {
         let path = directory.join(Shard::OUTCOMES);
         let text = Disk::read(&path)?;
-        let outcomes: Outcomes = serde_json::from_str(&text).map_err(|source| Failure::Outcomes { path, source })?;
+        let outcomes: Outcomes = Json::read(&text).map_err(|source| Failure::Outcomes { path, source })?;
         outcomes.outcomes.into_iter().map(|outcome| outcome.ran(directory)).collect()
     }
 }

@@ -8,8 +8,7 @@ use dispatch_ports::{Clock, Deadline, Due, Pause, Ran, Shell, Timeout};
 use file_ports::Files;
 use grammar::spec_line::Attachment;
 use invariants::Ignoring;
-use serde::Deserialize;
-use serde::de::DeserializeOwned;
+use json_ports::{Decode, Json};
 use store_ports::Store;
 
 use super::super::super::Ground;
@@ -31,20 +30,20 @@ pub enum Verdict {
     Red(Vec<FailedJob>),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Head {
     #[serde(rename = "headRefOid")]
     head: CommitSha,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Merging {
     mergeable: Mergeability,
     #[serde(rename = "mergeStateStatus")]
     state: MergeState,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 enum Mergeability {
     #[serde(rename = "MERGEABLE")]
     Clean,
@@ -54,7 +53,7 @@ enum Mergeability {
     Unknown,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 enum MergeState {
     Behind,
@@ -69,14 +68,14 @@ pub enum Merge {
     Stale,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Check {
     name: CheckName,
     bucket: Bucket,
     link: Link,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 enum Bucket {
     Pass,
@@ -93,11 +92,11 @@ enum State {
     Waiting,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(from = "String")]
 struct Link(Option<JobId>);
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Run {
     #[serde(rename = "databaseId")]
     id: NonZeroU64,
@@ -110,18 +109,18 @@ struct Attempt {
     number: u32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Attempted {
     jobs: Vec<Job>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Job {
     name: CheckName,
     conclusion: Conclusion,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 enum Conclusion {
     Success,
@@ -144,28 +143,28 @@ pub enum Unopened {
 #[derive(Clone, Copy, Debug)]
 struct Body<'spec>(&'spec Attachment);
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Found {
     data: Data,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Data {
     repository: Holder,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Holder {
     #[serde(rename = "ref")]
     reference: Option<Targeted>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Targeted {
     target: Oid,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Oid {
     oid: CommitSha,
 }
@@ -198,10 +197,10 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
         self.crew.spoke(Hub::<C, G>::PROGRAM, arguments, self.directory, timeout)
     }
 
-    pub fn viewed<T: DeserializeOwned>(&self, pull: PullNumber, fields: &str) -> Option<T> {
+    pub fn viewed<T: Decode>(&self, pull: PullNumber, fields: &str) -> Option<T> {
         let ran = self.ran(&["pr", "view", &pull.to_string(), "--json", fields], Self::QUICK);
         let printed = ran.as_ref().and_then(Ran::succeeded)?;
-        serde_json::from_str(printed.as_ref()).ignoring(Ignored::Unviewed)
+        Json::read(printed.as_ref()).ignoring(Ignored::Unviewed)
     }
 
     pub fn landed(&self) -> Option<Vec<Landed>> {
@@ -209,7 +208,7 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
             ["pr", "list", "--state", "all", "--limit", Self::LANDED, "--json", "number,state,title,headRefName,body"];
         let ran = self.ran(&asked, Self::QUICK);
         let printed = ran.as_ref().and_then(Ran::succeeded)?;
-        serde_json::from_str(printed.as_ref()).ignoring(Ignored::Undrained)
+        Json::read(printed.as_ref()).ignoring(Ignored::Undrained)
     }
 
     pub fn opened<F: Files, S: Store>(
@@ -231,7 +230,7 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
         self.ran(&asked, Self::QUICK).as_ref().and_then(Ran::succeeded).ok_or(UnreadStep::Open)?;
         let viewed = self.ran(&["pr", "view", &branch, "--json", "number"], Self::QUICK);
         let printed = viewed.as_ref().and_then(Ran::succeeded).ok_or(UnreadStep::Open)?;
-        let opened = serde_json::from_str::<Opened>(printed.as_ref()).map_err(|_unread| UnreadStep::Open)?;
+        let opened = Json::read::<Opened>(printed.as_ref()).map_err(|_unread| UnreadStep::Open)?;
         Ok(Pushed::new(opened.pull(), branched.head()))
     }
 
@@ -243,7 +242,7 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
         let asked = ["api", "graphql", "-F", &owner, "-F", &name, "-f", &reference, "-f", &query];
         let ran = self.spoke(&asked, Self::QUICK);
         let printed = ran.as_ref().and_then(Ran::succeeded).ok_or(UnreadStep::Remote)?;
-        let found: Found = serde_json::from_str(printed.as_ref()).map_err(|_unread| UnreadStep::Remote)?;
+        let found: Found = Json::read(printed.as_ref()).map_err(|_unread| UnreadStep::Remote)?;
         Ok(found.data.repository.reference.map(|targeted| targeted.target.oid))
     }
 
@@ -251,7 +250,7 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
         let compare = format!("repos/{}/compare/{}...{head}", self.repository, Hub::<C, G>::BASE);
         let ran = self.spoke(&["api", &compare], Self::QUICK);
         let printed = ran.as_ref().and_then(Ran::succeeded).ok_or(UnreadStep::Commits)?;
-        let compared: Compared = serde_json::from_str(printed.as_ref()).map_err(|_unread| UnreadStep::Commits)?;
+        let compared: Compared = Json::read(printed.as_ref()).map_err(|_unread| UnreadStep::Commits)?;
         compared.first().ok_or(UnreadStep::Commits)
     }
 
@@ -267,8 +266,7 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
         let compare = format!("repos/{}/compare/{head}...{}", self.repository, Hub::<C, G>::BASE);
         let ran = self.spoke(&["api", &compare], Self::QUICK);
         let printed = ran.as_ref().and_then(Ran::succeeded);
-        let compared: Option<Compared> =
-            printed.and_then(|read| serde_json::from_str(read.as_ref()).ignoring(Ignored::Unlacked));
+        let compared: Option<Compared> = printed.and_then(|read| Json::read(read.as_ref()).ignoring(Ignored::Unlacked));
         compared.map_or_default(Compared::titles)
     }
 
@@ -301,7 +299,7 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
     fn listed(&self, pull: PullNumber) -> Option<Vec<Check>> {
         let ran = self.ran(&["pr", "checks", &pull.to_string(), "--json", "name,bucket,link"], Self::QUICK);
         let printed = ran.as_ref().and_then(Ran::printed);
-        printed.and_then(|read| serde_json::from_str(read.as_ref()).ignoring(Ignored::Unlisted))
+        printed.and_then(|read| Json::read(read.as_ref()).ignoring(Ignored::Unlisted))
     }
 
     fn checks(&self, pull: PullNumber) -> Result<Option<Verdict>, UnreadStep> {
@@ -326,10 +324,10 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
         Ok(attempted.jobs.into_iter().find_map(Job::gated))
     }
 
-    fn read<T: DeserializeOwned>(&self, arguments: &[&str]) -> Option<T> {
+    fn read<T: Decode>(&self, arguments: &[&str]) -> Option<T> {
         let ran = self.ran(arguments, Self::QUICK);
         let printed = ran.as_ref().and_then(Ran::succeeded)?;
-        serde_json::from_str(printed.as_ref()).ignoring(Ignored::Unattempted)
+        Json::read(printed.as_ref()).ignoring(Ignored::Unattempted)
     }
 
     pub fn log(&self, job: JobId) -> String {

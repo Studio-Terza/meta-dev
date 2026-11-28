@@ -11,8 +11,8 @@ doctest = false
 bench = false
 
 [dependencies]
-serde.workspace = true
-toml.workspace = true
+json-ports = { path = "../json-ports" }
+toml-ports = { path = "../toml-ports" }
 
 [dev-dependencies]
 tempfile.workspace = true

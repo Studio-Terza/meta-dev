@@ -13,12 +13,12 @@ bench = false
 [dependencies]
 derive = { path = "../derive" }
 invariants = { path = "../invariants" }
-proptest.workspace = true
-serde.workspace = true
-strum.workspace = true
+variant-ports = { path = "../variant-ports" }
 
 [dev-dependencies]
-serde_json.workspace = true
+json-ports = { path = "../json-ports" }
+proptest.workspace = true
+serde.workspace = true
 thiserror.workspace = true
 
 [lints]

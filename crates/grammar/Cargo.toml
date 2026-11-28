@@ -18,10 +18,10 @@ bench = false
 invariants = { path = "../invariants" }
 logos.workspace = true
 newtype = { path = "../newtype" }
+proptest.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-proptest.workspace = true
 serde.workspace = true
 test-failure = { path = "../test-failure" }
 

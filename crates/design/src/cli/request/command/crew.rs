@@ -4,7 +4,7 @@ use std::slice;
 
 use dispatch_ports::{Call, Clock, Deadline, Pause, Ran, Shell, Timeout, Wall};
 use invariants::Ignoring;
-use serde::Deserialize;
+use json_ports::Json;
 
 use crate::cli::request::ignored::Ignored;
 
@@ -21,13 +21,13 @@ pub struct Prompt(String);
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Reply(String);
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Envelope {
     subtype: Subtype,
     result: Option<String>,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 enum Subtype {
     #[serde(rename = "success")]
     Success,
@@ -99,7 +99,7 @@ impl<Shown: fmt::Display> From<&Shown> for Prompt {
 
 impl Reply {
     fn read(printed: &dispatch_ports::Printed) -> Option<Reply> {
-        let envelope: Envelope = serde_json::from_str(printed.as_ref()).ignoring(Ignored::Unreplied)?;
+        let envelope: Envelope = Json::read(printed.as_ref()).ignoring(Ignored::Unreplied)?;
         (envelope.subtype == Subtype::Success).then_some(envelope.result).flatten().map(Reply)
     }
 }

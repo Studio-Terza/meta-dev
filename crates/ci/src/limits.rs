@@ -3,15 +3,15 @@ use std::fmt;
 use std::path::Path;
 use std::time::Duration;
 
-use serde::Deserialize;
+use toml_ports::Toml;
 
 use crate::failure::Failure;
 use crate::ports::Disk;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Limits(BTreeMap<String, Limit>);
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, serde::Deserialize)]
 pub(crate) struct Limit {
     warn: f64,
     block: f64,
@@ -29,7 +29,7 @@ pub(crate) struct Tenths(Duration);
 
 impl Limit {
     pub(crate) fn read(path: &Path, stage: &str) -> Result<Limit, Failure> {
-        let Limits(stages) = toml::from_str(&Disk::read(path)?)?;
+        let Limits(stages) = Toml::read(&Disk::read(path)?)?;
         stages.get(stage).copied().ok_or_else(|| Failure::Unlimited(stage.to_owned()))
     }
 

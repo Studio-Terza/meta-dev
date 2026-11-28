@@ -16,6 +16,7 @@ invariants = { path = "../invariants" }
 newtype = { path = "../newtype" }
 pipeline = { path = "../pipeline" }
 port-core = { path = "../port-core" }
+proptest.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
@@ -23,7 +24,6 @@ test-failure = { path = "../test-failure" }
 sqlite-ports = { path = "../sqlite-ports" }
 design-messages = { path = "../design-messages" }
 file-ports = { path = "../file-ports" }
-proptest.workspace = true
 tempfile.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 

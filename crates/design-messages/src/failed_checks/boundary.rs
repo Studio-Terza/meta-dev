@@ -2,10 +2,9 @@ use std::fmt;
 use std::num::NonZeroU32;
 use std::str::FromStr;
 
-use hex::FromHex;
+use digest_ports::Hex;
 use newtype::{Checked, CheckedDeserialize, Display, Newtype, Serialize, Spelled};
 use port_core::Op;
-use serde::Deserialize;
 use store_ports::{Batch, Columns, Execute, Prepared, Query, StoreFailure, Written};
 
 #[derive(Clone, Copy, Debug, Op)]
@@ -38,7 +37,7 @@ impl Failing {
 #[derive(Newtype, Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PullNumber(NonZeroU32);
 
-#[derive(Spelled, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Spelled, serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(try_from = "String")]
 pub struct CommitSha([u8; 20]);
 
@@ -72,7 +71,7 @@ impl FromStr for CommitSha {
     type Err = Unhexed;
 
     fn from_str(text: &str) -> Result<CommitSha, Unhexed> {
-        <[u8; 20]>::from_hex(text).map(CommitSha).map_err(|_unhexed| Unhexed)
+        Hex::decoded(text).map(CommitSha).ok_or(Unhexed)
     }
 }
 
@@ -86,7 +85,7 @@ impl TryFrom<String> for CommitSha {
 
 impl fmt::Display for CommitSha {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(&hex::encode(self.0))
+        formatter.write_str(&Hex::encoded(self.0))
     }
 }
 

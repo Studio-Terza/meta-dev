@@ -14,6 +14,7 @@ bench = false
 invariants = { path = "../invariants" }
 newtype = { path = "../newtype" }
 pipeline = { path = "../pipeline" }
+proptest.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
