@@ -1,3 +1,4 @@
+use std::env;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -6,10 +7,10 @@ use std::path::{Path, PathBuf};
 pub struct Disk;
 
 impl Disk {
-    pub const HERE: &'static str = ".";
+    const MANIFEST: &'static str = "CARGO_MANIFEST_DIR";
 
-    pub fn here() -> io::Result<PathBuf> {
-        fs::canonicalize(Disk::HERE)
+    pub fn manifest() -> PathBuf {
+        env::var_os(Self::MANIFEST).map_or_default(PathBuf::from)
     }
 
     pub fn text(path: &Path) -> io::Result<String> {

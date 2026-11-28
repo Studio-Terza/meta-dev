@@ -1,8 +1,6 @@
 mod declared;
 mod unexpanded;
 
-use std::path::PathBuf;
-
 use super::ports::Disk;
 use declared::Column;
 pub use declared::Described;
@@ -34,9 +32,7 @@ impl<Name: Decode> Entry<Name> {
     pub fn found(sql: &str) -> Result<Entry<Name>, Unexpanded> {
         let file = CacheFile::from(sql);
         let named = file.to_string();
-        let here =
-            Disk::here().map_err(|failed| Unexpanded::Unread { path: PathBuf::from(Disk::HERE), source: failed })?;
-        let path = here
+        let path = Disk::manifest()
             .ancestors()
             .find_map(|directory| Disk::held(directory.join(Self::DIRECTORY).join(&named)))
             .ok_or(Unexpanded::Uncached(file))?;
