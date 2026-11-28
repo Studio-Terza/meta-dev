@@ -1,5 +1,4 @@
 {
-  "db_name": "SQLite",
   "query": "UPDATE cursors SET read_to = ?1 WHERE session = ?2",
   "describe": {
     "columns": [],
@@ -7,6 +6,5 @@
       "Right": 2
     },
     "nullable": []
-  },
-  "hash": "340ee57731d53e66c03c7cef6e594c24a7ce9f1e1b48ea783293a84c86547801"
+  }
 }

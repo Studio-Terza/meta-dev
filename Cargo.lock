@@ -547,10 +547,14 @@ name = "query-cache"
 version = "0.1.0"
 dependencies = [
  "hex",
+ "proc-macro2",
+ "rusqlite",
  "serde",
  "serde_json",
  "sha2",
  "strum",
+ "syn",
+ "test-failure",
  "thiserror",
 ]
 

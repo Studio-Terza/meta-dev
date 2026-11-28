@@ -1,51 +1,22 @@
 {
-  "db_name": "SQLite",
   "query": "\nSELECT\n  uuid,\n  at,\n  author,\n  body\nFROM\n  messages\n",
   "describe": {
     "columns": [
       {
         "name": "uuid",
-        "ordinal": 0,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "messages",
-            "name": "uuid"
-          }
-        }
+        "type_info": "Text"
       },
       {
         "name": "at",
-        "ordinal": 1,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "messages",
-            "name": "at"
-          }
-        }
+        "type_info": "Text"
       },
       {
         "name": "author",
-        "ordinal": 2,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "messages",
-            "name": "author"
-          }
-        }
+        "type_info": "Text"
       },
       {
         "name": "body",
-        "ordinal": 3,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "messages",
-            "name": "body"
-          }
-        }
+        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -57,6 +28,5 @@
       false,
       false
     ]
-  },
-  "hash": "63c82f4b533da0e474f9dfa1f87166cbea5380b85f60f14b2143b36cc82a3429"
+  }
 }
