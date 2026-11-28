@@ -1,0 +1,68 @@
+name: kill-matrix
+
+# Which tests kill which mutants, over every mutant in the workspace (lint-rebuild D3). Each shard
+# runs its mutants with --no-fail-fast, so every test binary runs under every mutant and each log
+# names every test that failed. The reduce job reads the logs into a typed report. It runs on main
+# only, and its findings are queued work, never a gate (lint-rebuild D4).
+
+on:
+  schedule:
+    - cron: "17 3 * * 0"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: never
+  RUSTFLAGS: -C link-arg=-fuse-ld=mold
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  shard:
+    name: shard (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/toolchain
+      - uses: rui314/setup-mold@v1
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-mutants@27.1.0
+      - name: every mutant of the shard, every test binary under each
+        run: cargo mutants --no-shuffle --output "$RUNNER_TEMP/out" --sharding round-robin --shard "${{ matrix.shard }}/${{ strategy.job-total }}" -- --no-fail-fast
+      - uses: actions/upload-artifact@v4
+        if: success() || failure()
+        with:
+          name: kill-shard-${{ matrix.shard }}
+          path: |
+            ${{ runner.temp }}/out/mutants.out/outcomes.json
+            ${{ runner.temp }}/out/mutants.out/log/
+          if-no-files-found: error
+
+  reduce:
+    if: always()
+    needs: shard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/toolchain
+      - uses: rui314/setup-mold@v1
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: kill-shard-*
+          path: ${{ runner.temp }}/shards
+      - name: the kill matrix, reduced to tautological, redundant and pinning tests and missed mutants
+        run: cargo run --locked -q --bin ci -- kill-matrix "$RUNNER_TEMP/kill-report.json" "$RUNNER_TEMP"/shards/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kill-report
+          path: ${{ runner.temp }}/kill-report.json

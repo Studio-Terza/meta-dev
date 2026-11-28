@@ -59,6 +59,7 @@ dependencies = [
  "file-ports",
  "fixture",
  "grammar-lines",
+ "grammar-test-log",
  "invariants",
  "port-core",
  "query-ports",
@@ -376,6 +377,7 @@ dependencies = [
  "grammar-notice",
  "grammar-shell",
  "grammar-spec-line",
+ "grammar-test-log",
  "invariants",
  "logos",
  "proptest",
@@ -462,6 +464,13 @@ dependencies = [
  "grammar",
  "newtype",
  "thiserror",
+]
+
+[[package]]
+name = "grammar-test-log"
+version = "0.1.0"
+dependencies = [
+ "grammar",
 ]
 
 [[package]]

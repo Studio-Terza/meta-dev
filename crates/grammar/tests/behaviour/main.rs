@@ -5,3 +5,4 @@ mod lines;
 mod notice;
 mod shell;
 mod spec_line;
+mod test_log;

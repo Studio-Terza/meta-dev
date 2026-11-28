@@ -7,7 +7,7 @@ use crate::boundary::{Said, Stage};
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum Failure {
     #[error(
-        "usage: ci timed <limits> <stage> [--since <mark>] <program> [<argument>...]\n       ci mutants-plan <workspace> <diff> <changed> <unselected> <output>\n       ci queries <workspace> [--record]"
+        "usage: ci timed <limits> <stage> [--since <mark>] <program> [<argument>...]\n       ci mutants-plan <workspace> <diff> <changed> <unselected> <output>\n       ci queries <workspace> [--record]\n       ci kill-matrix <report> <shard>..."
     )]
     Usage,
     #[error("cannot check the query cache: {0}")]
@@ -30,6 +30,10 @@ pub(crate) enum Failure {
     Unstarted { program: PathBuf, source: io::Error },
     #[error("cannot read the mutants: {0}")]
     Mutants(#[from] serde_json::Error),
+    #[error("cannot read the outcomes in {}: {source}", path.display())]
+    Outcomes { path: PathBuf, source: serde_json::Error },
+    #[error("cannot write the kill report: {0}")]
+    Unserialized(serde_json::Error),
     #[error("a numstat row is not added, deleted and path separated by tabs: {0}")]
     Numstat(Said),
     #[error("cannot write the report: {0}")]

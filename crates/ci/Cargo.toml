@@ -21,6 +21,7 @@ console-ports = { path = "../console-ports" }
 design-messages = { path = "../design-messages" }
 file-ports = { path = "../file-ports" }
 grammar-lines = { path = "../grammar-lines" }
+grammar-test-log = { path = "../grammar-test-log" }
 invariants = { path = "../invariants" }
 port-core = { path = "../port-core" }
 query-ports = { path = "../query-ports" }
