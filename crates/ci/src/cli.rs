@@ -1,13 +1,9 @@
 use std::ffi::OsString;
-use std::io::Write;
 use std::path::PathBuf;
-use std::process::ExitCode;
 
-use invariants::Ignoring;
+use console_ports::Answer;
 
-use crate::exit::Exit;
 use crate::failure::Failure;
-use crate::ignored::Ignored;
 use crate::kills::Kills;
 use crate::mutants::Plan;
 use crate::timed::Timed;
@@ -45,17 +41,13 @@ impl Cli {
         }
     }
 
-    pub fn exit(self, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
-        let ran = match self {
-            Cli::Timed(timed) => timed.run(out),
-            Cli::Plan(plan) => plan.run(out),
-            Cli::Kills(kills) => kills.run(out),
+    #[must_use]
+    pub fn answer(self) -> Answer {
+        Answer::answered(match self {
+            Cli::Timed(timed) => timed.answered(),
+            Cli::Plan(plan) => plan.answered(),
+            Cli::Kills(kills) => kills.answered(),
             Cli::Usage => Err(Failure::Usage),
-        };
-        let exit = ran.or_else(|failure| writeln!(err, "{failure}").map(|()| Exit::Failed));
-        match exit.ignoring(Ignored::Unwritable) {
-            Some(Exit::Passed) => ExitCode::SUCCESS,
-            Some(Exit::Failed) | None => ExitCode::FAILURE,
-        }
+        })
     }
 }

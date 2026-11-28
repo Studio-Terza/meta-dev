@@ -8,6 +8,32 @@ fast = []
 [dependencies]
 linked = { path = "../linked" }
 
+[lib]
+test = false
+doctest = false
+bench = false
+
 [[bin]]
 name = "tool"
 path = "tools/run.rs"
+test = false
+doctest = false
+bench = false
+
+[[bin]]
+name = "app"
+test = false
+doctest = false
+bench = false
+
+[[bin]]
+name = "single"
+test = false
+doctest = false
+bench = false
+
+[[bin]]
+name = "multi"
+test = false
+doctest = false
+bench = false

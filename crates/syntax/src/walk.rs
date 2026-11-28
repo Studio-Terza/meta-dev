@@ -16,8 +16,8 @@ use crate::hooks::{Descent, Expanded, Hooks, nodes};
 use crate::lint::{Fact, Lint, Reads};
 use crate::lints::{
     AdapterFacts, ApiFacts, BoolMethods, ExpressionFlow, ForeignFacts, HandMeasures, ManualIteration, ModuleCycles,
-    ModuleFacts, NamedLifetimes, NoComments, NoDyn, NoFreeFns, NoTestOnlyApi, PortModel, ProcessStarters,
-    PublicApiTests, PublicSurface, RealAdapters, SurfaceFacts, TestOnlyFacts, TypeShape, VecOutParams,
+    ModuleFacts, NamedLifetimes, NoComments, NoDyn, NoFreeFns, NoTestOnlyApi, OptoutFacts, PortModel, ProcessStarters,
+    PublicApiTests, PublicSurface, RealAdapters, SurfaceFacts, TargetOptouts, TestOnlyFacts, TypeShape, VecOutParams,
 };
 use crate::source::Source;
 use crate::workspace::Package;
@@ -281,6 +281,7 @@ nodes!(walker {
         module_cycles: ModuleCycles<'file> => ModuleFacts,
         hand_measures: HandMeasures => Findings,
         port_model: PortModel<'file> => ForeignFacts,
+        target_optouts: TargetOptouts => OptoutFacts,
         test_budget: TestBudget => Budget,
     ]
 });

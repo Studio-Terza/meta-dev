@@ -2,4 +2,4 @@ mod codec;
 mod document;
 
 pub use codec::{Toml, TomlFailure};
-pub use document::{Document, Table, Value};
+pub use document::{Document, Key, Table, Value};

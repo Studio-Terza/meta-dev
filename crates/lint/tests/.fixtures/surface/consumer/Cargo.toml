@@ -1,2 +1,13 @@
 [package]
 name = "consumer"
+
+[lib]
+test = false
+doctest = false
+bench = false
+
+[[bin]]
+name = "consumer"
+test = false
+doctest = false
+bench = false

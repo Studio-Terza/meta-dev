@@ -13,6 +13,7 @@ mod process_starters;
 mod public_api_tests;
 mod public_surface;
 mod real_adapters;
+mod target_optouts;
 mod type_shape;
 mod vec_out_params;
 
@@ -31,5 +32,6 @@ pub(crate) use process_starters::ProcessStarters;
 pub(crate) use public_api_tests::{ApiFacts, PublicApiTests};
 pub(crate) use public_surface::{PublicSurface, SurfaceFacts};
 pub(crate) use real_adapters::{AdapterFacts, RealAdapters};
+pub(crate) use target_optouts::{OptoutFacts, TargetOptouts};
 pub(crate) use type_shape::TypeShape;
 pub(crate) use vec_out_params::VecOutParams;

@@ -1,0 +1,6 @@
+[package]
+name = "partial"
+
+[lib]
+test = false
+bench = false

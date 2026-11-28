@@ -1,2 +1,13 @@
 [package]
 name = "provider"
+
+[lib]
+test = false
+doctest = false
+bench = false
+
+[[bin]]
+name = "provider"
+test = false
+doctest = false
+bench = false

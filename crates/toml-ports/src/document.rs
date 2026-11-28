@@ -71,6 +71,11 @@ impl<'value, 'text> Value<'value, 'text> {
     }
 
     #[must_use]
+    pub fn flag(self) -> Option<bool> {
+        self.value.as_bool()
+    }
+
+    #[must_use]
     pub fn array(self) -> Option<Vec<Value<'value, 'text>>> {
         self.value
             .as_array()

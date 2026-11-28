@@ -6,3 +6,8 @@ testing = []
 mocks_extra = []
 
 [workspace]
+
+[lib]
+test = false
+doctest = false
+bench = false

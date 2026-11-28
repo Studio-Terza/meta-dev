@@ -6,3 +6,8 @@ serde = "1"
 
 [dev-dependencies]
 first = { path = "../first" }
+
+[lib]
+test = false
+doctest = false
+bench = false

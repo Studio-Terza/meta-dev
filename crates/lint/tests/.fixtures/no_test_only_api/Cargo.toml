@@ -5,3 +5,8 @@ test-utils = []
 fast = []
 
 [workspace]
+
+[lib]
+test = false
+doctest = false
+bench = false

@@ -3,3 +3,8 @@ name = "derived"
 
 [dependencies]
 serde = "1"
+
+[lib]
+test = false
+doctest = false
+bench = false
