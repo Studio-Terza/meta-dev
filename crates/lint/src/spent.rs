@@ -15,8 +15,10 @@ pub(crate) enum Stage {
     Reduce,
 }
 
-#[derive(Debug, Measure)]
-pub(crate) struct Spent(BTreeMap<Stage, Elapsed>);
+pipeline::measured! {
+    #[derive(Debug)]
+    pub(crate) struct Spent(BTreeMap<Stage, Elapsed>);
+}
 
 impl Spent {
     pub(crate) fn timed<Made>(&mut self, timer: &impl Timer, stage: Stage, work: impl FnOnce() -> Made) -> Made {

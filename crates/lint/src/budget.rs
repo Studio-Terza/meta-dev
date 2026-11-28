@@ -1,7 +1,7 @@
 use std::fmt;
 use std::sync::Arc;
 
-use pipeline::{Limit, Measure, Verdict};
+use pipeline::{Limit, Verdict};
 use syn::spanned::Spanned;
 use syn::{ItemMod, Macro};
 
@@ -12,10 +12,12 @@ use crate::lint::{Fact, Lint, Reads};
 use crate::source::{Place, Source};
 use crate::workspace::Package;
 
-#[derive(Clone, Copy, Debug, Measure)]
-pub(crate) struct Budget {
-    lines: usize,
-    test_lines: usize,
+pipeline::measured! {
+    #[derive(Clone, Copy, Debug)]
+    pub(crate) struct Budget {
+        lines: usize,
+        test_lines: usize,
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default)]

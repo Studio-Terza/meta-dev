@@ -3,7 +3,6 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::sync::Arc;
 
-use pipeline::Measure;
 use proc_macro2::Span;
 
 #[derive(Debug)]
@@ -34,8 +33,10 @@ pub(crate) struct Finding {
     found: Found,
 }
 
-#[derive(Debug, Measure)]
-pub(crate) struct Findings(Vec<Finding>);
+pipeline::measured! {
+    #[derive(Debug)]
+    pub(crate) struct Findings(Vec<Finding>);
+}
 
 impl Findings {
     pub(crate) fn found(headline: &'static str, path: &Arc<Path>, found: Vec<Found>) -> Findings {

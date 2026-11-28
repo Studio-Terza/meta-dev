@@ -1,7 +1,8 @@
 use pipeline::Measure;
 
-#[derive(Measure)]
-pub struct Derived(usize);
+pipeline::measured! {
+    pub struct Generated(usize);
+}
 
 #[derive(Default)]
 pub struct Hand(usize);

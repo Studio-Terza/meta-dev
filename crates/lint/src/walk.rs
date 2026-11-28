@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use pipeline::Measure;
 use syn::visit::{self, Visit};
 use syn::{
     Attribute, Block, Expr, ExprAssign, ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprMethodCall, ExprWhile, Field,
@@ -142,9 +141,11 @@ macro_rules! lineup {
             $($lint: Option<Expanded>,)*
         }
 
-        #[derive(Debug, Measure)]
-        pub(crate) struct Facts {
-            $(pub $lint: $fact,)*
+        pipeline::measured! {
+            #[derive(Debug)]
+            pub(crate) struct Facts {
+                $(pub $lint: $fact,)*
+            }
         }
 
         impl<$life> Lineup<$life> {

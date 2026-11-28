@@ -2,7 +2,6 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use pipeline::Measure;
 use syn::{Attribute, ImplItemFn, ItemFn, ItemImpl, ItemMacro, ItemMod, Macro};
 
 use crate::expansion::Expansion;
@@ -21,8 +20,10 @@ pub(crate) enum ApiFact {
     Invoked { name: String, path: Arc<Path>, line: usize },
 }
 
-#[derive(Debug, Measure)]
-pub(crate) struct ApiFacts(Vec<ApiFact>);
+pipeline::measured! {
+    #[derive(Debug)]
+    pub(crate) struct ApiFacts(Vec<ApiFact>);
+}
 
 #[derive(Debug)]
 pub(crate) struct PublicApiTests<'file> {

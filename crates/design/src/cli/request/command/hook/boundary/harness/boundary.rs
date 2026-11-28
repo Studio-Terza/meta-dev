@@ -55,11 +55,13 @@ pub struct Task {
 #[derive(Debug, Default)]
 pub struct Stopped(BTreeSet<TaskId>);
 
-#[derive(Debug, Measure)]
-pub struct Tasks {
-    shells: usize,
-    agents: usize,
-    hung: BTreeSet<Body>,
+pipeline::measured! {
+    #[derive(Debug)]
+    pub struct Tasks {
+        shells: usize,
+        agents: usize,
+        hung: BTreeSet<Body>,
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

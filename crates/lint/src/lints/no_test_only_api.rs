@@ -3,8 +3,6 @@ use std::sync::Arc;
 use proc_macro2::{TokenStream, TokenTree};
 use syn::{Attribute, Field, ImplItem, Item, ItemImpl, ItemMod, Lit, Macro, Meta, Visibility};
 
-use pipeline::Measure;
-
 use crate::finding::{Finding, Findings, Found};
 use crate::gate::Gate;
 use crate::hooks::{Descent, Expanded, Hooks};
@@ -12,8 +10,10 @@ use crate::lint::{Fact, Lint, Reads};
 use crate::source::{Place, Source};
 use crate::workspace::Package;
 
-#[derive(Debug, Measure)]
-pub(crate) struct TestOnlyFacts(Findings);
+pipeline::measured! {
+    #[derive(Debug)]
+    pub(crate) struct TestOnlyFacts(Findings);
+}
 
 #[derive(Debug)]
 pub(crate) struct NoTestOnlyApi<'file> {

@@ -12,11 +12,13 @@ pub struct SessionRecords {
     cursor: CursorRow,
 }
 
-#[derive(Debug, Measure)]
-struct Lifted {
-    messages: Vec<MessageRow>,
-    ended: Vec<EndedRow>,
-    unrecognised: Vec<Kind>,
+pipeline::measured! {
+    #[derive(Debug)]
+    struct Lifted {
+        messages: Vec<MessageRow>,
+        ended: Vec<EndedRow>,
+        unrecognised: Vec<Kind>,
+    }
 }
 
 impl SessionRecords {

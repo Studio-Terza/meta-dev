@@ -20,12 +20,14 @@ use crate::tree::Tree;
 use crate::walk::Walker;
 use crate::workspace::Workspace;
 
-#[derive(Debug, Measure)]
-struct Judged {
-    failures: Vec<Failure>,
-    findings: Findings,
-    budget: Budget,
-    spent: Spent,
+pipeline::measured! {
+    #[derive(Debug)]
+    struct Judged {
+        failures: Vec<Failure>,
+        findings: Findings,
+        budget: Budget,
+        spent: Spent,
+    }
 }
 
 #[derive(Debug)]

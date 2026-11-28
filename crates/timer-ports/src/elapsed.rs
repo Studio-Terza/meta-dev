@@ -1,10 +1,10 @@
 use std::fmt;
 use std::time::Duration;
 
-use pipeline::Measure;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Measure)]
-pub struct Elapsed(Duration);
+pipeline::measured! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    pub struct Elapsed(Duration);
+}
 
 impl From<Duration> for Elapsed {
     fn from(span: Duration) -> Elapsed {

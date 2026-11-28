@@ -5,8 +5,6 @@ use std::sync::Arc;
 use proc_macro2::Ident;
 use syn::{ItemImpl, ItemUse, Macro, Type};
 
-use pipeline::Measure;
-
 use crate::finding::{Finding, Found};
 use crate::hooks::{Descent, Expanded, Hooks};
 use crate::lint::{Fact, Lint, Reads};
@@ -20,8 +18,10 @@ pub(crate) enum AdapterFact {
     Named { crate_name: String, name: String, path: Arc<Path>, line: usize },
 }
 
-#[derive(Debug, Measure)]
-pub(crate) struct AdapterFacts(Vec<AdapterFact>);
+pipeline::measured! {
+    #[derive(Debug)]
+    pub(crate) struct AdapterFacts(Vec<AdapterFact>);
+}
 
 #[derive(Debug)]
 pub(crate) struct RealAdapters<'file> {

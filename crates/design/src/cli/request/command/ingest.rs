@@ -16,12 +16,14 @@ struct ReadTo {
     cursor: Cursor,
 }
 
-#[derive(Debug, Measure)]
-pub struct Tally {
-    ends: Vec<ReadTo>,
-    authorship: BTreeMap<Authorship, Count>,
-    unrecognised: BTreeMap<Kind, Count>,
-    written: Written,
+pipeline::measured! {
+    #[derive(Debug)]
+    pub struct Tally {
+        ends: Vec<ReadTo>,
+        authorship: BTreeMap<Authorship, Count>,
+        unrecognised: BTreeMap<Kind, Count>,
+        written: Written,
+    }
 }
 
 #[derive(Debug)]

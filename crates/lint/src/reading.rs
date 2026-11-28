@@ -19,11 +19,13 @@ use crate::tree::Tree;
 use crate::walk::{Facts, Walker};
 use crate::workspace::{CrateKind, CrateRoot, Package};
 
-#[derive(Debug, Measure)]
-pub(crate) struct Read {
-    pub failures: Vec<Failure>,
-    pub facts: Facts,
-    pub spent: Spent,
+pipeline::measured! {
+    #[derive(Debug)]
+    pub(crate) struct Read {
+        pub failures: Vec<Failure>,
+        pub facts: Facts,
+        pub spent: Spent,
+    }
 }
 
 impl Read {

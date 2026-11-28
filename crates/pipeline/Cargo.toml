@@ -10,9 +10,6 @@ test = false
 doctest = false
 bench = false
 
-[dependencies]
-derive = { path = "../derive" }
-
 [dev-dependencies]
 proptest.workspace = true
 

@@ -40,8 +40,10 @@ enum Used {
     Globbed,
 }
 
-#[derive(Debug, Measure)]
-pub(crate) struct SurfaceFacts(Vec<SurfaceFact>);
+pipeline::measured! {
+    #[derive(Debug)]
+    pub(crate) struct SurfaceFacts(Vec<SurfaceFact>);
+}
 
 #[derive(Debug)]
 pub(crate) struct PublicSurface<'file> {

@@ -4,7 +4,6 @@ use std::iter;
 use std::path::Path;
 use std::sync::Arc;
 
-use pipeline::Measure;
 use proc_macro2::Ident;
 use syn::{ItemMod, ItemUse, Macro, VisRestricted};
 
@@ -21,8 +20,10 @@ pub(crate) enum ModuleFact {
     Named(Naming),
 }
 
-#[derive(Debug, Measure)]
-pub(crate) struct ModuleFacts(Vec<ModuleFact>);
+pipeline::measured! {
+    #[derive(Debug)]
+    pub(crate) struct ModuleFacts(Vec<ModuleFact>);
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Anchor {
