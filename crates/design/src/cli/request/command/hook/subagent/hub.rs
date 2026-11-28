@@ -215,7 +215,7 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
     pub fn landed(&self) -> Option<Vec<Landed>> {
         let asked =
             ["pr", "list", "--state", "all", "--limit", Self::LANDED, "--json", "number,state,title,headRefName,body"];
-        self.read(&asked, ()).ignoring(Ignored::Undrained)
+        self.read(&asked, UnreadStep::Landed).ignoring(Ignored::Undrained)
     }
 
     pub fn opened<F: Files, S: Store>(
@@ -265,7 +265,7 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
 
     pub fn lacking(&self, head: CommitSha) -> Vec<String> {
         let compare = format!("repos/{}/compare/{head}...{}", self.repository, Hub::<C, G>::BASE);
-        self.read::<Compared, _>(&[Self::API, &compare], ())
+        self.read::<Compared, _>(&[Self::API, &compare], UnreadStep::Lacking)
             .ignoring(Ignored::Unlacked)
             .map_or_default(Compared::titles)
     }

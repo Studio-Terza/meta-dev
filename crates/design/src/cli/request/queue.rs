@@ -92,6 +92,8 @@ pub enum UnreadStep {
     Open,
     Runs,
     Attempt,
+    Landed,
+    Lacking,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
