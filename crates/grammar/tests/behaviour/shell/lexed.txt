@@ -1,6 +1,7 @@
 [
     (
         "for d in a b; do rm -rf \"$d\"; done",
+        None,
         Some(
             (
                 Rm,
@@ -11,6 +12,7 @@
     ),
     (
         "bash -c 'rm x'",
+        None,
         Some(
             (
                 Rm,
@@ -21,6 +23,7 @@
     ),
     (
         "sh -c \"rm -rf /tmp/x\"",
+        None,
         Some(
             (
                 Rm,
@@ -31,6 +34,7 @@
     ),
     (
         "zsh -ec 'cd a && rm b'",
+        None,
         Some(
             (
                 Rm,
@@ -41,6 +45,7 @@
     ),
     (
         "find . -name x -delete",
+        None,
         Some(
             (
                 Delete,
@@ -51,6 +56,7 @@
     ),
     (
         "find . -name '*.o' -exec rm {} \\;",
+        None,
         Some(
             (
                 Rm,
@@ -61,6 +67,7 @@
     ),
     (
         "find . -type d -empty -exec rmdir {} +",
+        None,
         Some(
             (
                 Rmdir,
@@ -71,6 +78,7 @@
     ),
     (
         "ls | xargs rm",
+        None,
         Some(
             (
                 Rm,
@@ -81,6 +89,7 @@
     ),
     (
         "ls | xargs -I {} rm {}",
+        None,
         Some(
             (
                 Rm,
@@ -91,6 +100,7 @@
     ),
     (
         "printf a | xargs -0 -n1 rm -f",
+        None,
         Some(
             (
                 Rm,
@@ -101,6 +111,7 @@
     ),
     (
         "echo $(rm x)",
+        None,
         Some(
             (
                 Rm,
@@ -111,6 +122,7 @@
     ),
     (
         "x=\"$(rm y)\"",
+        None,
         Some(
             (
                 Rm,
@@ -121,6 +133,7 @@
     ),
     (
         "echo `rm x`",
+        None,
         Some(
             (
                 Rm,
@@ -131,6 +144,7 @@
     ),
     (
         "(cd a && rm b)",
+        None,
         Some(
             (
                 Rm,
@@ -141,6 +155,7 @@
     ),
     (
         "cleanup() { rm -rf build; }; cleanup",
+        None,
         Some(
             (
                 Rm,
@@ -151,6 +166,7 @@
     ),
     (
         "function tidy { rmdir out; }",
+        None,
         Some(
             (
                 Rmdir,
@@ -161,6 +177,7 @@
     ),
     (
         "if [ -e x ]; then rm x; fi",
+        None,
         Some(
             (
                 Rm,
@@ -171,6 +188,7 @@
     ),
     (
         "while read f; do rm \"$f\"; done < list",
+        None,
         Some(
             (
                 Rm,
@@ -181,6 +199,7 @@
     ),
     (
         "case \"$x\" in a) rm a;; esac",
+        None,
         Some(
             (
                 Rm,
@@ -191,6 +210,7 @@
     ),
     (
         "bash <<'EOF'\nrm x\nEOF",
+        None,
         Some(
             (
                 Rm,
@@ -201,6 +221,7 @@
     ),
     (
         "sh <<-EOF\n\trm x\n\tEOF",
+        None,
         Some(
             (
                 Rm,
@@ -211,6 +232,7 @@
     ),
     (
         "cat <<A; bash <<B\nrm x\nA\nrm y\nB",
+        None,
         Some(
             (
                 Rm,
@@ -221,6 +243,7 @@
     ),
     (
         "bash <<A\nrm x",
+        None,
         Some(
             (
                 Rm,
@@ -232,20 +255,24 @@
     (
         "cat <<A\nrm x\nA\nrm y",
         None,
+        None,
         [],
     ),
     (
         "cat <<-A\n\trm x\n\tA\nrm y",
+        None,
         None,
         [],
     ),
     (
         "cat <<A\n\tA\nrm y\nA",
         None,
+        None,
         [],
     ),
     (
         "bash <<A\n\tA\nrm y\nA",
+        None,
         Some(
             (
                 Rm,
@@ -256,6 +283,7 @@
     ),
     (
         "bash <<A\necho a\nrm x\nA\necho done",
+        None,
         Some(
             (
                 Rm,
@@ -266,6 +294,7 @@
     ),
     (
         ">log bash -c 'rm x'",
+        None,
         Some(
             (
                 Rm,
@@ -278,6 +307,7 @@
     ),
     (
         "cd /w && for f in *.tmp; do /bin/rm \"$f\"; done",
+        None,
         Some(
             (
                 Rm,
@@ -288,6 +318,7 @@
     ),
     (
         "bash -c 'for f in a; do rm $f; done'",
+        None,
         Some(
             (
                 Rm,
@@ -298,6 +329,7 @@
     ),
     (
         "for f in a; do bash -c \"rm $f\"; done",
+        None,
         Some(
             (
                 Rm,
@@ -308,6 +340,7 @@
     ),
     (
         "xargs sh -c 'rm \"$1\"' _",
+        None,
         Some(
             (
                 Rm,
@@ -318,6 +351,7 @@
     ),
     (
         "find . -exec echo {} \\; -delete",
+        None,
         Some(
             (
                 Delete,
@@ -328,6 +362,7 @@
     ),
     (
         "echo \"`rm x`\"",
+        None,
         Some(
             (
                 Rm,
@@ -338,6 +373,7 @@
     ),
     (
         "true && { rm x; }",
+        None,
         Some(
             (
                 Rm,
@@ -349,6 +385,7 @@
     (
         "{ echo a; echo b; } > log; rm x",
         None,
+        None,
         [
             "(\n    Wrote(\n        \"log\",\n    ),\n    None,\n    Started,\n)\n",
         ],
@@ -356,10 +393,12 @@
     (
         "(( i++ )); echo \"$(( 1 + 2 ))\"; rm x",
         None,
+        None,
         [],
     ),
     (
         "cat a 2>&1 >/dev/null | tee log; rm x",
+        None,
         None,
         [
             "(\n    Wrote(\n        \"/dev/null\",\n    ),\n    None,\n    Started,\n)\n",
@@ -369,70 +408,84 @@
     (
         "rm x",
         None,
+        None,
         [],
     ),
     (
         "rm -rf /tmp/build && rmdir /tmp/empty",
+        None,
         None,
         [],
     ),
     (
         "git rm x",
         None,
+        None,
         [],
     ),
     (
         "echo rm",
+        None,
         None,
         [],
     ),
     (
         "cd /w; rm a; rm b",
         None,
+        None,
         [],
     ),
     (
         "\\rm x",
+        None,
         None,
         [],
     ),
     (
         "git commit -m \"$(cat <<'EOF'\nfor x; do rm y; done\nEOF\n)\"",
         None,
+        None,
         [],
     ),
     (
         "grep -rn 'rm -rf' . | xargs echo",
+        None,
         None,
         [],
     ),
     (
         "find . -name '*.rs' -exec grep -l rm {} \\; -print",
         None,
+        None,
         [],
     ),
     (
         "echo \"for x in a; do rm; done\"",
+        None,
         None,
         [],
     ),
     (
         "for f in rm rmdir; do echo $f; done",
         None,
+        None,
         [],
     ),
     (
         "cat <<EOF\nrm x\nEOF",
+        None,
         None,
         [],
     ),
     (
         "ls # rm x",
         None,
+        None,
         [],
     ),
     (
         "printf 'rm x' > script.sh",
+        None,
         None,
         [
             "(\n    Wrote(\n        \"script.sh\",\n    ),\n    None,\n    Started,\n)\n",
@@ -441,35 +494,44 @@
     (
         "for d in a b; do echo \"$d\"; done; rm -rf a",
         None,
+        None,
         [],
     ),
     (
         "case x in rm) echo;; esac",
+        None,
         None,
         [],
     ),
     (
         "RM=rm make clean",
         None,
+        None,
         [],
     ),
     (
         "rm -rf \"$(git rev-parse --show-toplevel)/target\"",
         None,
+        None,
         [],
     ),
     (
         "'unterminated rm",
+        Some(
+            Unreadable,
+        ),
         None,
         [],
     ),
     (
         "",
         None,
+        None,
         [],
     ),
     (
         "sed -i 's/a/b/' src/lib.rs",
+        None,
         None,
         [
             "(\n    InPlace(\n        Sed,\n    ),\n    None,\n    Started,\n)\n",
@@ -478,12 +540,14 @@
     (
         "sed -i '' -e 's/a/b/' x.rs",
         None,
+        None,
         [
             "(\n    InPlace(\n        Sed,\n    ),\n    None,\n    Started,\n)\n",
         ],
     ),
     (
         "gsed --in-place=.bak 's/a/b/' x.rs",
+        None,
         None,
         [
             "(\n    InPlace(\n        Sed,\n    ),\n    None,\n    Started,\n)\n",
@@ -492,6 +556,7 @@
     (
         "sed -ni 's/a/b/p' x.rs",
         None,
+        None,
         [
             "(\n    InPlace(\n        Sed,\n    ),\n    None,\n    Started,\n)\n",
         ],
@@ -499,10 +564,12 @@
     (
         "sed -n 's/i/b/p' x.rs",
         None,
+        None,
         [],
     ),
     (
         "perl -pi -e 's/a/b/' x.rs",
+        None,
         None,
         [
             "(\n    InPlace(\n        Perl,\n    ),\n    None,\n    Started,\n)\n",
@@ -511,6 +578,7 @@
     (
         "perl -i.bak -pe 's/a/b/' x.rs",
         None,
+        None,
         [
             "(\n    InPlace(\n        Perl,\n    ),\n    None,\n    Started,\n)\n",
         ],
@@ -518,10 +586,12 @@
     (
         "perl -Mstrict -ne 'print' x.rs",
         None,
+        None,
         [],
     ),
     (
         "for f in *.rs; do sed -i 's/a/b/' \"$f\"; done",
+        None,
         None,
         [
             "(\n    InPlace(\n        Sed,\n    ),\n    Some(\n        Loop,\n    ),\n    Started,\n)\n",
@@ -530,12 +600,14 @@
     (
         "echo a > src/x.rs",
         None,
+        None,
         [
             "(\n    Wrote(\n        \"src/x.rs\",\n    ),\n    None,\n    Started,\n)\n",
         ],
     ),
     (
         "cargo test 2>/dev/null >> log.txt",
+        None,
         None,
         [
             "(\n    Wrote(\n        \"/dev/null\",\n    ),\n    None,\n    Started,\n)\n",
@@ -545,6 +617,7 @@
     (
         "cat <<'EOF' > notes.md\nhello\nEOF",
         None,
+        None,
         [
             "(\n    Wrote(\n        \"notes.md\",\n    ),\n    None,\n    Started,\n)\n",
         ],
@@ -552,10 +625,12 @@
     (
         "grep x < input.txt",
         None,
+        None,
         [],
     ),
     (
         "echo a | tee -a out.txt other.txt",
+        None,
         None,
         [
             "(\n    Wrote(\n        \"out.txt\",\n    ),\n    None,\n    Started,\n)\n",
@@ -565,12 +640,14 @@
     (
         "(cd a && echo b > c)",
         None,
+        None,
         [
             "(\n    Wrote(\n        \"c\",\n    ),\n    Some(\n        Subshell,\n    ),\n    Changed(\n        [\n            \"a\",\n        ],\n    ),\n)\n",
         ],
     ),
     (
         "mv src/a.rs /tmp/a.rs",
+        None,
         None,
         [
             "(\n    Moved {\n        sources: [\n            \"src/a.rs\",\n        ],\n        destination: \"/tmp/a.rs\",\n    },\n    None,\n    Started,\n)\n",
@@ -579,6 +656,7 @@
     (
         "mv -f a b c dest/",
         None,
+        None,
         [
             "(\n    Moved {\n        sources: [\n            \"a\",\n            \"b\",\n            \"c\",\n        ],\n        destination: \"dest/\",\n    },\n    None,\n    Started,\n)\n",
         ],
@@ -586,20 +664,24 @@
     (
         "mv only",
         None,
+        None,
         [],
     ),
     (
         "git mv a b",
+        None,
         None,
         [],
     ),
     (
         "echo '> not a redirect' 'sed -i'",
         None,
+        None,
         [],
     ),
     (
         "cd src && echo a > x.rs",
+        None,
         None,
         [
             "(\n    Wrote(\n        \"x.rs\",\n    ),\n    None,\n    Changed(\n        [\n            \"src\",\n        ],\n    ),\n)\n",
@@ -608,12 +690,14 @@
     (
         "cd /a; cd b; echo a > x",
         None,
+        None,
         [
             "(\n    Wrote(\n        \"x\",\n    ),\n    None,\n    Changed(\n        [\n            \"/a\",\n            \"b\",\n        ],\n    ),\n)\n",
         ],
     ),
     (
         "cd $HOME/repo && echo a > x",
+        None,
         None,
         [
             "(\n    Wrote(\n        \"x\",\n    ),\n    None,\n    Unknown,\n)\n",
@@ -622,12 +706,14 @@
     (
         "cd - && echo a > x",
         None,
+        None,
         [
             "(\n    Wrote(\n        \"x\",\n    ),\n    None,\n    Unknown,\n)\n",
         ],
     ),
     (
         "cd && echo a > x",
+        None,
         None,
         [
             "(\n    Wrote(\n        \"x\",\n    ),\n    None,\n    Unknown,\n)\n",
@@ -636,8 +722,53 @@
     (
         "cd ~/r; cd /abs && echo a > x",
         None,
+        None,
         [
             "(\n    Wrote(\n        \"x\",\n    ),\n    None,\n    Changed(\n        [\n            \"/abs\",\n        ],\n    ),\n)\n",
         ],
+    ),
+    (
+        "cd /w && S=/tmp/s; export CARGO_TARGET_DIR=$S/t; P=(${(f)\"$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | \"-p\", .name')\"}); cargo clean -q $P; cargo test --workspace --no-run -q 2>&1 | tail -4",
+        Some(
+            Unreadable,
+        ),
+        None,
+        [],
+    ),
+    (
+        "P=(a b c); echo $P",
+        Some(
+            Unreadable,
+        ),
+        None,
+        [],
+    ),
+    (
+        "files+=(x)",
+        Some(
+            Unreadable,
+        ),
+        None,
+        [],
+    ),
+    (
+        "echo \"${(j:,:)names}\"",
+        Some(
+            Unreadable,
+        ),
+        None,
+        [],
+    ),
+    (
+        "echo ${name:-default} ${#name} ${name%.rs}",
+        None,
+        None,
+        [],
+    ),
+    (
+        "cargo test --workspace",
+        None,
+        None,
+        [],
     ),
 ]

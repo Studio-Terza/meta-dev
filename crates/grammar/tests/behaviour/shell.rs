@@ -1,5 +1,5 @@
 use fixture::{Cases, Debugged, Failed, Fixture, Spelled};
-use grammar_shell::{Edited, Nested};
+use grammar_shell::{Edited, Nested, Unreadable};
 use serde::Deserialize;
 
 #[derive(Fixture, Deserialize, Debug)]
@@ -19,7 +19,8 @@ fn the_shell_lexer_reads_its_fixture_texts_as_its_golden_says() -> Result<(), Fa
                     .iter()
                     .map(|edited| Debugged((edited.edit(), edited.construct(), edited.directory())).to_string())
                     .collect();
-                (text, Nested::read(text.as_str()).map(|nested| (nested.flagged(), nested.construct())), edited)
+                let nested = Nested::read(text.as_str()).map(|nested| (nested.flagged(), nested.construct()));
+                (text, Unreadable::read(text.as_str()), nested, edited)
             })
             .collect();
         Ok(Debugged(shell).to_string())

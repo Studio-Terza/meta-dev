@@ -478,6 +478,10 @@ input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","t
 
 [[Story.hidden-command.step]]
 words = ["hook", "pre-tool-use"]
+input = '''{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"P=(${(f)\"$(cargo metadata --no-deps | jq -r '.packages[].name')\"}); cargo clean -q $P"},"tool_name":"Bash"}'''
+
+[[Story.hidden-command.step]]
+words = ["hook", "pre-tool-use"]
 input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"rm x"},"tool_name":"Bash"}'
 
 [[Story.hidden-command.step]]

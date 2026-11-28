@@ -85,4 +85,10 @@ shell = [
     "cd - && echo a > x",
     "cd && echo a > x",
     "cd ~/r; cd /abs && echo a > x",
+    """cd /w && S=/tmp/s; export CARGO_TARGET_DIR=$S/t; P=(${(f)"$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | "-p", .name')"}); cargo clean -q $P; cargo test --workspace --no-run -q 2>&1 | tail -4""",
+    "P=(a b c); echo $P",
+    "files+=(x)",
+    'echo "${(j:,:)names}"',
+    "echo ${name:-default} ${#name} ${name%.rs}",
+    "cargo test --workspace",
 ]

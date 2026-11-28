@@ -123,6 +123,13 @@ impl Refusal {
 impl fmt::Display for Refusal {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Refusal::Unreadable => write!(
+                formatter,
+                "Refused: this command holds shell the harness cannot read (an array assignment, a zsh \
+                 `${{(flags)...}}` expansion, or text no shell lexeme covers), so it would stall waiting for \
+                 permission. Run plain single commands instead: one command per call, literal arguments, no \
+                 arrays, loops or expansions over command output."
+            ),
             Refusal::Unroll(nested) => {
                 let word = Refusal::word(nested.flagged());
                 let construct = Refusal::construct(nested.construct());

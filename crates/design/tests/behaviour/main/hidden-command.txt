@@ -246,6 +246,36 @@
                 "pre-tool-use",
             ],
             Ok(
+                Blocked,
+            ),
+            Answer {
+                shown: Shown(
+                    "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Refused: this command holds shell the harness cannot read (an array assignment, a zsh `${(flags)...}` expansion, or text no shell lexeme covers), so it would stall waiting for permission. Run plain single commands instead: one command per call, literal arguments, no arrays, loops or expansions over command output.\"}}\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "pre-tool-use",
+            ],
+            Ok(
                 Hooked(
                     PreToolUse,
                 ),
