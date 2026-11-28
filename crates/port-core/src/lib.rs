@@ -11,4 +11,4 @@ pub use op::{Op, Pass};
 pub use port::{Metered, Port};
 pub use port_derive::{Op, Resource, port};
 pub use run::Run;
-pub use snapshot::{Counted, Snapshot};
+pub use snapshot::Snapshot;

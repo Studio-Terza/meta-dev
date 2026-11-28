@@ -5,7 +5,7 @@ use dispatch_doubles::{Count, Stepped};
 use dispatch_ports::{Clock, Pause, Wall};
 use fixture::{Cases, Debugged, Failed, Fixture};
 use newtype::Wrapping;
-use port_core::{Counted, Op, Released, Resource, Run};
+use port_core::{Op, Released, Resource, Run};
 use serde::Deserialize;
 use sqlite_ports::SqliteOpener;
 use store_ports::{Opens, Parses, Store, StoreLock};
@@ -35,7 +35,7 @@ fn every_call_counts_once_under_its_op_in_name_order_across_threads() -> Result<
             });
             (paused, clock.now())
         };
-        let counted: Vec<Counted> = run.finish().iter().collect();
+        let counted: Vec<_> = run.finish().iter().collect();
         Ok(Debugged((walls, counted)).to_string())
     })?;
     assert_eq!(drifted, Vec::new());
@@ -58,7 +58,7 @@ fn a_per_type_op_counts_under_its_own_name_and_a_held_lock_is_released_once_when
             (cursors, refused, again)
         };
         let names = [SessionCursors::NAME, StoreLock::NAME, Released::<StoreLock>::NAME];
-        let counted: Vec<Counted> = run.finish().iter().collect();
+        let counted: Vec<_> = run.finish().iter().collect();
         Ok(Debugged((observed, names, counted)).to_string())
     })?;
     assert_eq!(drifted, Vec::new());
