@@ -598,11 +598,8 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 name = "pipeline"
 version = "0.1.0"
 dependencies = [
- "file-ports",
  "newtype-derive",
- "port-core",
  "proptest",
- "store-ports",
 ]
 
 [[package]]

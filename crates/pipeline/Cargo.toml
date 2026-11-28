@@ -14,10 +14,7 @@ bench = false
 newtype-derive = { path = "../newtype-derive" }
 
 [dev-dependencies]
-file-ports = { path = "../file-ports" }
-port-core = { path = "../port-core" }
 proptest.workspace = true
-store-ports = { path = "../store-ports" }
 
 [lints]
 workspace = true

@@ -1,12 +1,9 @@
 mod boundary;
 
 use std::error::Error;
-use std::fmt;
-use std::mem;
 use std::sync::Mutex;
 
 use invariants::Unpoisoned;
-use pipeline::Measure;
 
 use super::op::OpName;
 use super::snapshot::Snapshot;
@@ -19,35 +16,23 @@ pub struct ReleaseFailure {
     failure: Told,
 }
 
-#[derive(Debug, Default, Measure)]
-pub struct ReleaseFailures(Vec<ReleaseFailure>);
+#[derive(Debug, thiserror::Error)]
+#[error("{first} ({} further release failures)", .rest.len())]
+pub struct ReleaseFailures {
+    first: ReleaseFailure,
+    rest: Vec<ReleaseFailure>,
+}
 
 #[derive(Debug, Default)]
 struct Ledger {
     calls: Mutex<Snapshot>,
-    failures: Mutex<ReleaseFailures>,
+    failures: Mutex<Vec<ReleaseFailure>>,
 }
 
 #[derive(Debug)]
 pub struct Measured {
     snapshot: Snapshot,
-    failures: ReleaseFailures,
-}
-
-impl ReleaseFailures {
-    fn failed(&mut self, failure: ReleaseFailure) {
-        *self = mem::take(self).joined(ReleaseFailures(vec![failure]));
-    }
-}
-
-impl Error for ReleaseFailures {}
-
-impl fmt::Display for ReleaseFailures {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0
-            .split_first()
-            .map_or(Ok(()), |(first, rest)| write!(formatter, "{first} ({} further release failures)", rest.len()))
-    }
+    failures: Vec<ReleaseFailure>,
 }
 
 impl Measured {
@@ -57,10 +42,10 @@ impl Measured {
     }
 
     pub fn settled(self) -> Result<Snapshot, ReleaseFailures> {
-        let Measured { snapshot, failures } = self;
-        match failures.0.first() {
+        let Measured { snapshot, mut failures } = self;
+        match failures.first().map(|_first| ()) {
             None => Ok(snapshot),
-            Some(_first) => Err(failures),
+            Some(()) => Err(ReleaseFailures { first: failures.remove(0), rest: failures }),
         }
     }
 }
@@ -87,6 +72,6 @@ impl Run {
     }
 
     pub(crate) fn fail(&self, resource: OpName, failure: &impl Error) {
-        self.ledger.failures.lock().unpoisoned().failed(ReleaseFailure { resource, failure: Told::from(failure) });
+        self.ledger.failures.lock().unpoisoned().push(ReleaseFailure { resource, failure: Told::from(failure) });
     }
 }

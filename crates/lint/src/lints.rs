@@ -1,5 +1,6 @@
 mod bool_methods;
 mod expression_flow;
+mod hand_measures;
 mod manual_iteration;
 mod module_cycles;
 mod named_lifetimes;
@@ -28,6 +29,7 @@ use crate::walk::{Lineup, Pausable, Walker};
 use crate::workspace::Package;
 pub(crate) use bool_methods::BoolMethods;
 pub(crate) use expression_flow::ExpressionFlow;
+pub(crate) use hand_measures::HandMeasures;
 pub(crate) use manual_iteration::ManualIteration;
 pub(crate) use module_cycles::{ModuleCycles, ModuleFact};
 pub(crate) use named_lifetimes::NamedLifetimes;
@@ -77,6 +79,7 @@ impl<'run> Lints<'run> {
             process_starters: lints.style(),
             bool_methods: lints.style(),
             no_dyn: lints.style(),
+            hand_measures: lints.style(),
             public_surface: lints.graph(),
             public_api_tests: lints.graph(),
             emitters: Pausable::admitted(Emitters::default(), lints.entered),
@@ -95,6 +98,7 @@ impl<'run> Lints<'run> {
             process_starters,
             bool_methods,
             no_dyn,
+            hand_measures,
             public_surface,
             public_api_tests,
             emitters,
@@ -114,6 +118,7 @@ impl<'run> Lints<'run> {
             lints.found(process_starters),
             lints.found(bool_methods),
             lints.found(no_dyn),
+            lints.found(hand_measures),
         ];
         let api = Lints::facts(public_api_tests).into_iter().chain(emitters.woken().map_or_default(Emitters::facts));
         let facts = Facts {

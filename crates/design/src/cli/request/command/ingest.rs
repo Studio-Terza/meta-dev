@@ -1,5 +1,4 @@
-mod count;
-
+use std::collections::BTreeMap;
 use std::fmt;
 
 use design_messages::{Cursors, SessionCursors, SessionRecords};
@@ -10,7 +9,6 @@ use transcript_ports::{Authorship, Cursor, Kind, Line, Session, SessionId, Trans
 
 use crate::cli::Count;
 use crate::cli::failure::Failure;
-use count::Counts;
 
 #[derive(Debug)]
 struct ReadTo {
@@ -29,8 +27,8 @@ struct Ingested {
 #[derive(Debug, Default, Measure)]
 pub struct Tally {
     ends: Vec<ReadTo>,
-    authorship: Counts<Authorship>,
-    unrecognised: Counts<Kind>,
+    authorship: BTreeMap<Authorship, Count>,
+    unrecognised: BTreeMap<Kind, Count>,
     written: Written,
 }
 
@@ -74,8 +72,8 @@ impl From<Ingested> for Tally {
         let Ingested { end, authors, unrecognised, written } = session;
         Tally {
             ends: vec![end],
-            authorship: authors.into_iter().collect(),
-            unrecognised: unrecognised.into_iter().collect(),
+            authorship: BTreeMap::total(authors.into_iter().map(|author| BTreeMap::from([(author, Count::new(1))]))),
+            unrecognised: BTreeMap::total(unrecognised.into_iter().map(|kind| BTreeMap::from([(kind, Count::new(1))]))),
             written,
         }
     }
@@ -84,8 +82,8 @@ impl From<Ingested> for Tally {
 impl fmt::Display for Tally {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.ends.iter().try_for_each(|end| writeln!(formatter, "session {} read to {}", end.session, end.cursor))?;
-        self.authorship.listed(formatter, "authorship")?;
-        self.unrecognised.listed(formatter, "unrecognised")?;
+        self.authorship.iter().try_for_each(|(author, count)| writeln!(formatter, "authorship {author} {count}"))?;
+        self.unrecognised.iter().try_for_each(|(kind, count)| writeln!(formatter, "unrecognised {kind} {count}"))?;
         writeln!(formatter, "written {}", Count::new(self.written.into_inner()))
     }
 }

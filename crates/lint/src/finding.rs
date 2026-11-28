@@ -22,6 +22,7 @@ pub(crate) enum Rule {
     NoDyn,
     RealAdapters,
     ModuleCycles,
+    HandMeasures,
 }
 
 impl Rule {
@@ -50,6 +51,9 @@ impl Rule {
                 "a port's real adapter is named only in a binary's main.rs and in its own port crate's tests; everything else builds over doubles"
             }
             Rule::ModuleCycles => "modules inside a crate never import each other in a cycle",
+            Rule::HandMeasures => {
+                "a Measure is derived, so its join is fieldwise and lawful by construction; only pipeline joins std types by hand"
+            }
         }
     }
 }
