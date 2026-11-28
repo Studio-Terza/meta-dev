@@ -12,7 +12,7 @@ mod stream_schema;
 
 pub use cursors::Cursors;
 pub use ended::EndedTasks;
-pub use failed_checks::{CheckName, FailedBefore, Failing, PullNumber};
+pub use failed_checks::{CheckName, CommitSha, FailedBefore, Failing, PullNumber};
 pub use overruns::{Overran, Overruns};
 pub use owner_said::{LastSaid, OwnerHistory, Quote, Said, Unabridged};
 pub use session_cursors::SessionCursors;

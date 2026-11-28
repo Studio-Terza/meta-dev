@@ -14,8 +14,10 @@ bench = false
 invariants = { path = "../invariants" }
 file-ports = { path = "../file-ports" }
 grammar-prose = { path = "../grammar-prose" }
+hex.workspace = true
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
+serde.workspace = true
 store-ports = { path = "../store-ports" }
 thiserror.workspace = true
 transcript-ports = { path = "../transcript-ports" }

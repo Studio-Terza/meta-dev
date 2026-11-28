@@ -5,10 +5,11 @@ use std::fmt;
 use std::path::Path;
 
 use console_ports::Heard;
-use design_messages::{CheckName, FailedBefore, Failing};
+use design_messages::{CheckName, CommitSha, FailedBefore, Failing};
 use dispatch_ports::{Clock, Shell};
 use file_ports::Files;
 use grammar_lines::Lines;
+use grammar_report::MissedMutant;
 use invariants::Ignoring;
 use newtype::Wrapping;
 use store_ports::Store;
@@ -23,7 +24,7 @@ use crate::cli::request::{Cause as Escalation, Item, Local, Target};
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
 use boundary::{At, Branched, JobId, Pushed, Reminder, Report, Said};
-pub use boundary::{Branch, CommitSha, Finishing};
+pub use boundary::{Branch, Finishing};
 pub use hub::Hub;
 use hub::{Merge, Unopened, Verdict};
 
@@ -181,10 +182,10 @@ impl Pushed {
 
     fn judged(self, verdict: Verdict, store: &impl Store) -> Ending {
         let before: Vec<CheckName> =
-            store.read(FailedBefore::from(self.pull())).ignoring(Ignored::Unremembered).unwrap_or_default();
+            store.read(FailedBefore::new(self.pull(), self.head())).ignoring(Ignored::Unremembered).unwrap_or_default();
         let jobs = verdict.failed();
         let names = jobs.iter().map(|job| job.check.clone()).collect();
-        store.write(Failing::new(self.pull(), names)).ignoring(Ignored::Unremembered);
+        store.write(Failing::new(self.pull(), self.head(), names)).ignoring(Ignored::Unremembered);
         let repeated = jobs.iter().find(|job| before.contains(&job.check));
         match (repeated, jobs.first()) {
             (Some(job), _first) => Ending::Escalate(Escalation::RepeatFailure(job.check.clone())),
@@ -204,19 +205,21 @@ impl Logged {
     const LINES: usize = 40;
 
     fn fetched<C: Clock, G: Shell>(pushed: Pushed, failed: &[FailedJob], hub: &Hub<'_, C, G>) -> Logged {
-        let jobs = failed.iter().map(|job| Excerpt::tailed(job.clone(), &hub.log(job.job))).collect();
+        let jobs = failed.iter().map(|job| Excerpt::excerpted(job.clone(), &hub.log(job.job))).collect();
         Logged { pushed, jobs }
     }
 }
 
 impl Excerpt {
-    fn tailed(failed: FailedJob, log: &str) -> Excerpt {
+    fn excerpted(failed: FailedJob, log: &str) -> Excerpt {
         let whole: Vec<String> = match log.parse::<Lines>() {
             Ok(lines) => lines.into_iter().collect(),
             Err(unsplit) => match unsplit {},
         };
+        let missed: Vec<String> = whole.iter().filter(|line| MissedMutant::read(line).is_some()).cloned().collect();
         let skipped = whole.len().saturating_sub(Logged::LINES);
-        Excerpt { failed, lines: whole.into_iter().skip(skipped).collect() }
+        let lines = if missed.is_empty() { whole.into_iter().skip(skipped).collect() } else { missed };
+        Excerpt { failed, lines }
     }
 }
 

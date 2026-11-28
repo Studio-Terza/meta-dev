@@ -700,6 +700,43 @@ pull = 12
 [item.escalation.cause]
 repeat-failure = "test"
 
+## a check failing again on a changed head is sent back with its log, mutants with only their MISSED lines, and failing twice on the same head is escalated
+$ hook subagent-stop < {"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}
+{"decision":"block","reason":"CI failed on #12 at 0123456789abcdef0123456789abcdef01234567. Fix these jobs, push, then end with DONE #12 <full sha>.\n\nmutants-shard (1) (job 470):\nmutants-shard (1)\tRun mutants\t2026-11-28T03:01:00Z MISSED   crates/design/src/a.rs:10:5: replace A::b -> bool with true in 1.0s build + 2.0s test\nmutants-shard (1)\tRun mutants\t2026-11-28T03:03:00Z MISSED   crates/design/src/a.rs:20:9: delete ! in A::d in 1.0s build + 2.0s test\n\nmutants (job 471):\nmutants\tevery shard succeeded\t2026-11-28T03:05:00Z Process completed with exit code 1.\n"}
+Ok(Blocked) ExitCode(unix_exit_status(0)) ""
++60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable,mergeStateStatus -R o/r
++60 gh pr checks 12 --json name,bucket,link -R o/r
++60 gh pr checks 12 --json name,bucket,link -R o/r
++60 gh run view --job 470 --log-failed -R o/r
++60 gh run view --job 471 --log-failed -R o/r
+$ hook subagent-stop < {"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 fedcba9876543210fedcba9876543210fedcba98","session_id":"s","stop_hook_active":false}
+{"decision":"block","reason":"CI failed on #12 at fedcba9876543210fedcba9876543210fedcba98. Fix these jobs, push, then end with DONE #12 <full sha>.\n\nmutants-shard (1) (job 470):\nmutants-shard (1)\tRun mutants\t2026-11-28T03:01:00Z MISSED   crates/design/src/a.rs:10:5: replace A::b -> bool with true in 1.0s build + 2.0s test\nmutants-shard (1)\tRun mutants\t2026-11-28T03:03:00Z MISSED   crates/design/src/a.rs:20:9: delete ! in A::d in 1.0s build + 2.0s test\n\nmutants (job 471):\nmutants\tevery shard succeeded\t2026-11-28T03:05:00Z Process completed with exit code 1.\n"}
+Ok(Blocked) ExitCode(unix_exit_status(0)) ""
++60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable,mergeStateStatus -R o/r
++60 gh pr checks 12 --json name,bucket,link -R o/r
++60 gh pr checks 12 --json name,bucket,link -R o/r
++60 gh run view --job 470 --log-failed -R o/r
++60 gh run view --job 471 --log-failed -R o/r
+$ hook subagent-stop < {"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 fedcba9876543210fedcba9876543210fedcba98","session_id":"s","stop_hook_active":false}
+Ok(Escalated) ExitCode(unix_exit_status(0)) ""
++60 gh pr view 12 --json headRefOid -R o/r
++60 gh pr view 12 --json mergeable,mergeStateStatus -R o/r
++60 gh pr checks 12 --json name,bucket,link -R o/r
++60 gh pr checks 12 --json name,bucket,link -R o/r
+queue:
+[[item]]
+
+[item.escalation]
+from = "/work/agent"
+
+[item.escalation.at]
+pull = 12
+
+[item.escalation.cause]
+repeat-failure = "mutants-shard (1)"
+
 ## a green that came on a rerun after a gate failed on the same head is escalated, a rerun after an infrastructure failure passes, and runs that cannot be read are escalated
 $ hook subagent-stop < {"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}
 Ok(Escalated) ExitCode(unix_exit_status(0)) ""

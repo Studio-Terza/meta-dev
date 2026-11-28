@@ -1,11 +1,11 @@
 use std::path::{Path, PathBuf};
 
-use design_messages::PullNumber;
+use design_messages::{CommitSha, PullNumber};
 use grammar_git::{MergeCommand, Worktree};
 use invariants::Ignoring;
 use serde::Deserialize;
 
-use super::super::subagent::{Branch, CommitSha};
+use super::super::subagent::Branch;
 use crate::cli::request::ignored::Ignored;
 
 #[derive(Debug, Deserialize)]

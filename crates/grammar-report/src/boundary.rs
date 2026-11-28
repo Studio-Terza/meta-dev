@@ -30,6 +30,19 @@ enum Linked {
     Slash,
 }
 
+#[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
+#[logos(crate = grammar::logos)]
+#[logos(skip r"[ \t]+")]
+enum Logged {
+    #[token("MISSED")]
+    Missed,
+    #[regex(r"[^ \t]+")]
+    Word,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MissedMutant;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Ended {
     Done,
@@ -135,5 +148,17 @@ impl JobLink {
     #[must_use]
     pub fn job(self) -> NonZeroU64 {
         self.0
+    }
+}
+
+impl MissedMutant {
+    #[must_use]
+    pub fn read(line: &str) -> Option<MissedMutant> {
+        Logged::lexer(line).filter_map(|logged| logged.ignoring(Unlexed::NotThisGrammar)).find_map(
+            |logged| match logged {
+                Logged::Missed => Some(MissedMutant),
+                Logged::Word => None,
+            },
+        )
     }
 }

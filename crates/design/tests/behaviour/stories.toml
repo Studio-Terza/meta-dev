@@ -536,6 +536,39 @@ finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
 reminded = "Yes"
 
 [[story]]
+name = "a check failing again on a changed head is sent back with its log, mutants with only their MISSED lines, and failing twice on the same head is escalated"
+queue = ""
+answers = [
+  { asked = "pr view 12 --json mergeable,mergeStateStatus -R o/r", ran = "Succeeded", printed = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"fail","link":"https://github.com/o/r/actions/runs/10/job/470","name":"mutants-shard (1)"},{"bucket":"fail","link":"https://github.com/o/r/actions/runs/10/job/471","name":"mutants"}]' },
+  { asked = "run view --job 470 --log-failed -R o/r", ran = "Succeeded", printed = """
+mutants-shard (1)\tRun mutants\t2026-11-28T03:00:00Z Found 3 mutants to test
+mutants-shard (1)\tRun mutants\t2026-11-28T03:01:00Z MISSED   crates/design/src/a.rs:10:5: replace A::b -> bool with true in 1.0s build + 2.0s test
+mutants-shard (1)\tRun mutants\t2026-11-28T03:02:00Z caught   crates/design/src/a.rs:12:5: replace A::c with () in 1.0s build + 2.0s test
+mutants-shard (1)\tRun mutants\t2026-11-28T03:03:00Z MISSED   crates/design/src/a.rs:20:9: delete ! in A::d in 1.0s build + 2.0s test
+mutants-shard (1)\tRun mutants\t2026-11-28T03:04:00Z 3 mutants tested in 9s: 2 missed, 1 caught""" },
+  { asked = "run view --job 471 --log-failed -R o/r", ran = "Succeeded", printed = "mutants\tevery shard succeeded\t2026-11-28T03:05:00Z Process completed with exit code 1." },
+]
+
+[[story.step]]
+finish = "DONE #12 0123456789abcdef0123456789abcdef01234567"
+answers = [
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+]
+
+[[story.step]]
+finish = "DONE #12 fedcba9876543210fedcba9876543210fedcba98"
+answers = [
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"fedcba9876543210fedcba9876543210fedcba98"}' },
+]
+
+[[story.step]]
+finish = "DONE #12 fedcba9876543210fedcba9876543210fedcba98"
+answers = [
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"fedcba9876543210fedcba9876543210fedcba98"}' },
+]
+
+[[story]]
 name = "a green that came on a rerun after a gate failed on the same head is escalated, a rerun after an infrastructure failure passes, and runs that cannot be read are escalated"
 queue = ""
 answers = [
