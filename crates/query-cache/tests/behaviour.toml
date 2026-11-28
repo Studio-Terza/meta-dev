@@ -1,9 +1,3 @@
-[Workspace.whole]
-root = "../.."
-
-[Workspace.stale]
-root = "tests/behaviour/stale"
-
 [Found.found]
 sql = "\nINSERT\n  OR IGNORE INTO ended (task)\nVALUES\n  (?1)\n"
 

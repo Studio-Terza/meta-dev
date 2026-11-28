@@ -1,0 +1,29 @@
+[package]
+name = "query-ports"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+test = false
+doctest = false
+bench = false
+
+[dependencies]
+file-ports = { path = "../file-ports" }
+port-core = { path = "../port-core" }
+query-cache = { path = "../query-cache" }
+serde_json.workspace = true
+syn.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+design-messages = { path = "../design-messages" }
+fixture = { path = "../fixture" }
+serde.workspace = true
+sqlite-ports = { path = "../sqlite-ports" }
+store-ports = { path = "../store-ports" }
+
+[lints]
+workspace = true

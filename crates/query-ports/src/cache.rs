@@ -3,9 +3,10 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, FileFailure, Files, Text};
+use query_cache::CacheFile;
 
 use crate::sources::Sources;
-use crate::{CacheFile, Describe, Undescribed};
+use crate::{Describe, Undescribed};
 
 #[derive(Debug)]
 pub struct Cache {

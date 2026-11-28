@@ -1,11 +1,10 @@
 mod declared;
 mod unexpanded;
 
-use file_ports::{Files, Kind};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-use crate::ports::Manifest;
+use crate::ports::Disk;
 pub use declared::Described;
 use declared::{Column, Nullable};
 pub use unexpanded::{CacheFile, Unexpanded};
@@ -65,16 +64,14 @@ impl<Name: Serialize> Entry<Name> {
 }
 
 impl<Name: DeserializeOwned> Entry<Name> {
-    pub fn found(files: &impl Files, sql: &str) -> Result<Entry<Name>, Unexpanded> {
+    pub fn found(sql: &str) -> Result<Entry<Name>, Unexpanded> {
         let file = CacheFile::from(sql);
         let named = file.to_string();
-        let path = Manifest::directory()
+        let path = Disk::manifest()
             .ancestors()
-            .map(|directory| directory.join(Entry::<Name>::DIRECTORY).join(&named))
-            .find(|candidate| files.kind(candidate) == Kind::File)
+            .find_map(|directory| Disk::held(directory.join(Entry::<Name>::DIRECTORY).join(&named)))
             .ok_or(Unexpanded::Uncached(file))?;
-        let text =
-            files.read_text(&path).map_err(|failed| Unexpanded::Unread { path: path.clone(), source: failed })?;
-        serde_json::from_str(text.as_ref()).map_err(|failed| Unexpanded::Unparsed { path, source: failed })
+        let text = Disk::text(&path).map_err(|failed| Unexpanded::Unread { path: path.clone(), source: failed })?;
+        serde_json::from_str(&text).map_err(|failed| Unexpanded::Unparsed { path, source: failed })
     }
 }

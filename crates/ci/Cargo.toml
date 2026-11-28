@@ -23,7 +23,7 @@ file-ports = { path = "../file-ports" }
 grammar-lines = { path = "../grammar-lines" }
 invariants = { path = "../invariants" }
 port-core = { path = "../port-core" }
-query-cache = { path = "../query-cache" }
+query-ports = { path = "../query-ports" }
 sqlite-ports = { path = "../sqlite-ports" }
 store-ports = { path = "../store-ports" }
 serde.workspace = true

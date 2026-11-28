@@ -1,0 +1,5 @@
+[Workspace.whole]
+root = "../.."
+
+[Workspace.stale]
+root = "tests/behaviour/stale"

@@ -1,7 +1,8 @@
 use std::fmt;
 use std::path::PathBuf;
 
-use file_ports::FileFailure;
+use std::io;
+
 use sha2::{Digest, Sha256};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -14,7 +15,7 @@ pub enum Unexpanded {
     )]
     Uncached(CacheFile),
     #[error("cannot read the cached query {}: {source}", path.display())]
-    Unread { path: PathBuf, source: FileFailure },
+    Unread { path: PathBuf, source: io::Error },
     #[error("cannot parse the cached query {}: {source}", path.display())]
     Unparsed { path: PathBuf, source: serde_json::Error },
     #[error("the query takes {wanted} parameters but {given} are bound")]

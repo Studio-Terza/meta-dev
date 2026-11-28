@@ -12,8 +12,6 @@ doctest = false
 bench = false
 
 [dependencies]
-file-ports = { path = "../file-ports" }
-port-core = { path = "../port-core" }
 query-cache = { path = "../query-cache" }
 proc-macro2.workspace = true
 quote.workspace = true

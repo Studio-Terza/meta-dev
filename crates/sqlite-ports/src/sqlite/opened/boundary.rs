@@ -1,4 +1,5 @@
-use query_cache::{Described, Entry, Undescribed};
+use query_cache::{Described, Entry};
+use query_ports::Undescribed;
 use rusqlite::Statement;
 use sha2::{Digest, Sha256};
 use store_ports::Schema;

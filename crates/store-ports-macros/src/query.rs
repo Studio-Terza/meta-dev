@@ -1,8 +1,6 @@
 mod bound;
 mod typed;
 
-use file_ports::Disk;
-use port_core::Run;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::parse::{Parse, ParseStream, Parser};
@@ -25,8 +23,7 @@ impl Expanding for Query {
         let Query { invoked, bounds } = self;
         let (row, source) = (invoked.row(), invoked.source());
         let failed = |unexpanded: Unexpanded| syn::Error::new(source.span(), unexpanded);
-        let run = Run::root();
-        let entry: Entry<ColumnName> = Entry::found(&run.port(Disk), &source.value()).map_err(failed)?;
+        let entry: Entry<ColumnName> = Entry::found(&source.value()).map_err(failed)?;
         entry.bound(bounds.len()).map_err(failed)?;
         let sql = LitStr::new(&source.value(), source.span());
         let arguments: Vec<TokenStream> = bounds.iter().map(Bound::encoded).collect();

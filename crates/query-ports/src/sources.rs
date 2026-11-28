@@ -1,11 +1,11 @@
 use std::path::{Path, PathBuf};
 
 use file_ports::{Files, Kind};
+use query_cache::{Invoked, Recorded};
 use syn::visit::Visit;
 use syn::{ItemStruct, LitStr, Macro};
 
 use crate::cache::Uncached;
-use crate::{Invoked, Recorded};
 
 #[derive(Debug, Default)]
 pub(crate) struct Sources {

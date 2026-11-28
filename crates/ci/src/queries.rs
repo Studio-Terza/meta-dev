@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use design_messages::StreamSchema;
 use port_core::Run;
-use query_cache::Cache;
+use query_ports::Cache;
 use sqlite_ports::SqliteOpener;
 use store_ports::{Opens, Parses};
 

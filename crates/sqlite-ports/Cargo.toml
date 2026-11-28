@@ -14,6 +14,7 @@ bench = false
 invariants = { path = "../invariants" }
 port-core = { path = "../port-core" }
 query-cache = { path = "../query-cache" }
+query-ports = { path = "../query-ports" }
 rusqlite = { version = "0.37.0", default-features = false, features = ["column_metadata", "serialize"] }
 sha2.workspace = true
 store-ports = { path = "../store-ports" }

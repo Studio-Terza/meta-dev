@@ -41,7 +41,8 @@ impl Recorded {
     const UNNAMED: &'static str = "a record is a struct with named fields";
     const ATTRIBUTE: &'static str = "record";
 
-    pub(crate) fn marked(row: &ItemStruct) -> Option<syn::Result<Recorded>> {
+    #[must_use]
+    pub fn marked(row: &ItemStruct) -> Option<syn::Result<Recorded>> {
         Recorded::marking(&row.attrs).map(|marking| Recorded::placed(row, marking))
     }
 

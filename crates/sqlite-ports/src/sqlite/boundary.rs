@@ -1,5 +1,6 @@
 use port_core::Pass;
-use query_cache::{DescribeFiller, Entry, Undescribed, describe_ops};
+use query_cache::Entry;
+use query_ports::{DescribeFiller, Undescribed, describe_ops};
 use rusqlite::fallible_iterator::FallibleIterator;
 use rusqlite::{Batch, Connection};
 use store_ports::{Parses, Schema, Statement, StoreFailure};

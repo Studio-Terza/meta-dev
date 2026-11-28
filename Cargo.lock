@@ -61,7 +61,7 @@ dependencies = [
  "grammar-lines",
  "invariants",
  "port-core",
- "query-cache",
+ "query-ports",
  "serde",
  "serde_json",
  "sqlite-ports",
@@ -709,19 +709,31 @@ dependencies = [
 name = "query-cache"
 version = "0.1.0"
 dependencies = [
- "design-messages",
- "file-ports",
  "fixture",
  "hex",
  "invariants",
- "port-core",
  "proc-macro2",
  "serde",
  "serde_json",
  "sha2",
+ "strum",
+ "syn",
+ "thiserror",
+]
+
+[[package]]
+name = "query-ports"
+version = "0.1.0"
+dependencies = [
+ "design-messages",
+ "file-ports",
+ "fixture",
+ "port-core",
+ "query-cache",
+ "serde",
+ "serde_json",
  "sqlite-ports",
  "store-ports",
- "strum",
  "syn",
  "thiserror",
 ]
@@ -930,6 +942,7 @@ dependencies = [
  "invariants",
  "port-core",
  "query-cache",
+ "query-ports",
  "rusqlite",
  "sha2",
  "store-ports",
@@ -950,8 +963,6 @@ dependencies = [
 name = "store-ports-macros"
 version = "0.1.0"
 dependencies = [
- "file-ports",
- "port-core",
  "proc-macro2",
  "query-cache",
  "quote",

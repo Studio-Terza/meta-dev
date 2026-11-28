@@ -1,8 +1,7 @@
 use std::fmt::Display;
 
 use port_core::port;
-
-use crate::Entry;
+use query_cache::Entry;
 
 #[port]
 pub trait Describe {
