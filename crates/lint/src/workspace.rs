@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use invariants::Ignoring;
-use toml::de::{DeTable, DeValue};
+use toml_ports::{Document, Table, Value};
 
 use crate::failure::Failure;
 use crate::ignored::Ignored;
@@ -132,8 +132,8 @@ impl Workspace {
         let read: Vec<Listed> =
             inside.into_iter().map(|manifest| Workspace::listed(tree, manifest)).collect::<Result<_, _>>()?;
         let outer = above.into_iter().filter_map(|manifest| {
-            let table = DeTable::parse(tree.text(manifest)?).ignoring(Ignored::Unparsed)?;
-            Some(Manifest::new(Workspace::directory(manifest), table.get_ref()))
+            let document = Document::read(tree.text(manifest)?).ignoring(Ignored::Unparsed)?;
+            Some(Manifest::new(Workspace::directory(manifest), document.table()))
         });
         let (found, listed): (Vec<Option<Package>>, Vec<Manifest>) =
             read.into_iter().map(|entry| (entry.package, entry.manifest)).unzip();
@@ -161,49 +161,39 @@ impl Workspace {
 
     fn listed(tree: &Tree, manifest: &Path) -> Result<Listed, Failure> {
         let text = tree.text(manifest).unwrap_or_default();
-        let table = DeTable::parse(text)
-            .map_err(|source| Failure::Manifest { path: tree.shown(manifest).to_path_buf(), source })?
-            .into_inner();
+        let document = Document::read(text)
+            .map_err(|source| Failure::Manifest { path: tree.shown(manifest).to_path_buf(), source })?;
+        let table = document.table();
         let directory = Workspace::directory(manifest);
-        let name = table.get("package").and_then(|package| Workspace::string(package.get_ref(), "name"));
+        let name = table.get("package").and_then(|package| Workspace::string(package, "name"));
         let package = name.map(|named| Package {
             name: named.to_owned(),
             manifest: tree.shown(manifest),
-            features: Workspace::features(text, &table),
-            declared: Workspace::declared(&directory, &table),
+            features: Workspace::features(table),
+            declared: Workspace::declared(&directory, table),
             directory: directory.clone(),
         });
-        Ok(Listed { package, manifest: Manifest::new(directory, &table) })
+        Ok(Listed { package, manifest: Manifest::new(directory, table) })
     }
 
-    fn string<'value>(value: &'value DeValue<'_>, key: &str) -> Option<&'value str> {
-        value.as_table().and_then(|table| table.get(key)).and_then(|found| found.get_ref().as_str())
+    fn string<'value>(value: Value<'value, '_>, key: &str) -> Option<&'value str> {
+        value.table().and_then(|table| table.get(key)).and_then(Value::text)
     }
 
-    fn features(text: &str, table: &DeTable<'_>) -> Vec<Feature> {
-        let declared = table.get("features").and_then(|features| features.get_ref().as_table());
+    fn features(table: Table<'_, '_>) -> Vec<Feature> {
+        let declared = table.get("features").and_then(Value::table);
         declared.map_or_default(|features| {
-            features
-                .iter()
-                .map(|(key, _)| Feature {
-                    name: key.get_ref().to_string(),
-                    line: text.get(..key.span().start).map_or(0, |before| before.matches('\n').count()) + 1,
-                })
-                .collect()
+            features.keys().into_iter().map(|key| Feature { name: key.name().to_owned(), line: key.line() }).collect()
         })
     }
 
-    fn declared(directory: &Path, table: &DeTable<'_>) -> Vec<Target> {
+    fn declared(directory: &Path, table: Table<'_, '_>) -> Vec<Target> {
         Workspace::DECLARED
             .iter()
             .flat_map(|(section, kind)| {
-                let value = table.get(*section).map(toml::Spanned::get_ref);
-                let tables: Vec<&DeValue<'_>> = match value {
-                    Some(DeValue::Array(listed)) => listed.iter().map(toml::Spanned::get_ref).collect(),
-                    Some(single) => vec![single],
-                    None => Vec::new(),
-                };
-                tables
+                table
+                    .get(section)
+                    .map_or_default(Value::each)
                     .into_iter()
                     .filter_map(|target| Workspace::string(target, "path"))
                     .map(|path| Target { path: directory.join(path), kind: *kind })

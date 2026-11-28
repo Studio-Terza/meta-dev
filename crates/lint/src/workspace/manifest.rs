@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
 use std::path::{Component, Path, PathBuf};
 
-use toml::de::{DeTable, DeValue};
+use toml_ports::{Table, Value};
 
 use crate::tree::Tree;
 
@@ -23,13 +23,10 @@ pub(crate) struct Manifest {
 impl Members {
     const ANY: char = '*';
 
-    fn of(workspace: &DeValue<'_>) -> Members {
+    fn of(workspace: Value<'_, '_>) -> Members {
         let names = |key: &str| -> Vec<String> {
-            let listed =
-                workspace.as_table().and_then(|table| table.get(key)).and_then(|value| value.get_ref().as_array());
-            listed.map_or_default(|names| {
-                names.iter().filter_map(|name| name.get_ref().as_str()).map(str::to_owned).collect()
-            })
+            let listed = workspace.table().and_then(|table| table.get(key)).and_then(Value::array);
+            listed.map_or_default(|names| names.into_iter().filter_map(Value::text).map(str::to_owned).collect())
         };
         Members { listed: names("members"), excluded: names("exclude") }
     }
@@ -67,15 +64,15 @@ impl Members {
 impl Manifest {
     const DEPENDENCIES: [&'static str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
 
-    pub(crate) fn new(directory: PathBuf, table: &DeTable<'_>) -> Manifest {
-        let workspace = table.get("workspace").map(toml::Spanned::get_ref);
-        let shared = workspace.and_then(|value| value.as_table()).and_then(|inner| inner.get("dependencies"));
-        let sections = Manifest::DEPENDENCIES.iter().filter_map(|name| table.get(*name)).chain(shared);
+    pub(crate) fn new(directory: PathBuf, table: Table<'_, '_>) -> Manifest {
+        let workspace = table.get("workspace");
+        let shared = workspace.and_then(Value::table).and_then(|inner| inner.get("dependencies"));
+        let sections = Manifest::DEPENDENCIES.iter().filter_map(|name| table.get(name)).chain(shared);
         let depends = sections
-            .filter_map(|section| section.get_ref().as_table())
-            .flat_map(|dependencies| dependencies.iter().map(|(_, dependency)| dependency.get_ref()))
-            .filter_map(|dependency| dependency.as_table().and_then(|inner| inner.get("path")))
-            .filter_map(|path| path.get_ref().as_str())
+            .filter_map(Value::table)
+            .flat_map(Table::values)
+            .filter_map(|dependency| dependency.table().and_then(|inner| inner.get("path")))
+            .filter_map(Value::text)
             .map(|path| Tree::lexical(&directory.join(path)))
             .collect();
         Manifest { packaged: table.get("package").map(|_| ()), members: workspace.map(Members::of), depends, directory }

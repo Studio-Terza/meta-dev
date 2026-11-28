@@ -424,7 +424,7 @@ dependencies = [
  "test-failure",
  "thiserror",
  "timer-ports",
- "toml",
+ "toml-ports",
 ]
 
 [[package]]

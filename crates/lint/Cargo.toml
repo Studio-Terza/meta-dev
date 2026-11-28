@@ -28,7 +28,7 @@ rustc_lexer.workspace = true
 syn.workspace = true
 thiserror.workspace = true
 timer-ports = { path = "../timer-ports" }
-toml.workspace = true
+toml-ports = { path = "../toml-ports" }
 
 [dev-dependencies]
 test-failure = { path = "../test-failure" }
