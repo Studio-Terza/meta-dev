@@ -14,7 +14,6 @@ pub enum Argument {
     Null,
     Integer(i64),
     Text(String),
-    Blob(Vec<u8>),
 }
 
 pub trait Bind {
@@ -23,8 +22,6 @@ pub trait Bind {
     fn integer(&mut self, integer: i64) -> Result<(), StoreFailure>;
 
     fn text(&mut self, text: String) -> Result<(), StoreFailure>;
-
-    fn blob(&mut self, blob: Vec<u8>) -> Result<(), StoreFailure>;
 }
 
 pub trait IntoArgument {
@@ -41,7 +38,6 @@ impl Argument {
             Argument::Null => bind.null(),
             Argument::Integer(integer) => bind.integer(integer),
             Argument::Text(text) => bind.text(text),
-            Argument::Blob(blob) => bind.blob(blob),
         }
     }
 }

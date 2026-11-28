@@ -17,11 +17,6 @@ impl Counted {
     pub fn name(&self) -> OpName {
         self.name
     }
-
-    #[must_use]
-    pub fn calls(&self) -> Calls {
-        self.calls
-    }
 }
 
 impl Snapshot {

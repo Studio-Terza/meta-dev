@@ -20,11 +20,6 @@ impl Bind for Bound {
         self.0.push(Stored::Text(text));
         Ok(())
     }
-
-    fn blob(&mut self, blob: Vec<u8>) -> Result<(), StoreFailure> {
-        self.0.push(Stored::Blob(blob));
-        Ok(())
-    }
 }
 
 impl Execute for Connected<'_> {

@@ -71,7 +71,7 @@ impl fmt::Debug for Spelled {
 #[derive(Debug)]
 pub struct Debugged<Shown>(pub Shown);
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Parsed<Read>(Read);
 
 impl<Read> Parsed<Read> {
@@ -87,21 +87,9 @@ impl<'de, Read: FromStr<Err: fmt::Display>> serde::Deserialize<'de> for Parsed<R
     }
 }
 
-impl<Read: fmt::Debug> fmt::Debug for Parsed<Read> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&self.0, formatter)
-    }
-}
-
 impl Spelled {
     #[must_use]
     pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl AsRef<str> for Spelled {
-    fn as_ref(&self) -> &str {
         &self.0
     }
 }
@@ -128,7 +116,7 @@ pub(crate) struct Entry {
 enum Unread {
     #[error("no story file {story} under {manifest}")]
     Unanchored { story: &'static str, manifest: &'static str },
-    #[error("case {0} has no golden file beside it")]
+    #[error("case {} has no golden file beside it", .0.0)]
     Unpaired(CaseName),
 }
 
@@ -211,11 +199,5 @@ impl Golden {
         recording.map_or(Ok(()), |()| fs::write(&self.path, &printed))?;
         let drifted = recording.xor(Some(())).filter(|()| printed != self.text);
         Ok(drifted.map(|()| Drift { case: case.clone(), printed }))
-    }
-}
-
-impl fmt::Display for CaseName {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(&self.0)
     }
 }
