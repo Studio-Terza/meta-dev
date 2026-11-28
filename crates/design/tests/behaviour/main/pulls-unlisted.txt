@@ -70,7 +70,12 @@
             },
         ),
     ],
-    Ok(
-        "[[item]]\npull = 43\n",
-    ),
+    [
+        Ok(
+            "[[item]]\npull = 43\n",
+        ),
+        Err(
+            NotFound,
+        ),
+    ],
 )

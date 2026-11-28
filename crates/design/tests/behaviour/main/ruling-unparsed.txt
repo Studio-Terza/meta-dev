@@ -52,7 +52,12 @@
             },
         ),
     ],
-    Ok(
-        "[[item]]\nruling = { asked = \"4c37\" }\n\n[[item]]\nruling = { asked = \"not-a-message-id\" }\n",
-    ),
+    [
+        Ok(
+            "[[item]]\nruling = { asked = \"4c37\" }\n\n[[item]]\nruling = { asked = \"not-a-message-id\" }\n",
+        ),
+        Err(
+            NotFound,
+        ),
+    ],
 )

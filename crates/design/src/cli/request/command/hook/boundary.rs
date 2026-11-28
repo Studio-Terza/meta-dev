@@ -9,7 +9,7 @@ use console_ports::{Heard, Shown};
 use design_messages::{LastSaid, Overran, Overruns, OwnerHistory, Said};
 use dispatch_ports::{Clock, Shell, Wall};
 use file_ports::{Epoch, Files};
-use grammar::Lines;
+use grammar_lines::Lines;
 use grammar_spec_line::Attachment;
 use newtype::Wrapping;
 use serde::{Deserialize, Serialize};
@@ -18,7 +18,7 @@ use transcript_ports::{Body, SessionId, Uuid};
 
 use super::super::Ground;
 use super::super::crew::Crew;
-use super::answers::{Answering, Answers};
+use super::answers::{Answering, Answers, Moment};
 use super::subagent::Hub;
 use crate::cli::failure::Failure;
 use crate::cli::request::ignored::Ignored;
@@ -31,7 +31,7 @@ use invariants::Ignoring;
 
 #[derive(Debug, Serialize)]
 pub(crate) struct Settings {
-    hooks: BTreeMap<HookEvent, [Matcher; 1]>,
+    hooks: BTreeMap<HookEvent, Vec<Matcher>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -44,6 +44,8 @@ struct Matcher {
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 enum Tool {
     Bash,
+    #[serde(rename = "Agent|SendMessage")]
+    Briefs,
 }
 
 #[derive(Debug, Serialize)]
@@ -113,33 +115,41 @@ impl Settings {
             hooks: events
                 .iter()
                 .map(|event| {
-                    (*event, [Matcher { matcher: Settings::matcher(*event), hooks: [Settings::handler(*event)] }])
+                    let matchers = Settings::matchers(*event)
+                        .iter()
+                        .map(|matcher| Matcher { matcher: *matcher, hooks: [Settings::handler(*event, *matcher)] })
+                        .collect();
+                    (*event, matchers)
                 })
                 .collect(),
         }
     }
 
-    const fn matcher(event: HookEvent) -> Option<Tool> {
+    const fn matchers(event: HookEvent) -> &'static [Option<Tool>] {
         match event {
-            HookEvent::Stop | HookEvent::SubagentStop => None,
-            HookEvent::PreToolUse | HookEvent::PostToolUse => Some(Tool::Bash),
+            HookEvent::Stop | HookEvent::SubagentStop => &[None],
+            HookEvent::PreToolUse => &[Some(Tool::Bash), Some(Tool::Briefs)],
+            HookEvent::PostToolUse => &[Some(Tool::Bash)],
         }
     }
 
-    fn handler(event: HookEvent) -> Handler {
+    fn handler(event: HookEvent, matcher: Option<Tool>) -> Handler {
         Handler {
             kind: Settings::KIND,
             command: format!("design --workspace \"$CLAUDE_PROJECT_DIR\" hook {event}"),
-            timeout: Settings::seconds(event),
+            timeout: Settings::seconds(event, matcher),
         }
     }
 
-    const fn seconds(event: HookEvent) -> u32 {
+    const fn seconds(event: HookEvent, matcher: Option<Tool>) -> u32 {
         match event {
             HookEvent::Stop => 3600,
             HookEvent::SubagentStop => 1500,
-            HookEvent::PreToolUse => 30,
-            HookEvent::PostToolUse => 300,
+            HookEvent::PreToolUse => match matcher {
+                Some(Tool::Briefs) => 300,
+                Some(Tool::Bash) | None => 30,
+            },
+            HookEvent::PostToolUse => 1800,
         }
     }
 
@@ -203,7 +213,7 @@ impl<'ground, 'run, F: Files, S: Store> Observed<'ground, 'run, F, S> {
         let last = stopping.said.clone().or_else(|| stopping.stored(store));
         let answers = last
             .as_ref()
-            .and_then(|said| Answering::new(store, crew).searched(said).ignoring(Ignored::Unanswered))
+            .and_then(|said| Answering::new(store, crew).searched(said, Moment::Stopping).ignoring(Ignored::Unanswered))
             .flatten();
         let reported: Vec<Body> = store.read(Overruns).ignoring(Ignored::Unanswered).unwrap_or_default();
         let fresh: Vec<Body> =

@@ -52,7 +52,12 @@
             },
         ),
     ],
-    Ok(
-        "[[item]]\nsaid = \"free text is not an item\"\npull = 44\n",
-    ),
+    [
+        Ok(
+            "[[item]]\nsaid = \"free text is not an item\"\npull = 44\n",
+        ),
+        Err(
+            NotFound,
+        ),
+    ],
 )

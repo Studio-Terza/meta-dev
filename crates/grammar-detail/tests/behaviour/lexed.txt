@@ -1,0 +1,22 @@
+[
+    (
+        "process-rebuild#D1",
+        "[\n    (\n        \"process-rebuild\",\n        1,\n    ),\n]\n",
+    ),
+    (
+        "process-rebuild#D1, process-rebuild#D2",
+        "[\n    (\n        \"process-rebuild\",\n        1,\n    ),\n    (\n        \"process-rebuild\",\n        2,\n    ),\n]\n",
+    ),
+    (
+        "a#D1,b#D2 c",
+        "[\n    (\n        \"a\",\n        1,\n    ),\n    (\n        \"b\",\n        2,\n    ),\n]\n",
+    ),
+    (
+        "none",
+        "[]\n",
+    ),
+    (
+        "",
+        "[]\n",
+    ),
+]

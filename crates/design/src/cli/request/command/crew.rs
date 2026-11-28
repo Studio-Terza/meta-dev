@@ -22,6 +22,8 @@ pub(crate) struct Crew<'ports, C: Clock, G: Shell> {
 pub(crate) enum Program {
     Git,
     Gh,
+    Cargo,
+    Design,
     Claude,
 }
 

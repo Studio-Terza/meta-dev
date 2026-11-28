@@ -369,7 +369,12 @@
             },
         ),
     ],
-    Err(
-        NotFound,
-    ),
+    [
+        Err(
+            NotFound,
+        ),
+        Err(
+            NotFound,
+        ),
+    ],
 )

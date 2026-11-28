@@ -48,7 +48,7 @@
                             "view",
                             "12",
                             "--json",
-                            "mergeable",
+                            "mergeable,mergeStateStatus",
                             "-R",
                             "o/r",
                         ],
@@ -145,6 +145,22 @@
                         directory: "/work/agent",
                         fed: None,
                     },
+                    Asked {
+                        after: 90,
+                        program: "gh",
+                        arguments: [
+                            "run",
+                            "list",
+                            "--commit",
+                            "0123456789abcdef0123456789abcdef01234567",
+                            "--json",
+                            "databaseId,attempt",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
                 ],
                 repeated: Count(
                     4,
@@ -154,11 +170,12 @@
                         after: 90,
                         program: "gh",
                         arguments: [
-                            "pr",
-                            "checks",
-                            "12",
+                            "run",
+                            "list",
+                            "--commit",
+                            "0123456789abcdef0123456789abcdef01234567",
                             "--json",
-                            "name,bucket,link",
+                            "databaseId,attempt",
                             "-R",
                             "o/r",
                         ],
@@ -170,7 +187,12 @@
             },
         ),
     ],
-    Ok(
-        "[[item]]\n\n[item.escalation]\ncause = \"blocked\"\nfrom = \"/work/agent\"\n\n[item.escalation.at]\npull = 13\n\n[[item]]\npull = 12\n",
-    ),
+    [
+        Ok(
+            "[[item]]\n\n[item.escalation]\ncause = \"blocked\"\nfrom = \"/work/agent\"\n\n[item.escalation.at]\npull = 13\n\n[[item]]\npull = 12\n",
+        ),
+        Err(
+            NotFound,
+        ),
+    ],
 )

@@ -1,0 +1,2 @@
+[Texts.lexed]
+lines = ["", "a\tb\n\nc\r\nd", "\t\tx\t\n"]

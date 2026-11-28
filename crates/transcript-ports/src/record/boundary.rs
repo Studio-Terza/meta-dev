@@ -1,7 +1,7 @@
 mod entry;
 
 use crate::boundary::LossyText;
-use grammar::Lines;
+use grammar_lines::Lines;
 use invariants::Ignoring;
 
 use crate::{Ignored, Line, Unrecognised};

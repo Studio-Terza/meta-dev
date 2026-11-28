@@ -139,7 +139,12 @@
             },
         ),
     ],
-    Ok(
-        "[[item]]\nspec = \"tools-retirement#D3\"\n\n[[item]]\npull = 43\n\n[[item]]\npull = 99\n\n[[item]]\n\n[item.escalation]\ncause = \"blocked\"\nfrom = \"/home/agent\"\n\n[item.escalation.at]\nbranch = \"design/queue\"\n\n[[item]]\n\n[item.worktree]\npath = \"/home/placed\"\nheld = \"unpushed\"\nmerged = 41\n\n[[item]]\n\n[item.ruling]\nasked = \"4c371128\"\n",
-    ),
+    [
+        Ok(
+            "[[item]]\nspec = \"tools-retirement#D3\"\n\n[[item]]\npull = 43\n\n[[item]]\npull = 99\n\n[[item]]\n\n[item.escalation]\ncause = \"blocked\"\nfrom = \"/home/agent\"\n\n[item.escalation.at]\nbranch = \"design/queue\"\n\n[[item]]\n\n[item.worktree]\npath = \"/home/placed\"\nheld = \"unpushed\"\nmerged = 41\n\n[[item]]\n\n[item.ruling]\nasked = \"4c371128\"\n",
+        ),
+        Err(
+            NotFound,
+        ),
+    ],
 )

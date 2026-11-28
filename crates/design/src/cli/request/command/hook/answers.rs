@@ -7,8 +7,8 @@ use transcript_ports::Body;
 
 use super::super::crew::{Crew, Prompt};
 use crate::cli::failure::Failure;
-pub(crate) use boundary::Answers;
 use boundary::Asked;
+pub(crate) use boundary::{Answers, Moment};
 
 #[derive(Debug)]
 pub(crate) struct Answering<'ports, S: Store, C: Clock, G: Shell> {
@@ -23,8 +23,8 @@ impl<'ports, S: Store, C: Clock, G: Shell> Answering<'ports, S, C, G> {
         Answering { store, crew }
     }
 
-    pub(crate) fn searched(&self, said: &Body) -> Result<Option<Answers>, Failure> {
-        let asked = Asked::from(said);
+    pub(crate) fn searched(&self, said: &Body, moment: Moment) -> Result<Option<Answers>, Failure> {
+        let asked = Asked::new(said, moment);
         let history: Vec<Said> = self.store.read(OwnerHistory)?;
         let reading = asked.reading(&history);
         let fanned = self.crew.fanned(reading.prompts(), Self::TIMEOUT);

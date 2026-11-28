@@ -21,16 +21,16 @@ use crate::cli::request::ignored::Ignored;
 use crate::cli::request::{Cause as Escalation, HeadRef, Item, Local, Target};
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
-use boundary::{At, Branched, Excerpt, JobId, Pushed, Reminder, Report, Said};
+use boundary::{At, Branched, Excerpt, JobId, Lacking, Pushed, Reminder, Report, Said};
 pub(crate) use boundary::{Branch, CommitSha, Finishing};
 pub(crate) use hub::Hub;
-use hub::{Mergeability, Unopened, Verdict};
+use hub::{Merge, Unopened, Verdict};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Ending {
     Stop,
     Unpushed { held: CommitSha },
-    Conflicting,
+    MergeMain { lacking: Lacking },
     Failing(Vec<FailedJob>),
     Escalate(Escalation),
 }
@@ -51,8 +51,9 @@ struct Unpushed {
 }
 
 #[derive(Debug)]
-struct Conflicted {
+struct Stalled {
     pushed: Pushed,
+    lacking: Lacking,
 }
 
 #[derive(Debug)]
@@ -120,7 +121,7 @@ impl<F: Files, S: Store> Desk<'_, '_, F, S> {
         match pushed.checked(hub, self.ground.store()) {
             Ok(Ending::Stop) => self.cleared(passed),
             Ok(Ending::Unpushed { held }) => Decision::blocked(Unpushed { pushed, held }.to_string()),
-            Ok(Ending::Conflicting) => Decision::blocked(Conflicted { pushed }.to_string()),
+            Ok(Ending::MergeMain { lacking }) => Decision::blocked(Stalled { pushed, lacking }.to_string()),
             Ok(Ending::Failing(jobs)) => Decision::blocked(Logged::fetched(pushed, &jobs, hub).to_string()),
             Ok(Ending::Escalate(escalation)) => self.escalated(Some(&at), escalation),
             Err(step) => self.escalated(Some(&at), Escalation::Unread(step)),
@@ -152,10 +153,18 @@ impl Pushed {
         let held = hub.head(self.pull())?;
         if held == self.head() {
             match hub.mergeable(self.pull())? {
-                Mergeability::Conflicting => Ok(Ending::Conflicting),
-                Mergeability::Clean | Mergeability::Unknown => {
+                Merge::Stale => Ok(Ending::MergeMain { lacking: hub.lacking(self.head()) }),
+                Merge::Current => {
                     hub.requested(self.pull())?;
-                    Ok(self.judged(hub.settled(self.pull())?, store))
+                    match self.judged(hub.settled(self.pull())?, store) {
+                        Ending::Stop => Ok(hub
+                            .gated(self.head())?
+                            .map_or(Ending::Stop, |check| Ending::Escalate(Escalation::GatedRerun(check)))),
+                        ending @ (Ending::Unpushed { .. }
+                        | Ending::MergeMain { .. }
+                        | Ending::Failing(_)
+                        | Ending::Escalate(_)) => Ok(ending),
+                    }
                 }
             }
         } else {
@@ -224,14 +233,16 @@ impl fmt::Display for Untyped {
     }
 }
 
-impl fmt::Display for Conflicted {
+impl fmt::Display for Stalled {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let pull = self.pushed.pull();
         write!(
             formatter,
-            "Pull request #{pull} at {} conflicts with main. Merge origin/main, resolve the conflicts, push, then end \
-             with DONE #{pull} <full sha of the pushed head>.",
-            self.pushed.head()
+            "Pull request #{pull} at {} is behind main or conflicts with it, so its CI cannot land it. Merge \
+             origin/main, resolve any conflicts keeping both sides' behaviour, push, then end with DONE #{pull} <full \
+             sha of the pushed head>.{}",
+            self.pushed.head(),
+            self.lacking
         )
     }
 }

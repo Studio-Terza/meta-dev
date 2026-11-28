@@ -361,7 +361,12 @@
             },
         ),
     ],
-    Ok(
-        "[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.cause]\nunread = \"ending\"\n",
-    ),
+    [
+        Ok(
+            "[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.cause]\nunread = \"ending\"\n",
+        ),
+        Err(
+            NotFound,
+        ),
+    ],
 )

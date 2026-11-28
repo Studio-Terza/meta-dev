@@ -56,7 +56,7 @@
             ),
             Answer {
                 shown: Shown(
-                    "{\"decision\":\"block\",\"reason\":\"Pull request #12 at 0123456789abcdef0123456789abcdef01234567 conflicts with main. Merge origin/main, resolve the conflicts, push, then end with DONE #12 <full sha of the pushed head>.\"}\n",
+                    "{\"decision\":\"block\",\"reason\":\"Pull request #12 at 0123456789abcdef0123456789abcdef01234567 is behind main or conflicts with it, so its CI cannot land it. Merge origin/main, resolve any conflicts keeping both sides' behaviour, push, then end with DONE #12 <full sha of the pushed head>.\\nMain has these merges the head lacks:\\n- Merge pull request #717 from o/ci/mutants-label\\n- Merge pull request #719 from o/ci/logos-chain\"}\n",
                 ),
                 complaint: Complaint(
                     "",
@@ -92,9 +92,90 @@
                             "view",
                             "12",
                             "--json",
-                            "mergeable",
+                            "mergeable,mergeStateStatus",
                             "-R",
                             "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "api",
+                            "repos/o/r/compare/0123456789abcdef0123456789abcdef01234567...main",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                ],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+        (
+            [
+                "hook",
+                "subagent-stop",
+            ],
+            Ok(
+                Blocked,
+            ),
+            Answer {
+                shown: Shown(
+                    "{\"decision\":\"block\",\"reason\":\"Pull request #12 at 0123456789abcdef0123456789abcdef01234567 is behind main or conflicts with it, so its CI cannot land it. Merge origin/main, resolve any conflicts keeping both sides' behaviour, push, then end with DONE #12 <full sha of the pushed head>.\"}\n",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "pr",
+                            "view",
+                            "12",
+                            "--json",
+                            "headRefOid",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "pr",
+                            "view",
+                            "12",
+                            "--json",
+                            "mergeable,mergeStateStatus",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "api",
+                            "repos/o/r/compare/0123456789abcdef0123456789abcdef01234567...main",
                         ],
                         directory: "/work/agent",
                         fed: None,
@@ -108,7 +189,12 @@
             },
         ),
     ],
-    Err(
-        NotFound,
-    ),
+    [
+        Err(
+            NotFound,
+        ),
+        Err(
+            NotFound,
+        ),
+    ],
 )

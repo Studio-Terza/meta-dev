@@ -58,7 +58,7 @@ dependencies = [
  "dispatch-ports",
  "file-ports",
  "fixture",
- "grammar",
+ "grammar-lines",
  "invariants",
  "port-core",
  "query-cache",
@@ -160,7 +160,14 @@ dependencies = [
  "file-ports",
  "fixture",
  "grammar",
+ "grammar-detail",
  "grammar-git",
+ "grammar-letters",
+ "grammar-lines",
+ "grammar-notice",
+ "grammar-report",
+ "grammar-repository",
+ "grammar-shell",
  "grammar-spec-line",
  "hex",
  "invariants",
@@ -182,7 +189,7 @@ name = "design-messages"
 version = "0.1.0"
 dependencies = [
  "file-ports",
- "grammar",
+ "grammar-prose",
  "invariants",
  "newtype",
  "port-core",
@@ -361,11 +368,27 @@ dependencies = [
 name = "grammar"
 version = "0.1.0"
 dependencies = [
- "fixture",
  "invariants",
  "logos",
- "serde",
  "thiserror",
+]
+
+[[package]]
+name = "grammar-bare"
+version = "0.1.0"
+dependencies = [
+ "fixture",
+ "grammar",
+ "serde",
+]
+
+[[package]]
+name = "grammar-detail"
+version = "0.1.0"
+dependencies = [
+ "fixture",
+ "grammar",
+ "serde",
 ]
 
 [[package]]
@@ -373,6 +396,65 @@ name = "grammar-git"
 version = "0.1.0"
 dependencies = [
  "grammar",
+ "grammar-report",
+]
+
+[[package]]
+name = "grammar-letters"
+version = "0.1.0"
+dependencies = [
+ "fixture",
+ "grammar",
+ "serde",
+]
+
+[[package]]
+name = "grammar-lines"
+version = "0.1.0"
+dependencies = [
+ "fixture",
+ "grammar",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "grammar-notice"
+version = "0.1.0"
+dependencies = [
+ "fixture",
+ "grammar",
+ "serde",
+]
+
+[[package]]
+name = "grammar-prose"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+]
+
+[[package]]
+name = "grammar-report"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+]
+
+[[package]]
+name = "grammar-repository"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+]
+
+[[package]]
+name = "grammar-shell"
+version = "0.1.0"
+dependencies = [
+ "fixture",
+ "grammar",
+ "serde",
 ]
 
 [[package]]
@@ -1014,7 +1096,9 @@ dependencies = [
  "file-doubles",
  "file-ports",
  "fixture",
- "grammar",
+ "grammar-bare",
+ "grammar-lines",
+ "grammar-notice",
  "invariants",
  "newtype",
  "port-core",

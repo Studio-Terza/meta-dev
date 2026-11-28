@@ -26,6 +26,8 @@ enum Tool {
     #[default]
     Gh,
     Git,
+    Cargo,
+    Design,
     Claude,
 }
 

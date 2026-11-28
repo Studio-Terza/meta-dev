@@ -1,13 +1,14 @@
 # Each story runs design's commands and hooks, step by step, against a fresh home with a real file
 # store; its golden beside this file holds what each step ended with and showed, every scripted call
-# it made, and the queue it leaves. `Home` holds what every story's home starts with.
+# it made, and the queue and workspace settings it leaves. `Home` holds what every story's home
+# starts with and which files it leaves.
 
 [[Home]]
 moved = { "/private/tmp" = "tmp", "/home" = "" }
 environment = { HOME = "/home", PWD = "/home" }
 arguments = ["--workspace", "work"]
 directories = ["/home/work/.meta", "/home/placed"]
-queue = "/home/placed/queue.toml"
+left = ["/home/placed/queue.toml", "/home/work/.claude/settings.local.json"]
 
 [Home.files]
 "/home/work/.meta/local.toml" = """
@@ -254,6 +255,45 @@ words = ["hook", "stop"]
 input = '{"hook_event_name":"Stop","last_assistant_message":"Shall I merge the branch now?","session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}'
 answers = [
   { tool = "claude", asked = "Below are earlier messages", ran = "Succeeded", printed = "not json" },
+]
+
+# owner words bearing on a brief or a plain message are appended to it with their ids, and a structured message, a brief nothing bears on and a failed reading pass unchanged
+[Story.briefs-quoted]
+answers = [
+  { tool = "claude", asked = "Below are earlier messages", ran = "Succeeded", printed = '{"subtype":"success","result":"[{\"uuid\": \"o1\", \"quote\": \"Merge only when CI is green.\"}]"}' },
+  { tool = "claude", asked = "Below, numbered", ran = "Succeeded", printed = '{"subtype":"success","result":"[1]"}' },
+]
+
+[Story.briefs-quoted.files]
+"/home/.claude/projects/-home-work/s.jsonl" = '''
+{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}
+{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}
+'''
+
+[[Story.briefs-quoted.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"description":"d","prompt":"Land #12 once its checks finish.","subagent_type":"worker"},"tool_name":"Agent"}'
+
+[[Story.briefs-quoted.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"message":"Merge #12 now.","summary":"s","to":"worker"},"tool_name":"SendMessage"}'
+
+[[Story.briefs-quoted.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"message":{"reason":"done","type":"shutdown_request"},"summary":"s","to":"worker"},"tool_name":"SendMessage"}'
+
+[[Story.briefs-quoted.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"description":"d","prompt":"Rename the crate.","subagent_type":"worker"},"tool_name":"Agent"}'
+answers = [
+  { tool = "claude", asked = "Below are earlier messages", ran = "Succeeded", printed = '{"subtype":"success","result":"[]"}' },
+]
+
+[[Story.briefs-quoted.step]]
+words = ["hook", "pre-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"description":"d","prompt":"Land #12 once its checks finish.","subagent_type":"worker"},"tool_name":"Agent"}'
+answers = [
+  { tool = "claude", asked = "Below are earlier messages", ran = "Failed", printed = '{"subtype":"error_during_execution","is_error":true,"result":"refused"}' },
 ]
 
 # a stop without its last message asks about the lead's last stored words
@@ -504,7 +544,7 @@ input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_m
 words = ["hook", "subagent-stop"]
 input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"Still prose.","session_id":"s","stop_hook_active":true}'
 
-# a done on a sha the pull request does not hold, or on a conflicting one, is sent back without waiting on ci
+# a done on a sha the pull request does not hold, or on one behind or conflicting with main, is sent back at once to merge main naming the merges it lacks
 [[Story.done-wrong-sha.step]]
 words = ["hook", "subagent-stop"]
 input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":true}'
@@ -517,14 +557,25 @@ words = ["hook", "subagent-stop"]
 input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":true}'
 answers = [
   { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
-  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"CONFLICTING"}' },
+  { asked = "pr view 12 --json mergeable,mergeStateStatus -R o/r", ran = "Succeeded", printed = '{"mergeStateStatus":"DIRTY","mergeable":"CONFLICTING"}' },
+  { asked = "api repos/o/r/compare/0123456789abcdef0123456789abcdef01234567...main", ran = "Succeeded", printed = '{"commits":[{"commit":{"message":"Merge pull request #717 from o/ci/mutants-label\n\nMutants on label"}},{"commit":{"message":"Merge pull request #719 from o/ci/logos-chain"}}]}' },
+]
+
+[[Story.done-wrong-sha.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+answers = [
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+  { asked = "pr view 12 --json mergeable,mergeStateStatus -R o/r", ran = "Succeeded", printed = '{"mergeStateStatus":"BEHIND","mergeable":"MERGEABLE"}' },
+  { asked = "api repos/o/r/compare/0123456789abcdef0123456789abcdef01234567...main", ran = "Failed", printed = "" },
 ]
 
 # a done right after opening asks for mutants, waits for checks to appear, watches them, and stops on green clearing its escalations
 [Story.done-waits-checks]
 answers = [
   { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
-  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"UNKNOWN"}' },
+  { asked = "pr view 12 --json mergeable,mergeStateStatus -R o/r", ran = "Succeeded", printed = '{"mergeStateStatus":"UNKNOWN","mergeable":"UNKNOWN"}' },
+  { asked = "run list --commit 0123456789abcdef0123456789abcdef01234567 --json databaseId,attempt -R o/r", ran = "Succeeded", printed = '[{"attempt":1,"databaseId":9}]' },
   { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = "" },
   { asked = "pr edit 12 --remove-label mutants -R o/r", ran = "Failed", printed = "" },
   { asked = "pr edit 12 --add-label mutants -R o/r", ran = "Succeeded", printed = "https://github.com/o/r/pull/12" },
@@ -557,7 +608,8 @@ input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_m
 [Story.red-done]
 answers = [
   { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
-  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"MERGEABLE"}' },
+  { asked = "pr view 12 --json mergeable,mergeStateStatus -R o/r", ran = "Succeeded", printed = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
+  { asked = "run list --commit 0123456789abcdef0123456789abcdef01234567 --json databaseId,attempt -R o/r", ran = "Succeeded", printed = '[{"attempt":1,"databaseId":9}]' },
   { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"fail","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"},{"bucket":"cancel","link":"https://github.com/o/r/actions/runs/9/job/458?pr=12","name":"build"},{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/457","name":"lint"},{"bucket":"pass","link":"https://github.com/o/r/actions/runs/10/job/460","name":"mutants"}]' },
   { asked = "run view --job 456 --log-failed -R o/r", ran = "Succeeded", printed = """
 test step line 1
@@ -627,6 +679,59 @@ input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_m
 words = ["hook", "subagent-stop"]
 input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":true}'
 
+# a green that came on a rerun after a gate failed on the same head is escalated, a rerun after an infrastructure failure passes, and runs that cannot be read are escalated
+[Story.gated-rerun]
+answers = [
+  { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
+  { asked = "pr view 12 --json mergeable,mergeStateStatus -R o/r", ran = "Succeeded", printed = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
+  { asked = "pr edit 12 --remove-label mutants -R o/r", ran = "Succeeded", printed = "https://github.com/o/r/pull/12" },
+  { asked = "pr edit 12 --add-label mutants -R o/r", ran = "Succeeded", printed = "https://github.com/o/r/pull/12" },
+  { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Succeeded", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"clippy"},{"bucket":"pass","link":"https://github.com/o/r/actions/runs/10/job/460","name":"mutants"}]' },
+]
+
+[Story.gated-rerun.files]
+"/home/placed/queue.toml" = ""
+
+[[Story.gated-rerun.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+answers = [
+  { asked = "run list --commit 0123456789abcdef0123456789abcdef01234567 --json databaseId,attempt -R o/r", ran = "Succeeded", printed = '[{"attempt":3,"databaseId":9},{"attempt":1,"databaseId":10}]' },
+  { asked = "run view 9 --attempt 1 --json jobs -R o/r", ran = "Succeeded", printed = '{"jobs":[{"name":"test","conclusion":"cancelled"}]}' },
+  { asked = "run view 9 --attempt 2 --json jobs -R o/r", ran = "Succeeded", printed = '{"jobs":[{"name":"lint","conclusion":"success"},{"name":"clippy","conclusion":"failure"}]}' },
+]
+
+[[Story.gated-rerun.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+answers = [
+  { asked = "run list --commit 0123456789abcdef0123456789abcdef01234567 --json databaseId,attempt -R o/r", ran = "Succeeded", printed = '[{"attempt":2,"databaseId":9}]' },
+  { asked = "run view 9 --attempt 1 --json jobs -R o/r", ran = "Succeeded", printed = '{"jobs":[{"name":"test","conclusion":"startup_failure"},{"name":"lint","conclusion":"cancelled"},{"name":"mutants","conclusion":"skipped"}]}' },
+]
+
+[[Story.gated-rerun.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+answers = [
+  { asked = "run list --commit 0123456789abcdef0123456789abcdef01234567 --json databaseId,attempt -R o/r", ran = "Succeeded", printed = '[{"attempt":2,"databaseId":9}]' },
+  { asked = "run view 9 --attempt 1 --json jobs -R o/r", ran = "Succeeded", printed = '{"jobs":[{"name":"mutants-shard (1)","conclusion":"timed_out"}]}' },
+]
+
+[[Story.gated-rerun.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+answers = [
+  { asked = "run list --commit 0123456789abcdef0123456789abcdef01234567 --json databaseId,attempt -R o/r", ran = "Failed", printed = "" },
+]
+
+[[Story.gated-rerun.step]]
+words = ["hook", "subagent-stop"]
+input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
+answers = [
+  { asked = "run list --commit 0123456789abcdef0123456789abcdef01234567 --json databaseId,attempt -R o/r", ran = "Succeeded", printed = '[{"attempt":2,"databaseId":9}]' },
+  { asked = "run view 9 --attempt 1 --json jobs -R o/r", ran = "Succeeded", printed = "not json" },
+]
+
 # a blocked agent and every unread step are queued on the pull request
 [Story.blocked-agent.files]
 "/home/placed/queue.toml" = ""
@@ -658,7 +763,7 @@ words = ["hook", "subagent-stop"]
 input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 answers = [
   { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
-  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"DIVERGED"}' },
+  { asked = "pr view 12 --json mergeable,mergeStateStatus -R o/r", ran = "Succeeded", printed = '{"mergeStateStatus":"CLEAN","mergeable":"DIVERGED"}' },
 ]
 
 [[Story.blocked-agent.step]]
@@ -666,7 +771,7 @@ words = ["hook", "subagent-stop"]
 input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 answers = [
   { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
-  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"MERGEABLE"}' },
+  { asked = "pr view 12 --json mergeable,mergeStateStatus -R o/r", ran = "Succeeded", printed = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
   { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"}]' },
   { asked = "pr edit 12 --remove-label mutants -R o/r", ran = "Succeeded", printed = "https://github.com/o/r/pull/12" },
   { asked = "pr edit 12 --add-label mutants -R o/r", ran = "Failed", printed = "could not add label: 'mutants' not found" },
@@ -677,7 +782,7 @@ words = ["hook", "subagent-stop"]
 input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 answers = [
   { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
-  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"MERGEABLE"}' },
+  { asked = "pr view 12 --json mergeable,mergeStateStatus -R o/r", ran = "Succeeded", printed = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
   { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"fail","link":"https://ci.example/9","name":"status"},{"bucket":"pending","link":"","name":"mutants"}]' },
 ]
 
@@ -686,7 +791,7 @@ words = ["hook", "subagent-stop"]
 input = '{"cwd":"/work/agent","hook_event_name":"SubagentStop","last_assistant_message":"DONE #12 0123456789abcdef0123456789abcdef01234567","session_id":"s","stop_hook_active":false}'
 answers = [
   { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
-  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"MERGEABLE"}' },
+  { asked = "pr view 12 --json mergeable,mergeStateStatus -R o/r", ran = "Succeeded", printed = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
   { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Failed", printed = '[{"bucket":"pending","link":"","name":"test"},{"bucket":"pending","link":"","name":"mutants"}]' },
   { asked = "pr checks 12 --watch --fail-fast -R o/r", ran = "Overdue", printed = "" },
 ]
@@ -720,8 +825,9 @@ https://github.com/o/r/pull/12
 """ },
   { asked = "pr view design/open-pr --json number -R o/r", ran = "Succeeded", printed = '{"number":12}' },
   { asked = "pr view 12 --json headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefOid":"0123456789abcdef0123456789abcdef01234567"}' },
-  { asked = "pr view 12 --json mergeable -R o/r", ran = "Succeeded", printed = '{"mergeable":"MERGEABLE"}' },
+  { asked = "pr view 12 --json mergeable,mergeStateStatus -R o/r", ran = "Succeeded", printed = '{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}' },
   { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Succeeded", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"}]' },
+  { asked = "run list --commit 0123456789abcdef0123456789abcdef01234567 --json databaseId,attempt -R o/r", ran = "Succeeded", printed = '[{"attempt":1,"databaseId":9}]' },
   { asked = "pr edit 12 --remove-label mutants -R o/r", ran = "Succeeded", printed = "https://github.com/o/r/pull/12" },
   { asked = "pr edit 12 --add-label mutants -R o/r", ran = "Succeeded", printed = "https://github.com/o/r/pull/12" },
   { asked = "pr checks 12 --json name,bucket,link -R o/r", ran = "Succeeded", printed = '[{"bucket":"pass","link":"https://github.com/o/r/actions/runs/9/job/456","name":"test"},{"bucket":"pass","link":"https://github.com/o/r/actions/runs/10/job/460","name":"mutants"}]' },
@@ -883,6 +989,11 @@ HEAD 0123456789abcdef0123456789abcdef01234567
 branch refs/heads/design/open-pr
 """ },
   { tool = "git", asked = "status --short", ran = "Succeeded", printed = "" },
+  { tool = "git", asked = "fetch origin main", ran = "Succeeded" },
+  { tool = "git", asked = "worktree add --detach /home/work/.meta/agents/install-12 origin/main", ran = "Succeeded" },
+  { tool = "cargo", asked = "install --path crates/design --locked --force", ran = "Succeeded" },
+  { tool = "git", asked = "worktree remove --force /home/work/.meta/agents/install-12", ran = "Succeeded" },
+  { tool = "design", asked = "--workspace /home/work hook --settings", ran = "Succeeded", printed = '{"hooks":{"Stop":[]}}' },
 ]
 
 [Story.merged-worktree.files]
@@ -962,6 +1073,90 @@ input = '{"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","
 answers = [
   { tool = "git", asked = "worktree remove /work/wt-open-pr", ran = "Failed", printed = "" },
 ]
+
+# a merge installs design from merged main and writes only the hooks of the workspace settings, and each failed install step is queued until a later merge installs
+[Story.merge-installs]
+answers = [
+  { asked = "pr view 12 --json state,headRefName,headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"MERGED"}' },
+  { tool = "git", asked = "worktree list --porcelain", ran = "Succeeded", printed = "" },
+  { tool = "git", asked = "fetch origin main", ran = "Succeeded" },
+  { tool = "git", asked = "worktree add --detach /home/work/.meta/agents/install-12 origin/main", ran = "Succeeded" },
+  { tool = "cargo", asked = "install --path crates/design --locked --force", ran = "Succeeded" },
+  { tool = "git", asked = "worktree remove --force /home/work/.meta/agents/install-12", ran = "Succeeded" },
+  { tool = "design", asked = "--workspace /home/work hook --settings", ran = "Succeeded", printed = '{"hooks":{"PreToolUse":[{"matcher":"Agent|SendMessage"}]}}' },
+]
+
+[Story.merge-installs.files]
+"/home/placed/queue.toml" = '''
+[[item]]
+uninstalled = { merged = 11, step = "build" }
+'''
+"/home/work/.claude/settings.local.json" = '{"env":{"A":"1"},"hooks":{"Stop":"old"},"permissions":{"deny":["Monitor"]}}'
+
+[[Story.merge-installs.step]]
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
+
+[[Story.merge-installs.step]]
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
+answers = [
+  { tool = "git", asked = "fetch origin main", ran = "Failed" },
+]
+
+[[Story.merge-installs.step]]
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
+answers = [
+  { tool = "git", asked = "worktree add --detach /home/work/.meta/agents/install-12 origin/main", ran = "Failed" },
+]
+
+[[Story.merge-installs.step]]
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
+answers = [
+  { tool = "cargo", asked = "install --path crates/design --locked --force", ran = "Failed", printed = "error: could not compile `design`" },
+]
+
+[[Story.merge-installs.step]]
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
+answers = [
+  { tool = "design", asked = "--workspace /home/work hook --settings", ran = "Succeeded", printed = "not json" },
+]
+
+[[Story.merge-installs.step]]
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
+answers = [
+  { asked = "pr view 12 --json state,headRefName,headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"OPEN"}' },
+]
+
+[[Story.merge-installs.step]]
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}'
+
+# workspace settings that do not parse are left as they are and the install is queued
+[Story.settings-unparsed]
+answers = [
+  { asked = "pr view 12 --json state,headRefName,headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"MERGED"}' },
+  { tool = "git", asked = "worktree list --porcelain", ran = "Succeeded", printed = "" },
+  { tool = "git", asked = "fetch origin main", ran = "Succeeded" },
+  { tool = "git", asked = "worktree add --detach /home/work/.meta/agents/install-12 origin/main", ran = "Succeeded" },
+  { tool = "cargo", asked = "install --path crates/design --locked --force", ran = "Succeeded" },
+  { tool = "git", asked = "worktree remove --force /home/work/.meta/agents/install-12", ran = "Succeeded" },
+  { tool = "design", asked = "--workspace /home/work hook --settings", ran = "Succeeded", printed = '{"hooks":{}}' },
+]
+
+[Story.settings-unparsed.files]
+"/home/placed/queue.toml" = ""
+"/home/work/.claude/settings.local.json" = """
+not json
+"""
+
+[[Story.settings-unparsed.step]]
+words = ["hook", "post-tool-use"]
+input = '{"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}'
 
 # in-place edits anywhere, shell writes under a repository, and moves out of one are refused toward the edit tools
 [Story.in-place-edits]

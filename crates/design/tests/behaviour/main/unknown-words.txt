@@ -156,7 +156,7 @@
             ),
             Answer {
                 shown: Shown(
-                    "{\n  \"hooks\": {\n    \"Stop\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"design --workspace \\\"$CLAUDE_PROJECT_DIR\\\" hook stop\",\n            \"timeout\": 3600\n          }\n        ]\n      }\n    ],\n    \"SubagentStop\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"design --workspace \\\"$CLAUDE_PROJECT_DIR\\\" hook subagent-stop\",\n            \"timeout\": 1500\n          }\n        ]\n      }\n    ],\n    \"PreToolUse\": [\n      {\n        \"matcher\": \"Bash\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"design --workspace \\\"$CLAUDE_PROJECT_DIR\\\" hook pre-tool-use\",\n            \"timeout\": 30\n          }\n        ]\n      }\n    ],\n    \"PostToolUse\": [\n      {\n        \"matcher\": \"Bash\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"design --workspace \\\"$CLAUDE_PROJECT_DIR\\\" hook post-tool-use\",\n            \"timeout\": 300\n          }\n        ]\n      }\n    ]\n  }\n}\n",
+                    "{\n  \"hooks\": {\n    \"Stop\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"design --workspace \\\"$CLAUDE_PROJECT_DIR\\\" hook stop\",\n            \"timeout\": 3600\n          }\n        ]\n      }\n    ],\n    \"SubagentStop\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"design --workspace \\\"$CLAUDE_PROJECT_DIR\\\" hook subagent-stop\",\n            \"timeout\": 1500\n          }\n        ]\n      }\n    ],\n    \"PreToolUse\": [\n      {\n        \"matcher\": \"Bash\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"design --workspace \\\"$CLAUDE_PROJECT_DIR\\\" hook pre-tool-use\",\n            \"timeout\": 30\n          }\n        ]\n      },\n      {\n        \"matcher\": \"Agent|SendMessage\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"design --workspace \\\"$CLAUDE_PROJECT_DIR\\\" hook pre-tool-use\",\n            \"timeout\": 300\n          }\n        ]\n      }\n    ],\n    \"PostToolUse\": [\n      {\n        \"matcher\": \"Bash\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"design --workspace \\\"$CLAUDE_PROJECT_DIR\\\" hook post-tool-use\",\n            \"timeout\": 1800\n          }\n        ]\n      }\n    ]\n  }\n}\n",
                 ),
                 complaint: Complaint(
                     "",
@@ -207,7 +207,12 @@
             },
         ),
     ],
-    Err(
-        NotFound,
-    ),
+    [
+        Err(
+            NotFound,
+        ),
+        Err(
+            NotFound,
+        ),
+    ],
 )

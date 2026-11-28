@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 use std::path::{Component, PathBuf};
 
-use grammar::{Fields, Lines};
+use grammar_lines::{Fields, Lines};
 
 use crate::boundary::Said;
 use crate::failure::Failure;

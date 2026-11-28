@@ -14,6 +14,13 @@ use invariants::Ignoring;
 #[derive(Debug)]
 pub(crate) struct Asked {
     question: Body,
+    moment: Moment,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Moment {
+    Stopping,
+    Briefing,
 }
 
 #[derive(Debug)]
@@ -24,7 +31,7 @@ pub(crate) struct Reading<'history> {
 
 #[derive(Debug)]
 pub(crate) struct Trimming<'asked> {
-    question: &'asked Body,
+    asked: &'asked Asked,
     quotes: Vec<String>,
 }
 
@@ -39,22 +46,20 @@ pub(crate) struct Answers(Vec<Quote>);
 
 #[derive(Debug)]
 pub(crate) struct Selecting<'asked> {
-    question: &'asked Body,
+    asked: &'asked Asked,
     shown: Vec<String>,
 }
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Replied<'reply>(&'reply Reply);
 
-impl From<&Body> for Asked {
-    fn from(said: &Body) -> Asked {
-        Asked { question: said.clone() }
-    }
-}
-
 impl Asked {
+    pub(crate) fn new(said: &Body, moment: Moment) -> Asked {
+        Asked { question: said.clone(), moment }
+    }
+
     fn selecting(&self, shown: &[impl fmt::Display]) -> Selecting<'_> {
-        Selecting { question: &self.question, shown: shown.iter().map(ToString::to_string).collect() }
+        Selecting { asked: self, shown: shown.iter().map(ToString::to_string).collect() }
     }
 
     pub(crate) fn reading<'history>(&self, history: &'history [Said]) -> Reading<'history> {
@@ -71,7 +76,7 @@ impl Asked {
 
     pub(crate) fn trimming(&self, quotes: &[Quote]) -> Trimming<'_> {
         Trimming {
-            question: &self.question,
+            asked: self,
             quotes: quotes.iter().zip(1..).map(|(quote, number)| format!("{number}. {quote}")).collect(),
         }
     }
@@ -134,11 +139,12 @@ impl fmt::Display for Selecting<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
-            "An AI agent just ended its turn with this message to its owner:\n{}\n\n\
+            "{}\n{}\n\n\
              Below are earlier messages from the owner, each headed by [uuid timestamp].\n\
              List every passage that bears on the message: an earlier answer to anything it asks, a decision, rule, preference or instruction it should follow, or the next step the owner set. A missed passage costs far more than an extra one, so when unsure, include it.\n\
              Reply with JSON only, no prose and no code fence: a list of {{\"uuid\": the full uuid from the header, \"quote\": an excerpt of that message copied exactly, character for character, one or two sentences}}. Reply [] if none bear on it.\n\n{}",
-            self.question,
+            self.asked.moment,
+            self.asked.question,
             self.shown.join("\n\n")
         )
     }
@@ -148,14 +154,26 @@ impl fmt::Display for Trimming<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
-            "An AI agent just ended its turn with this message to its owner:\n{}\n\n\
+            "{}\n{}\n\n\
              Below, numbered, are passages the owner wrote earlier, each with its message uuid and timestamp.\n\
              Keep only the passages the agent needs now: an earlier answer to what it asks, or a decision, rule, preference or next step that bears directly on what it says it will do. Keep at most {}.\n\
              Reply with JSON only, no prose and no code fence: a list of passage numbers, such as [3, 1]. Reply [] if none bear on it.\n\n{}",
-            self.question,
+            self.asked.moment,
+            self.asked.question,
             Answers::KEPT,
             self.quotes.join("\n")
         )
+    }
+}
+
+impl fmt::Display for Moment {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Moment::Stopping => "An AI agent just ended its turn with this message to its owner:",
+            Moment::Briefing => {
+                "An AI agent is about to send this brief or message to another agent, who will act on it:"
+            }
+        })
     }
 }
 

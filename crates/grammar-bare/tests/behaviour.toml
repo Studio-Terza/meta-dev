@@ -1,0 +1,2 @@
+[Texts.lexed]
+bare = ["abc", "_a-9", "msg:1", "a b", "-a", "", "abc\n"]

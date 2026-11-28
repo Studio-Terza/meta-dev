@@ -3,9 +3,11 @@ use std::num::{NonZeroU32, NonZeroU64};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use design_messages::PullNumber;
+use design_messages::{CheckName, PullNumber};
 use dispatch_ports::Printed;
-use grammar::{AgentReport, BranchName, Ended, JobLink, Lines, SpecTrailer, Target};
+use grammar_lines::Lines;
+use grammar_report::{AgentReport, BranchName, Ended, JobLink, Target};
+use grammar_repository::SpecTrailer;
 use grammar_spec_line::Attachment;
 use hex::FromHex;
 use invariants::Ignoring;
@@ -76,11 +78,53 @@ pub(crate) struct Unbranched;
 #[serde(from = "String")]
 pub(crate) struct First {
     spec: Option<Attachment>,
+    title: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Compared {
     commits: Vec<Committed>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Lacking(Vec<String>);
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct Run {
+    #[serde(rename = "databaseId")]
+    id: NonZeroU64,
+    attempt: NonZeroU32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Attempt {
+    run: NonZeroU64,
+    number: u32,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct Attempted {
+    jobs: Vec<Job>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Job {
+    name: CheckName,
+    conclusion: Conclusion,
+}
+
+#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum Conclusion {
+    Success,
+    Failure,
+    TimedOut,
+    Cancelled,
+    Skipped,
+    Neutral,
+    StartupFailure,
+    #[serde(other)]
+    Unfinished,
 }
 
 #[derive(Debug, Deserialize)]
@@ -182,13 +226,66 @@ impl First {
 impl From<String> for First {
     fn from(message: String) -> First {
         let trailer = SpecTrailer::read(&message).map(|trailer| trailer.value().to_owned());
-        First { spec: trailer.and_then(|value| Attachment::try_new(value).ignoring(Ignored::Unspecified)) }
+        let lines = match message.parse::<Lines>() {
+            Ok(lines) => lines,
+            Err(unsplit) => match unsplit {},
+        };
+        First {
+            spec: trailer.and_then(|value| Attachment::try_new(value).ignoring(Ignored::Unspecified)),
+            title: lines.into_iter().next().unwrap_or_default(),
+        }
     }
 }
 
 impl Compared {
     pub(crate) fn first(self) -> Option<First> {
         self.commits.into_iter().next().map(|committed| committed.commit.message)
+    }
+
+    pub(crate) fn lacking(self) -> Lacking {
+        Lacking(self.commits.into_iter().map(|committed| committed.commit.message.title).collect())
+    }
+}
+
+impl fmt::Display for Lacking {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.first().map_or(Ok(()), |_first| {
+            write!(formatter, "\nMain has these merges the head lacks:")?;
+            self.0.iter().try_for_each(|title| write!(formatter, "\n- {title}"))
+        })
+    }
+}
+
+impl Run {
+    pub(crate) fn earlier(&self) -> impl Iterator<Item = Attempt> + use<'_> {
+        (1..self.attempt.get()).map(|number| Attempt { run: self.id, number })
+    }
+}
+
+impl Attempt {
+    pub(crate) fn viewed(self) -> [String; 7] {
+        ["run", "view", &self.run.to_string(), "--attempt", &self.number.to_string(), "--json", "jobs"]
+            .map(str::to_owned)
+    }
+}
+
+impl Attempted {
+    pub(crate) fn gated(self) -> Option<CheckName> {
+        self.jobs.into_iter().find_map(Job::gated)
+    }
+}
+
+impl Job {
+    fn gated(self) -> Option<CheckName> {
+        match self.conclusion {
+            Conclusion::Failure | Conclusion::TimedOut => Some(self.name),
+            Conclusion::Success
+            | Conclusion::Cancelled
+            | Conclusion::Skipped
+            | Conclusion::Neutral
+            | Conclusion::StartupFailure
+            | Conclusion::Unfinished => None,
+        }
     }
 }
 

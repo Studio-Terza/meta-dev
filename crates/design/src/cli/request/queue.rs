@@ -26,6 +26,25 @@ pub(crate) enum Item {
     Escalation(Escalated),
     Worktree(Kept),
     Ruling(Ruling),
+    Uninstalled(Uninstalled),
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub(crate) struct Uninstalled {
+    merged: NonZeroU32,
+    step: InstallStep,
+}
+
+#[derive(strum::Display, Deserialize, Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "kebab-case")]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum InstallStep {
+    Fetch,
+    Checkout,
+    Build,
+    Unchecked,
+    Print,
+    Settings,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -48,6 +67,7 @@ pub(crate) enum Target {
 pub(crate) enum Cause {
     Blocked,
     RepeatFailure(CheckName),
+    GatedRerun(CheckName),
     Unread(UnreadStep),
 }
 
@@ -68,6 +88,8 @@ pub(crate) enum UnreadStep {
     Spec,
     Detail,
     Open,
+    Runs,
+    Attempt,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -123,9 +145,15 @@ impl Queue {
             | Item::Spec(_)
             | Item::Pull(_)
             | Item::Worktree(_)
-            | Item::Ruling(_) => true,
+            | Item::Ruling(_)
+            | Item::Uninstalled(_) => true,
         };
         Queue { items: self.items.into_iter().filter(open).collect() }
+    }
+
+    #[must_use]
+    pub(crate) fn installed(self) -> Queue {
+        Queue { items: self.items.into_iter().filter(|item| matches!(item, Item::Uninstalled(_)).not()).collect() }
     }
 }
 
@@ -136,6 +164,10 @@ impl Item {
 
     pub(crate) fn kept(path: PathBuf, held: Held, merged: NonZeroU32) -> Item {
         Item::Worktree(Kept { path, held, merged })
+    }
+
+    pub(crate) fn uninstalled(merged: NonZeroU32, step: InstallStep) -> Item {
+        Item::Uninstalled(Uninstalled { merged, step })
     }
 
     fn closed(&self, landed: &[Landed], kind: impl Fn(&Path) -> Kind) -> Option<Closed> {
@@ -151,6 +183,7 @@ impl Item {
                 (kind(path) == Kind::Missing).then_some(Closed)
             }
             Item::Ruling(Ruling { ruled, .. }) => ruled.as_ref().map(|_ruled| Closed),
+            Item::Uninstalled(_) => None,
         }
     }
 }
@@ -160,6 +193,7 @@ impl fmt::Display for Cause {
         match self {
             Cause::Blocked => formatter.write_str("blocked"),
             Cause::RepeatFailure(check) => write!(formatter, "repeat failure of {check}"),
+            Cause::GatedRerun(check) => write!(formatter, "green only on a rerun after {check} failed a gate"),
             Cause::Unread(step) => write!(formatter, "unread {step}"),
         }
     }

@@ -1,5 +1,6 @@
 mod answers;
 mod boundary;
+mod brief;
 mod release;
 mod subagent;
 mod unroll;
@@ -40,7 +41,7 @@ impl Hook {
             Hook::Settings => Settings::listed(HookEvent::VARIANTS).written(),
             Hook::On(HookEvent::Stop) => Hook::stopped(&Stopping::heard(heard()?)?, ground, crew),
             Hook::On(HookEvent::SubagentStop) => Finishing::heard(heard()?)?.answered(ground, crew),
-            Hook::On(HookEvent::PreToolUse) => Running::heard(heard()?)?.answered(ground),
+            Hook::On(HookEvent::PreToolUse) => Running::heard(heard()?)?.answered(ground, crew),
             Hook::On(HookEvent::PostToolUse) => Used::heard(heard()?)?.answered(ground, crew),
         }
     }

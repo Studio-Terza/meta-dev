@@ -2,15 +2,18 @@ mod boundary;
 
 use std::path::{Component, Path, PathBuf};
 
+use dispatch_ports::{Clock, Shell};
 use file_ports::{Files, Kind};
-use grammar::{Construct, Directory, Edit, Edited, Editor, Nested};
+use grammar_shell::{Construct, Directory, Edit, Edited, Editor, Nested};
 use store_ports::Store;
 
 use super::super::Ground;
+use super::super::crew::Crew;
 use crate::cli::failure::Failure;
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
 pub(crate) use boundary::Running;
+use boundary::{Input, Tool};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Refusal {
@@ -28,8 +31,19 @@ struct Judging<'ground, 'run, F: Files, S: Store> {
 }
 
 impl Running {
-    pub(crate) fn answered<F: Files, S: Store>(&self, ground: &Ground<'_, F, S>) -> Result<Uttered, Failure> {
-        let command = self.command();
+    pub(crate) fn answered<F: Files + Clone, S: Store, C: Clock, G: Shell>(
+        &self,
+        ground: &Ground<'_, F, S>,
+        crew: &Crew<'_, C, G>,
+    ) -> Result<Uttered, Failure> {
+        match self.tool() {
+            Tool::Bash(input) => self.judged(input, ground),
+            Tool::Agent(brief) | Tool::SendMessage(brief) => brief.told(ground, crew),
+        }
+    }
+
+    fn judged<F: Files, S: Store>(&self, input: &Input, ground: &Ground<'_, F, S>) -> Result<Uttered, Failure> {
+        let command = input.command();
         let judging = Judging { ground, cwd: self.cwd() };
         let refused = Nested::read(command)
             .map(Refusal::Unroll)

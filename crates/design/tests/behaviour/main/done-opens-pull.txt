@@ -111,7 +111,7 @@
                             "view",
                             "12",
                             "--json",
-                            "mergeable",
+                            "mergeable,mergeStateStatus",
                             "-R",
                             "o/r",
                         ],
@@ -178,6 +178,22 @@
                         directory: "/work/agent",
                         fed: None,
                     },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "run",
+                            "list",
+                            "--commit",
+                            "0123456789abcdef0123456789abcdef01234567",
+                            "--json",
+                            "databaseId,attempt",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
                 ],
                 repeated: Count(
                     0,
@@ -187,7 +203,12 @@
             },
         ),
     ],
-    Ok(
-        "",
-    ),
+    [
+        Ok(
+            "",
+        ),
+        Err(
+            NotFound,
+        ),
+    ],
 )

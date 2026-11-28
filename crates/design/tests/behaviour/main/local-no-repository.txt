@@ -61,7 +61,12 @@
             },
         ),
     ],
-    Ok(
-        "[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\npull = 12\n\n[item.escalation.cause]\nunread = \"no-repository\"\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\nbranch = \"design/open-pr\"\n\n[item.escalation.cause]\nunread = \"no-repository\"\n",
-    ),
+    [
+        Ok(
+            "[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\npull = 12\n\n[item.escalation.cause]\nunread = \"no-repository\"\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\nbranch = \"design/open-pr\"\n\n[item.escalation.cause]\nunread = \"no-repository\"\n",
+        ),
+        Err(
+            NotFound,
+        ),
+    ],
 )

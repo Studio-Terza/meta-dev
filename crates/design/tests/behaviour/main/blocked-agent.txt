@@ -214,7 +214,7 @@
                             "view",
                             "12",
                             "--json",
-                            "mergeable",
+                            "mergeable,mergeStateStatus",
                             "-R",
                             "o/r",
                         ],
@@ -275,7 +275,7 @@
                             "view",
                             "12",
                             "--json",
-                            "mergeable",
+                            "mergeable,mergeStateStatus",
                             "-R",
                             "o/r",
                         ],
@@ -381,7 +381,7 @@
                             "view",
                             "12",
                             "--json",
-                            "mergeable",
+                            "mergeable,mergeStateStatus",
                             "-R",
                             "o/r",
                         ],
@@ -472,7 +472,7 @@
                             "view",
                             "12",
                             "--json",
-                            "mergeable",
+                            "mergeable,mergeStateStatus",
                             "-R",
                             "o/r",
                         ],
@@ -564,7 +564,12 @@
             },
         ),
     ],
-    Ok(
-        "[[item]]\n\n[item.escalation]\ncause = \"blocked\"\nfrom = \"/work/agent\"\n\n[item.escalation.at]\npull = 12\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\npull = 12\n\n[item.escalation.cause]\nunread = \"head\"\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\npull = 12\n\n[item.escalation.cause]\nunread = \"head\"\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\npull = 12\n\n[item.escalation.cause]\nunread = \"head\"\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\npull = 12\n\n[item.escalation.cause]\nunread = \"mergeable\"\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\npull = 12\n\n[item.escalation.cause]\nunread = \"label\"\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\npull = 12\n\n[item.escalation.cause]\nunread = \"checks\"\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\npull = 12\n\n[item.escalation.cause]\nunread = \"overdue\"\n",
-    ),
+    [
+        Ok(
+            "[[item]]\n\n[item.escalation]\ncause = \"blocked\"\nfrom = \"/work/agent\"\n\n[item.escalation.at]\npull = 12\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\npull = 12\n\n[item.escalation.cause]\nunread = \"head\"\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\npull = 12\n\n[item.escalation.cause]\nunread = \"head\"\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\npull = 12\n\n[item.escalation.cause]\nunread = \"head\"\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\npull = 12\n\n[item.escalation.cause]\nunread = \"mergeable\"\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\npull = 12\n\n[item.escalation.cause]\nunread = \"label\"\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\npull = 12\n\n[item.escalation.cause]\nunread = \"checks\"\n\n[[item]]\n\n[item.escalation]\nfrom = \"/work/agent\"\n\n[item.escalation.at]\npull = 12\n\n[item.escalation.cause]\nunread = \"overdue\"\n",
+        ),
+        Err(
+            NotFound,
+        ),
+    ],
 )

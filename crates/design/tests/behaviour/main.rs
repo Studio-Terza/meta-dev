@@ -25,7 +25,7 @@ struct Home {
     arguments: Vec<Spelled>,
     directories: Vec<PathBuf>,
     files: BTreeMap<PathBuf, Spelled>,
-    queue: PathBuf,
+    left: Vec<PathBuf>,
 }
 
 #[derive(Fixture, Deserialize, Debug)]
@@ -64,7 +64,7 @@ struct Binary {
 }
 
 #[test]
-fn every_story_shows_each_step_its_calls_and_the_queue_it_leaves_as_its_golden_says() -> Result<(), Failed> {
+fn every_story_shows_each_step_its_calls_and_the_files_it_leaves_as_its_golden_says() -> Result<(), Failed> {
     Rows::<Home>::read()?.iter().try_for_each(|home| {
         let drifted = Cases::<Story>::drifted(|case| {
             let story = case.into_row();
@@ -108,8 +108,12 @@ fn every_story_shows_each_step_its_calls_and_the_queue_it_leaves_as_its_golden_s
                     Ok((step.words.clone(), ended, answer, answering))
                 })
                 .collect::<Result<Vec<_>, Failed>>()?;
-            let queue = fs::read_to_string(files.real(&home.queue)).map_err(|unread| unread.kind());
-            Ok(Debugged((steps, queue)))
+            let left: Vec<_> = home
+                .left
+                .iter()
+                .map(|path| fs::read_to_string(files.real(path)).map_err(|unread| unread.kind()))
+                .collect();
+            Ok(Debugged((steps, left)))
         })?;
         assert_eq!(drifted, Vec::new());
         Ok(())

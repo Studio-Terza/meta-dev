@@ -1,7 +1,7 @@
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-use grammar::RepositoryName;
+use grammar_repository::RepositoryName;
 use invariants::Ignoring;
 use serde::Deserialize;
 

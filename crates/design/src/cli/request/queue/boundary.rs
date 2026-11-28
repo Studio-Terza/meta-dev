@@ -2,12 +2,13 @@ use std::fmt;
 use std::num::NonZeroU32;
 use std::str::FromStr;
 
-use grammar::{Cited as Detail, Lines};
+use grammar_detail::Cited as Detail;
+use grammar_lines::Lines;
 use grammar_spec_line::{Attachment, Line};
 use invariants::Ignoring;
 use serde::{Deserialize, Serialize};
 
-use super::{Closed, Escalated, Item, Kept, Ruling, Target};
+use super::{Closed, Escalated, Item, Kept, Ruling, Target, Uninstalled};
 use crate::cli::request::ignored::Ignored;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -188,6 +189,11 @@ impl<N: Named> fmt::Display for Shown<'_, N> {
                     asked.0
                 )
             }
+            Item::Uninstalled(Uninstalled { merged, step }) => write!(
+                formatter,
+                "- design not installed after {} merged: the {step} step failed (closes when a later merge installs)",
+                Landed::titled(landed, *merged)
+            ),
         }
     }
 }

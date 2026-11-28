@@ -2,10 +2,11 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 
 use console_ports::{Heard, Shown};
-use grammar::{Construct, Editor, Flagged};
+use grammar_shell::{Construct, Editor, Flagged};
 use newtype::Wrapping;
 use serde::{Deserialize, Serialize};
 
+use super::super::brief::Brief;
 use super::Refusal;
 use crate::cli::failure::Failure;
 use crate::cli::uttered::Uttered;
@@ -15,12 +16,20 @@ use crate::{HookEvent, Outcome};
 pub(crate) struct Running {
     #[serde(default)]
     cwd: PathBuf,
-    #[serde(default)]
-    tool_input: Input,
+    #[serde(flatten)]
+    tool: Tool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "tool_name", content = "tool_input")]
+pub(crate) enum Tool {
+    Bash(Input),
+    Agent(Brief),
+    SendMessage(Brief),
 }
 
 #[derive(Debug, Default, Deserialize)]
-struct Input {
+pub(crate) struct Input {
     #[serde(default)]
     command: Option<String>,
 }
@@ -56,8 +65,14 @@ impl Running {
         &self.cwd
     }
 
+    pub(crate) fn tool(&self) -> &Tool {
+        &self.tool
+    }
+}
+
+impl Input {
     pub(crate) fn command(&self) -> &str {
-        self.tool_input.command.as_deref().unwrap_or_default()
+        self.command.as_deref().unwrap_or_default()
     }
 }
 

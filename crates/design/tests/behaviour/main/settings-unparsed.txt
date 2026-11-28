@@ -1,0 +1,130 @@
+(
+    [
+        (
+            [
+                "hook",
+                "post-tool-use",
+            ],
+            Ok(
+                Escalated,
+            ),
+            Answer {
+                shown: Shown(
+                    "",
+                ),
+                complaint: Complaint(
+                    "",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        0,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "pr",
+                            "view",
+                            "12",
+                            "--json",
+                            "state,headRefName,headRefOid",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "git",
+                        arguments: [
+                            "worktree",
+                            "list",
+                            "--porcelain",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 120,
+                        program: "git",
+                        arguments: [
+                            "fetch",
+                            "origin",
+                            "main",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 120,
+                        program: "git",
+                        arguments: [
+                            "worktree",
+                            "add",
+                            "--detach",
+                            "/home/work/.meta/agents/install-12",
+                            "origin/main",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 1200,
+                        program: "cargo",
+                        arguments: [
+                            "install",
+                            "--path",
+                            "crates/design",
+                            "--locked",
+                            "--force",
+                        ],
+                        directory: "/home/work/.meta/agents/install-12",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 120,
+                        program: "git",
+                        arguments: [
+                            "worktree",
+                            "remove",
+                            "--force",
+                            "/home/work/.meta/agents/install-12",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 120,
+                        program: "design",
+                        arguments: [
+                            "--workspace",
+                            "/home/work",
+                            "hook",
+                            "--settings",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                ],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+    ],
+    [
+        Ok(
+            "[[item]]\n\n[item.uninstalled]\nmerged = 12\nstep = \"settings\"\n",
+        ),
+        Ok(
+            "not json\n",
+        ),
+    ],
+)
