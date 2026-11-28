@@ -224,11 +224,9 @@ dependencies = [
 name = "dispatch-ports"
 version = "0.1.0"
 dependencies = [
- "fixture",
  "invariants",
  "newtype",
  "port-core",
- "serde",
  "thiserror",
 ]
 
@@ -513,10 +511,6 @@ dependencies = [
 [[package]]
 name = "invariants"
 version = "0.1.0"
-dependencies = [
- "fixture",
- "serde",
-]
 
 [[package]]
 name = "itoa"
@@ -613,18 +607,11 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 name = "newtype"
 version = "0.1.0"
 dependencies = [
- "design-messages",
- "file-ports",
- "fixture",
- "grammar-spec-line",
  "invariants",
  "newtype-derive",
  "proptest",
  "serde",
- "serde_json",
- "store-ports",
  "strum",
- "transcript-ports",
 ]
 
 [[package]]
@@ -664,13 +651,19 @@ dependencies = [
  "design-messages",
  "dispatch-doubles",
  "dispatch-ports",
+ "file-ports",
  "fixture",
+ "grammar-spec-line",
  "invariants",
  "newtype",
  "port-derive",
+ "proptest",
  "serde",
+ "serde_json",
  "sqlite-ports",
  "store-ports",
+ "tempfile",
+ "transcript-ports",
 ]
 
 [[package]]
@@ -939,19 +932,11 @@ dependencies = [
 name = "store-ports"
 version = "0.1.0"
 dependencies = [
- "design-messages",
- "file-ports",
- "fixture",
  "invariants",
  "newtype",
  "port-core",
- "proptest",
- "serde",
- "sqlite-ports",
  "store-ports-macros",
- "tempfile",
  "thiserror",
- "transcript-ports",
 ]
 
 [[package]]

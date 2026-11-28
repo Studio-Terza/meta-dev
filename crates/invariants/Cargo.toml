@@ -10,9 +10,5 @@ test = false
 doctest = false
 bench = false
 
-[dev-dependencies]
-fixture = { path = "../fixture" }
-serde.workspace = true
-
 [lints]
 workspace = true

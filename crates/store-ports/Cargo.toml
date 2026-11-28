@@ -17,15 +17,5 @@ port-core = { path = "../port-core" }
 store-ports-macros = { path = "../store-ports-macros" }
 thiserror.workspace = true
 
-[dev-dependencies]
-fixture = { path = "../fixture" }
-sqlite-ports = { path = "../sqlite-ports" }
-design-messages = { path = "../design-messages" }
-file-ports = { path = "../file-ports" }
-proptest.workspace = true
-serde.workspace = true
-tempfile.workspace = true
-transcript-ports = { path = "../transcript-ports" }
-
 [lints]
 workspace = true
