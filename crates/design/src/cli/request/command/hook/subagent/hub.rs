@@ -172,6 +172,7 @@ struct Oid {
 
 impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
     const PROGRAM: &'static str = "gh";
+    const API: &'static str = "api";
     const QUICK: Timeout = Timeout::new(60);
     const WATCH: Timeout = Timeout::new(20 * 60);
     const POLL: Pause = Pause::new(10);
@@ -191,25 +192,30 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
 
     fn ran(&self, arguments: &[&str], timeout: Timeout) -> Option<Ran> {
         let named = self.repository.to_string();
-        self.spoke(&[arguments, &["-R", &named]].concat(), timeout)
+        let scoped = (arguments.first() != Some(&Self::API)).then_some(["-R", named.as_str()]);
+        let spoken: Vec<&str> = arguments.iter().copied().chain(scoped.into_iter().flatten()).collect();
+        self.crew.spoke(Hub::<C, G>::PROGRAM, &spoken, self.directory, timeout)
     }
 
-    fn spoke(&self, arguments: &[&str], timeout: Timeout) -> Option<Ran> {
-        self.crew.spoke(Hub::<C, G>::PROGRAM, arguments, self.directory, timeout)
+    fn read<T: DeserializeOwned, Unread: Copy>(&self, arguments: &[&str], unread: Unread) -> Result<T, Unread> {
+        let ran = self.ran(arguments, Self::QUICK);
+        let printed = ran.as_ref().and_then(Ran::succeeded).ok_or(unread)?;
+        serde_json::from_str(printed.as_ref()).map_err(|_unparsed| unread)
     }
 
-    pub fn viewed<T: DeserializeOwned>(&self, pull: PullNumber, fields: &str) -> Option<T> {
-        let ran = self.ran(&["pr", "view", &pull.to_string(), "--json", fields], Self::QUICK);
-        let printed = ran.as_ref().and_then(Ran::succeeded)?;
-        serde_json::from_str(printed.as_ref()).ignoring(Ignored::Unviewed)
+    pub fn viewed<T: DeserializeOwned, Unread: Copy>(
+        &self,
+        pull: PullNumber,
+        fields: &str,
+        unread: Unread,
+    ) -> Result<T, Unread> {
+        self.read(&["pr", "view", &pull.to_string(), "--json", fields], unread)
     }
 
     pub fn landed(&self) -> Option<Vec<Landed>> {
         let asked =
             ["pr", "list", "--state", "all", "--limit", Self::LANDED, "--json", "number,state,title,headRefName,body"];
-        let ran = self.ran(&asked, Self::QUICK);
-        let printed = ran.as_ref().and_then(Ran::succeeded)?;
-        serde_json::from_str(printed.as_ref()).ignoring(Ignored::Undrained)
+        self.read(&asked, ()).ignoring(Ignored::Undrained)
     }
 
     pub fn opened<F: Files, S: Store>(
@@ -229,9 +235,7 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
         let asked =
             ["pr", "create", "--head", &branch, "--base", Hub::<C, G>::BASE, "--title", &title, "--body", &body];
         self.ran(&asked, Self::QUICK).as_ref().and_then(Ran::succeeded).ok_or(UnreadStep::Open)?;
-        let viewed = self.ran(&["pr", "view", &branch, "--json", "number"], Self::QUICK);
-        let printed = viewed.as_ref().and_then(Ran::succeeded).ok_or(UnreadStep::Open)?;
-        let opened = serde_json::from_str::<Opened>(printed.as_ref()).map_err(|_unread| UnreadStep::Open)?;
+        let opened: Opened = self.read(&["pr", "view", &branch, "--json", "number"], UnreadStep::Open)?;
         Ok(Pushed::new(opened.pull(), branched.head()))
     }
 
@@ -240,36 +244,30 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
         let query = format!("query={}", Hub::<C, G>::REMOTE);
         let owner = format!("owner={}", self.repository.owner());
         let name = format!("name={}", self.repository.name());
-        let asked = ["api", "graphql", "-F", &owner, "-F", &name, "-f", &reference, "-f", &query];
-        let ran = self.spoke(&asked, Self::QUICK);
-        let printed = ran.as_ref().and_then(Ran::succeeded).ok_or(UnreadStep::Remote)?;
-        let found: Found = serde_json::from_str(printed.as_ref()).map_err(|_unread| UnreadStep::Remote)?;
+        let asked = [Self::API, "graphql", "-F", &owner, "-F", &name, "-f", &reference, "-f", &query];
+        let found: Found = self.read(&asked, UnreadStep::Remote)?;
         Ok(found.data.repository.reference.map(|targeted| targeted.target.oid))
     }
 
     fn first(&self, head: CommitSha) -> Result<First, UnreadStep> {
         let compare = format!("repos/{}/compare/{}...{head}", self.repository, Hub::<C, G>::BASE);
-        let ran = self.spoke(&["api", &compare], Self::QUICK);
-        let printed = ran.as_ref().and_then(Ran::succeeded).ok_or(UnreadStep::Commits)?;
-        let compared: Compared = serde_json::from_str(printed.as_ref()).map_err(|_unread| UnreadStep::Commits)?;
+        let compared: Compared = self.read(&[Self::API, &compare], UnreadStep::Commits)?;
         compared.first().ok_or(UnreadStep::Commits)
     }
 
     pub fn head(&self, pull: PullNumber) -> Result<CommitSha, UnreadStep> {
-        self.viewed::<Head>(pull, "headRefOid").map(|read| read.head).ok_or(UnreadStep::Head)
+        self.viewed::<Head, _>(pull, "headRefOid", UnreadStep::Head).map(|read| read.head)
     }
 
     pub fn mergeable(&self, pull: PullNumber) -> Result<Merge, UnreadStep> {
-        self.viewed::<Merging>(pull, "mergeable,mergeStateStatus").map(Merging::merge).ok_or(UnreadStep::Mergeable)
+        self.viewed::<Merging, _>(pull, "mergeable,mergeStateStatus", UnreadStep::Mergeable).map(Merging::merge)
     }
 
     pub fn lacking(&self, head: CommitSha) -> Vec<String> {
         let compare = format!("repos/{}/compare/{head}...{}", self.repository, Hub::<C, G>::BASE);
-        let ran = self.spoke(&["api", &compare], Self::QUICK);
-        let printed = ran.as_ref().and_then(Ran::succeeded);
-        let compared: Option<Compared> =
-            printed.and_then(|read| serde_json::from_str(read.as_ref()).ignoring(Ignored::Unlacked));
-        compared.map_or_default(Compared::titles)
+        self.read::<Compared, _>(&[Self::API, &compare], ())
+            .ignoring(Ignored::Unlacked)
+            .map_or_default(Compared::titles)
     }
 
     pub fn settled(&self, pull: PullNumber) -> Result<Verdict, UnreadStep> {
@@ -311,7 +309,7 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
     pub fn gated(&self, head: CommitSha) -> Result<Option<CheckName>, UnreadStep> {
         let sha = head.to_string();
         let runs: Vec<Run> =
-            self.read(&["run", "list", "--commit", &sha, "--json", "databaseId,attempt"]).ok_or(UnreadStep::Runs)?;
+            self.read(&["run", "list", "--commit", &sha, "--json", "databaseId,attempt"], UnreadStep::Runs)?;
         runs.iter()
             .flat_map(Run::earlier)
             .map(|attempt| self.attempted(attempt))
@@ -322,14 +320,8 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
     fn attempted(&self, attempt: Attempt) -> Result<Option<CheckName>, UnreadStep> {
         let asked =
             ["run", "view", &attempt.run.to_string(), "--attempt", &attempt.number.to_string(), "--json", "jobs"];
-        let attempted: Attempted = self.read(&asked).ok_or(UnreadStep::Attempt)?;
+        let attempted: Attempted = self.read(&asked, UnreadStep::Attempt)?;
         Ok(attempted.jobs.into_iter().find_map(Job::gated))
-    }
-
-    fn read<T: DeserializeOwned>(&self, arguments: &[&str]) -> Option<T> {
-        let ran = self.ran(arguments, Self::QUICK);
-        let printed = ran.as_ref().and_then(Ran::succeeded)?;
-        serde_json::from_str(printed.as_ref()).ignoring(Ignored::Unattempted)
     }
 
     pub fn log(&self, job: JobId) -> String {

@@ -142,7 +142,7 @@ impl<C: Clock, G: Shell> Releasing<'_, '_, C, G> {
     fn landed(&self, local: &Local) -> Result<Landed, Holding> {
         let repository = local.repository().ok_or(Holding::from(Held::NoRepository))?;
         let hub = Hub::new(self.crew, self.directory, repository);
-        Ok(hub.viewed(self.pull, "state,headRefName,headRefOid").ok_or(Held::Unviewed)?)
+        Ok(hub.viewed(self.pull, "state,headRefName,headRefOid", Held::Unviewed)?)
     }
 
     fn released(&self, landed: &Landed) -> Result<Released, Holding> {
