@@ -3,7 +3,7 @@ use std::fmt;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
-use grammar::{Fields, Lines};
+use grammar_lines::{Fields, Lines};
 use serde::Deserialize;
 
 use crate::cli::Exit;

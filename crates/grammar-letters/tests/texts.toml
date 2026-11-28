@@ -1,0 +1,2 @@
+# Texts the letters lexer reads; tests/lexed.txt holds what it reads them as.
+slugs = ["/Users/me/my_repo", "abc123", "a.b é", ""]

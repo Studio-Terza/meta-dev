@@ -18,7 +18,7 @@ bench = false
 
 [dependencies]
 console-ports = { path = "../console-ports" }
-grammar = { path = "../grammar" }
+grammar-lines = { path = "../grammar-lines" }
 invariants = { path = "../invariants" }
 serde.workspace = true
 serde_json.workspace = true

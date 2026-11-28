@@ -1,0 +1,5 @@
+cited "process-rebuild#D1": ["process-rebuild 1"]
+cited "process-rebuild#D1, process-rebuild#D2": ["process-rebuild 1", "process-rebuild 2"]
+cited "a#D1,b#D2 c": ["a 1", "b 2"]
+cited "none": []
+cited "": []
