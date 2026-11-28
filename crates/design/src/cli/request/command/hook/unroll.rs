@@ -4,7 +4,7 @@ use std::path::{Component, Path, PathBuf};
 use console_ports::{Heard, Shown};
 use dispatch_ports::{Clock, Shell};
 use file_ports::{Files, Kind};
-use grammar_shell::{Construct, Directory, Edit, Edited, Editor, Flagged, Nested};
+use grammar_shell::{Construct, Directory, Edit, Edited, Editor, Flagged, Nested, Unreadable};
 use newtype::Wrapping;
 use serde::{Deserialize, Serialize};
 use store_ports::Store;
@@ -40,6 +40,7 @@ struct Input {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Refusal {
+    Unreadable,
     Unroll(Nested),
     InPlace { editor: Editor, within: Option<Construct> },
     Wrote { path: PathBuf, repository: PathBuf, within: Option<Construct> },
@@ -94,8 +95,9 @@ impl Running {
     fn judged<F: Files, S: Store>(&self, input: &Input, ground: &Ground<'_, F, S>) -> Result<Uttered, Failure> {
         let command = input.command.as_deref().unwrap_or_default();
         let judging = Judging { ground, cwd: &self.cwd };
-        let refused = Nested::read(command)
-            .map(Refusal::Unroll)
+        let refused = Unreadable::read(command)
+            .map(|Unreadable| Refusal::Unreadable)
+            .or_else(|| Nested::read(command).map(Refusal::Unroll))
             .or_else(|| Edited::read(command).iter().find_map(|edited| judging.refusal(edited)));
         refused
             .map_or_else(|| Ok(Uttered::silent(Ok(Outcome::Hooked(HookEvent::PreToolUse)))), |refusal| refusal.denied())
@@ -203,6 +205,13 @@ impl Refusal {
 impl fmt::Display for Refusal {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Refusal::Unreadable => write!(
+                formatter,
+                "Refused: this command holds shell the harness cannot read (an array assignment, a zsh \
+                 `${{(flags)...}}` expansion, or text no shell lexeme covers), so it would stall waiting for \
+                 permission. Run plain single commands instead: one command per call, literal arguments, no \
+                 arrays, loops or expansions over command output."
+            ),
             Refusal::Unroll(nested) => {
                 let word = Refusal::word(nested.flagged());
                 let construct = Refusal::construct(nested.construct());

@@ -163,14 +163,14 @@ impl<'text> Reading<'text> {
     fn step(self) -> ControlFlow<Vec<Occurrence>, Reading<'text>> {
         let Reading { lexing, state } = self;
         match lexing {
-            Lexing::Command(mut lexer) => {
-                match lexer.next().and_then(|lexed| lexed.ignoring(Unlexed::NotThisGrammar)) {
-                    Some(lexeme) => ControlFlow::Continue(state.commanded(lexeme, lexer)),
-                    None => ControlFlow::Break(state.ended()),
-                }
-            }
-            Lexing::Quoted(mut lexer) => match lexer.next().and_then(|lexed| lexed.ignoring(Unlexed::NotThisGrammar)) {
-                Some(lexeme) => ControlFlow::Continue(state.quoted(lexeme, lexer)),
+            Lexing::Command(mut lexer) => match lexer.next() {
+                Some(Ok(lexeme)) => ControlFlow::Continue(state.commanded(lexeme, lexer)),
+                Some(Err(())) => ControlFlow::Continue(state.noted(Spotted::Unreadable).commanding(lexer)),
+                None => ControlFlow::Break(state.ended()),
+            },
+            Lexing::Quoted(mut lexer) => match lexer.next() {
+                Some(Ok(lexeme)) => ControlFlow::Continue(state.quoted(lexeme, lexer)),
+                Some(Err(())) => ControlFlow::Continue(state.noted(Spotted::Unreadable).quoting(lexer)),
                 None => ControlFlow::Break(state.ended()),
             },
             Lexing::Body(mut lexer, body) => {
@@ -204,6 +204,7 @@ impl State {
                 self.part(text, Quoting::Quoted).commanding(lexer)
             }
             Lexeme::Quote => self.part("", Quoting::Quoted).quoting(lexer.morph()),
+            Lexeme::Unreadable => self.worded().noted(Spotted::Unreadable).commanding(lexer),
             Lexeme::Substitution => self.substituted(Closer::Paren, Mode::Command).commanding(lexer),
             Lexeme::Arithmetic => self.counted(Mode::Command).commanding(lexer),
             Lexeme::Backtick => self.backticked(lexer),
@@ -225,6 +226,7 @@ impl State {
     fn quoted<'text>(self, lexeme: Quoted<'text>, lexer: Lexer<'text, Quoted<'text>>) -> Reading<'text> {
         match lexeme {
             Quoted::End => self.commanding(lexer.morph()),
+            Quoted::Unreadable => self.noted(Spotted::Unreadable).quoting(lexer),
             Quoted::Text(text) | Quoted::Escaped(text) => self.part(text, Quoting::Quoted).quoting(lexer),
             Quoted::Substitution => self.substituted(Closer::Paren, Mode::Quoted).commanding(lexer.morph()),
             Quoted::Backtick => self.substituted(Closer::Backtick, Mode::Quoted).commanding(lexer.morph()),

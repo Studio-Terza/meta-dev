@@ -546,6 +546,9 @@ Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"test -d out && { rm -rf out; }"},"tool_name":"Bash"}
 {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: `rm` inside a `{ ...; }` group. The harness flags `rm` there and stalls the call. Unroll it into separate plain top-level commands: list the targets first, then run each `rm` as its own command with literal paths."}}
 Ok(Blocked) ExitCode(unix_exit_status(0)) ""
+$ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"P=(${(f)\"$(cargo metadata --no-deps | jq -r '.packages[].name')\"}); cargo clean -q $P"},"tool_name":"Bash"}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Refused: this command holds shell the harness cannot read (an array assignment, a zsh `${(flags)...}` expansion, or text no shell lexeme covers), so it would stall waiting for permission. Run plain single commands instead: one command per call, literal arguments, no arrays, loops or expansions over command output."}}
+Ok(Blocked) ExitCode(unix_exit_status(0)) ""
 $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"rm x"},"tool_name":"Bash"}
 Ok(Hooked(PreToolUse)) ExitCode(unix_exit_status(0)) ""
 $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"git rm x"},"tool_name":"Bash"}

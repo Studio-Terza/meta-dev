@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use grammar_shell::{Edited, Nested};
+use grammar_shell::{Edited, Nested, Unreadable};
 use serde::Deserialize;
 use test_failure::Failed;
 
@@ -23,7 +23,8 @@ fn the_shell_lexer_reads_its_fixture_texts_as_its_golden_says() -> Result<(), Fa
                 .map(|edited| format!("{:?} {:?} {:?}", edited.edit(), edited.construct(), edited.directory()))
                 .collect();
             format!(
-                "shell {text:?}: {:?} {edited:?}",
+                "shell {text:?}: {:?} {:?} {edited:?}",
+                Unreadable::read(text),
                 Nested::read(text).map(|nested| (nested.flagged(), nested.construct()))
             )
         })

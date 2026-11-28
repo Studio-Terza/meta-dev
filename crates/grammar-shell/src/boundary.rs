@@ -44,7 +44,11 @@ enum Spotted {
     Flagged(Flagged),
     Edit(Edit),
     Changed(Changed),
+    Unreadable,
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Unreadable;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Changed {
@@ -96,6 +100,15 @@ impl Nested {
     }
 }
 
+impl Unreadable {
+    #[must_use]
+    pub fn read(command: &str) -> Option<Unreadable> {
+        Reading::occurrences(command)
+            .iter()
+            .find_map(|occurrence| (occurrence.spotted == Spotted::Unreadable).then_some(Unreadable))
+    }
+}
+
 impl Edited {
     #[must_use]
     pub fn read(command: &str) -> Vec<Edited> {
@@ -134,7 +147,7 @@ impl Walk {
                 Walk { edited: self.edited.into_iter().chain([edited]).collect(), ..self }
             }
             Spotted::Changed(changed) => Walk { directory: self.directory.changed(changed), ..self },
-            Spotted::Flagged(_) => self,
+            Spotted::Flagged(_) | Spotted::Unreadable => self,
         }
     }
 }
@@ -156,7 +169,7 @@ impl Occurrence {
     fn nested(&self) -> Option<Nested> {
         match self.spotted {
             Spotted::Flagged(flagged) => self.within.first().map(|construct| Nested { flagged, construct: *construct }),
-            Spotted::Edit(_) | Spotted::Changed(_) => None,
+            Spotted::Edit(_) | Spotted::Changed(_) | Spotted::Unreadable => None,
         }
     }
 
