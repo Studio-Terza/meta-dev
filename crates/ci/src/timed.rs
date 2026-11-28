@@ -39,13 +39,16 @@ impl Timed {
         let ran = Ran::started(&self.program, &self.arguments)?;
         let spent = Took::from(self.since.as_deref().map_or(Ok(ran.spent()), Mark::elapsed)?);
         let verdict = limit.judged(spent)?;
-        let (stage, block, status) = (&self.stage, limit.block(), ran.status());
+        let (stage, warn, block, status) = (&self.stage, limit.warn(), limit.block(), ran.status());
         let failed = (!status.success()).then(|| format!("::error::{stage} failed: {status}\n"));
         let judged = match verdict {
-            Verdict::Within => format!("{stage}: within block {block} s, took {spent}\n"),
+            Verdict::Within => format!("{stage}: within warn {warn} s and block {block} s, took {spent}\n"),
+            Verdict::Warned => {
+                format!("::warning::{stage}: above warn {warn} s, within block {block} s, took {spent}\n")
+            }
             Verdict::Over => format!("::error::{stage}: above block {block} s, took {spent}\n"),
         };
-        let passed = status.success() && verdict == Verdict::Within;
+        let passed = status.success() && verdict != Verdict::Over;
         let code = if passed { ExitCode::SUCCESS } else { ExitCode::FAILURE };
         Ok(Answer::new(code).showing(failed.unwrap_or_default()).showing(judged))
     }

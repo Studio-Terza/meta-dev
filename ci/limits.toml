@@ -1,11 +1,15 @@
 [clippy]
+warn = 11
 block = 16
 
 [test-compile]
+warn = 12
 block = 18
 
 [test-run]
+warn = 2
 block = 3.5
 
 [lint]
+warn = 1.5
 block = 3

@@ -15,6 +15,7 @@ struct Limits(BTreeMap<String, Stage>);
 #[derive(Clone, Copy, Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Stage {
+    warn: f64,
     block: f64,
 }
 
@@ -28,7 +29,12 @@ impl Stage {
     }
 
     pub(crate) fn judged(self, spent: Took) -> Result<Verdict, Failure> {
-        Ok(Limit::at(Took(Duration::try_from_secs_f64(self.block)?)).judged(&spent))
+        let [warn, block] = [self.warn, self.block].map(Duration::try_from_secs_f64);
+        Ok(Limit::warned(Took(warn?), Took(block?)).judged(&spent))
+    }
+
+    pub(crate) fn warn(self) -> f64 {
+        self.warn
     }
 
     pub(crate) fn block(self) -> f64 {
