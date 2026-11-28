@@ -9,7 +9,8 @@ use std::path::{Path, PathBuf};
 use invariants::Ignoring;
 use newtype::Wrapping;
 
-use crate::{Bytes, FileFailure, Files, Ignored, Kind, Size, Stamps, Text};
+use crate::ignored::Ignored;
+use crate::{Bytes, FileFailure, Files, Kind, Size, Stamps, Text};
 use locked::Locked;
 use resolved::Resolved;
 

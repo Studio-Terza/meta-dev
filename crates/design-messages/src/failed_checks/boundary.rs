@@ -4,10 +4,36 @@ use std::str::FromStr;
 
 use hex::FromHex;
 use newtype::{Checked, CheckedDeserialize, Display, Newtype, Serialize, Spelled};
+use port_core::Op;
 use serde::Deserialize;
 use store_ports::{Batch, Columns, Execute, Prepared, Query, StoreFailure};
 
-use super::{FailedBefore, Failing};
+#[derive(Clone, Copy, Debug, Op)]
+pub struct FailedBefore {
+    pull: PullNumber,
+    head: CommitSha,
+}
+
+#[derive(Debug, Op)]
+pub struct Failing {
+    pull: PullNumber,
+    head: CommitSha,
+    checks: Vec<CheckName>,
+}
+
+impl FailedBefore {
+    #[must_use]
+    pub fn new(pull: PullNumber, head: CommitSha) -> FailedBefore {
+        FailedBefore { pull, head }
+    }
+}
+
+impl Failing {
+    #[must_use]
+    pub fn new(pull: PullNumber, head: CommitSha, checks: Vec<CheckName>) -> Failing {
+        Failing { pull, head, checks }
+    }
+}
 
 #[derive(Newtype, Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PullNumber(NonZeroU32);

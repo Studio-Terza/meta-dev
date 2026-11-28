@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use super::{Declared, Rendered};
+use super::definition::{Declared, Rendered};
 
 pub struct Caller;
 

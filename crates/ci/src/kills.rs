@@ -6,7 +6,7 @@ use std::ffi::OsString;
 use std::io::Write;
 use std::path::PathBuf;
 
-use crate::cli::Exit;
+use crate::exit::Exit;
 use crate::failure::Failure;
 use crate::kills::outcomes::{Ran, Shard};
 use crate::kills::report::{Matrix, Report};

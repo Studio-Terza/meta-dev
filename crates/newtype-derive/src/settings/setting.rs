@@ -1,7 +1,11 @@
 use syn::parse::{Parse, ParseStream};
 use syn::{Expr, Token};
 
-use super::Checking;
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Checking {
+    Unchecked,
+    Checked,
+}
 
 mod keyword {
     syn::custom_keyword!(checked);

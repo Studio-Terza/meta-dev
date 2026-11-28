@@ -2,7 +2,7 @@ use std::fmt;
 use std::num::{NonZeroU32, NonZeroU64};
 use std::path::{Path, PathBuf};
 
-use design_messages::{CommitSha, PullNumber};
+use design_messages::{CheckName, CommitSha, PullNumber};
 use grammar_lines::Lines;
 use grammar_report::{AgentReport, BranchName, Ended, JobLink, Target};
 use grammar_repository::SpecTrailer;
@@ -99,6 +99,12 @@ pub struct Opened {
 
 #[derive(Newtype, Display, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct JobId(NonZeroU64);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FailedJob {
+    check: CheckName,
+    job: JobId,
+}
 
 impl Finishing {
     pub fn said(&self) -> &Said {
@@ -217,6 +223,20 @@ impl TryFrom<String> for Branch {
 impl fmt::Display for Branch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.0)
+    }
+}
+
+impl FailedJob {
+    pub fn new(check: CheckName, job: JobId) -> FailedJob {
+        FailedJob { check, job }
+    }
+
+    pub fn check(&self) -> &CheckName {
+        &self.check
+    }
+
+    pub fn job(&self) -> JobId {
+        self.job
     }
 }
 

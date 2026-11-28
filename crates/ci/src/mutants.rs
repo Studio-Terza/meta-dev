@@ -6,7 +6,7 @@ use std::path::{Component, Path, PathBuf};
 use grammar_lines::{Fields, Lines};
 use serde::Deserialize;
 
-use crate::cli::Exit;
+use crate::exit::Exit;
 use crate::failure::Failure;
 use crate::ports::Disk;
 

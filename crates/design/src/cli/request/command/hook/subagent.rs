@@ -23,7 +23,7 @@ use crate::cli::request::ignored::Ignored;
 use crate::cli::request::{Cause as Escalation, Item, Local, Target};
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
-use boundary::{At, Branched, JobId, Pushed, Reminder, Report, Said};
+use boundary::{At, Branched, FailedJob, Pushed, Reminder, Report, Said};
 pub use boundary::{Branch, Finishing};
 pub use hub::Hub;
 use hub::{Merge, Unopened, Verdict};
@@ -35,12 +35,6 @@ pub enum Ending {
     MergeMain { lacking: Vec<String> },
     Failing(Vec<FailedJob>),
     Escalate(Escalation),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FailedJob {
-    check: CheckName,
-    job: JobId,
 }
 
 #[derive(Debug)]
@@ -184,20 +178,14 @@ impl Pushed {
         let before: Vec<CheckName> =
             store.read(FailedBefore::new(self.pull(), self.head())).ignoring(Ignored::Unremembered).unwrap_or_default();
         let jobs = verdict.failed();
-        let names = jobs.iter().map(|job| job.check.clone()).collect();
+        let names = jobs.iter().map(|job| job.check().clone()).collect();
         store.write(Failing::new(self.pull(), self.head(), names)).ignoring(Ignored::Unremembered);
-        let repeated = jobs.iter().find(|job| before.contains(&job.check));
+        let repeated = jobs.iter().find(|job| before.contains(job.check()));
         match (repeated, jobs.first()) {
-            (Some(job), _first) => Ending::Escalate(Escalation::RepeatFailure(job.check.clone())),
+            (Some(job), _first) => Ending::Escalate(Escalation::RepeatFailure(job.check().clone())),
             (None, Some(_first)) => Ending::Failing(jobs),
             (None, None) => Ending::Stop,
         }
-    }
-}
-
-impl FailedJob {
-    pub fn new(check: CheckName, job: JobId) -> FailedJob {
-        FailedJob { check, job }
     }
 }
 
@@ -205,7 +193,7 @@ impl Logged {
     const LINES: usize = 40;
 
     fn fetched<C: Clock, G: Shell>(pushed: Pushed, failed: &[FailedJob], hub: &Hub<'_, C, G>) -> Logged {
-        let jobs = failed.iter().map(|job| Excerpt::excerpted(job.clone(), &hub.log(job.job))).collect();
+        let jobs = failed.iter().map(|job| Excerpt::excerpted(job.clone(), &hub.log(job.job()))).collect();
         Logged { pushed, jobs }
     }
 }
@@ -304,8 +292,8 @@ impl fmt::Display for Logged {
             "CI failed on #{pull} at {}. Fix these jobs, push, then end with DONE #{pull} <full sha>.",
             self.pushed.head()
         )?;
-        self.jobs.iter().try_for_each(|Excerpt { failed: FailedJob { check, job }, lines }| {
-            write!(formatter, "\n{check} (job {job}):\n")?;
+        self.jobs.iter().try_for_each(|Excerpt { failed, lines }| {
+            write!(formatter, "\n{} (job {}):\n", failed.check(), failed.job())?;
             lines.iter().try_for_each(|line| writeln!(formatter, "{line}"))
         })
     }

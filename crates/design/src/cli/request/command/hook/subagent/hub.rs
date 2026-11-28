@@ -14,10 +14,9 @@ use store_ports::Store;
 
 use super::super::super::Ground;
 use super::super::super::crew::Crew;
-use super::boundary::{Branch, Branched, Compared, First, JobId, Opened, Pushed};
-use super::{FailedJob, UnreadStep};
+use super::boundary::{Branch, Branched, Compared, FailedJob, First, JobId, Opened, Pushed};
 use crate::cli::request::ignored::Ignored;
-use crate::cli::request::{Landed, Local, Repository};
+use crate::cli::request::{Landed, Local, Repository, UnreadStep};
 
 #[derive(Debug)]
 pub struct Hub<'crew, C: Clock, G: Shell> {

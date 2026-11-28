@@ -21,6 +21,7 @@ pub(crate) enum Rule {
     BoolMethods,
     NoDyn,
     RealAdapters,
+    ModuleCycles,
 }
 
 impl Rule {
@@ -48,6 +49,7 @@ impl Rule {
             Rule::RealAdapters => {
                 "a port's real adapter is named only in a binary's main.rs and in its own port crate's tests; everything else builds over doubles"
             }
+            Rule::ModuleCycles => "modules inside a crate never import each other in a cycle",
         }
     }
 }

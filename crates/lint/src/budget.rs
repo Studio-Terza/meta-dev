@@ -5,8 +5,8 @@ use syn::spanned::Spanned;
 use syn::{ItemMod, Macro};
 
 use crate::gate::Gate;
+use crate::hooks::{Descent, Expanded, Hooks};
 use crate::source::{Place, Source};
-use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Budget {

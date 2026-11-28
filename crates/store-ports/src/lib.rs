@@ -1,4 +1,3 @@
-mod batch;
 mod busy;
 mod cause;
 mod column;
@@ -13,12 +12,11 @@ mod store_lock;
 mod value;
 mod written;
 
-pub use batch::{Batch, Counted, Counts};
 pub use busy::Busy;
 pub use cause::Cause;
 pub use column::{Column, ColumnFailure, Columns};
 pub use opens::Opens;
-pub use prepared::{Execute, Prepared, Values};
+pub use prepared::{Batch, Counted, Counts, Execute, Prepared, Values};
 pub use query::Query;
 pub use record::{Created, Record};
 pub use schema::Schema;

@@ -16,7 +16,7 @@ use crate::finding::Finding;
 use crate::gate::Gate;
 use crate::ignored::Ignored;
 use crate::lints::{Facts, Lints};
-use crate::source::Source;
+use crate::source::{ModulePath, Source};
 use crate::spent::{Spent, Stage};
 use crate::workspace::{CrateKind, CrateRoot, Package, Tree};
 
@@ -48,6 +48,7 @@ impl Read {
 #[derive(Debug)]
 struct Module {
     real: Arc<Path>,
+    path: ModulePath,
     package: Arc<Package>,
     kind: CrateKind,
     gate: Gate,
@@ -89,6 +90,7 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
             .into_iter()
             .map(|root| Module {
                 real: Arc::from(root.path()),
+                path: ModulePath::root(Arc::from(root.path())),
                 package: Arc::clone(root.package()),
                 kind: root.kind(),
                 gate: Gate::Entered,
@@ -121,8 +123,14 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
         let parsed = spent.timed(self.timer, Stage::Parse, || syn::parse_file(&text));
         match parsed {
             Ok(file) => {
-                let source =
-                    Source::new(Arc::clone(&module.package), Arc::clone(&module.real), shown, module.kind, text);
+                let source = Source::new(
+                    Arc::clone(&module.package),
+                    Arc::clone(&module.real),
+                    shown,
+                    module.path.clone(),
+                    module.kind,
+                    text,
+                );
                 self.linted(module, &source, &file, spent)
             }
             Err(source) => {
@@ -217,6 +225,7 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
         };
         Ok(Module {
             real: Arc::from(chosen),
+            path: parent.path.child(declared.inline.iter().cloned().chain([declared.name.clone()])),
             package: Arc::clone(&parent.package),
             kind: parent.kind,
             gate: declared.gate,

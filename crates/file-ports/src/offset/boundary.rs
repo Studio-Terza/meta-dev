@@ -1,7 +1,7 @@
 use invariants::Ignoring;
 use newtype::{Arbitrary, Checked, Display, Newtype};
 
-use crate::Ignored;
+use crate::ignored::Ignored;
 
 #[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[newtype(checked, strategy = 0..=i64::MAX)]
