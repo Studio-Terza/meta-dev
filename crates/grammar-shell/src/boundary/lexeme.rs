@@ -6,44 +6,15 @@ use grammar::{Ignoring, Unlexed};
 pub(super) enum Lexeme<'text> {
     #[regex(r"[ \t]+")]
     #[token("\\\n")]
-    Blank,
     #[regex(r"#[^\n]*", allow_greedy = true)]
-    Comment,
-    #[token("\n")]
-    Newline,
+    Blank,
     #[token(";")]
-    #[token("&")]
     #[token("&&")]
     #[token("||")]
     #[token("|")]
-    #[token("|&")]
+    #[token("\n")]
     Separator,
-    #[token(";;")]
-    #[token(";&")]
-    #[token(";;&")]
-    CaseEnd,
-    #[token("(")]
-    Open,
-    #[regex(r"\([ \t]*\)")]
-    Parens,
-    #[token(")")]
-    Close,
-    #[token("((")]
-    #[token("$((")]
-    Arithmetic,
-    #[token("))")]
-    Closes,
-    #[token("$(")]
-    #[token("<(")]
-    #[token(">(")]
-    Substitution,
-    #[token("`")]
-    Backtick,
-    #[regex(r"[0-9]*<<")]
-    Heredoc,
-    #[regex(r"[0-9]*<<-")]
-    Stripped,
-    #[regex(r"[0-9]*(<|<<<)")]
+    #[regex(r"[0-9]*<")]
     Input,
     #[regex(r"[0-9]*(>|>>|>\||<>)")]
     #[token("&>")]
@@ -53,53 +24,46 @@ pub(super) enum Lexeme<'text> {
     Duplicate,
     #[token("\"")]
     Quote,
-    #[regex(r"[A-Za-z_][A-Za-z0-9_]*\+?=\(")]
-    #[token("${(")]
-    Unreadable,
     #[regex(r"'[^']*'", |lexer| Lexeme::inner(lexer.slice(), 1))]
     #[regex(r"\$'(\\(.|\n)|[^'\\])*'", |lexer| Lexeme::inner(lexer.slice(), 2))]
-    Single(&'text str),
     #[regex(r"\\[^\n]", |lexer| lexer.slice().get(1..))]
-    Escaped(&'text str),
-    #[regex(r"\$\{([^(}][^}]*)?\}", |lexer| lexer.slice())]
+    Quoted(&'text str),
+    #[regex(r"\$\{#?[A-Za-z_][A-Za-z0-9_]*[^}$`(]*\}", |lexer| lexer.slice())]
     #[regex(r"\$([A-Za-z_][A-Za-z0-9_]*|[0-9@*#?$!-])", |lexer| lexer.slice())]
     Expansion(&'text str),
     #[regex(r#"[^ \t\n;&|()<>'"`$\\#][^ \t\n;&|()<>'"`$\\]*"#, |lexer| lexer.slice())]
     #[token("$", |lexer| lexer.slice())]
     Literal(&'text str),
+    #[token("(")]
+    #[token(")")]
+    #[token("`")]
+    #[token("$(")]
+    #[token("${")]
+    #[regex(r"[0-9]*<<")]
+    #[token("<(")]
+    #[token(">(")]
+    #[token("&")]
+    #[token("|&")]
+    #[token(";;")]
+    Unplain,
 }
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
-pub(super) enum Quoted<'text> {
+pub(super) enum Inside<'text> {
     #[token("\"")]
     End,
-    #[token("$(")]
-    Substitution,
-    #[token("$((")]
-    Arithmetic,
-    #[token("`")]
-    Backtick,
-    #[token("${(")]
-    Unreadable,
     #[regex(r"\\(.|\n)", |lexer| lexer.slice().get(1..))]
-    Escaped(&'text str),
-    #[regex(r"\$\{([^(}][^}]*)?\}", |lexer| lexer.slice())]
-    #[regex(r"\$([A-Za-z_][A-Za-z0-9_]*|[0-9@*#?$!-])", |lexer| lexer.slice())]
     #[regex(r#"[^"\\$`]+"#, |lexer| lexer.slice())]
     #[token("$", |lexer| lexer.slice())]
     Text(&'text str),
-}
-
-#[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-#[logos(crate = grammar::logos)]
-pub(super) enum Line<'text> {
-    #[regex(r"\t+")]
-    Tabs,
-    #[regex(r"[^\t\n][^\n]*", |lexer| lexer.slice(), allow_greedy = true)]
-    Text(&'text str),
-    #[token("\n")]
-    End,
+    #[regex(r"\$\{#?[A-Za-z_][A-Za-z0-9_]*[^}$`(]*\}", |lexer| lexer.slice())]
+    #[regex(r"\$([A-Za-z_][A-Za-z0-9_]*|[0-9@*#?$!-])", |lexer| lexer.slice())]
+    Expansion(&'text str),
+    #[token("`")]
+    #[token("$(")]
+    #[token("${")]
+    Unplain,
 }
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
@@ -107,41 +71,36 @@ pub(super) enum Line<'text> {
 pub(super) enum Spelling {
     #[token("for")]
     #[token("select")]
-    For,
     #[token("while")]
     #[token("until")]
-    While,
     #[token("if")]
-    If,
-    #[token("case")]
-    Case,
-    #[token("do")]
     #[token("then")]
-    #[token("else")]
     #[token("elif")]
-    #[token("!")]
-    #[token("time")]
-    Lead,
-    #[token("{")]
-    Brace,
-    #[token("}")]
-    Unbrace,
-    #[token("done")]
-    Done,
+    #[token("else")]
     #[token("fi")]
-    Fi,
+    #[token("do")]
+    #[token("done")]
+    #[token("case")]
     #[token("esac")]
-    Esac,
     #[token("function")]
-    Function,
+    #[token("coproc")]
+    #[token("time")]
+    #[token("!")]
+    #[token("{")]
+    #[token("}")]
     #[token("[[")]
-    Test,
+    #[token("]]")]
+    Keyword,
     #[regex(r"[A-Za-z_][A-Za-z0-9_]*\+?=[^\x00]*", allow_greedy = true, priority = 100)]
     Assignment,
     #[regex(r"([^/\x00]*/)*rm", allow_greedy = true)]
     Rm,
     #[regex(r"([^/\x00]*/)*rmdir", allow_greedy = true)]
     Rmdir,
+    #[regex(r"([^/\x00]*/)*cargo", allow_greedy = true)]
+    Cargo,
+    #[regex(r"([^/\x00]*/)*git", allow_greedy = true)]
+    Git,
     #[regex(r"([^/\x00]*/)*(bash|sh|zsh|dash|ksh)", allow_greedy = true)]
     Shell,
     #[regex(r"([^/\x00]*/)*xargs", allow_greedy = true)]
@@ -192,8 +151,8 @@ pub(super) enum Argued {
     #[token(";")]
     #[token("+")]
     Terminator,
-    #[token("in")]
-    In,
+    #[token("clean")]
+    Clean,
     #[token("-I")]
     #[token("-J")]
     #[token("-L")]

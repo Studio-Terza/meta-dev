@@ -313,7 +313,7 @@ answers = [
 stop = {}
 
 [[story]]
-name = "a flagged command hidden in a script is refused and told to unroll; a plain one passes to the harness"
+name = "shell that is not plain is refused, as is a deletion run through another command or on arguments that are not literal; a plain one passes to the harness"
 
 [[story.step]]
 ran = 'for d in a b; do rm -rf "$d"; done'
@@ -343,7 +343,16 @@ ran = "test -d out && { rm -rf out; }"
 ran = """P=(${(f)"$(cargo metadata --no-deps | jq -r '.packages[].name')"}); cargo clean -q $P"""
 
 [[story.step]]
+ran = 'rm -rf "$d"'
+
+[[story.step]]
+ran = "git clean -fdx $DIR"
+
+[[story.step]]
 ran = "rm x"
+
+[[story.step]]
+ran = "cargo clean"
 
 [[story.step]]
 ran = "git rm x"
@@ -954,6 +963,9 @@ ran = "sed -i 's/a/b/' /tmp/x"
 
 [[story.step]]
 ran = "for f in a; do perl -pi -e 's/a/b/' $f; done"
+
+[[story.step]]
+ran = "ls | xargs perl -pi -e 's/a/b/'"
 
 [[story.step]]
 ran = "echo a > /home/repo/src/x.rs"
