@@ -2,6 +2,7 @@ use invariants::Ignoring;
 use serde::Deserialize;
 
 use super::classified::Classified;
+use super::closing::Closing;
 use super::object::Object;
 use super::said::{Hears, Said};
 use super::stamp::Stamp;
@@ -57,10 +58,20 @@ enum Block {
     Unknown(Unrecognised),
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum Reason {
+    EndTurn,
+    StopSequence,
+    #[serde(other)]
+    Other,
+}
+
 #[derive(Debug)]
 struct Message {
     model: Model,
     content: Vec<Block>,
+    reason: Option<Reason>,
 }
 
 #[derive(Debug)]
@@ -86,16 +97,25 @@ impl Assistant {
         let delivery = entry.present(Self::DELIVERY).map_or_else(|| Ok(Delivery::default()), Object::whole)?;
         Ok(Assistant { stamp: entry.whole()?, delivery, message: Message::read(entry.required(Self::MESSAGE)?)? })
     }
+
+    pub fn closing(&self) -> Closing {
+        match self.message.reason {
+            Some(Reason::EndTurn | Reason::StopSequence) => Closing::Ends,
+            Some(Reason::Other) | None => Closing::Leaves,
+        }
+    }
 }
 
 impl Message {
     const MODEL: &'static str = "model";
     const CONTENT: &'static str = "content";
+    const REASON: &'static str = "stop_reason";
 
     fn read(message: Object<'_>) -> Result<Message, serde_json::Error> {
         let content: Vec<Block> =
             message.required(Self::CONTENT)?.each()?.into_iter().map(Block::read).collect::<Result<_, _>>()?;
-        Ok(Message { model: message.field(Self::MODEL)?, content })
+        let reason = message.field(Self::REASON).ignoring(Ignored::NotKnown).flatten();
+        Ok(Message { model: message.field(Self::MODEL)?, content, reason })
     }
 }
 

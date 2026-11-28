@@ -5,13 +5,11 @@ use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, Epoch, Offset, Size, Stamp, Stamps, Tail};
 use grammar::Grammar;
-use grammar::lines::Lines;
 use grammar::notice::TaskFile;
 use invariants::Ignoring;
 use newtype::Wrapping;
 use pipeline::Measure;
-use serde::Deserialize;
-use transcript_ports::{Body, TaskId};
+use transcript_ports::{Body, TaskId, Turn};
 
 use crate::cli::request::ignored::Ignored;
 
@@ -64,65 +62,6 @@ pub struct Tasks {
     hung: BTreeSet<Body>,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(tag = "type", rename_all = "lowercase")]
-enum Line {
-    Assistant {
-        #[serde(default)]
-        message: Closing,
-    },
-    Attachment {
-        attachment: Note,
-    },
-    #[serde(other)]
-    Other,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-enum Reason {
-    EndTurn,
-    StopSequence,
-    #[serde(other)]
-    Other,
-}
-
-#[derive(Debug, Default, Deserialize)]
-struct Closing {
-    #[serde(default)]
-    stop_reason: Option<Reason>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-enum Note {
-    PromptSnapshot,
-    HookSuccess {
-        #[serde(rename = "hookEvent")]
-        event: Event,
-    },
-    HookNonBlockingError {
-        #[serde(rename = "hookEvent")]
-        event: Event,
-    },
-    #[serde(other)]
-    Other,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
-enum Event {
-    SubagentStop,
-    #[serde(other)]
-    Other,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Turn {
-    Ended,
-    Open,
-    Trailing,
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Written {
     Output,
@@ -170,7 +109,7 @@ impl Runner {
     fn ending(self, text: &str) -> Option<Ended> {
         match self {
             Runner::Shell => Task::TRAILERS.iter().any(|trailer| text.contains(trailer)).then_some(Ended),
-            Runner::Agent => Line::last(text),
+            Runner::Agent => (Turn::from(text) == Turn::Ended).then_some(Ended),
         }
     }
 
@@ -214,47 +153,6 @@ impl From<Runner> for Stamp {
         match runner {
             Runner::Shell => Stamp::Born,
             Runner::Agent => Stamp::Touched,
-        }
-    }
-}
-
-impl Line {
-    fn last(text: &str) -> Option<Ended> {
-        let read = Lines::from(text)
-            .into_iter()
-            .rev()
-            .map(|line| serde_json::from_str::<Line>(&line).ignoring(Ignored::Untasked).map_or(Turn::Open, Line::read))
-            .find(|read| *read != Turn::Trailing)?;
-        (read == Turn::Ended).then_some(Ended)
-    }
-
-    fn read(self) -> Turn {
-        match self {
-            Line::Assistant { message } => message.read(),
-            Line::Attachment { attachment } => attachment.read(),
-            Line::Other => Turn::Open,
-        }
-    }
-}
-
-impl Closing {
-    fn read(&self) -> Turn {
-        match self.stop_reason {
-            Some(Reason::EndTurn | Reason::StopSequence) => Turn::Ended,
-            Some(Reason::Other) | None => Turn::Open,
-        }
-    }
-}
-
-impl Note {
-    fn read(self) -> Turn {
-        match self {
-            Note::PromptSnapshot
-            | Note::HookSuccess { event: Event::SubagentStop }
-            | Note::HookNonBlockingError { event: Event::SubagentStop } => Turn::Trailing,
-            Note::HookSuccess { event: Event::Other }
-            | Note::HookNonBlockingError { event: Event::Other }
-            | Note::Other => Turn::Open,
         }
     }
 }

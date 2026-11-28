@@ -16,6 +16,7 @@ mod session_id;
 mod skipped;
 mod task_id;
 mod transcripts;
+mod turn;
 mod unrecognised;
 mod uuid;
 
@@ -34,6 +35,7 @@ pub use session_id::SessionId;
 pub use skipped::Skipped;
 pub use task_id::TaskId;
 pub use transcripts::{Transcripts, transcripts_ops};
+pub use turn::Turn;
 pub use unrecognised::Unrecognised;
 pub use uuid::Uuid;
 
