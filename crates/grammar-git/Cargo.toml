@@ -11,6 +11,7 @@ format = "git"
 [lib]
 test = false
 doctest = false
+bench = false
 
 [dependencies]
 grammar = { path = "../grammar" }

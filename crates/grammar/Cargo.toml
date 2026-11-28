@@ -12,6 +12,7 @@ shared = ["proc-macro2", "quote", "syn"]
 [lib]
 test = false
 doctest = false
+bench = false
 
 [dependencies]
 invariants = { path = "../invariants" }
