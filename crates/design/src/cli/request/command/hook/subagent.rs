@@ -37,6 +37,12 @@ pub enum Ending {
 }
 
 #[derive(Debug)]
+struct Checked {
+    ending: Ending,
+    failing: Option<Failing>,
+}
+
+#[derive(Debug)]
 struct Untyped;
 
 #[derive(Debug)]
@@ -116,7 +122,12 @@ impl<F: Files, S: Store> Desk<'_, '_, F, S> {
         hub: &Hub<'_, C, G>,
     ) -> Result<Reply<'static>, Failure> {
         let at = At::Pull(pushed);
-        match pushed.checked(hub, self.ground.store()) {
+        let store = self.ground.store();
+        let ended = pushed.checked(hub, store).map(|Checked { ending, failing }| {
+            failing.map(|recorded| store.write(recorded).ignoring(Ignored::Unremembered));
+            ending
+        });
+        match ended {
             Ok(Ending::Stop) => self.cleared(passed),
             Ok(Ending::Unpushed { held }) => Ok(Reply::Block { reason: Unpushed { pushed, held }.to_string() }),
             Ok(Ending::MergeMain { lacking }) => Ok(Reply::Block { reason: Stalled { pushed, lacking }.to_string() }),
@@ -147,41 +158,52 @@ impl<F: Files, S: Store> Desk<'_, '_, F, S> {
 }
 
 impl Pushed {
-    fn checked<C: Clock, G: Shell>(self, hub: &Hub<'_, C, G>, store: &impl Store) -> Result<Ending, UnreadStep> {
+    fn checked<C: Clock, G: Shell>(self, hub: &Hub<'_, C, G>, store: &impl Store) -> Result<Checked, UnreadStep> {
         let held = hub.head(self.pull())?;
         if held == self.head() {
             match hub.mergeable(self.pull())? {
-                Merge::Stale => Ok(Ending::MergeMain { lacking: hub.lacking(self.head()) }),
+                Merge::Stale => Ok(Checked::ended(Ending::MergeMain { lacking: hub.lacking(self.head()) })),
                 Merge::Current => {
                     hub.requested(self.pull())?;
-                    match self.judged(hub.settled(self.pull())?, store) {
-                        Ending::Stop => Ok(hub
-                            .gated(self.head())?
-                            .map_or(Ending::Stop, |check| Ending::Escalate(Escalation::GatedRerun(check)))),
-                        ending @ (Ending::Unpushed { .. }
+                    let judged = self.judged(hub.settled(self.pull())?, store);
+                    match judged.ending {
+                        Ending::Stop => Ok(Checked {
+                            ending: hub
+                                .gated(self.head())?
+                                .map_or(Ending::Stop, |check| Ending::Escalate(Escalation::GatedRerun(check))),
+                            failing: judged.failing,
+                        }),
+                        Ending::Unpushed { .. }
                         | Ending::MergeMain { .. }
                         | Ending::Failing(_)
-                        | Ending::Escalate(_)) => Ok(ending),
+                        | Ending::Escalate(_) => Ok(judged),
                     }
                 }
             }
         } else {
-            Ok(Ending::Unpushed { held })
+            Ok(Checked::ended(Ending::Unpushed { held }))
         }
     }
 
-    fn judged(self, verdict: Verdict, store: &impl Store) -> Ending {
+    fn judged(self, verdict: Verdict, store: &impl Store) -> Checked {
         let before: Vec<CheckName> =
             store.read(FailedBefore::new(self.pull(), self.head())).ignoring(Ignored::Unremembered).unwrap_or_default();
         let jobs = verdict.failed();
         let names = jobs.iter().map(|job| job.check().clone()).collect();
-        store.write(Failing::new(self.pull(), self.head(), names)).ignoring(Ignored::Unremembered);
+        let failing = Some(Failing::new(self.pull(), self.head(), names));
         let repeated = jobs.iter().find(|job| before.contains(job.check()));
-        match (repeated, jobs.first()) {
+        let ending = match (repeated, jobs.first()) {
             (Some(job), _first) => Ending::Escalate(Escalation::RepeatFailure(job.check().clone())),
             (None, Some(_first)) => Ending::Failing(jobs),
             (None, None) => Ending::Stop,
-        }
+        };
+        Checked { ending, failing }
+    }
+}
+
+impl Checked {
+    fn ended(ending: Ending) -> Checked {
+        Checked { ending, failing: None }
     }
 }
 
