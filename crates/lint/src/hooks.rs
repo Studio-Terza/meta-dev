@@ -32,7 +32,6 @@ macro_rules! nodes {
             nodes [
                 visit_file(syn::File) file left_file,
                 visit_item(Item) item left_item,
-                visit_item_mod(ItemMod) item_mod left_item_mod,
                 visit_item_impl(ItemImpl) item_impl left_item_impl,
                 visit_item_trait(ItemTrait) item_trait left_item_trait,
                 visit_item_fn(ItemFn) item_fn left_item_fn,
@@ -66,12 +65,18 @@ macro_rules! nodes {
                 visit_expr_method_call(ExprMethodCall) expr_method_call left_expr_method_call,
                 visit_vis_restricted(VisRestricted) vis_restricted left_vis_restricted,
             ]
+            gated [
+                visit_item_mod(ItemMod) item_mod left_item_mod,
+            ]
         }
     };
 }
 
 macro_rules! hooks {
-    (nodes [$($visit:ident($node:ty) $hook:ident $left:ident),* $(,)?]) => {
+    (
+        nodes [$($visit:ident($node:ty) $hook:ident $left:ident),* $(,)?]
+        gated [$($gated_visit:ident($gated_node:ty) $gated_hook:ident $gated_left:ident),* $(,)?]
+    ) => {
         pub(crate) trait Hooks {
             $(
                 fn $hook(&mut self, _: &$node) -> Descent {
@@ -79,6 +84,14 @@ macro_rules! hooks {
                 }
 
                 fn $left(&mut self, _: &$node) {}
+            )*
+
+            $(
+                fn $gated_hook(&mut self, _: &$gated_node) -> Descent {
+                    Descent::Into
+                }
+
+                fn $gated_left(&mut self, _: &$gated_node) {}
             )*
 
             fn macro_called(&mut self, _: &Macro) -> Expanded {

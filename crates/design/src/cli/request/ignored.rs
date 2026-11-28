@@ -19,6 +19,5 @@ invariants::ignored! {
         Unhooked => "a workspace settings file that cannot be read, parsed or written keeps its old hooks, and the install is escalated",
         Unidentified => "an id -u line that does not read as a number names no harness folder, so the settings are not printed",
         Outside => "a path outside home has no home-relative form, so it is shown as given",
-        Structured => "a message sent to an agent that is not plain text is a protocol reply with no brief to read, so it passes unchanged",
     }
 }

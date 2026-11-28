@@ -1,3 +1,6 @@
+use std::sync::Arc;
+
+use pipeline::Measure;
 use syn::visit::{self, Visit};
 use syn::{
     Attribute, Block, Expr, ExprAssign, ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprMethodCall, ExprWhile, Field,
@@ -6,13 +9,19 @@ use syn::{
     TypeTuple, VisRestricted,
 };
 
-use crate::budget::TestScan;
+use crate::budget::{Budget, TestBudget};
 use crate::expansion::Expansion;
+use crate::finding::{Finding, Findings};
+use crate::gate::Gate;
 use crate::hooks::{Descent, Expanded, Hooks, nodes};
+use crate::lint::{Fact, Lint, Reads};
 use crate::lints::{
-    BoolMethods, Emitters, ExpressionFlow, HandMeasures, ManualIteration, ModuleCycles, NamedLifetimes, NoDyn,
-    NoFreeFns, NoTestOnlyApi, ProcessStarters, PublicApiTests, PublicSurface, RealAdapters, TypeShape, VecOutParams,
+    AdapterFacts, ApiFacts, BoolMethods, ExpressionFlow, HandMeasures, ManualIteration, ModuleCycles, ModuleFacts,
+    NamedLifetimes, NoComments, NoDyn, NoFreeFns, NoTestOnlyApi, ProcessStarters, PublicApiTests, PublicSurface,
+    RealAdapters, SurfaceFacts, TestOnlyFacts, TypeShape, VecOutParams,
 };
+use crate::source::Source;
+use crate::workspace::Package;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Phase {
@@ -32,6 +41,7 @@ enum State {
 pub(crate) struct Pausable<Lint> {
     lint: Lint,
     state: State,
+    skips: Option<()>,
 }
 
 #[derive(Debug)]
@@ -51,12 +61,13 @@ impl Phase {
     }
 }
 
-impl<Lint> Pausable<Lint> {
-    pub(crate) fn admitted(lint: Lint, admitted: Option<()>) -> Pausable<Lint> {
-        Pausable { lint, state: admitted.map_or(State::Off, |()| State::Awake) }
+impl<Walked> Pausable<Walked> {
+    fn admitted(lint: Walked, reads: Reads, source: &Source) -> Pausable<Walked> {
+        let state = reads.admits(source).map_or(State::Off, |()| State::Awake);
+        Pausable { lint, state, skips: reads.skips() }
     }
 
-    pub(crate) fn woken(self) -> Option<Lint> {
+    fn woken(self) -> Option<Walked> {
         self.active().map(|()| self.lint)
     }
 
@@ -64,12 +75,20 @@ impl<Lint> Pausable<Lint> {
         (self.state == State::Awake).then_some(())
     }
 
-    fn entered(&mut self, depth: usize, hook: impl FnOnce(&mut Lint) -> Descent) {
+    fn entered(&mut self, depth: usize, hook: impl FnOnce(&mut Walked) -> Descent) {
         let over = self.active().map(|()| hook(&mut self.lint)).filter(|descent| *descent == Descent::Over);
         self.state = over.map_or(self.state, |_| State::PausedAt(depth));
     }
 
-    fn left(&mut self, depth: usize, hook: impl FnOnce(&mut Lint)) {
+    fn gated(&mut self, depth: usize, gate: Gate, hook: impl FnOnce(&mut Walked) -> Descent) {
+        let skipped = self.skips.and(Reads::skipped(gate)).and(self.active());
+        match skipped {
+            Some(()) => self.state = State::PausedAt(depth),
+            None => self.entered(depth, hook),
+        }
+    }
+
+    fn left(&mut self, depth: usize, hook: impl FnOnce(&mut Walked)) {
         match self.state {
             State::Awake => hook(&mut self.lint),
             State::PausedAt(at) => self.state = if at == depth { State::Awake } else { self.state },
@@ -77,7 +96,7 @@ impl<Lint> Pausable<Lint> {
         }
     }
 
-    fn chose(&mut self, hook: impl FnOnce(&mut Lint) -> Expanded) -> Option<Expanded> {
+    fn chose(&mut self, hook: impl FnOnce(&mut Walked) -> Expanded) -> Option<Expanded> {
         self.active().map(|()| hook(&mut self.lint))
     }
 
@@ -87,11 +106,15 @@ impl<Lint> Pausable<Lint> {
     }
 }
 
-impl Walker<'_> {
-    pub(crate) fn walked<'file>(lineup: Lineup<'file>, file: &syn::File) -> Lineup<'file> {
-        let mut walker = Walker { lineup, depth: 0 };
+impl<'file> Walker<'file> {
+    pub(crate) fn walked(source: &'file Source, file: &syn::File) -> Facts {
+        let mut walker = Walker { lineup: Lineup::admitted(source), depth: 0 };
         walker.visit_file(file);
-        walker.lineup
+        walker.lineup.facts(source)
+    }
+
+    pub(crate) fn headlines() -> Vec<&'static str> {
+        Lineup::headlines()
     }
 
     fn deeper(&mut self, walk: impl FnOnce(&mut Self, usize)) {
@@ -102,16 +125,16 @@ impl Walker<'_> {
 }
 
 macro_rules! each {
-    ($lineup:expr, [$($lint:ident: $kind:ty),* $(,)?], $method:ident $arguments:tt) => {
+    ($lineup:expr, [$($lint:ident: $kind:ty => $fact:ty),* $(,)?], $method:ident $arguments:tt) => {
         $( $lineup.$lint.$method $arguments; )*
     };
 }
 
 macro_rules! lineup {
-    ($life:lifetime [$($lint:ident: $kind:ty),* $(,)?]) => {
+    ($life:lifetime [$($lint:ident: $kind:ty => $fact:ty),* $(,)?]) => {
         #[derive(Debug)]
-        pub(crate) struct Lineup<$life> {
-            $(pub $lint: Pausable<$kind>,)*
+        struct Lineup<$life> {
+            $($lint: Pausable<$kind>,)*
         }
 
         #[derive(Clone, Copy, Debug)]
@@ -119,7 +142,31 @@ macro_rules! lineup {
             $($lint: Option<Expanded>,)*
         }
 
-        impl Lineup<'_> {
+        #[derive(Debug, Measure)]
+        pub(crate) struct Facts {
+            $(pub $lint: $fact,)*
+        }
+
+        impl<$life> Lineup<$life> {
+            fn admitted(source: &$life Source) -> Lineup<$life> {
+                Lineup {
+                    $($lint: Pausable::admitted(
+                        <$kind as Lint<$life>>::new(source),
+                        <$kind as Lint<$life>>::READS,
+                        source,
+                    ),)*
+                }
+            }
+
+            fn facts(self, source: &$life Source) -> Facts {
+                let Lineup { $($lint),* } = self;
+                Facts { $($lint: $lint.woken().map_or_default(|lint| lint.fact(source)),)* }
+            }
+
+            fn headlines() -> Vec<&'static str> {
+                vec![$(<$kind as Lint<$life>>::HEADLINE),*]
+            }
+
             fn awake(&self) -> Option<()> {
                 [$(self.$lint.active()),*].into_iter().flatten().next()
             }
@@ -137,6 +184,13 @@ macro_rules! lineup {
             }
         }
 
+        impl Facts {
+            pub(crate) fn findings(self, packages: &[Arc<Package>]) -> Vec<Finding> {
+                let Facts { $($lint),* } = self;
+                [$(Fact::findings($lint, packages)),*].into_iter().flatten().collect()
+            }
+        }
+
         impl Chosen {
             fn wanting(self, phase: Phase) -> Option<()> {
                 [$(self.$lint.and_then(|choice| phase.admitted(choice))),*].into_iter().flatten().next()
@@ -150,6 +204,7 @@ macro_rules! walker {
         $life:lifetime;
         lints $lints:tt
         nodes [$($visit:ident($node:ty) $hook:ident $left:ident),* $(,)?]
+        gated [$($gated_visit:ident($gated_node:ty) $gated_hook:ident $gated_left:ident),* $(,)?]
     ) => {
         lineup!($life $lints);
 
@@ -170,6 +225,17 @@ macro_rules! walker {
                         each!(walker.lineup, $lints, entered(depth, |lint| Hooks::$hook(lint, node)));
                         walker.lineup.awake().map_or_default(|()| visit::$visit(walker, node));
                         each!(walker.lineup, $lints, left(depth, |lint| Hooks::$left(lint, node)));
+                    });
+                }
+            )*
+
+            $(
+                fn $gated_visit(&mut self, node: &'ast $gated_node) {
+                    let gate = Gate::of(&node.attrs);
+                    self.deeper(|walker, depth| {
+                        each!(walker.lineup, $lints, gated(depth, gate, |lint| Hooks::$gated_hook(lint, node)));
+                        walker.lineup.awake().map_or_default(|()| visit::$gated_visit(walker, node));
+                        each!(walker.lineup, $lints, left(depth, |lint| Hooks::$gated_left(lint, node)));
                     });
                 }
             )*
@@ -197,22 +263,22 @@ macro_rules! walker {
 nodes!(walker {
     'file;
     lints [
-        no_free_fns: NoFreeFns,
-        vec_out_params: VecOutParams,
-        named_lifetimes: NamedLifetimes,
-        type_shape: TypeShape,
-        expression_flow: ExpressionFlow,
-        manual_iteration: ManualIteration,
-        process_starters: ProcessStarters,
-        bool_methods: BoolMethods,
-        no_dyn: NoDyn,
-        hand_measures: HandMeasures,
-        public_surface: PublicSurface<'file>,
-        public_api_tests: PublicApiTests<'file>,
-        emitters: Emitters,
-        no_test_only_api: NoTestOnlyApi<'file>,
-        real_adapters: RealAdapters<'file>,
-        test_scan: TestScan,
-        module_cycles: ModuleCycles<'file>,
+        no_comments: NoComments => Findings,
+        no_free_fns: NoFreeFns => Findings,
+        vec_out_params: VecOutParams => Findings,
+        named_lifetimes: NamedLifetimes => Findings,
+        type_shape: TypeShape => Findings,
+        expression_flow: ExpressionFlow => Findings,
+        manual_iteration: ManualIteration => Findings,
+        process_starters: ProcessStarters => Findings,
+        public_surface: PublicSurface<'file> => SurfaceFacts,
+        public_api_tests: PublicApiTests<'file> => ApiFacts,
+        no_test_only_api: NoTestOnlyApi<'file> => TestOnlyFacts,
+        bool_methods: BoolMethods => Findings,
+        no_dyn: NoDyn => Findings,
+        real_adapters: RealAdapters<'file> => AdapterFacts,
+        module_cycles: ModuleCycles<'file> => ModuleFacts,
+        hand_measures: HandMeasures => Findings,
+        test_budget: TestBudget => Budget,
     ]
 });

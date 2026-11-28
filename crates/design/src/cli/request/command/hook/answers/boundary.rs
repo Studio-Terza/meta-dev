@@ -3,8 +3,7 @@ use std::fmt;
 use std::ops::Not;
 
 use design_messages::{Quote, Said, Unabridged};
-use serde::Deserialize;
-use serde::de::DeserializeOwned;
+use json_ports::{Decode, Json};
 use transcript_ports::{Body, Uuid};
 
 use super::super::super::crew::{Prompt, Reply};
@@ -35,7 +34,7 @@ pub struct Trimming<'asked> {
     quotes: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Picked {
     uuid: Uuid,
     quote: Body,
@@ -99,8 +98,8 @@ impl Reading<'_> {
 }
 
 impl Replied<'_> {
-    pub fn listed<T: DeserializeOwned>(self) -> Vec<T> {
-        serde_json::from_str(&self.braced('[', ']')).ignoring(Ignored::Unpicked).unwrap_or_default()
+    pub fn listed<T: Decode>(self) -> Vec<T> {
+        Json::read(&self.braced('[', ']')).ignoring(Ignored::Unpicked).unwrap_or_default()
     }
 
     fn braced(self, open: char, close: char) -> String {

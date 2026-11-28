@@ -1,10 +1,9 @@
-use syn::{Attribute, ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, ReturnType, Signature, TraitItemFn, Type};
+use syn::{Attribute, ImplItemFn, ItemFn, ItemImpl, ItemTrait, ReturnType, Signature, TraitItemFn, Type};
 
-use crate::finding::{Found, Rule};
+use crate::finding::Found;
 use crate::gate::Gate;
 use crate::hooks::{Descent, Hooks};
-use crate::source::Source;
-use crate::style::{Reads, Style};
+use crate::lint::style;
 
 #[derive(Debug, Default)]
 pub(crate) struct BoolMethods {
@@ -32,10 +31,6 @@ impl BoolMethods {
 }
 
 impl Hooks for BoolMethods {
-    fn item_mod(&mut self, module: &ItemMod) -> Descent {
-        Descent::from(Gate::of(&module.attrs).entered())
-    }
-
     fn item_impl(&mut self, item: &ItemImpl) -> Descent {
         Descent::from(Gate::inherent(item).and(Gate::of(&item.attrs)).entered())
     }
@@ -57,15 +52,4 @@ impl Hooks for BoolMethods {
     }
 }
 
-impl<'file> Style<'file> for BoolMethods {
-    const RULE: Rule = Rule::BoolMethods;
-    const READS: Reads = Reads::Shipped;
-
-    fn new(_: &'file Source) -> BoolMethods {
-        BoolMethods::default()
-    }
-
-    fn found(self) -> Vec<Found> {
-        self.found
-    }
-}
+style!(BoolMethods, Shipped, "a function returning bool forgets what it found and makes the caller branch on a flag");

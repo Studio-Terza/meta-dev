@@ -1,5 +1,5 @@
-use strum::{IntoStaticStr, VariantArray};
 use syn::{AngleBracketedGenericArguments, GenericArgument, PathArguments, PathSegment, Type, TypePath};
+use variant_ports::Enumerated;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Spine {
@@ -7,7 +7,7 @@ pub enum Spine {
     Held,
 }
 
-#[derive(IntoStaticStr, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(strum::IntoStaticStr, strum::VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
 enum Spelled {
     Option,
     Result,

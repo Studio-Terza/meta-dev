@@ -4,7 +4,6 @@ use design_messages::{CommitSha, PullNumber};
 use grammar::Grammar;
 use grammar::git::{MergeCommand, Worktree};
 use invariants::Ignoring;
-use serde::Deserialize;
 
 use file_ports::Files;
 use store_ports::Store;
@@ -13,24 +12,24 @@ use super::super::super::Ground;
 use super::super::subagent::Branch;
 use crate::cli::request::ignored::Ignored;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct Used {
     cwd: PathBuf,
     #[serde(default)]
     tool_input: Input,
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, serde::Deserialize)]
 struct Input {
     #[serde(default)]
     command: Merge,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(serde::Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(from = "Option<String>")]
 struct Merge(Option<PullNumber>);
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct Landed {
     state: State,
     #[serde(rename = "headRefName")]
@@ -39,7 +38,7 @@ pub struct Landed {
     head: CommitSha,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum State {
     #[serde(rename = "MERGED")]
     Merged,

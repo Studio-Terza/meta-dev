@@ -5,28 +5,28 @@ use super::ports::Disk;
 use declared::Column;
 pub use declared::Described;
 use declared::Nullable;
-use serde::Deserialize;
+use json_ports::{Decode, Json};
 use unexpanded::CacheFile;
 pub use unexpanded::Unexpanded;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct Entry<Name> {
     describe: Describe<Name>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Describe<Name> {
     columns: Vec<Column<Name>>,
     parameters: Parameters,
     nullable: Vec<Nullable>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 enum Parameters {
     Right(usize),
 }
 
-impl<Name: serde::de::DeserializeOwned> Entry<Name> {
+impl<Name: Decode> Entry<Name> {
     const DIRECTORY: &'static str = ".sqlx";
 
     pub fn found(sql: &str) -> Result<Entry<Name>, Unexpanded> {
@@ -37,8 +37,8 @@ impl<Name: serde::de::DeserializeOwned> Entry<Name> {
             .find_map(|directory| Disk::held(directory.join(Self::DIRECTORY).join(&named)))
             .ok_or(Unexpanded::Uncached(file))?;
         let text = Disk::text(&path).map_err(|failed| Unexpanded::Unread { path: path.clone(), source: failed })?;
-        let entry: Entry<Name> = serde_json::from_str(&text)
-            .map_err(|failed| Unexpanded::Unparsed { path: path.clone(), source: failed })?;
+        let entry: Entry<Name> =
+            Json::read(&text).map_err(|failed| Unexpanded::Unparsed { path: path.clone(), source: failed })?;
         Ok(entry)
     }
 

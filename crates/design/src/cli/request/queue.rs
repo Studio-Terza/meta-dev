@@ -9,15 +9,14 @@ use grammar::Grammar;
 use grammar::detail::Cited as Detail;
 use grammar::lines::Lines;
 use grammar::spec_line::{Attachment, Line};
-use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
 pub struct Queue {
     #[serde(default, rename = "item", skip_serializing_if = "Vec::is_empty")]
     items: Vec<Item>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum Item {
     Spec(Cited),
@@ -28,13 +27,13 @@ pub enum Item {
     Uninstalled(Uninstalled),
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
 pub struct Uninstalled {
     merged: NonZeroU32,
     step: InstallStep,
 }
 
-#[derive(strum::Display, Deserialize, Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(strum::Display, serde::Deserialize, serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[strum(serialize_all = "kebab-case")]
 #[serde(rename_all = "kebab-case")]
 pub enum InstallStep {
@@ -46,7 +45,7 @@ pub enum InstallStep {
     Settings,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
 pub struct Escalated {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     at: Option<Target>,
@@ -54,14 +53,14 @@ pub struct Escalated {
     from: PathBuf,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum Target {
     Pull(NonZeroU32),
     Branch(String),
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum Cause {
     Blocked,
@@ -70,7 +69,7 @@ pub enum Cause {
     Unread(UnreadStep),
 }
 
-#[derive(strum::Display, Deserialize, Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(strum::Display, serde::Deserialize, serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[strum(serialize_all = "kebab-case")]
 #[serde(rename_all = "kebab-case")]
 pub enum UnreadStep {
@@ -93,14 +92,14 @@ pub enum UnreadStep {
     Lacking,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
 pub struct Kept {
     path: PathBuf,
     held: Held,
     merged: NonZeroU32,
 }
 
-#[derive(strum::Display, Deserialize, Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(strum::Display, serde::Deserialize, serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[strum(serialize_all = "kebab-case")]
 #[serde(rename_all = "kebab-case")]
 pub enum Held {
@@ -113,22 +112,22 @@ pub enum Held {
     Unremoved,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
 pub struct Ruling {
     asked: MessageRef,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     ruled: Option<MessageRef>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
 #[serde(try_from = "String", into = "String")]
 pub struct MessageRef(String);
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
 #[serde(try_from = "String", into = "String")]
 pub struct Cited(Attachment);
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct Landed {
     number: NonZeroU32,
     state: Settled,
@@ -138,7 +137,7 @@ pub struct Landed {
     body: String,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 enum Settled {
     #[serde(rename = "MERGED")]
     Merged,

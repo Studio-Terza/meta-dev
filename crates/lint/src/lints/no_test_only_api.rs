@@ -3,12 +3,17 @@ use std::sync::Arc;
 use proc_macro2::{TokenStream, TokenTree};
 use syn::{Attribute, Field, ImplItem, Item, ItemImpl, ItemMod, Lit, Macro, Meta, Visibility};
 
-use crate::finding::{Finding, Found, Rule};
+use pipeline::Measure;
+
+use crate::finding::{Finding, Findings, Found};
 use crate::gate::Gate;
-use crate::graph::Graph;
 use crate::hooks::{Descent, Expanded, Hooks};
+use crate::lint::{Fact, Lint, Reads};
 use crate::source::{Place, Source};
 use crate::workspace::Package;
+
+#[derive(Debug, Measure)]
+pub(crate) struct TestOnlyFacts(Findings);
 
 #[derive(Debug)]
 pub(crate) struct NoTestOnlyApi<'file> {
@@ -173,19 +178,23 @@ impl Hooks for NoTestOnlyApi<'_> {
     }
 }
 
-impl<'file> Graph<'file> for NoTestOnlyApi<'file> {
-    type Fact = Finding;
+impl<'file> Lint<'file> for NoTestOnlyApi<'file> {
+    const HEADLINE: &'static str = "shipped code has no test-only API";
+    const READS: Reads = Reads::Every;
+
+    type Fact = TestOnlyFacts;
 
     fn new(source: &'file Source) -> NoTestOnlyApi<'file> {
         NoTestOnlyApi { source, found: Vec::new(), gates: Vec::new() }
     }
 
-    fn facts(self) -> Vec<Finding> {
-        let shown = self.source.shown();
-        self.found.into_iter().map(|found| found.in_file(Rule::NoTestOnlyApi, shown)).collect()
+    fn fact(self, source: &'file Source) -> TestOnlyFacts {
+        TestOnlyFacts(Findings::found(NoTestOnlyApi::HEADLINE, source.shown(), self.found))
     }
+}
 
-    fn reduce(facts: Vec<Finding>, packages: &[Arc<Package>]) -> Vec<Finding> {
+impl Fact for TestOnlyFacts {
+    fn findings(self, packages: &[Arc<Package>]) -> Vec<Finding> {
         let manifests = packages.iter().flat_map(|package| {
             package.features().iter().filter_map(|feature| {
                 NoTestOnlyApi::testing(feature.name()).map(|()| {
@@ -194,10 +203,10 @@ impl<'file> Graph<'file> for NoTestOnlyApi<'file> {
                         format_args!("test feature {}", feature.name()),
                         NoTestOnlyApi::FEATURE_FIX,
                     )
-                    .in_file(Rule::NoTestOnlyApi, package.manifest())
+                    .in_file(NoTestOnlyApi::HEADLINE, package.manifest())
                 })
             })
         });
-        facts.into_iter().chain(manifests).collect()
+        self.0.into_iter().chain(manifests).collect()
     }
 }

@@ -34,8 +34,8 @@ impl Settings {
         match self.expressed(Expressed::Strategy) {
             None => vec![
                 parse_quote!(Self: ::core::fmt::Debug),
-                parse_quote!(#inner: ::newtype::proptest::arbitrary::Arbitrary + 'static),
-                parse_quote!(<#inner as ::newtype::proptest::arbitrary::Arbitrary>::Strategy: 'static),
+                parse_quote!(#inner: ::proptest::arbitrary::Arbitrary + 'static),
+                parse_quote!(<#inner as ::proptest::arbitrary::Arbitrary>::Strategy: 'static),
             ],
             Some(_) => vec![parse_quote!(Self: ::core::fmt::Debug), parse_quote!(Self: 'static)],
         }
@@ -43,7 +43,7 @@ impl Settings {
 
     pub fn parameters(&self, inner: &Type) -> Type {
         self.expressed(Expressed::Strategy).map_or_else(
-            || parse_quote!(<#inner as ::newtype::proptest::arbitrary::Arbitrary>::Parameters),
+            || parse_quote!(<#inner as ::proptest::arbitrary::Arbitrary>::Parameters),
             |_| parse_quote!(()),
         )
     }
@@ -51,7 +51,7 @@ impl Settings {
     pub fn source(&self, inner: &Type) -> Vec<Stmt> {
         match self.expressed(Expressed::Strategy) {
             Some(strategy) => parse_quote!(let _ = parameters; let inner = #strategy;),
-            None => parse_quote!(let inner = ::newtype::proptest::arbitrary::any_with::<#inner>(parameters);),
+            None => parse_quote!(let inner = ::proptest::arbitrary::any_with::<#inner>(parameters);),
         }
     }
 

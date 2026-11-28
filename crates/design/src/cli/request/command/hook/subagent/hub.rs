@@ -7,8 +7,7 @@ use design_messages::{CheckName, CommitSha, PullNumber};
 use dispatch_ports::{Deadline, Due, Pause, Ran, Timeout};
 use grammar::spec_line::Attachment;
 use invariants::Ignoring;
-use serde::Deserialize;
-use serde::de::DeserializeOwned;
+use json_ports::{Decode, Json};
 
 use super::super::super::crew::{Asked, Cut, Tape};
 use super::boundary::{Branch, Branched, Compared, FailedJob, First, JobId, Opened, Pushed};
@@ -27,20 +26,20 @@ pub enum Verdict {
     Red(Vec<FailedJob>),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Head {
     #[serde(rename = "headRefOid")]
     head: CommitSha,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Merging {
     mergeable: Mergeability,
     #[serde(rename = "mergeStateStatus")]
     state: MergeState,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 enum Mergeability {
     #[serde(rename = "MERGEABLE")]
     Clean,
@@ -50,7 +49,7 @@ enum Mergeability {
     Unknown,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 enum MergeState {
     Behind,
@@ -65,14 +64,14 @@ pub enum Merge {
     Stale,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Check {
     name: CheckName,
     bucket: Bucket,
     link: Link,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 enum Bucket {
     Pass,
@@ -89,11 +88,11 @@ enum State {
     Waiting,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(from = "String")]
 struct Link(Option<JobId>);
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Run {
     #[serde(rename = "databaseId")]
     id: NonZeroU64,
@@ -106,18 +105,18 @@ struct Attempt {
     number: u32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Attempted {
     jobs: Vec<Job>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Job {
     name: CheckName,
     conclusion: Conclusion,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 enum Conclusion {
     Success,
@@ -140,28 +139,28 @@ pub enum Unopened {
 #[derive(Clone, Copy, Debug)]
 struct Body<'spec>(&'spec Attachment);
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Found {
     data: Data,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Data {
     repository: Holder,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Holder {
     #[serde(rename = "ref")]
     reference: Option<Targeted>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Targeted {
     target: Oid,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Oid {
     oid: CommitSha,
 }
@@ -189,20 +188,15 @@ impl<'hook> Hub<'hook> {
         tape.spoke(Self::PROGRAM, &spoken, self.directory, timeout)
     }
 
-    fn read<T: DeserializeOwned, Unread>(
-        &self,
-        tape: &Tape<'_>,
-        arguments: &[&str],
-        unread: Unread,
-    ) -> Result<T, Cut<Unread>> {
+    fn read<T: Decode, Unread>(&self, tape: &Tape<'_>, arguments: &[&str], unread: Unread) -> Result<T, Cut<Unread>> {
         let ran = self.ran(tape, arguments, Self::QUICK)?;
-        match ran.as_ref().and_then(Ran::succeeded).map(|printed| serde_json::from_str(printed.as_ref())) {
+        match ran.as_ref().and_then(Ran::succeeded).map(|printed| Json::read(printed.as_ref())) {
             Some(Ok(read)) => Ok(read),
             Some(Err(_)) | None => Err(Cut::Failed(unread)),
         }
     }
 
-    pub fn viewed<T: DeserializeOwned, Unread>(
+    pub fn viewed<T: Decode, Unread>(
         &self,
         tape: &Tape<'_>,
         pull: PullNumber,
@@ -307,7 +301,7 @@ impl<'hook> Hub<'hook> {
     fn listed(&self, tape: &Tape<'_>, pull: PullNumber) -> Result<Option<Vec<Check>>, Asked> {
         let ran = self.ran(tape, &["pr", "checks", &pull.to_string(), "--json", "name,bucket,link"], Self::QUICK)?;
         let printed = ran.as_ref().and_then(Ran::printed);
-        Ok(printed.and_then(|read| serde_json::from_str(read.as_ref()).ignoring(Ignored::Unlisted)))
+        Ok(printed.and_then(|read| Json::read(read.as_ref()).ignoring(Ignored::Unlisted)))
     }
 
     pub fn gated(&self, tape: &Tape<'_>, head: CommitSha) -> Result<Option<CheckName>, Cut<UnreadStep>> {

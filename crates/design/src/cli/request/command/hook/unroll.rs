@@ -4,7 +4,6 @@ use std::path::{Component, Path, PathBuf};
 
 use file_ports::{Files, Kind};
 use grammar::shell::{Deletion, Directory, Edit, Edited, Editor, Plain, Target, Unreadable};
-use serde::Deserialize;
 use store_ports::Store;
 
 use super::super::Ground;
@@ -14,7 +13,7 @@ use super::reply::{Hook, Reply};
 use crate::cli::failure::Failure;
 use crate::{HookEvent, Outcome};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct Running {
     #[serde(default)]
     cwd: PathBuf,
@@ -22,7 +21,7 @@ pub struct Running {
     tool: Tool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 #[serde(tag = "tool_name", content = "tool_input")]
 enum Tool {
     Bash(Input),
@@ -30,7 +29,7 @@ enum Tool {
     SendMessage(Brief),
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, serde::Deserialize)]
 struct Input {
     #[serde(default)]
     command: Option<String>,

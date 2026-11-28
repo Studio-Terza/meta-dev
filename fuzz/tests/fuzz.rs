@@ -141,8 +141,13 @@ impl Input {
         .into_iter()
         .collect();
         let mut err = Vec::new();
-        let verdict =
-            Cli::from_args([OsString::from(ROOT)]).verdict(&files, Monotonic::default(), &mut Vec::new(), &mut err);
+        let verdict = Cli::from_args([OsString::from(ROOT)]).verdict(
+            &files,
+            Path::new(""),
+            Monotonic::default(),
+            &mut Vec::new(),
+            &mut err,
+        );
         Run { verdict, err }
     }
 

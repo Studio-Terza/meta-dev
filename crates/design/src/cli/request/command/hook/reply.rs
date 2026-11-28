@@ -1,9 +1,7 @@
 use console_ports::{Heard, Shown};
 use file_ports::Files;
+use json_ports::{Decode, Fields, Json};
 use newtype::Wrapping;
-use serde::Serialize;
-use serde::de::DeserializeOwned;
-use serde_json::{Map, Value};
 use store_ports::Store;
 
 use super::super::Ground;
@@ -12,9 +10,9 @@ use crate::cli::failure::Failure;
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
 
-pub trait Hook: DeserializeOwned {
+pub trait Hook: Decode {
     fn heard(heard: Heard) -> Result<Self, Failure> {
-        serde_json::from_str(&heard.into_inner()).map_err(Failure::Unheard)
+        Json::read(&heard.into_inner()).map_err(Failure::Unheard)
     }
 
     fn answered<F: Files + Clone, S: Store>(
@@ -24,15 +22,15 @@ pub trait Hook: DeserializeOwned {
     ) -> Result<Reply<'_>, Failure>;
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 pub struct Told<'hook> {
     #[serde(flatten)]
     said: Telling,
     #[serde(flatten)]
-    rest: &'hook Map<String, Value>,
+    rest: &'hook Fields,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Telling {
     Prompt(String),
@@ -47,7 +45,7 @@ pub enum Reply<'hook> {
     Rewrite { input: Told<'hook> },
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 #[serde(untagged)]
 enum Envelope<'reply> {
     Decided {
@@ -60,13 +58,13 @@ enum Envelope<'reply> {
     },
 }
 
-#[derive(Clone, Copy, Debug, Serialize)]
+#[derive(Clone, Copy, Debug, serde::Serialize)]
 enum Decision {
     #[serde(rename = "block")]
     Block,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 #[serde(untagged)]
 enum Specific<'reply> {
     Denied {
@@ -85,14 +83,14 @@ enum Specific<'reply> {
     },
 }
 
-#[derive(Clone, Copy, Debug, Serialize)]
+#[derive(Clone, Copy, Debug, serde::Serialize)]
 enum Permission {
     #[serde(rename = "deny")]
     Deny,
 }
 
 impl<'hook> Told<'hook> {
-    pub fn new(said: Telling, rest: &'hook Map<String, Value>) -> Told<'hook> {
+    pub fn new(said: Telling, rest: &'hook Fields) -> Told<'hook> {
         Told { said, rest }
     }
 }
@@ -102,7 +100,7 @@ impl Reply<'_> {
         self.envelope().map_or_else(
             || Ok(Uttered::silent(Ok(self.outcome()))),
             |envelope| {
-                let json = serde_json::to_string(&envelope).map_err(Failure::Render)?;
+                let json = Json::written(&envelope).map_err(Failure::Render)?;
                 Ok(Uttered::new(Shown::said(format_args!("{json}\n")), Ok(self.outcome())))
             },
         )

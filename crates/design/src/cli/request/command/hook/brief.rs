@@ -1,8 +1,7 @@
 use design_messages::OwnerHistory;
 use file_ports::Files;
 use invariants::Ignoring;
-use serde::Deserialize;
-use serde_json::{Map, Value};
+use json_ports::{Fields, Lenient};
 use store_ports::Store;
 use transcript_ports::Body;
 
@@ -15,24 +14,20 @@ use crate::cli::failure::Failure;
 use crate::cli::request::ignored::Ignored;
 use crate::{HookEvent, Outcome};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct Brief {
     #[serde(flatten)]
     said: Said,
     #[serde(flatten)]
-    rest: Map<String, Value>,
+    rest: Fields,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 enum Said {
     Prompt(Body),
-    Message(Message),
+    Message(Lenient<Body>),
 }
-
-#[derive(Debug, Deserialize)]
-#[serde(from = "Value")]
-struct Message(Option<Body>);
 
 impl Brief {
     pub fn told<F: Files + Clone, S: Store>(
@@ -59,7 +54,7 @@ impl Said {
     fn body(&self) -> Option<&Body> {
         match self {
             Said::Prompt(body) => Some(body),
-            Said::Message(Message(body)) => body.as_ref(),
+            Said::Message(body) => body.read(),
         }
     }
 
@@ -68,11 +63,5 @@ impl Said {
             Said::Prompt(_) => Telling::Prompt(text),
             Said::Message(_) => Telling::Message(text),
         }
-    }
-}
-
-impl From<Value> for Message {
-    fn from(message: Value) -> Message {
-        Message(serde_json::from_value(message).ignoring(Ignored::Structured))
     }
 }

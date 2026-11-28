@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-use serde::Serialize;
+use json_ports::Json;
 
 use crate::failure::Failure;
 use crate::kills::log::{Kind, Test};
@@ -15,7 +15,7 @@ pub(crate) struct Matrix {
     unviable: BTreeSet<Mutant>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 pub(crate) struct Report {
     caught: usize,
     unviable: usize,
@@ -28,7 +28,7 @@ pub(crate) struct Report {
     kills: Vec<Row>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 struct Row {
     test: Test,
     killed: Vec<Mutant>,
@@ -119,7 +119,7 @@ impl From<Matrix> for Report {
 
 impl Report {
     pub(crate) fn json(&self) -> Result<String, Failure> {
-        serde_json::to_string_pretty(self).map(|json| [json.as_str(), "\n"].concat()).map_err(Failure::Unserialized)
+        Json::pretty(self).map(|json| [json.as_str(), "\n"].concat()).map_err(Failure::Unserialized)
     }
 }
 

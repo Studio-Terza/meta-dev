@@ -62,7 +62,9 @@ impl Cache {
         let nested = fs::read_dir(directory)?
             .map(|entry| {
                 let path = entry?.path();
-                let fixture = path.file_name().filter(|name| *name == Cache::FIXTURES);
+                let fixture = path
+                    .file_name()
+                    .filter(|name| *name == Cache::FIXTURES || name.as_encoded_bytes().first() == Some(&b'.'));
                 let rust =
                     path.extension().filter(|extension| *extension == Cache::RUST).map(|_rust| vec![path.clone()]);
                 match (fixture, path.is_dir()) {

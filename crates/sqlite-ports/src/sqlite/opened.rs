@@ -2,9 +2,9 @@ mod connected;
 
 use std::path::Path;
 
+use digest_ports::Digested;
 use rusqlite::Connection;
 use rusqlite::config::DbConfig;
-use sha2::{Digest, Sha256};
 use store_ports::{Batch, Query, Schema, StoreFailure};
 
 use super::failed::{Unbuilt, Unexecuted, Unopened};
@@ -23,8 +23,7 @@ pub(super) struct Stamped {
 
 impl Stamped {
     pub(super) fn of<S: Schema>() -> Stamped {
-        let digest = Sha256::digest(S::SQL.as_bytes());
-        let [first, second, third, fourth, ..]: [u8; 32] = digest.into();
+        let [first, second, third, fourth, ..] = Digested::of(S::SQL.as_bytes()).bytes();
         Stamped { sql: S::SQL, stamp: i32::from_be_bytes([first, second, third, fourth]) }
     }
 }

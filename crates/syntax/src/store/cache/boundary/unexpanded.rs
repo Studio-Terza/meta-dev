@@ -1,7 +1,8 @@
 use std::fmt;
 use std::path::PathBuf;
 
-use sha2::{Digest, Sha256};
+use digest_ports::{Digested, Hex};
+use json_ports::JsonFailure;
 
 #[derive(Debug)]
 pub struct CacheFile(String);
@@ -15,14 +16,14 @@ pub enum Unexpanded {
     #[error("cannot read the cached query {}: {source}", path.display())]
     Unread { path: PathBuf, source: std::io::Error },
     #[error("cannot parse the cached query {}: {source}", path.display())]
-    Unparsed { path: PathBuf, source: serde_json::Error },
+    Unparsed { path: PathBuf, source: JsonFailure },
     #[error("the query takes {wanted} parameters but {given} are bound")]
     Unbound { wanted: usize, given: usize },
 }
 
 impl From<&str> for CacheFile {
     fn from(sql: &str) -> CacheFile {
-        CacheFile(hex::encode(Sha256::digest(sql.as_bytes())))
+        CacheFile(Hex::encoded(Digested::of(sql.as_bytes()).bytes()))
     }
 }
 

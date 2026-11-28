@@ -3,8 +3,7 @@ use std::path::Path;
 use design_messages::PullNumber;
 use dispatch_ports::{Ran, Timeout};
 use file_ports::{Bytes, Files, Kind};
-use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
+use json_ports::{Fields, Json, Opaque};
 use store_ports::Store;
 
 use super::super::super::Ground;
@@ -18,17 +17,17 @@ pub struct Installing {
     pull: PullNumber,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Printed {
-    hooks: Value,
+    hooks: Opaque,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, serde::Deserialize, serde::Serialize)]
 struct Configured {
     #[serde(default)]
-    hooks: Value,
+    hooks: Opaque,
     #[serde(flatten)]
-    rest: Map<String, Value>,
+    rest: Fields,
 }
 
 impl Installing {
@@ -57,7 +56,7 @@ impl Installing {
         Ok(printed.and_then(|hooks| Self::hooked(ground, hooks).ok_or(InstallStep::Settings)))
     }
 
-    fn printed(self, tape: &Tape<'_>, workspace: &Path) -> Result<Value, Cut<InstallStep>> {
+    fn printed(self, tape: &Tape<'_>, workspace: &Path) -> Result<Opaque, Cut<InstallStep>> {
         let checkout = Kept::Agents.within().join(format!("{}{}", Self::CHECKOUT, self.pull));
         let path = checkout.to_string_lossy();
         let quick = |program, arguments: &[&str], step| {
@@ -71,7 +70,7 @@ impl Installing {
         let removed = Self::ran(tape, Self::GIT, &["worktree", "remove", "--force", &path], workspace, Self::QUICK)?;
         built.and(removed.ok_or(InstallStep::Unchecked)).map_err(Cut::Failed)?;
         let printed = quick(Self::DESIGN, &["--workspace", Self::HERE, "hook", "--settings"], InstallStep::Print)?;
-        let settings: Printed = serde_json::from_str(&printed).map_err(|_unprinted| Cut::Failed(InstallStep::Print))?;
+        let settings: Printed = Json::read(&printed).map_err(|_unprinted| Cut::Failed(InstallStep::Print))?;
         Ok(settings.hooks)
     }
 
@@ -86,17 +85,16 @@ impl Installing {
         Ok(ran.as_ref().and_then(Ran::succeeded).map(|printed| AsRef::<str>::as_ref(printed).to_owned()))
     }
 
-    fn hooked<F: Files, S: Store>(ground: &Ground<'_, F, S>, hooks: Value) -> Option<()> {
+    fn hooked<F: Files, S: Store>(ground: &Ground<'_, F, S>, hooks: Opaque) -> Option<()> {
         let file = ground.settings();
         let configured: Configured = match ground.kind(&file) {
             Kind::Missing => Configured::default(),
             Kind::File | Kind::Directory | Kind::Link => {
                 let text = ground.files().read_text(&file).ignoring(Ignored::Unhooked)?;
-                serde_json::from_str(text.as_ref()).ignoring(Ignored::Unhooked)?
+                Json::read(text.as_ref()).ignoring(Ignored::Unhooked)?
             }
         };
-        let written =
-            serde_json::to_string_pretty(&Configured { hooks, rest: configured.rest }).ignoring(Ignored::Unhooked)?;
+        let written = Json::pretty(&Configured { hooks, rest: configured.rest }).ignoring(Ignored::Unhooked)?;
         ground.prepared(file.parent()?).ignoring(Ignored::Unhooked)?;
         ground.files().write(&file, Bytes::new(format!("{written}\n").into_bytes())).ignoring(Ignored::Unhooked)
     }

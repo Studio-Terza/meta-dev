@@ -5,8 +5,8 @@ use std::slice;
 
 use dispatch_ports::{Call, Clock, Deadline, Pause, Printed, Ran, Shell, Timeout, Wall};
 use invariants::Ignoring;
+use json_ports::Json;
 use newtype::Wrapping;
-use serde::Deserialize;
 
 use crate::cli::request::ignored::Ignored;
 
@@ -22,14 +22,14 @@ pub enum Asked {
     Paused(Pause),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize)]
 #[serde(from = "Recorded")]
 pub struct Answer {
     took: i64,
     ran: Vec<Option<Ran>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 enum Recorded {
     Succeeded(String),
     Failed(String),
@@ -59,13 +59,13 @@ pub struct Prompt(String);
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Reply(String);
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Envelope {
     subtype: Subtype,
     result: Option<String>,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 enum Subtype {
     #[serde(rename = "success")]
     Success,
@@ -212,7 +212,7 @@ impl<Shown: fmt::Display> From<&Shown> for Prompt {
 
 impl Reply {
     fn read(printed: &Printed) -> Option<Reply> {
-        let envelope: Envelope = serde_json::from_str(printed.as_ref()).ignoring(Ignored::Unreplied)?;
+        let envelope: Envelope = Json::read(printed.as_ref()).ignoring(Ignored::Unreplied)?;
         (envelope.subtype == Subtype::Success).then_some(envelope.result).flatten().map(Reply)
     }
 }

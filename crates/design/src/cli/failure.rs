@@ -3,8 +3,10 @@ use std::io;
 use std::path::PathBuf;
 
 use file_ports::FileFailure;
+use json_ports::JsonFailure;
 use port_core::{ReleaseFailures, Snapshot};
 use store_ports::{Busy, StoreFailure, Unlock};
+use toml_ports::TomlFailure;
 use transcript_ports::ReadFailure;
 
 use super::request::Asked;
@@ -33,19 +35,19 @@ pub enum Failure {
     #[error("cannot hear the hook input: {0}")]
     Deaf(#[source] io::Error),
     #[error("cannot read the hook input: {0}")]
-    Unheard(#[source] serde_json::Error),
+    Unheard(#[source] JsonFailure),
     #[error("cannot write the queue: {0}")]
     Unqueued(#[source] FileFailure),
     #[error("cannot write the queue: the workspace local.toml names no queue path")]
     Unplaced,
     #[error("the queue does not read as its typed TOML, so it is left as it is: {0}")]
-    Unparsed(#[source] toml::de::Error),
+    Unparsed(#[source] TomlFailure),
     #[error("cannot render the queue as TOML: {0}")]
-    Unwritten(#[source] toml::ser::Error),
+    Unwritten(#[source] TomlFailure),
     #[error("cannot read the user id that names the harness folder")]
     Unidentified,
     #[error("cannot render the hook settings: {0}")]
-    Render(#[source] serde_json::Error),
+    Render(#[source] JsonFailure),
     #[error("no answer is recorded for the call it made next")]
     Unanswered,
     #[error("a resource was not released cleanly: {0}")]

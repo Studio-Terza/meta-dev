@@ -4,25 +4,25 @@ use std::path::{Path, PathBuf};
 use grammar::Grammar;
 use grammar::repository::RepositoryName;
 use invariants::Ignoring;
-use serde::Deserialize;
+use toml_ports::Toml;
 
 use super::ignored::Ignored;
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, serde::Deserialize)]
 pub struct Local {
     repository: Option<Repository>,
     queue: Option<Rooted>,
     specs: Option<Rooted>,
 }
 
-#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(serde::Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(try_from = "String")]
 pub struct Repository {
     owner: String,
     name: String,
 }
 
-#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(serde::Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Rooted(PathBuf);
 
 #[derive(Debug, thiserror::Error)]
@@ -31,7 +31,7 @@ pub struct Unrepositoried;
 
 impl Local {
     pub fn written(text: &str) -> Local {
-        toml::from_str(text).ignoring(Ignored::Unconfigured).unwrap_or_default()
+        Toml::read(text).ignoring(Ignored::Unconfigured).unwrap_or_default()
     }
 
     pub fn repository(&self) -> Option<&Repository> {

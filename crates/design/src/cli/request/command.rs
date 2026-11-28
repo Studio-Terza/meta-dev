@@ -6,8 +6,8 @@ use std::path::PathBuf;
 
 use console_ports::{Environment, Heard, Shown};
 use file_ports::Files;
+use newtype::Enumerated;
 use store_ports::{Opens, Store};
-use strum::VariantArray;
 
 use super::Ground;
 use super::persistence::Persistence;
