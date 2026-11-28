@@ -1,4 +1,5 @@
 mod boundary;
+mod install;
 
 use std::path::{Path, PathBuf};
 
@@ -14,11 +15,12 @@ use super::super::Ground;
 use super::super::crew::Crew;
 use super::subagent::Hub;
 use crate::cli::failure::Failure;
-use crate::cli::request::{Held, Item, Local};
+use crate::cli::request::{Held, InstallStep, Item, Local, Queue};
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
 pub use boundary::Used;
 use boundary::{Checkout, Landed, State};
+use install::Installing;
 
 #[derive(Debug)]
 struct Releasing<'used, 'crew, C: Clock, G: Shell> {
@@ -31,6 +33,13 @@ struct Releasing<'used, 'crew, C: Clock, G: Shell> {
 enum Released {
     Removed,
     Untouched,
+}
+
+#[derive(Debug)]
+enum Landing {
+    Unmerged,
+    Unviewed(Holding),
+    Merged { released: Result<Released, Holding>, installed: Result<(), InstallStep> },
 }
 
 #[derive(Debug)]
@@ -60,16 +69,69 @@ impl Used {
         crew: &Crew<'_, C, G>,
     ) -> Result<Uttered, Failure> {
         let local = ground.local();
-        match (Releasing { crew, directory: self.directory(), pull }).released(&local) {
-            Ok(Released::Removed) => Ok(Uttered::silent(Ok(Outcome::Released))),
-            Ok(Released::Untouched) => Ok(Uttered::silent(Ok(Outcome::Hooked(HookEvent::PostToolUse)))),
-            Err(holding) => {
-                let file = local.queue().ok_or(Failure::Unplaced)?;
-                let worktree = holding.worktree.unwrap_or_else(|| self.directory().to_path_buf());
-                let item = Item::kept(worktree, holding.held, pull.into_inner());
-                ground.queued(file, &ground.queue(file)?.with(item))?;
-                Ok(Uttered::silent(Ok(Outcome::Escalated)))
+        let releasing = Releasing { crew, directory: self.directory(), pull };
+        let landing = match releasing.landed(&local) {
+            Ok(landed) => match landed.state() {
+                State::Merged => Landing::Merged {
+                    released: releasing.released(&landed),
+                    installed: Installing::new(crew, self.directory(), pull).installed(ground),
+                },
+                State::Open | State::Closed => Landing::Unmerged,
+            },
+            Err(holding) => Landing::Unviewed(holding),
+        };
+        let escalated = landing.escalated(self.directory(), pull);
+        match local.queue() {
+            Some(file) => {
+                let read = ground.queue(file)?;
+                let queue = escalated.iter().cloned().fold(landing.cleared(read.clone()), Queue::with);
+                (queue != read).then(|| ground.queued(file, &queue)).transpose()?;
+                Ok(())
             }
+            None => escalated.first().map_or(Ok(()), |_escalated| Err(Failure::Unplaced)),
+        }?;
+        Ok(Uttered::silent(Ok(landing.outcome())))
+    }
+}
+
+impl Landing {
+    fn escalated(&self, directory: &Path, pull: PullNumber) -> Vec<Item> {
+        let held = |holding: &Holding| {
+            let worktree = holding.worktree.clone().unwrap_or_else(|| directory.to_path_buf());
+            Item::kept(worktree, holding.held, pull.into_inner())
+        };
+        match self {
+            Landing::Unmerged => Vec::new(),
+            Landing::Unviewed(holding) => vec![held(holding)],
+            Landing::Merged { released, installed } => {
+                let kept = match released {
+                    Ok(_released) => None,
+                    Err(holding) => Some(held(holding)),
+                };
+                let uninstalled = match installed {
+                    Ok(()) => None,
+                    Err(step) => Some(Item::uninstalled(pull.into_inner(), *step)),
+                };
+                kept.into_iter().chain(uninstalled).collect()
+            }
+        }
+    }
+
+    fn cleared(&self, queue: Queue) -> Queue {
+        match self {
+            Landing::Merged { installed: Ok(()), .. } => queue.installed(),
+            Landing::Merged { installed: Err(_), .. } | Landing::Unmerged | Landing::Unviewed(_) => queue,
+        }
+    }
+
+    fn outcome(&self) -> Outcome {
+        match self {
+            Landing::Unmerged => Outcome::Hooked(HookEvent::PostToolUse),
+            Landing::Unviewed(_)
+            | Landing::Merged { released: Err(_), .. }
+            | Landing::Merged { installed: Err(_), .. } => Outcome::Escalated,
+            Landing::Merged { released: Ok(Released::Removed), installed: Ok(()) } => Outcome::Released,
+            Landing::Merged { released: Ok(Released::Untouched), installed: Ok(()) } => Outcome::Installed,
         }
     }
 }
@@ -78,16 +140,14 @@ impl<C: Clock, G: Shell> Releasing<'_, '_, C, G> {
     const PROGRAM: &'static str = "git";
     const QUICK: Timeout = Timeout::new(60);
 
-    fn released(&self, local: &Local) -> Result<Released, Holding> {
+    fn landed(&self, local: &Local) -> Result<Landed, Holding> {
         let repository = local.repository().ok_or(Holding::from(Held::NoRepository))?;
         let hub = Hub::new(self.crew, self.directory, repository);
-        let landed: Landed = hub.viewed(self.pull, "state,headRefName,headRefOid").ok_or(Held::Unviewed)?;
-        match landed.state() {
-            State::Merged => {
-                self.checkout(&landed)?.map_or(Ok(Released::Untouched), |found| self.freed(&landed, &found))
-            }
-            State::Open | State::Closed => Ok(Released::Untouched),
-        }
+        Ok(hub.viewed(self.pull, "state,headRefName,headRefOid").ok_or(Held::Unviewed)?)
+    }
+
+    fn released(&self, landed: &Landed) -> Result<Released, Holding> {
+        self.checkout(landed)?.map_or(Ok(Released::Untouched), |found| self.freed(landed, &found))
     }
 
     fn checkout(&self, landed: &Landed) -> Result<Option<Checkout>, Holding> {

@@ -87,7 +87,7 @@ $ hook --settings <
           {
             "type": "command",
             "command": "design --workspace \"$CLAUDE_PROJECT_DIR\" hook post-tool-use",
-            "timeout": 300
+            "timeout": 1800
           }
         ]
       }
@@ -1016,15 +1016,25 @@ Ok(Released) ExitCode(unix_exit_status(0)) ""
 +60 git worktree list --porcelain
 +60 git status --short in /work/wt-open-pr
 +60 git worktree remove /work/wt-open-pr
++120 git fetch origin main
++120 git worktree add --detach /home/work/.meta/agents/install-12 origin/main
++1200 cargo install --path crates/design --locked --force in /home/work/.meta/agents/install-12
++120 git worktree remove --force /home/work/.meta/agents/install-12
++120 design --workspace /home/work hook --settings
 $ hook post-tool-use < {"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"gh pr view 12 && echo merge 12"},"tool_name":"Bash","tool_response":{"stdout":""}}
 Ok(Hooked(PostToolUse)) ExitCode(unix_exit_status(0)) ""
 $ hook post-tool-use < {"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"cd /work && gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}
 Ok(Hooked(PostToolUse)) ExitCode(unix_exit_status(0)) ""
 +60 gh pr view 12 --json state,headRefName,headRefOid -R o/r
 $ hook post-tool-use < {"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"cd /work && gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}
-Ok(Hooked(PostToolUse)) ExitCode(unix_exit_status(0)) ""
+Ok(Installed) ExitCode(unix_exit_status(0)) ""
 +60 gh pr view 12 --json state,headRefName,headRefOid -R o/r
 +60 git worktree list --porcelain
++120 git fetch origin main
++120 git worktree add --detach /home/work/.meta/agents/install-12 origin/main
++1200 cargo install --path crates/design --locked --force in /home/work/.meta/agents/install-12
++120 git worktree remove --force /home/work/.meta/agents/install-12
++120 design --workspace /home/work hook --settings
 $ hook post-tool-use < {"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"cd /work && gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}
 Ok(Escalated) ExitCode(unix_exit_status(0)) ""
 +60 gh pr view 12 --json state,headRefName,headRefOid -R o/r
@@ -1032,22 +1042,42 @@ $ hook post-tool-use < {"cwd":"/work/agent","hook_event_name":"PostToolUse","ses
 Ok(Escalated) ExitCode(unix_exit_status(0)) ""
 +60 gh pr view 12 --json state,headRefName,headRefOid -R o/r
 +60 git worktree list --porcelain
++120 git fetch origin main
++120 git worktree add --detach /home/work/.meta/agents/install-12 origin/main
++1200 cargo install --path crates/design --locked --force in /home/work/.meta/agents/install-12
++120 git worktree remove --force /home/work/.meta/agents/install-12
++120 design --workspace /home/work hook --settings
 $ hook post-tool-use < {"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"cd /work && gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}
 Ok(Escalated) ExitCode(unix_exit_status(0)) ""
 +60 gh pr view 12 --json state,headRefName,headRefOid -R o/r
 +60 git worktree list --porcelain
 +60 git status --short in /work/wt-open-pr
++120 git fetch origin main
++120 git worktree add --detach /home/work/.meta/agents/install-12 origin/main
++1200 cargo install --path crates/design --locked --force in /home/work/.meta/agents/install-12
++120 git worktree remove --force /home/work/.meta/agents/install-12
++120 design --workspace /home/work hook --settings
 $ hook post-tool-use < {"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"cd /work && gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}
 Ok(Escalated) ExitCode(unix_exit_status(0)) ""
 +60 gh pr view 12 --json state,headRefName,headRefOid -R o/r
 +60 git worktree list --porcelain
 +60 git status --short in /work/wt-open-pr
++120 git fetch origin main
++120 git worktree add --detach /home/work/.meta/agents/install-12 origin/main
++1200 cargo install --path crates/design --locked --force in /home/work/.meta/agents/install-12
++120 git worktree remove --force /home/work/.meta/agents/install-12
++120 design --workspace /home/work hook --settings
 $ hook post-tool-use < {"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"cd /work && gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}
 Ok(Escalated) ExitCode(unix_exit_status(0)) ""
 +60 gh pr view 12 --json state,headRefName,headRefOid -R o/r
 +60 git worktree list --porcelain
 +60 git status --short in /work/wt-open-pr
 +60 git worktree remove /work/wt-open-pr
++120 git fetch origin main
++120 git worktree add --detach /home/work/.meta/agents/install-12 origin/main
++1200 cargo install --path crates/design --locked --force in /home/work/.meta/agents/install-12
++120 git worktree remove --force /home/work/.meta/agents/install-12
++120 design --workspace /home/work hook --settings
 queue:
 [[item]]
 
@@ -1083,6 +1113,119 @@ merged = 12
 path = "/work/wt-open-pr"
 held = "unremoved"
 merged = 12
+settings:
+{
+  "hooks": {
+    "Stop": []
+  }
+}
+
+## a merge installs design from merged main and writes only the hooks of the workspace settings, and each failed install step is queued until a later merge installs
+$ hook post-tool-use < {"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}
+Ok(Installed) ExitCode(unix_exit_status(0)) ""
++60 gh pr view 12 --json state,headRefName,headRefOid -R o/r
++60 git worktree list --porcelain
++120 git fetch origin main
++120 git worktree add --detach /home/work/.meta/agents/install-12 origin/main
++1200 cargo install --path crates/design --locked --force in /home/work/.meta/agents/install-12
++120 git worktree remove --force /home/work/.meta/agents/install-12
++120 design --workspace /home/work hook --settings
+$ hook post-tool-use < {"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}
+Ok(Escalated) ExitCode(unix_exit_status(0)) ""
++60 gh pr view 12 --json state,headRefName,headRefOid -R o/r
++60 git worktree list --porcelain
++120 git fetch origin main
+$ hook post-tool-use < {"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}
+Ok(Escalated) ExitCode(unix_exit_status(0)) ""
++60 gh pr view 12 --json state,headRefName,headRefOid -R o/r
++60 git worktree list --porcelain
++120 git fetch origin main
++120 git worktree add --detach /home/work/.meta/agents/install-12 origin/main
+$ hook post-tool-use < {"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}
+Ok(Escalated) ExitCode(unix_exit_status(0)) ""
++60 gh pr view 12 --json state,headRefName,headRefOid -R o/r
++60 git worktree list --porcelain
++120 git fetch origin main
++120 git worktree add --detach /home/work/.meta/agents/install-12 origin/main
++1200 cargo install --path crates/design --locked --force in /home/work/.meta/agents/install-12
++120 git worktree remove --force /home/work/.meta/agents/install-12
+$ hook post-tool-use < {"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}
+Ok(Escalated) ExitCode(unix_exit_status(0)) ""
++60 gh pr view 12 --json state,headRefName,headRefOid -R o/r
++60 git worktree list --porcelain
++120 git fetch origin main
++120 git worktree add --detach /home/work/.meta/agents/install-12 origin/main
++1200 cargo install --path crates/design --locked --force in /home/work/.meta/agents/install-12
++120 git worktree remove --force /home/work/.meta/agents/install-12
++120 design --workspace /home/work hook --settings
+$ hook post-tool-use < {"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}
+Ok(Hooked(PostToolUse)) ExitCode(unix_exit_status(0)) ""
++60 gh pr view 12 --json state,headRefName,headRefOid -R o/r
+$ hook stop < {"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}
+{"decision":"block","reason":"Nothing is running: no background shell or agent will wake you, so the turn has stalled.\nOpen items in the queue:\n- design not installed after #12 merged: the fetch step failed (closes when a later merge installs)\n- design not installed after #12 merged: the checkout step failed (closes when a later merge installs)\n- design not installed after #12 merged: the build step failed (closes when a later merge installs)\n- design not installed after #12 merged: the print step failed (closes when a later merge installs)\n"}
+Ok(Blocked) ExitCode(unix_exit_status(0)) ""
++60 gh pr list --state all --limit 100 --json number,state,title,headRefName,body -R o/r in /home/work/.meta/agents
+queue:
+[[item]]
+
+[item.uninstalled]
+merged = 12
+step = "fetch"
+
+[[item]]
+
+[item.uninstalled]
+merged = 12
+step = "checkout"
+
+[[item]]
+
+[item.uninstalled]
+merged = 12
+step = "build"
+
+[[item]]
+
+[item.uninstalled]
+merged = 12
+step = "print"
+settings:
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent|SendMessage"
+      }
+    ]
+  },
+  "env": {
+    "A": "1"
+  },
+  "permissions": {
+    "deny": [
+      "Monitor"
+    ]
+  }
+}
+
+## workspace settings that do not parse are left as they are and the install is queued
+$ hook post-tool-use < {"cwd":"/work/agent","hook_event_name":"PostToolUse","session_id":"s","tool_input":{"command":"gh pr merge 12 --merge -R o/r"},"tool_name":"Bash","tool_response":{"stdout":""}}
+Ok(Escalated) ExitCode(unix_exit_status(0)) ""
++60 gh pr view 12 --json state,headRefName,headRefOid -R o/r
++60 git worktree list --porcelain
++120 git fetch origin main
++120 git worktree add --detach /home/work/.meta/agents/install-12 origin/main
++1200 cargo install --path crates/design --locked --force in /home/work/.meta/agents/install-12
++120 git worktree remove --force /home/work/.meta/agents/install-12
++120 design --workspace /home/work hook --settings
+queue:
+[[item]]
+
+[item.uninstalled]
+merged = 12
+step = "settings"
+settings:
+not json
 
 ## in-place edits anywhere, shell writes under a repository, and moves out of one are refused toward the edit tools
 $ hook pre-tool-use < {"cwd":"/work/agent","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"sed -i 's/a/b/' /tmp/x"},"tool_name":"Bash"}

@@ -74,6 +74,8 @@ enum Tool {
     #[default]
     Gh,
     Git,
+    Cargo,
+    Design,
     Claude,
 }
 
@@ -120,7 +122,9 @@ impl Scripted {
 
     fn answers(&self, call: &Call, spoken: &str) -> Option<()> {
         match self.tool {
-            Tool::Gh | Tool::Git => (spoken == format!("{} {}", self.tool.program(), self.asked)).then_some(()),
+            Tool::Gh | Tool::Git | Tool::Cargo | Tool::Design => {
+                (spoken == format!("{} {}", self.tool.program(), self.asked)).then_some(())
+            }
             Tool::Claude => (call.program() == Tool::Claude.program()
                 && call.input().is_some_and(|fed| fed.contains(&self.asked)))
             .then_some(()),
@@ -133,6 +137,8 @@ impl Tool {
         match self {
             Tool::Gh => "gh",
             Tool::Git => "git",
+            Tool::Cargo => "cargo",
+            Tool::Design => "design",
             Tool::Claude => "claude",
         }
     }
@@ -279,6 +285,7 @@ struct Story {
     name: String,
     local: Option<String>,
     queue: Option<String>,
+    settings: Option<String>,
     spec: Option<String>,
     #[serde(default)]
     transcript: Vec<[String; 3]>,
@@ -387,6 +394,10 @@ impl Home {
         Path::new(ROOT).join("placed")
     }
 
+    fn settings() -> PathBuf {
+        Home::workspace().join(".claude/settings.local.json")
+    }
+
     fn slug() -> String {
         Letters::slugged(&Home::workspace().to_string_lossy())
     }
@@ -419,6 +430,11 @@ impl Home {
         let placed = self.real(&Home::placed());
         fs::write(self.real(&Home::workspace().join(".meta/local.toml")), story.local.as_deref().unwrap_or(LOCAL))?;
         story.queue.as_ref().map_or(Ok(()), |queue| fs::write(placed.join("queue.toml"), queue))?;
+        story.settings.as_ref().map_or(Ok(()), |settings| {
+            let file = self.real(&Home::settings());
+            fs::create_dir_all(file.with_file_name(""))?;
+            fs::write(file, settings)
+        })?;
         story.spec.as_ref().map_or(Ok(()), |spec| {
             fs::create_dir_all(placed.join("specs"))?;
             fs::write(placed.join("specs/tools-retirement.md"), spec)
@@ -564,7 +580,11 @@ impl Story {
             Ok(queued) => format!("queue:\n{queued}"),
             Err(_absent) => String::new(),
         };
-        Ok(format!("## {}\n{}{queue}\n", self.name, steps.concat()))
+        let settings = match fs::read_to_string(home.real(&Home::settings())) {
+            Ok(written) => format!("settings:\n{written}"),
+            Err(_absent) => String::new(),
+        };
+        Ok(format!("## {}\n{}{queue}{settings}\n", self.name, steps.concat()))
     }
 }
 

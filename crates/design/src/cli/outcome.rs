@@ -9,4 +9,5 @@ pub enum Outcome {
     Briefed,
     Escalated,
     Released,
+    Installed,
 }

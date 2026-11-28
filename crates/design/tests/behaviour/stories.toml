@@ -727,6 +727,11 @@ HEAD 0123456789abcdef0123456789abcdef01234567
 branch refs/heads/design/open-pr
 """ },
   { tool = "git", asked = "status --short", ran = "Succeeded", printed = "" },
+  { tool = "git", asked = "fetch origin main", ran = "Succeeded" },
+  { tool = "git", asked = "worktree add --detach /home/work/.meta/agents/install-12 origin/main", ran = "Succeeded" },
+  { tool = "cargo", asked = "install --path crates/design --locked --force", ran = "Succeeded" },
+  { tool = "git", asked = "worktree remove --force /home/work/.meta/agents/install-12", ran = "Succeeded" },
+  { tool = "design", asked = "--workspace /home/work hook --settings", ran = "Succeeded", printed = '{"hooks":{"Stop":[]}}' },
 ]
 
 [[story.step]]
@@ -794,6 +799,73 @@ used = "cd /work && gh pr merge 12 --merge -R o/r"
 answers = [
   { tool = "git", asked = "worktree remove /work/wt-open-pr", ran = "Failed", printed = "" },
 ]
+
+[[story]]
+name = "a merge installs design from merged main and writes only the hooks of the workspace settings, and each failed install step is queued until a later merge installs"
+queue = "[[item]]\nuninstalled = { merged = 11, step = \"build\" }\n"
+settings = '{"env":{"A":"1"},"hooks":{"Stop":"old"},"permissions":{"deny":["Monitor"]}}'
+answers = [
+  { asked = "pr view 12 --json state,headRefName,headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"MERGED"}' },
+  { tool = "git", asked = "worktree list --porcelain", ran = "Succeeded", printed = "" },
+  { tool = "git", asked = "fetch origin main", ran = "Succeeded" },
+  { tool = "git", asked = "worktree add --detach /home/work/.meta/agents/install-12 origin/main", ran = "Succeeded" },
+  { tool = "cargo", asked = "install --path crates/design --locked --force", ran = "Succeeded" },
+  { tool = "git", asked = "worktree remove --force /home/work/.meta/agents/install-12", ran = "Succeeded" },
+  { tool = "design", asked = "--workspace /home/work hook --settings", ran = "Succeeded", printed = '{"hooks":{"PreToolUse":[{"matcher":"Agent|SendMessage"}]}}' },
+]
+
+[[story.step]]
+used = "gh pr merge 12 --merge -R o/r"
+
+[[story.step]]
+used = "gh pr merge 12 --merge -R o/r"
+answers = [
+  { tool = "git", asked = "fetch origin main", ran = "Failed" },
+]
+
+[[story.step]]
+used = "gh pr merge 12 --merge -R o/r"
+answers = [
+  { tool = "git", asked = "worktree add --detach /home/work/.meta/agents/install-12 origin/main", ran = "Failed" },
+]
+
+[[story.step]]
+used = "gh pr merge 12 --merge -R o/r"
+answers = [
+  { tool = "cargo", asked = "install --path crates/design --locked --force", ran = "Failed", printed = "error: could not compile `design`" },
+]
+
+[[story.step]]
+used = "gh pr merge 12 --merge -R o/r"
+answers = [
+  { tool = "design", asked = "--workspace /home/work hook --settings", ran = "Succeeded", printed = "not json" },
+]
+
+[[story.step]]
+used = "gh pr merge 12 --merge -R o/r"
+answers = [
+  { asked = "pr view 12 --json state,headRefName,headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"OPEN"}' },
+]
+
+[[story.step]]
+stop = {}
+
+[[story]]
+name = "workspace settings that do not parse are left as they are and the install is queued"
+queue = ""
+settings = "not json\n"
+answers = [
+  { asked = "pr view 12 --json state,headRefName,headRefOid -R o/r", ran = "Succeeded", printed = '{"headRefName":"design/open-pr","headRefOid":"0123456789abcdef0123456789abcdef01234567","state":"MERGED"}' },
+  { tool = "git", asked = "worktree list --porcelain", ran = "Succeeded", printed = "" },
+  { tool = "git", asked = "fetch origin main", ran = "Succeeded" },
+  { tool = "git", asked = "worktree add --detach /home/work/.meta/agents/install-12 origin/main", ran = "Succeeded" },
+  { tool = "cargo", asked = "install --path crates/design --locked --force", ran = "Succeeded" },
+  { tool = "git", asked = "worktree remove --force /home/work/.meta/agents/install-12", ran = "Succeeded" },
+  { tool = "design", asked = "--workspace /home/work hook --settings", ran = "Succeeded", printed = '{"hooks":{}}' },
+]
+
+[[story.step]]
+used = "gh pr merge 12 --merge -R o/r"
 
 [[story]]
 name = "in-place edits anywhere, shell writes under a repository, and moves out of one are refused toward the edit tools"

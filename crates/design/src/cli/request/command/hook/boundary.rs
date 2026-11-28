@@ -149,7 +149,7 @@ impl Settings {
                 Some(Tool::Briefs) => 300,
                 Some(Tool::Bash) | None => 30,
             },
-            HookEvent::PostToolUse => 300,
+            HookEvent::PostToolUse => 1800,
         }
     }
 
