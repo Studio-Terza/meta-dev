@@ -13,6 +13,7 @@ bench = false
 [dependencies]
 pipeline = { path = "../pipeline" }
 port-core = { path = "../port-core" }
+syntax = { path = "../syntax" }
 
 [lints]
 workspace = true

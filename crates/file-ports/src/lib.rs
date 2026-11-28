@@ -12,6 +12,7 @@ mod size;
 mod stamps;
 mod tail;
 mod text;
+mod tree;
 
 pub use absent::Absent;
 pub use bytes::Bytes;
@@ -26,3 +27,4 @@ pub use size::Size;
 pub use stamps::{Epoch, Stamp, Stamps};
 pub use tail::Tail;
 pub use text::Text;
+pub use tree::Disked;

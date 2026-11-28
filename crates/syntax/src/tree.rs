@@ -42,6 +42,10 @@ impl Tree {
         inside.take_while(move |path| path.starts_with(directory))
     }
 
+    pub fn inside(&self) -> impl Iterator<Item = &Path> {
+        self.below(&self.canonical).filter_map(|path| path.strip_prefix(&self.canonical).ignoring(Ignored::Outside))
+    }
+
     pub(crate) fn manifests(&self) -> impl Iterator<Item = &Path> {
         self.texts.keys().map(PathBuf::as_path).filter(|path| path.file_name() == Some(OsStr::new(Tree::MANIFEST)))
     }

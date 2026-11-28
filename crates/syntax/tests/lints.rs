@@ -1,8 +1,8 @@
 use std::fmt;
 use std::path::Path;
 
+use design::{Lint, Verdict};
 use file_ports::{Disk, Files};
-use lint::{Cli, Verdict};
 use test_failure::{Failed, Golden};
 use timer_ports::Monotonic;
 
@@ -29,7 +29,7 @@ impl Linted {
     fn of(fixture: &Path) -> Result<Linted, Failed> {
         let mut out = Vec::new();
         let mut err = Vec::new();
-        let verdict = Cli::from_args([]).verdict(&Disk, fixture, Monotonic::default(), &mut out, &mut err);
+        let verdict = Lint::from_args([]).verdict(&Disk, fixture, Monotonic::default(), &mut out, &mut err);
         Ok(Linted { verdict, out: String::from_utf8(out)?, err: String::from_utf8(err)? })
     }
 }

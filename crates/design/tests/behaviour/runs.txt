@@ -1,9 +1,4 @@
-$ lint skipped
-Clean
---- out
-test budget: 0 of 1 lines are tests, at most 18% may be
---- err
-$ lint workspace
+$ design lint workspace
 Violations
 --- out
 --- err
@@ -37,14 +32,14 @@ workspace/app/src/lib.rs:14: test code in src; move it to the package's tests di
 shipped code has no test-only API:
 workspace/app/Cargo.toml:5: test feature mock-data; remove the feature and test through the API every build has
 test budget: 36 of 80 lines are tests, at most 18% may be; cut test lines or test through fewer, table-driven cases
-$ lint /nowhere bad_manifest/notes
+$ design lint /nowhere bad_manifest/notes
 Refused
 --- out
 test budget: 0 of 0 lines are tests, at most 18% may be
 --- err
 cannot read /nowhere: No such file or directory (os error 2)
 no Rust sources found under bad_manifest/notes
-$ lint workspace/app workspace/store-ports
+$ design lint workspace/app workspace/store-ports
 Violations
 --- out
 --- err

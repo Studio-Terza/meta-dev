@@ -1,39 +1,48 @@
+mod ignored;
+
 use std::ffi::OsString;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use file_ports::Files;
+use file_ports::{Disked, Files};
 use invariants::Ignoring;
 use pipeline::Measure;
 use port_core::Run;
 use syntax::{Judged, Pool, Shown};
-use timer_ports::TimerFiller;
+use timer_ports::{Timed, TimerFiller};
 
-use crate::disk::{Disked, Timed};
-use crate::ignored::Ignored;
-
+use ignored::Ignored;
 pub use syntax::Verdict;
 
 #[derive(Debug)]
-pub struct Cli {
+pub struct Lint {
     roots: Vec<PathBuf>,
     shown: Shown,
 }
 
-impl Cli {
+impl Lint {
+    const LINT: &'static str = "lint";
     const TIMINGS: &'static str = "--timings";
     const CURRENT: &'static str = ".";
 
-    pub fn from_args(arguments: impl IntoIterator<Item = OsString>) -> Cli {
+    #[must_use]
+    pub fn asked(arguments: &[OsString]) -> Option<Lint> {
+        match arguments {
+            [first, rest @ ..] if first == Lint::LINT => Some(Lint::from_args(rest.iter().cloned())),
+            [..] => None,
+        }
+    }
+
+    pub fn from_args(arguments: impl IntoIterator<Item = OsString>) -> Lint {
         let given: Vec<OsString> = arguments.into_iter().collect();
-        let shown = given.iter().find(|argument| *argument == Cli::TIMINGS).map_or(Shown::Gate, |_| Shown::Timings);
+        let shown = given.iter().find(|argument| *argument == Lint::TIMINGS).map_or(Shown::Gate, |_| Shown::Timings);
         let named: Vec<PathBuf> =
-            given.iter().filter(|argument| *argument != Cli::TIMINGS).map(PathBuf::from).collect();
+            given.iter().filter(|argument| *argument != Lint::TIMINGS).map(PathBuf::from).collect();
         let roots = match named.first() {
             Some(_) => named,
-            None => vec![PathBuf::from(Cli::CURRENT)],
+            None => vec![PathBuf::from(Lint::CURRENT)],
         };
-        Cli { roots, shown }
+        Lint { roots, shown }
     }
 
     pub fn verdict(

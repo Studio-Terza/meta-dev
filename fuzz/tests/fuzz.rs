@@ -4,9 +4,9 @@ use std::iter;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
+use design::{Lint, Verdict};
 use file_ports::{Bytes, Memory};
 use invariants::{Ignoring, ignored};
-use lint::{Cli, Verdict};
 use proptest::collection::vec;
 use proptest::prelude::{BoxedStrategy, Strategy, any, prop_assert_eq, prop_oneof};
 use proptest::sample::{Index, select};
@@ -141,7 +141,7 @@ impl Input {
         .into_iter()
         .collect();
         let mut err = Vec::new();
-        let verdict = Cli::from_args([OsString::from(ROOT)]).verdict(
+        let verdict = Lint::from_args([OsString::from(ROOT)]).verdict(
             &files,
             Path::new(""),
             Monotonic::default(),

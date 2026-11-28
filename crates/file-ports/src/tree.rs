@@ -1,32 +1,24 @@
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
-use file_ports::{Files, Kind};
 use invariants::Ignoring;
-use syntax::{Clock, Failure, Tree};
-use timer_ports::{Moment, Timer};
+use syntax::{Failure, Tree};
 
 use crate::ignored::Ignored;
+use crate::{Files, Kind};
 
 #[derive(Debug)]
-pub(crate) struct Disked<'files, F>(&'files F);
-
-#[derive(Debug)]
-pub(crate) struct Timed<'timer, T> {
-    timer: &'timer T,
-    origin: Moment,
-}
+pub struct Disked<'files, F>(&'files F);
 
 impl<'files, F: Files> Disked<'files, F> {
     const HIDDEN: u8 = b'.';
 
-    pub(crate) fn new(files: &'files F) -> Disked<'files, F> {
+    pub fn new(files: &'files F) -> Disked<'files, F> {
         Disked(files)
     }
 
-    pub(crate) fn tree(&self, working: &Path, given: &Path) -> Result<Tree, Failure> {
+    pub fn tree(&self, working: &Path, given: &Path) -> Result<Tree, Failure> {
         let files = self.0;
         let canonical = files
             .canonical(&working.join(given))
@@ -66,17 +58,5 @@ impl<'files, F: Files> Disked<'files, F> {
                 }
             })
             .collect()
-    }
-}
-
-impl<'timer, T: Timer> Timed<'timer, T> {
-    pub(crate) fn new(timer: &'timer T) -> Timed<'timer, T> {
-        Timed { timer, origin: timer.now() }
-    }
-}
-
-impl<T: Timer> Clock for Timed<'_, T> {
-    fn now(&self) -> Duration {
-        self.timer.now().since(self.origin).into()
     }
 }

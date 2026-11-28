@@ -1,5 +1,10 @@
 use std::fmt::Display;
+use std::io::Write;
 use std::process::ExitCode;
+
+use invariants::Ignoring;
+
+use super::ignored::Ignored;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Shown(String);
@@ -45,6 +50,11 @@ impl Answer {
 
     pub fn code(&self) -> ExitCode {
         self.code
+    }
+
+    pub fn written(&self, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
+        let written = out.write_all(self.shown.0.as_bytes()).and_then(|()| err.write_all(self.complaint.0.as_bytes()));
+        written.ignoring(Ignored::Unwritable).map_or(ExitCode::FAILURE, |()| self.code)
     }
 }
 

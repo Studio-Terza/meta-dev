@@ -160,9 +160,11 @@ dependencies = [
  "sqlite-ports",
  "store-ports",
  "strum",
+ "syntax",
  "tempfile",
  "test-failure",
  "thiserror",
+ "timer-ports",
  "toml-ports",
  "transcript-ports",
 ]
@@ -263,6 +265,7 @@ dependencies = [
  "newtype",
  "pipeline",
  "proptest",
+ "syntax",
  "tempfile",
  "test-failure",
  "thiserror",
@@ -284,9 +287,9 @@ checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
 name = "fuzz"
 version = "0.1.0"
 dependencies = [
+ "design",
  "file-ports",
  "invariants",
- "lint",
  "proptest",
  "timer-ports",
 ]
@@ -406,20 +409,6 @@ checksum = "133c182a6a2c87864fe97778797e46c7e999672690dc9fa3ee8e241aa4a9c13f"
 dependencies = [
  "pkg-config",
  "vcpkg",
-]
-
-[[package]]
-name = "lint"
-version = "0.1.0"
-dependencies = [
- "console-ports",
- "file-ports",
- "invariants",
- "pipeline",
- "port-core",
- "syntax",
- "test-failure",
- "timer-ports",
 ]
 
 [[package]]
@@ -795,12 +784,12 @@ dependencies = [
 name = "syntax"
 version = "0.1.0"
 dependencies = [
+ "design",
  "digest-ports",
  "file-ports",
  "hex",
  "invariants",
  "json-ports",
- "lint",
  "pipeline",
  "proc-macro2",
  "quote",
@@ -867,6 +856,7 @@ version = "0.1.0"
 dependencies = [
  "pipeline",
  "port-core",
+ "syntax",
 ]
 
 [[package]]
