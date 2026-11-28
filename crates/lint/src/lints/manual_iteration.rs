@@ -22,7 +22,6 @@ pub(crate) struct ManualIteration {
 struct Counting {
     local: *const Local,
     init: *const Expr,
-    at: Count,
     calls: Count,
     reading: Reading,
 }
@@ -124,11 +123,9 @@ impl Hooks for ManualIteration {
     }
 
     fn local(&mut self, local: &Local) -> Descent {
-        let at = Count::counted(self.found.len());
         let counting = ManualIteration::mutable_init(local).map(|init| Counting {
             local,
             init,
-            at,
             calls: Count::default(),
             reading: Reading::Waiting,
         });
@@ -141,9 +138,9 @@ impl Hooks for ManualIteration {
             .counting
             .pop_if(|counting| ptr::eq(counting.local, local))
             .filter(|ended| ended.calls > Count::default());
-        counted.map_or_default(|ended| {
+        counted.map_or_default(|_ended| {
             let found = Found::spanned(local.span(), "mutable iterator local", ManualIteration::COUNTING_FIX);
-            self.found.insert(ended.at.number(), found);
+            self.found.push(found);
         });
     }
 

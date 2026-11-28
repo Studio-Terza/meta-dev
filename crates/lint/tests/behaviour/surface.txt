@@ -1,4 +1,4 @@
-test budget: 4 of 50 lines are tests, at most 18% may be
+test budget: 4 of 57 lines are tests, at most 18% may be
 free functions are not allowed; make them associated functions or methods:
 provider/src/inner.rs:9: fn own; make it an associated function or a method
 a crate exports exactly what another crate uses:

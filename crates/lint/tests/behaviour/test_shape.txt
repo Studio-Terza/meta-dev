@@ -1,10 +1,20 @@
 free functions are not allowed; make them associated functions or methods:
 tests/story.rs:14: fn helper; make it an associated function or a method
+primitives stay at the boundary: outside a module named boundary, signatures, fields and variants carry types with meaning:
+tests/shapes.rs:7: u32 in a field; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
+tests/shapes.rs:10: u8 in a type alias; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 tests run production code paths: no literals in a test body and no test helpers beyond a test table:
+tests/shapes.rs:2: test helper type Unmarked; test through the production code path; a test file holds tests and their table
+tests/shapes.rs:4: test helper type Helping; test through the production code path; a test file holds tests and their table
+tests/shapes.rs:6: test helper type Overlay; test through the production code path; a test file holds tests and their table
+tests/shapes.rs:10: test helper type Alias; test through the production code path; a test file holds tests and their table
+tests/shapes.rs:25: literal in test drawn; read expected values from a golden file and inputs from a fixture or a derived Arbitrary
+tests/shapes.rs:28: literal in test opened; read expected values from a golden file and inputs from a fixture or a derived Arbitrary
+tests/shapes.rs:32: literal in test nested; read expected values from a golden file and inputs from a fixture or a derived Arbitrary
 tests/story.rs:10: test helper type Helper; test through the production code path; a test file holds tests and their table
 tests/story.rs:12: literal in test constant LIMIT; read expected values from a golden file and inputs from a fixture or a derived Arbitrary
 tests/story.rs:14: test helper fn helper; test through the production code path; a test file holds tests and their table
 tests/story.rs:25: literal in test spelled_out; read expected values from a golden file and inputs from a fixture or a derived Arbitrary
 every pub item is named by another workspace crate:
 src/lib.rs:1: pub Shown is named by no other crate; make it private or delete it
-test budget: 28 of 29 lines are tests, at most 18% may be; cut test lines or test through fewer, table-driven cases
+test budget: 62 of 63 lines are tests, at most 18% may be; cut test lines or test through fewer, table-driven cases

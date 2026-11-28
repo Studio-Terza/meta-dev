@@ -75,10 +75,6 @@ impl Text {
 }
 
 impl Count {
-    pub(crate) fn counted(count: usize) -> Count {
-        Count(count)
-    }
-
     pub(crate) fn number(self) -> usize {
         self.0
     }
@@ -124,12 +120,6 @@ impl AsRef<str> for Word {
 impl PartialEq<str> for Name {
     fn eq(&self, other: &str) -> bool {
         self.0 == other
-    }
-}
-
-impl PartialEq<Ident> for Name {
-    fn eq(&self, ident: &Ident) -> bool {
-        ident == &self.0
     }
 }
 

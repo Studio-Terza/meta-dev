@@ -1,4 +1,4 @@
-test budget: 0 of 22 lines are tests, at most 18% may be
+test budget: 0 of 44 lines are tests, at most 18% may be
 free functions are not allowed; make them associated functions or methods:
 provider/src/lib.rs:12: fn spoken; make it an associated function or a method
 provider/src/lib.rs:16: fn kept; make it an associated function or a method
@@ -8,3 +8,4 @@ every pub item is named by another workspace crate:
 provider/src/lib.rs:8: pub Hidden is named by no other crate; make it private or delete it
 provider/src/lib.rs:10: pub Unused is named by no other crate; make it private or delete it
 provider/src/lib.rs:19: pub tested is named by no other crate; make it private or delete it
+provider/src/lib.rs:29: pub Decoyed is named by no other crate; make it private or delete it

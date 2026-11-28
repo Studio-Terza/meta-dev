@@ -1,8 +1,9 @@
-test budget: 0 of 30 lines are tests, at most 18% may be
+test budget: 0 of 35 lines are tests, at most 18% may be
 free functions are not allowed; make them associated functions or methods:
 src/accumulating.rs:1: fn f; make it an associated function or a method
 src/counter.rs:1: fn f; make it an associated function or a method
 src/filtered.rs:1: fn f; make it an associated function or a method
+src/held.rs:1: fn f; make it an associated function or a method
 src/mutable.rs:1: fn f; make it an associated function or a method
 src/working.rs:1: fn f; make it an associated function or a method
 a &mut Vec parameter lets any caller push without the checks; give the collection a type that owns its rules:
@@ -28,7 +29,8 @@ src/mutable.rs:1: u8 in a signature; take and return a newtype or a type that ca
 src/working.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 every pub item is named by another workspace crate:
 src/lib.rs:1: pub mutable is named by no other crate; make it private or delete it
-src/lib.rs:2: pub accumulating is named by no other crate; make it private or delete it
-src/lib.rs:3: pub filtered is named by no other crate; make it private or delete it
-src/lib.rs:4: pub counter is named by no other crate; make it private or delete it
-src/lib.rs:5: pub working is named by no other crate; make it private or delete it
+src/lib.rs:2: pub held is named by no other crate; make it private or delete it
+src/lib.rs:3: pub accumulating is named by no other crate; make it private or delete it
+src/lib.rs:4: pub filtered is named by no other crate; make it private or delete it
+src/lib.rs:5: pub counter is named by no other crate; make it private or delete it
+src/lib.rs:6: pub working is named by no other crate; make it private or delete it

@@ -1,6 +1,7 @@
-use std::{fmt, ptr};
+use std::fmt;
 
 use syn::spanned::Spanned;
+use syn::visit::{self, Visit};
 use syn::{
     Field, FnArg, GenericArgument, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, Macro, PathArguments, ReturnType,
     Signature, Type, TypePath, TypeTuple,
@@ -16,15 +17,10 @@ use crate::walk::{Descent, Expanded, Hooks};
 #[derive(Debug, Default)]
 pub(crate) struct TypeShape {
     found: Vec<Found>,
-    roots: Vec<Vec<*const Type>>,
-    open: Option<Root>,
 }
 
-#[derive(Clone, Copy, Debug)]
-struct Root {
-    at: *const Type,
-    line: Line,
-}
+#[derive(Debug, Default)]
+struct Shapes(Vec<Shape>);
 
 #[derive(Clone, Copy, Debug)]
 enum Shape {
@@ -54,21 +50,24 @@ impl TypeShape {
     const BOOL_FIX: Fix = Fix("a stored flag is a stored mode, make it an enum or a type parameter");
 
     fn rooted<'ty>(&mut self, roots: impl Iterator<Item = &'ty Type>) -> Descent {
-        self.roots.push(roots.map(ptr::from_ref).collect());
+        roots.for_each(|root| {
+            let mut shapes = Shapes::default();
+            shapes.visit_type(root);
+            let line = Line::of(root.span());
+            self.found.extend(shapes.0.into_iter().map(|shape| Found::at(line, shape, shape.fix())));
+        });
         Descent::Into
     }
 
-    fn unrooted(&mut self) {
-        self.roots.pop();
-    }
-
-    fn root(&self, ty: *const Type) -> Option<()> {
-        self.roots.iter().any(|frame| frame.contains(&ty)).then_some(())
-    }
-
-    fn shaped(&mut self, seen: Option<Shape>) {
-        let found = self.open.zip(seen).map(|(root, shape)| Found::at(root.line, shape, shape.fix()));
-        self.found.extend(found);
+    fn fielded<'field>(&mut self, given: impl Iterator<Item = &'field Field>) -> Descent {
+        let fields: Vec<&Field> = given.collect();
+        let flags =
+            fields.iter().filter(|field| TypeShape::last_named(&field.ty, Word("bool")).is_some()).map(|field| {
+                let span = field.ident.as_ref().map_or_else(|| field.ty.span(), syn::Ident::span);
+                Found::spanned(span, "bool field", TypeShape::BOOL_FIX)
+            });
+        self.found.extend(flags);
+        self.rooted(fields.into_iter().map(|field| &field.ty))
     }
 
     fn last_named(ty: &Type, name: Word) -> Option<()> {
@@ -78,6 +77,28 @@ impl TypeShape {
             }
             _ => None,
         }
+    }
+}
+
+impl<'ast> Visit<'ast> for Shapes {
+    fn visit_type_tuple(&mut self, tuple: &'ast TypeTuple) {
+        self.0.extend(tuple.elems.first().map(|_| Shape::Tuple));
+        visit::visit_type_tuple(self, tuple);
+    }
+
+    fn visit_type_path(&mut self, path: &'ast TypePath) {
+        let result = path.path.segments.last().filter(|segment| segment.ident == "Result");
+        let error = result
+            .and_then(|segment| match &segment.arguments {
+                PathArguments::AngleBracketed(arguments) => arguments.args.iter().nth(1),
+                PathArguments::None | PathArguments::Parenthesized(_) => None,
+            })
+            .and_then(|argument| match argument {
+                GenericArgument::Type(error) => TypeShape::last_named(error, Word("String")),
+                _ => None,
+            });
+        self.0.extend(error.map(|()| Shape::StringError));
+        visit::visit_type_path(self, path);
     }
 }
 
@@ -91,31 +112,19 @@ impl Hooks for TypeShape {
     }
 
     fn macro_called(&mut self, _: &Macro) -> Expanded {
-        self.open.map_or(Expanded::Statements, |_| Expanded::Nothing)
+        Expanded::Statements
     }
 
     fn item_struct(&mut self, item: &ItemStruct) -> Descent {
-        self.rooted(item.fields.iter().map(|field| &field.ty))
-    }
-
-    fn left_item_struct(&mut self, _: &ItemStruct) {
-        self.unrooted();
+        self.fielded(item.fields.iter())
     }
 
     fn item_enum(&mut self, item: &ItemEnum) -> Descent {
-        self.rooted(item.variants.iter().flat_map(|variant| variant.fields.iter()).map(|field| &field.ty))
-    }
-
-    fn left_item_enum(&mut self, _: &ItemEnum) {
-        self.unrooted();
+        self.fielded(item.variants.iter().flat_map(|variant| variant.fields.iter()))
     }
 
     fn item_type(&mut self, item: &ItemType) -> Descent {
         self.rooted([&*item.ty].into_iter())
-    }
-
-    fn left_item_type(&mut self, _: &ItemType) {
-        self.unrooted();
     }
 
     fn signature(&mut self, signature: &Signature) -> Descent {
@@ -128,49 +137,6 @@ impl Hooks for TypeShape {
             ReturnType::Default => None,
         };
         self.rooted(inputs.chain(output))
-    }
-
-    fn left_signature(&mut self, _: &Signature) {
-        self.unrooted();
-    }
-
-    fn field(&mut self, field: &Field) -> Descent {
-        let flag = self.root(ptr::from_ref(&field.ty)).and_then(|()| TypeShape::last_named(&field.ty, Word("bool")));
-        let span = field.ident.as_ref().map_or_else(|| field.ty.span(), syn::Ident::span);
-        self.found.extend(flag.map(|()| Found::spanned(span, "bool field", TypeShape::BOOL_FIX)));
-        Descent::Into
-    }
-
-    fn ty(&mut self, ty: &Type) -> Descent {
-        let at = ptr::from_ref(ty);
-        let opened = self.open.xor(Some(Root { at, line: Line::of(ty.span()) }));
-        self.open = self.open.or(opened.filter(|_| self.root(at).is_some()));
-        Descent::Into
-    }
-
-    fn left_ty(&mut self, ty: &Type) {
-        let closing = self.open.filter(|root| ptr::eq(root.at, ty));
-        self.open = self.open.xor(closing);
-    }
-
-    fn type_tuple(&mut self, tuple: &TypeTuple) -> Descent {
-        self.shaped(tuple.elems.first().map(|_| Shape::Tuple));
-        Descent::Into
-    }
-
-    fn type_path(&mut self, path: &TypePath) -> Descent {
-        let result = path.path.segments.last().filter(|segment| segment.ident == "Result");
-        let error = result
-            .and_then(|segment| match &segment.arguments {
-                PathArguments::AngleBracketed(arguments) => arguments.args.iter().nth(1),
-                PathArguments::None | PathArguments::Parenthesized(_) => None,
-            })
-            .and_then(|argument| match argument {
-                GenericArgument::Type(error) => TypeShape::last_named(error, Word("String")),
-                _ => None,
-            });
-        self.shaped(error.map(|()| Shape::StringError));
-        Descent::Into
     }
 }
 

@@ -1,4 +1,4 @@
-test budget: 0 of 57 lines are tests, at most 18% may be
+test budget: 0 of 65 lines are tests, at most 18% may be
 free functions are not allowed; make them associated functions or methods:
 src/dropped.rs:1: fn f; make it an associated function or a method
 src/early.rs:1: fn f; make it an associated function or a method
@@ -10,6 +10,8 @@ src/reassigned.rs:1: fn f; make it an associated function or a method
 src/reassigned.rs:6: fn g; make it an associated function or a method
 src/tail.rs:1: fn f; make it an associated function or a method
 control flow is an expression; every branch yields the value the function returns:
+src/defaulted.rs:3: mutable local that is only reassigned; a mutable binding is borrowed as &mut or has methods called on it
+src/defaulted.rs:4: assignment to a local; build the value in one expression or give its type an updater method
 src/dropped.rs:2: if or match whose value is dropped; let it produce the value the function returns
 src/early.rs:2: if or match whose value is dropped; let it produce the value the function returns
 src/early.rs:2: if without else yields nothing; use then_some, filter, or an else branch that produces the value
@@ -24,6 +26,7 @@ src/reassigned.rs:3: assignment to a local; build the value in one expression or
 src/reassigned.rs:7: mutable local that is only reassigned; a mutable binding is borrowed as &mut or has methods called on it
 src/reassigned.rs:8: compound assignment to a local; build the value in one expression or give its type an updater method
 primitives stay at the boundary: outside a module named boundary, signatures, fields and variants carry types with meaning:
+src/defaulted.rs:2: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 src/dropped.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 src/early.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
 src/early.rs:1: u8 in a signature; take and return a newtype or a type that carries meaning, or move the code into a module named boundary
@@ -37,7 +40,8 @@ every pub item is named by another workspace crate:
 src/lib.rs:1: pub early is named by no other crate; make it private or delete it
 src/lib.rs:2: pub loops is named by no other crate; make it private or delete it
 src/lib.rs:3: pub dropped is named by no other crate; make it private or delete it
-src/lib.rs:4: pub lonely is named by no other crate; make it private or delete it
-src/lib.rs:5: pub reassigned is named by no other crate; make it private or delete it
-src/lib.rs:6: pub tail is named by no other crate; make it private or delete it
-src/lib.rs:7: pub mutated is named by no other crate; make it private or delete it
+src/lib.rs:4: pub defaulted is named by no other crate; make it private or delete it
+src/lib.rs:5: pub lonely is named by no other crate; make it private or delete it
+src/lib.rs:6: pub reassigned is named by no other crate; make it private or delete it
+src/lib.rs:7: pub tail is named by no other crate; make it private or delete it
+src/lib.rs:8: pub mutated is named by no other crate; make it private or delete it

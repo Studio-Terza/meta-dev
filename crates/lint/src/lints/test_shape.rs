@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use proc_macro2::{Delimiter, Ident, Punct, Spacing, TokenStream, TokenTree};
+use proc_macro2::{Delimiter, Group, Ident, Punct, Spacing, TokenStream, TokenTree};
 use syn::visit::{self, Visit};
 use syn::{
     Attribute, ImplItemFn, ItemConst, ItemEnum, ItemFn, ItemMod, ItemStatic, ItemStruct, ItemTrait, ItemType,
@@ -52,6 +52,15 @@ enum Scan {
     Marked,
     Declared,
     Named(Ident),
+}
+
+#[derive(Debug)]
+enum Token {
+    Declaring,
+    Word(Ident),
+    Braced(TokenStream),
+    Bracketed(Group),
+    Other,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -142,25 +151,25 @@ impl TestShape {
     }
 
     fn scanned(&mut self, scan: Scan, tree: TokenTree) -> Scan {
-        match (scan, tree) {
-            (Scan::Named(name), TokenTree::Group(group)) if group.delimiter() == Delimiter::Brace => {
-                TestShape::tokens(group.stream()).map_or_default(|()| self.named_literal(&name));
+        match (scan, Token::from(tree)) {
+            (Scan::Named(name), Token::Braced(body)) => {
+                TestShape::tokens(body).map_or_default(|()| self.named_literal(&name));
                 Scan::Idle
             }
-            (Scan::Marked, TokenTree::Ident(ident)) if ident == TestShape::DECLARING => Scan::Declared,
-            (Scan::Declared, TokenTree::Ident(ident)) => Scan::Named(ident),
-            (Scan::Idle, TokenTree::Group(group)) if group.delimiter() == Delimiter::Brace => {
-                self.written(group.stream());
+            (Scan::Marked, Token::Declaring) => Scan::Declared,
+            (Scan::Declared, Token::Word(ident)) => Scan::Named(ident),
+            (Scan::Idle, Token::Braced(body)) => {
+                self.written(body);
                 Scan::Idle
             }
-            (waiting, TokenTree::Group(group)) if group.delimiter() == Delimiter::Bracket => {
+            (waiting, Token::Bracketed(group)) => {
                 let mark = TokenStream::from_iter([
                     TokenTree::Punct(Punct::new(TestShape::MARK, Spacing::Alone)),
                     TokenTree::Group(group),
                 ]);
                 TestMark::written(mark).iter().find_map(TestMark::on).map_or(waiting, |_| Scan::Marked)
             }
-            (waiting, _) => waiting,
+            (waiting, Token::Declaring | Token::Word(_) | Token::Braced(_) | Token::Other) => waiting,
         }
     }
 
@@ -196,6 +205,22 @@ impl TestShape {
             .into_iter()
             .find(|tree| matches!(tree, TokenTree::Ident(ident) if ident == TestShape::FIXTURE))
             .map(|_| ())
+    }
+}
+
+impl From<TokenTree> for Token {
+    fn from(tree: TokenTree) -> Token {
+        match tree {
+            TokenTree::Ident(ident) => Some(&ident)
+                .filter(|word| *word == TestShape::DECLARING)
+                .map_or(Token::Word(ident.clone()), |_| Token::Declaring),
+            TokenTree::Group(group) => match group.delimiter() {
+                Delimiter::Brace => Token::Braced(group.stream()),
+                Delimiter::Bracket => Token::Bracketed(group),
+                Delimiter::Parenthesis | Delimiter::None => Token::Other,
+            },
+            TokenTree::Punct(_) | TokenTree::Literal(_) => Token::Other,
+        }
     }
 }
 

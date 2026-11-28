@@ -55,6 +55,15 @@ verdict = "Violations"
 [package]
 name = "corpus"
 """
+"src/defaulted.rs" = """
+trait Defaulted {
+    fn reset(&self) -> u8 {
+        let mut kept = 0;
+        kept = 1;
+        kept
+    }
+}
+"""
 "src/dropped.rs" = """
 fn f(x: u8) {
     match x {
@@ -75,6 +84,7 @@ fn f(x: u8) -> u8 {
 pub mod early;
 pub mod loops;
 pub mod dropped;
+pub mod defaulted;
 pub mod lonely;
 pub mod reassigned;
 pub mod tail;
@@ -330,6 +340,7 @@ fn f(items: Vec<u8>, out: &mut Vec<u8>) {
 """
 "src/lib.rs" = """
 pub mod mutable;
+pub mod held;
 pub mod accumulating;
 pub mod filtered;
 pub mod counter;
@@ -339,6 +350,12 @@ pub mod working;
 fn f(items: Vec<u8>) {
     let mut walk = items.iter();
     walk.next();
+}
+"""
+"src/held.rs" = """
+fn f() {
+    let mut held = Vec::new();
+    held.iter();
 }
 """
 "src/working.rs" = """
@@ -718,6 +735,11 @@ macro_rules! made {
         $( provider::Transcribed::from($item) ),*
     };
 }
+macro_rules! flushed {
+    () => {
+        provider::Flushed::new(); $(x) ; provider::Followed::new();
+    };
+}
 """
 "consumer/src/main.rs" = """
 fn main() {
@@ -757,6 +779,8 @@ pub struct Crated;
 pub fn own() -> provider::Unnamed {
     provider::Unnamed
 }
+pub struct Flushed;
+pub struct Followed;
 """
 "provider/src/internal.rs" = """
 pub struct Internal;
@@ -766,7 +790,7 @@ mod inner;
 mod shared;
 pub mod shapes;
 pub(crate) mod internal;
-pub use inner::{Imported, Pathed, Renamed as Alias, Tested, Transcribed, Unnamed};
+pub use inner::{Imported, Pathed, Renamed as Alias, Tested, Transcribed, Unnamed, Flushed, Followed};
 pub use inner::*;
 use inner::Private;
 pub(crate) use inner::Crated;
@@ -1756,6 +1780,54 @@ name = "p"
 
 """
 
+[Lint.budget_gated]
+arguments = []
+verdict = "Violations"
+
+[Lint.budget_gated.files]
+"Cargo.toml" = """
+[package]
+name = "p"
+"""
+"src/lib.rs" = """
+#[cfg(test)]
+extern crate alloc
+    as allocated;
+#[cfg(test)]
+extern "C" {
+    fn probe();
+}
+#[cfg(test)]
+probed! {
+    fn probe() {}
+}
+#[cfg(test)]
+trait Probing =
+    Sized;
+trait Probe {
+    #[cfg(test)]
+    fn probe(&self)
+        -> Self;
+    #[cfg(test)]
+    type Probed
+        : Sized;
+}
+impl Probe for Probing {
+    #[cfg(test)]
+    type Probed =
+        Self;
+}
+#[cfg(test)]
+struct After {
+    first: Probing,
+}
+#[cfg(test)]
+mod nested {
+    #[cfg(test)]
+    struct Inner;
+}
+"""
+
 [Lint.budget_past]
 arguments = []
 verdict = "Violations"
@@ -1832,6 +1904,14 @@ name = "corpus"
 "src/lib.rs" = """
 mod boundary;
 mod meaning;
+mod inline;
+"""
+"src/inline.rs" = """
+mod boundary {
+    pub(crate) struct Inside(u8);
+}
+
+pub(crate) struct Outside(u8);
 """
 "src/boundary.rs" = """
 pub(crate) struct Seconds(u64);
@@ -1915,6 +1995,42 @@ fn spelled_out() {
     assert!(true);
 }
 """
+"tests/shapes.rs" = """
+#[serde(Fixture)]
+struct Unmarked;
+
+trait Helping {}
+
+union Overlay {
+    whole: u32,
+}
+
+type Alias = u8;
+
+const PLAIN: Option<Alias> = None;
+
+impl Unmarked {
+    const AFTER: usize = 2;
+
+    #[test]
+    fn inside() {}
+
+    const LATER: usize = 4;
+}
+
+proptest! {
+    #[test]
+    fn drawn() { assert!(1 > 0); }
+
+    #[test]
+    pub fn opened() { assert!(2 > 0); }
+
+    {
+        #[test]
+        fn nested() { assert!(3 > 0); }
+    }
+}
+"""
 
 [Lint.dead_code]
 arguments = ["."]
@@ -1949,6 +2065,26 @@ pub(crate) fn kept() {}
 
 #[test]
 pub fn tested() {}
+
+pub struct ByFn;
+
+pub struct ByType;
+
+pub struct ByConst;
+
+pub struct Formatted;
+
+pub struct Decoyed;
+
+pub trait Shaped {}
+
+impl Shaped for Used {
+    type Out = ByType;
+    const LIMIT: ByConst = ByConst;
+    fn made(&self) -> ByFn {
+        ByFn
+    }
+}
 """
 "consumer/Cargo.toml" = """
 [package]
@@ -1957,6 +2093,8 @@ name = "consumer"
 "consumer/src/main.rs" = """
 fn main() {
     let _ = provider::spoken();
+    let _ = format_ident!("Formatted");
+    let _ = concat!("Decoyed");
 }
 """
 [Lint.unwritable]
@@ -2020,7 +2158,7 @@ verdict = "Violations"
 [Lint.feature_only.files]
 "Cargo.toml" = """
 [workspace]
-members = ["app", "support", "base"]
+members = ["app", "support", "base", "helper"]
 """
 "app/Cargo.toml" = """
 [package]
@@ -2031,6 +2169,16 @@ support = { path = "../support", features = ["shipped"] }
 
 [dev-dependencies]
 support = { path = "../support", features = ["laws"] }
+helper = { path = "../helper" }
+"""
+"helper/Cargo.toml" = """
+[package]
+name = "helper"
+
+[dependencies]
+base = { path = "../base", features = ["unasked"] }
+"""
+"helper/src/lib.rs" = """
 """
 "app/src/main.rs" = """
 fn main() {}
