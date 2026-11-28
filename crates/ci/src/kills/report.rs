@@ -4,7 +4,6 @@ use std::fmt;
 use pipeline::{Edges, Measure};
 use serde::Serialize;
 
-use crate::failure::Failure;
 use crate::kills::log::{Kind, Test};
 use crate::kills::outcomes::{Fate, Mutant, Ran};
 
@@ -84,12 +83,6 @@ impl From<Matrix> for Report {
                 .map(|test| Row { test: test.clone(), killed: killed(test).into_iter().collect() })
                 .collect(),
         }
-    }
-}
-
-impl Report {
-    pub(crate) fn json(&self) -> Result<String, Failure> {
-        serde_json::to_string_pretty(self).map(|json| [json.as_str(), "\n"].concat()).map_err(Failure::Unserialized)
     }
 }
 

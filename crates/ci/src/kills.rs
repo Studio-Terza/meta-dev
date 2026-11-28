@@ -57,6 +57,7 @@ impl Pipeline for KillMatrix {
     }
 
     fn act(&self, report: Report) -> Result<Reported, Failure> {
-        Ok(Reported { json: report.json()?, summary: format!("{report}\n") })
+        let json = serde_json::to_string_pretty(&report).map_err(Failure::Unserialized)?;
+        Ok(Reported { json: [json.as_str(), "\n"].concat(), summary: format!("{report}\n") })
     }
 }

@@ -5,7 +5,7 @@ use std::process::ExitCode;
 
 use console_ports::Answer;
 use grammar::lines::{Fields, Lines};
-use pipeline::{Measure, Pipeline};
+use pipeline::Measure;
 use serde::Deserialize;
 
 use crate::failure::Failure;
@@ -26,30 +26,10 @@ struct Mutant {
     file: String,
 }
 
-#[derive(Debug)]
-struct Selection {
-    in_diff: BTreeSet<String>,
-    tested: BTreeSet<PathBuf>,
-}
-
 #[derive(Debug, Measure)]
 struct Partition {
     selected: Vec<Mutant>,
     unselected: Vec<Mutant>,
-}
-
-#[derive(Debug)]
-struct Sharded {
-    selected: usize,
-    shards: Shards,
-    unselected: Vec<Mutant>,
-}
-
-#[derive(Debug)]
-struct Planned {
-    unselected: String,
-    output: String,
-    shown: String,
 }
 
 #[derive(Debug)]
@@ -64,51 +44,23 @@ impl Plan {
 
     pub(crate) fn answered(&self) -> Result<Answer, Failure> {
         let workspace = Mutant::listed(&self.workspace)?;
-        let in_diff = Mutant::listed(&self.diff)?.into_iter().map(|mutant| mutant.name).collect();
-        let selection = Selection { in_diff, tested: Changed::tested(&Disk::read(&self.changed)?)? };
-        let planned = selection.run(workspace);
-        Disk::write(&self.unselected, &planned.unselected)?;
-        Disk::append(&self.output, &planned.output)?;
-        Ok(Answer::new(ExitCode::SUCCESS).showing(planned.shown))
-    }
-}
-
-impl Pipeline for Selection {
-    type Unit = Mutant;
-    type Parsed = Partition;
-    type Measured = Sharded;
-    type Act = Planned;
-
-    fn parsed(&self, mutant: Mutant) -> Partition {
-        let file = Path::new(&mutant.file);
-        let named = self.in_diff.get(&mutant.name).map(|_| ());
-        let chosen = named.or(self.tested.iter().find(|root| file.starts_with(root)).map(|_| ()));
-        match chosen {
-            Some(()) => Partition { selected: vec![mutant], unselected: Vec::new() },
-            None => Partition { selected: Vec::new(), unselected: vec![mutant] },
-        }
-    }
-
-    fn measured(&self, partition: Partition) -> Sharded {
-        let selected = partition.selected.len();
-        let shards = Shards(selected.div_ceil(Plan::PER_SHARD).max(1));
-        Sharded { selected, shards, unselected: partition.unselected }
-    }
-
-    fn act(&self, sharded: Sharded) -> Planned {
-        let Sharded { selected, shards, unselected } = sharded;
-        let count = selected + unselected.len();
-        let crates: Vec<String> = self.tested.iter().map(|path| path.display().to_string()).collect();
-        Planned {
-            unselected: unselected.iter().map(|mutant| [mutant.name.as_str(), "\n"].concat()).collect(),
-            output: format!("shards={shards}\n"),
-            shown: format!(
-                "mutants: every one in the crates whose tests changed: [{}]\nmutants: {selected} of {count} selected, {} in the diff; every one tested, in {} shards\n",
-                crates.join(", "),
-                self.in_diff.len(),
-                shards.0
-            ),
-        }
+        let in_diff: BTreeSet<String> = Mutant::listed(&self.diff)?.into_iter().map(|mutant| mutant.name).collect();
+        let tested = Changed::tested(&Disk::read(&self.changed)?)?;
+        let count = workspace.len();
+        let Partition { selected, unselected } =
+            Partition::total(workspace.into_iter().map(|mutant| mutant.parted(&in_diff, &tested)));
+        let shards = Shards(selected.len().div_ceil(Plan::PER_SHARD).max(1));
+        let names: String = unselected.iter().map(|mutant| [mutant.name.as_str(), "\n"].concat()).collect();
+        Disk::write(&self.unselected, &names)?;
+        Disk::append(&self.output, &format!("shards={shards}\n"))?;
+        let crates: Vec<String> = tested.iter().map(|path| path.display().to_string()).collect();
+        Ok(Answer::new(ExitCode::SUCCESS).showing(format_args!(
+            "mutants: every one in the crates whose tests changed: [{}]\nmutants: {} of {count} selected, {} in the diff; every one tested, in {} shards\n",
+            crates.join(", "),
+            selected.len(),
+            in_diff.len(),
+            shards.0
+        )))
     }
 }
 
@@ -116,6 +68,15 @@ impl Mutant {
     fn listed(path: &Path) -> Result<Vec<Mutant>, Failure> {
         let text = Disk::read(path)?;
         Ok(serde_json::Deserializer::from_str(&text).into_iter().next().unwrap_or_else(|| Ok(Vec::new()))?)
+    }
+
+    fn parted(self, in_diff: &BTreeSet<String>, tested: &BTreeSet<PathBuf>) -> Partition {
+        let file = Path::new(&self.file);
+        let named = in_diff.get(&self.name).map(|_| ());
+        match named.or(tested.iter().find(|root| file.starts_with(root)).map(|_| ())) {
+            Some(()) => Partition { selected: vec![self], unselected: Vec::new() },
+            None => Partition { selected: Vec::new(), unselected: vec![self] },
+        }
     }
 }
 
