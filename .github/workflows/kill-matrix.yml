@@ -9,8 +9,6 @@ on:
   schedule:
     - cron: "17 3 * * 0"
   workflow_dispatch:
-  push:
-    branches: [ci/kill-matrix]
 
 env:
   CARGO_TERM_COLOR: never
