@@ -120,4 +120,6 @@ shell = [
     "diff <(ls a) <(ls b)",
     "echo 'for' \\if \"done\"",
     "cd /w\ncargo build 2>&1 | tail -3",
+    "cd src* && echo a > x",
+    "find . -name *.o -print",
 ]

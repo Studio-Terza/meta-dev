@@ -132,8 +132,7 @@ impl Words {
         let unaimed = redirect.map(|_pending| Unreadable { span: Redirect::SPAN.to_owned() });
         let keyword = simple.keyword().map(|head| Unreadable { span: head.text.clone() });
         unaimed.or(keyword).map_or(Ok(()), Err)?;
-        let kept = (!simple.words.is_empty() || !simple.written.is_empty()).then_some(simple);
-        Ok(Words { read: read.into_iter().chain(kept).collect(), simple: Simple::default(), word, redirect: None })
+        Ok(Words { read: read.into_iter().chain([simple]).collect(), simple: Simple::default(), word, redirect: None })
     }
 
     fn ended(self) -> Result<Vec<Simple>, Unreadable> {
