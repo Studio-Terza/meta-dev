@@ -1,0 +1,72 @@
+name: seed
+
+# Builds on main exactly what ci's clippy and test jobs build, under their
+# target keys, so a pull request's first run starts from main's caches.
+# It times and judges nothing: a failure here is fix-forward, never a gate.
+# The env block must match ci.yml's, because the target key hashes it.
+
+on:
+  push:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -C link-arg=-fuse-ld=mold
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/toolchain
+      - uses: rui314/setup-mold@v1
+      - name: the target key, as ci's clippy job computes it
+        id: target
+        run: |
+          build=$({ cat rust-toolchain.toml; awk '/^\[/ { profile = /^\[profile/ } profile' Cargo.toml; env | grep -E '^(RUSTFLAGS|RUSTC_WRAPPER|CARGO_[A-Z_]+)=' | sort; } | sha256sum | cut -c1-64)
+          registry=$(grep -B2 '^source = ' Cargo.lock | sha256sum | cut -c1-64)
+          echo "prefix=clippy-${{ runner.os }}-$build-" >> "$GITHUB_OUTPUT"
+          echo "key=clippy-${{ runner.os }}-$build-$registry" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v4
+        with:
+          path: target
+          key: ${{ steps.target.outputs.key }}
+          restore-keys: ${{ steps.target.outputs.prefix }}
+      - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: target
+          key: ${{ steps.target.outputs.key }}
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/toolchain
+      - uses: rui314/setup-mold@v1
+      - name: the target key, as ci's test job computes it
+        id: target
+        run: |
+          build=$({ cat rust-toolchain.toml; awk '/^\[/ { profile = /^\[profile/ } profile' Cargo.toml; env | grep -E '^(RUSTFLAGS|RUSTC_WRAPPER|CARGO_[A-Z_]+)=' | sort; } | sha256sum | cut -c1-64)
+          registry=$(grep -B2 '^source = ' Cargo.lock | sha256sum | cut -c1-64)
+          echo "prefix=target-${{ runner.os }}-$build-" >> "$GITHUB_OUTPUT"
+          echo "key=target-${{ runner.os }}-$build-$registry" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v4
+        with:
+          path: target
+          key: ${{ steps.target.outputs.key }}
+          restore-keys: ${{ steps.target.outputs.prefix }}
+      - run: cargo test --locked --workspace --no-run
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: target
+          key: ${{ steps.target.outputs.key }}
