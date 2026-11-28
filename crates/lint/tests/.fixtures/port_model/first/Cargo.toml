@@ -3,6 +3,7 @@ name = "first"
 
 [dependencies]
 serde = "1"
+toml = "1"
 
 [lib]
 test = false

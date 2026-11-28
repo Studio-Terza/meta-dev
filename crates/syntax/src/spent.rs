@@ -34,8 +34,8 @@ impl Spent {
     }
 
     pub fn written(&self, out: &mut impl Write) -> io::Result<()> {
-        writeln!(out, "lint timings in milliseconds, each stage summed over files and threads:")?;
-        self.0.iter().try_for_each(|(stage, spent)| writeln!(out, "{:>7}  {stage}", spent.as_millis()))
+        writeln!(out, "lint timings in microseconds, each stage summed over files and threads:")?;
+        self.0.iter().try_for_each(|(stage, spent)| writeln!(out, "{:>10}  {stage}", spent.as_micros()))
     }
 }
 

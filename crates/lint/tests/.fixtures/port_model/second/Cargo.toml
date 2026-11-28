@@ -2,6 +2,7 @@
 name = "second"
 
 [dependencies]
+anyhow = "1"
 serde = "1"
 
 [dev-dependencies]

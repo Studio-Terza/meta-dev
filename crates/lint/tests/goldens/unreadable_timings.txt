@@ -1,0 +1,8 @@
+Refused
+--- out
+test budget: 0 of 0 lines are tests, at most 18% may be
+lint timings in microseconds, each stage summed over files and threads:
+some run: wall time of the whole run
+some find: read the tree once and list its packages and crate roots
+--- err
+cannot read /nowhere: No such file or directory (os error 2)

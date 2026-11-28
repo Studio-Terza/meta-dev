@@ -1,0 +1,16 @@
+[package]
+name = "skipped"
+
+[lib]
+test = false
+doctest = false
+bench = false
+
+[[bin]]
+name = "notes"
+path = "notes.txt"
+test = false
+doctest = false
+bench = false
+
+[workspace]

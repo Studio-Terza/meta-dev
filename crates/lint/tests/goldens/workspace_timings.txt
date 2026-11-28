@@ -1,11 +1,11 @@
 Violations
 --- out
-lint timings in milliseconds, each stage summed over files and threads:
-run: wall time of the whole run
-find: read the tree once and list its packages and crate roots
-parse: parse each file once
-visit: walk each file's tree once through every lint and the test budget
-reduce: join the graph lints' facts
+lint timings in microseconds, each stage summed over files and threads:
+some run: wall time of the whole run
+some find: read the tree once and list its packages and crate roots
+some parse: parse each file once
+some visit: walk each file's tree once through every lint and the test budget
+some reduce: join the graph lints' facts
 --- err
 free functions are not allowed; make them associated functions or methods:
 app/benches/timed.rs:1: fn timed; make it an associated function or a method

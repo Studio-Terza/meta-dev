@@ -30,8 +30,9 @@ struct Shown {
 #[derive(Debug)]
 struct Unwritable;
 
-const CASES: [Case<'static>; 4] = [
+const CASES: [Case<'static>; 5] = [
     Case { golden: "workspace_timings", fixture: "workspace", arguments: &["--timings", "."] },
+    Case { golden: "unreadable_timings", fixture: ALL, arguments: &["--timings", "/nowhere"] },
     Case { golden: "two_roots", fixture: "workspace", arguments: &["app", "store-ports"] },
     Case { golden: "mounted", fixture: ALL, arguments: &["no_dyn"] },
     Case { golden: "unreadable", fixture: ALL, arguments: &["/nowhere", "bad_manifest/notes"] },
@@ -97,8 +98,11 @@ impl Shown {
 
     fn unnumbered(line: &[char]) -> String {
         let timed = line.first().is_some_and(|first| *first == ' ' || first.is_ascii_digit());
-        let label = line.iter().skip_while(|letter| **letter == ' ' || letter.is_ascii_digit());
-        if timed { label.collect() } else { line.iter().collect() }
+        let numbered = |letter: &&char| **letter == ' ' || letter.is_ascii_digit();
+        let spent = line.iter().take_while(numbered).any(|letter| letter.is_ascii_digit() && *letter != '0');
+        let label: String = line.iter().skip_while(numbered).collect();
+        let shown = if spent { "some " } else { "none " };
+        if timed { [shown, &label].concat() } else { line.iter().collect() }
     }
 }
 
