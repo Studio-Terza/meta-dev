@@ -10,7 +10,7 @@ use proptest::option;
 use proptest::prelude::{any, prop_assert, prop_assert_eq, proptest};
 use proptest::test_runner::{Config, RngSeed};
 use sqlite_ports::SqliteOpener;
-use store_ports::{Batch, Busy, Column, ColumnFailure, Execute, Opens, Schema, Store, StoreFailure};
+use store_ports::{Batch, Busy, Column, ColumnFailure, Execute, Opens, Schema, Store, StoreFailure, Written};
 use tempfile::TempDir;
 use transcript_ports::{Authorship, Body, Cursor, Instant, SessionId, TaskId, Uuid};
 
@@ -29,42 +29,44 @@ struct HalfWritten;
 impl Batch for Resumed {
     type Failure = StoreFailure;
 
-    type Done = ();
+    type Done = Written;
 
-    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
-        statements.written(store_ports::query!(
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+        statements.written([store_ports::query!(
             r#"
 INSERT INTO
   cursors (session, read_to)
 VALUES
   ('s', 7)
 "#
-        ))
+        )])
     }
 }
 
 impl Batch for HalfWritten {
     type Failure = StoreFailure;
 
-    type Done = ();
+    type Done = Written;
 
-    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
-        statements.written(store_ports::query!(
-            r#"
+    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+        statements.written([
+            store_ports::query!(
+                r#"
 INSERT INTO
   cursors (session, read_to)
 VALUES
   ('s', 1)
 "#
-        ))?;
-        statements.written(store_ports::query!(
-            r#"
+            ),
+            store_ports::query!(
+                r#"
 INSERT INTO
   cursors (session, read_to)
 VALUES
   ('s', 2)
 "#
-        ))
+            ),
+        ])
     }
 }
 
@@ -106,7 +108,7 @@ fn a_store_opens_lazily_and_creates_its_directory_on_the_first_op() -> Result<()
     let run = Run::root();
     let store = run.port(place.opened());
     assert!(place.store().metadata().is_err());
-    store.write(Resumed)?;
+    assert_eq!(store.write(Resumed)?, Written::new(1));
     assert!(place.store().metadata().is_ok());
     assert!(place.store().with_file_name("design.sqlite-wal").metadata().is_ok());
     Ok(())
@@ -116,7 +118,7 @@ fn a_store_opens_lazily_and_creates_its_directory_on_the_first_op() -> Result<()
 fn reopening_a_store_under_its_own_schema_keeps_its_rows() -> Result<(), Failed> {
     let place = Place::new()?;
     let run = Run::root();
-    run.port(place.opened()).write(Resumed)?;
+    assert_eq!(run.port(place.opened()).write(Resumed)?, Written::new(1));
     let reopened = run.port(place.opened());
     assert_eq!(Place::cursor(&reopened)?, Cursor::new(Offset::try_new(7)?));
     Ok(())
@@ -126,10 +128,10 @@ fn reopening_a_store_under_its_own_schema_keeps_its_rows() -> Result<(), Failed>
 fn a_store_built_for_another_schema_is_emptied_and_rebuilt() -> Result<(), Failed> {
     let place = Place::new()?;
     let run = Run::root();
-    run.port(place.opened()).write(Resumed)?;
+    assert_eq!(run.port(place.opened()).write(Resumed)?, Written::new(1));
     let altered = run.port(place.opened_as::<Altered>());
     assert_eq!(Place::cursor(&altered)?, Cursor::default());
-    altered.write(Resumed)?;
+    assert_eq!(altered.write(Resumed)?, Written::new(1));
     let restored = run.port(place.opened());
     assert_eq!(Place::cursor(&restored)?, Cursor::default());
     Ok(())

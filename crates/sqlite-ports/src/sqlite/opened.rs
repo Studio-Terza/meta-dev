@@ -5,7 +5,7 @@ use std::path::Path;
 use rusqlite::Connection;
 use rusqlite::config::DbConfig;
 use sha2::{Digest, Sha256};
-use store_ports::{Batch, Created, Query, Record, Schema, StoreFailure};
+use store_ports::{Batch, Query, Schema, StoreFailure};
 
 use super::failed::{Unbuilt, Unexecuted, Unopened};
 pub(super) use connected::Connected;
@@ -61,10 +61,6 @@ impl Opened {
 
     pub(super) fn transacted<B: Batch>(&self, batch: B) -> Result<B::Done, B::Failure> {
         self.settled(|connected| batch.written(connected))
-    }
-
-    pub(super) fn created<R: Record>(&self, created: Created<R>) -> Result<R, StoreFailure> {
-        self.settled(|connected| created.stored(connected))
     }
 
     fn configured(connection: Connection) -> Result<Opened, StoreFailure> {

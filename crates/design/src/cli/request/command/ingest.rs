@@ -4,7 +4,7 @@ use std::fmt;
 use design_messages::{Cursors, SessionCursors, SessionRecords};
 use newtype::Wrapping;
 use pipeline::Measure;
-use store_ports::{Counted, Store, Written};
+use store_ports::{Store, Written};
 use transcript_ports::{Authorship, Cursor, Kind, Line, Session, SessionId, Transcripts};
 
 use crate::cli::Count;
@@ -62,7 +62,7 @@ impl<'ports, T: Transcripts, S: Store> Ingest<'ports, T, S> {
         let records = SessionRecords::read(&end.session, end.cursor, &lines);
         let authors = records.authors().collect();
         let unrecognised = records.unrecognised().to_vec();
-        let written = self.store.write(Counted::new(records))?;
+        let written = self.store.write(records)?;
         Ok(Ingested { end, authors, unrecognised, written })
     }
 }
