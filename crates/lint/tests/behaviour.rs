@@ -1,6 +1,6 @@
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
-use std::{ascii, env, iter};
+use std::{ascii, env, iter, mem};
 
 use dispatch_ports::{Call, Clock, Deadline, Shell, SystemClock, SystemShell, Timeout};
 use file_doubles::Memory;
@@ -19,17 +19,24 @@ use timer_ports::Stopped;
 #[derive(Fixture, Deserialize, Debug)]
 struct Sampled {
     drawn: NonZeroUsize,
+    kept: NonZeroUsize,
 }
 
 #[test]
 fn the_fuzz_generator_draws_the_workspaces_its_golden_lists() -> Result<(), Failed> {
     let drifted = Cases::<Sampled>::drifted(|case| {
         let mut runner = TestRunner::new(Properties::settled());
-        let drawn = iter::repeat_with(|| any::<Input>().new_tree(&mut runner).map(|tree| tree.current()))
+        let pool = iter::repeat_with(|| any::<Input>().new_tree(&mut runner).map(|tree| tree.current()))
             .take(case.row().drawn.get())
             .collect::<Result<Vec<Input>, _>>()?;
-        let rendered = drawn
+        let shapes = pool
             .iter()
+            .map(mem::discriminant)
+            .fold(Vec::new(), |seen, shape| if seen.contains(&shape) { seen } else { [seen, vec![shape]].concat() });
+        let drawn = shapes.iter().flat_map(|shape| {
+            pool.iter().filter(move |input| mem::discriminant(*input) == *shape).take(case.row().kept.get())
+        });
+        let rendered = drawn
             .map(|input| {
                 let run = Run::root();
                 let files = run.port(input.files());

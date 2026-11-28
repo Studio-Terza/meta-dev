@@ -16,5 +16,9 @@ newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 thiserror.workspace = true
 
+[dev-dependencies]
+fixture = { path = "../fixture" }
+serde.workspace = true
+
 [lints]
 workspace = true

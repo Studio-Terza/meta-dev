@@ -14,7 +14,6 @@ bench = false
 design-messages = { path = "../design-messages" }
 dispatch-doubles = { path = "../dispatch-doubles" }
 dispatch-ports = { path = "../dispatch-ports" }
-file-doubles = { path = "../file-doubles" }
 file-ports = { path = "../file-ports" }
 fixture = { path = "../fixture" }
 grammar-spec-line = { path = "../grammar-spec-line" }

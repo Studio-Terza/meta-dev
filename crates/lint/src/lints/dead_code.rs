@@ -228,11 +228,9 @@ impl Graphed {
     }
 
     fn grown(&self, alive: BTreeSet<At>) -> BTreeSet<At> {
-        let reached: BTreeSet<At> = self
-            .indexed()
-            .filter(|indexed| !alive.contains(&indexed.at()) && self.used(&alive, indexed.export()).is_some())
-            .map(Indexed::at)
-            .collect();
+        let used: BTreeSet<At> =
+            self.indexed().filter(|indexed| self.used(&alive, indexed.export()).is_some()).map(Indexed::at).collect();
+        let reached: Vec<At> = used.difference(&alive).copied().collect();
         match reached.first() {
             Some(_) => self.grown(alive.into_iter().chain(reached).collect()),
             None => alive,

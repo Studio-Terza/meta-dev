@@ -1,5 +1,6 @@
 [Sampled.sampled]
-drawn = 96
+drawn = 400
+kept = 16
 
 [[Binary]]
 program = "CARGO_BIN_EXE_lint"

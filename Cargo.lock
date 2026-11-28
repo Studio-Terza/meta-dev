@@ -224,9 +224,11 @@ dependencies = [
 name = "dispatch-ports"
 version = "0.1.0"
 dependencies = [
+ "fixture",
  "invariants",
  "newtype",
  "port-core",
+ "serde",
  "thiserror",
 ]
 
@@ -286,10 +288,13 @@ dependencies = [
 name = "file-ports"
 version = "0.1.0"
 dependencies = [
+ "file-doubles",
+ "fixture",
  "invariants",
  "newtype",
  "port-core",
  "serde",
+ "tempfile",
  "thiserror",
 ]
 
@@ -512,7 +517,6 @@ dependencies = [
  "design-messages",
  "dispatch-doubles",
  "dispatch-ports",
- "file-doubles",
  "file-ports",
  "fixture",
  "grammar-spec-line",
