@@ -2,6 +2,8 @@ use std::io;
 use std::path::PathBuf;
 use std::time::TryFromFloatSecsError;
 
+use dispatch_ports::DispatchFailure;
+use file_ports::FileFailure;
 use json_ports::JsonFailure;
 use toml_ports::TomlFailure;
 
@@ -12,9 +14,9 @@ pub(crate) enum Failure {
     )]
     Usage,
     #[error("cannot read {}: {source}", path.display())]
-    Unreadable { path: PathBuf, source: io::Error },
+    Unreadable { path: PathBuf, source: FileFailure },
     #[error("cannot write {}: {source}", path.display())]
-    Unwritable { path: PathBuf, source: io::Error },
+    Unwritable { path: PathBuf, source: FileFailure },
     #[error("cannot read the limits: {0}")]
     Limits(#[from] TomlFailure),
     #[error("the limits hold no stage named {0}")]
@@ -25,6 +27,8 @@ pub(crate) enum Failure {
     Unmarked(PathBuf),
     #[error("cannot start {program}: {source}")]
     Unstarted { program: String, source: io::Error },
+    #[error("{0}")]
+    Dispatched(DispatchFailure),
     #[error("cannot read the mutants: {0}")]
     Mutants(#[from] JsonFailure),
     #[error("cannot read the outcomes in {}: {source}", path.display())]

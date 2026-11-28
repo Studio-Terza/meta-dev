@@ -4,7 +4,7 @@ use std::io::{self, Write};
 use std::mem;
 
 use pipeline::Measure;
-use timer_ports::{Elapsed, Timer};
+use timer_ports::{Elapsed, Wall};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Stage {
@@ -19,10 +19,10 @@ pub(crate) enum Stage {
 pub(crate) struct Spent(BTreeMap<Stage, Elapsed>);
 
 impl Spent {
-    pub(crate) fn timed<Made>(&mut self, timer: &impl Timer, stage: Stage, work: impl FnOnce() -> Made) -> Made {
-        let start = timer.now();
+    pub(crate) fn timed<Made>(&mut self, stage: Stage, work: impl FnOnce() -> Made) -> Made {
+        let start = Wall::now();
         let made = work();
-        let spent = Spent(BTreeMap::from([(stage, timer.now().since(start))]));
+        let spent = Spent(BTreeMap::from([(stage, Wall::now().since(start))]));
         *self = mem::take(self).joined(spent);
         made
     }

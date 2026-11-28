@@ -22,7 +22,6 @@ console-ports = { path = "../console-ports" }
 file-ports = { path = "../file-ports" }
 invariants = { path = "../invariants" }
 pipeline = { path = "../pipeline" }
-port-core = { path = "../port-core" }
 proc-macro2.workspace = true
 rayon = "1.12.0"
 rustc_lexer.workspace = true

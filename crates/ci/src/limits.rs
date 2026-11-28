@@ -3,11 +3,14 @@ use std::fmt;
 use std::path::Path;
 use std::time::Duration;
 
+use dispatch_ports::Shell;
+use file_ports::Files;
 use pipeline::{Limit, Verdict};
+use timer_ports::{Clock, Elapsed};
 use toml_ports::Toml;
 
 use crate::failure::Failure;
-use crate::ports::Disk;
+use crate::ports::Ports;
 
 #[derive(Debug, serde::Deserialize)]
 struct Limits(BTreeMap<String, Stage>);
@@ -23,8 +26,12 @@ pub(crate) struct Stage {
 pub(crate) struct Took(Duration);
 
 impl Stage {
-    pub(crate) fn read(path: &Path, stage: &str) -> Result<Stage, Failure> {
-        let Limits(stages) = Toml::read(&Disk::read(path)?)?;
+    pub(crate) fn read(
+        ports: &Ports<'_, impl Files, impl Clock, impl Shell>,
+        path: &Path,
+        stage: &str,
+    ) -> Result<Stage, Failure> {
+        let Limits(stages) = Toml::read(&ports.read(path)?)?;
         stages.get(stage).copied().ok_or_else(|| Failure::Unlimited(stage.to_owned()))
     }
 
@@ -42,9 +49,9 @@ impl Stage {
     }
 }
 
-impl From<Duration> for Took {
-    fn from(spent: Duration) -> Took {
-        Took(spent)
+impl From<Elapsed> for Took {
+    fn from(spent: Elapsed) -> Took {
+        Took(Duration::from(spent))
     }
 }
 

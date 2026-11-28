@@ -5,7 +5,9 @@ use std::path::{Path, PathBuf};
 use invariants::Ignoring;
 
 use crate::ignored::Ignored;
-use crate::{Bytes, Epoch, FileFailure, Files, Kind, Offset, Size, Stamps, Text};
+use timer_ports::Wall;
+
+use crate::{Bytes, FileFailure, Files, Kind, Offset, Size, Stamps, Text};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Disk;
@@ -64,6 +66,6 @@ impl Files for Disk {
 
     fn stamps(&self, path: &Path) -> Result<Stamps, FileFailure> {
         let metadata = fs::metadata(path)?;
-        Ok(Stamps::new(Epoch::from(metadata.created()?), Epoch::from(metadata.modified()?)))
+        Ok(Stamps::new(Wall::from(metadata.created()?), Wall::from(metadata.modified()?)))
     }
 }

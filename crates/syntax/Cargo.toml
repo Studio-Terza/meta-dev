@@ -23,6 +23,7 @@ thiserror.workspace = true
 variant-ports = { path = "../variant-ports" }
 
 [dev-dependencies]
+console-ports = { path = "../console-ports" }
 hex.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

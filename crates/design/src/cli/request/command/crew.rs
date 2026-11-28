@@ -2,11 +2,13 @@ use std::cell::{Cell, RefCell};
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::slice;
+use std::time::Duration;
 
-use dispatch_ports::{Call, Clock, Deadline, Pause, Printed, Ran, Shell, Timeout, Wall};
+use dispatch_ports::{Call, Printed, Ran, Shell};
 use invariants::Ignoring;
 use json_ports::Json;
-use newtype::Wrapping;
+use pipeline::Measure;
+use timer_ports::{Clock, Deadline, Elapsed, Pause, Timeout, Wall};
 
 use crate::cli::request::ignored::Ignored;
 
@@ -25,7 +27,7 @@ pub enum Asked {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize)]
 #[serde(from = "Recorded")]
 pub struct Answer {
-    took: i64,
+    took: Elapsed,
     ran: Vec<Option<Ran>>,
 }
 
@@ -35,7 +37,7 @@ enum Recorded {
     Failed(String),
     Overdue,
     Unrun,
-    Paused(i64),
+    Paused(u64),
 }
 
 #[derive(Debug)]
@@ -91,7 +93,7 @@ impl<'ports, C: Clock, G: Shell> Crew<'ports, C, G> {
             ),
             Asked::Paused(pause) => (self.clock.paused(*pause), Vec::new()),
         };
-        Answer { took: after.into_inner().saturating_sub(before.into_inner()), ran }
+        Answer { took: after.since(before), ran }
     }
 }
 
@@ -115,8 +117,7 @@ impl<'heard> Tape<'heard> {
     }
 
     fn elapsed(start: Wall, heard: &[Answer]) -> Wall {
-        let took: i64 = heard.iter().map(|answer| answer.took).sum();
-        Wall::new(start.into_inner().saturating_add(took))
+        start.after(Elapsed::total(heard.iter().map(|answer| answer.took)))
     }
 
     pub fn now(&self) -> Wall {
@@ -193,13 +194,13 @@ impl<E> From<Asked> for Cut<E> {
 
 impl From<Recorded> for Answer {
     fn from(recorded: Recorded) -> Answer {
-        let ran = |ran: Option<Ran>| Answer { took: 0, ran: vec![ran] };
+        let ran = |ran: Option<Ran>| Answer { took: Elapsed::default(), ran: vec![ran] };
         match recorded {
             Recorded::Succeeded(printed) => ran(Some(Ran::Succeeded(Printed::new(printed)))),
             Recorded::Failed(printed) => ran(Some(Ran::Failed(Printed::new(printed)))),
             Recorded::Overdue => ran(Some(Ran::Overdue)),
             Recorded::Unrun => ran(None),
-            Recorded::Paused(took) => Answer { took, ran: Vec::new() },
+            Recorded::Paused(seconds) => Answer { took: Elapsed::from(Duration::from_secs(seconds)), ran: Vec::new() },
         }
     }
 }

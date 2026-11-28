@@ -1,7 +1,7 @@
 mod boundary;
 
 use design_messages::{Quote, Said};
-use dispatch_ports::Timeout;
+use timer_ports::Timeout;
 use transcript_ports::Body;
 
 use super::super::crew::{Asked, Prompt, Tape};

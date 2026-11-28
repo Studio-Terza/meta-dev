@@ -3,13 +3,15 @@ use std::iter;
 use std::os::unix::process::CommandExt;
 use std::process::{Child, ChildStdin, ChildStdout, Command, ExitStatus, Stdio};
 use std::thread::{self, JoinHandle};
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use invariants::Ignoring;
 use port_core::{Pass, Real};
+use timer_ports::{Deadline, Due, Wall};
 
 use crate::ignored::Ignored;
-use crate::{Call, Deadline, DispatchFailure, Due, Printed, Ran, ShellFiller, Wall, shell_ops};
+use crate::shell::Output;
+use crate::{Call, DispatchFailure, Printed, Ran, ShellFiller, shell_ops};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SystemShell;
@@ -37,14 +39,18 @@ impl SystemShell {
 
     fn started(call: &Call) -> Result<Running, DispatchFailure> {
         let input = call.input().map_or_else(Stdio::null, |_fed| Stdio::piped());
+        let [stdout, stderr] = match call.output() {
+            Output::Captured => [Stdio::piped(), Stdio::null()],
+            Output::Inherited => [Stdio::inherit(), Stdio::inherit()],
+        };
         let mut child = Command::new(call.program())
             .args(call.arguments())
             .current_dir(call.directory())
             .env(SystemShell::CURRENT, call.directory())
             .process_group(0)
             .stdin(input)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stdout(stdout)
+            .stderr(stderr)
             .spawn()
             .map_err(DispatchFailure::Spawn)?;
         call.input()
@@ -81,18 +87,17 @@ impl SystemShell {
     }
 
     fn waited(child: &mut Child, deadline: Deadline) -> Result<Waited, DispatchFailure> {
-        iter::repeat_with(|| Wall::from(SystemTime::now()))
+        iter::repeat_with(Wall::now)
             .take_while(|now| deadline.due(*now) == Due::Pending)
-            .find_map(|_| SystemShell::checked(child).transpose())
+            .find_map(|_| match child.try_wait() {
+                Ok(Some(status)) => Some(Ok(Waited::Exited(status))),
+                Ok(None) => {
+                    thread::sleep(SystemShell::POLL);
+                    None
+                }
+                Err(failure) => Some(Err(DispatchFailure::Collect(failure))),
+            })
             .unwrap_or(Ok(Waited::Overdue))
-    }
-
-    fn checked(child: &mut Child) -> Result<Option<Waited>, DispatchFailure> {
-        let exited = child.try_wait().map_err(DispatchFailure::Collect)?;
-        Ok(exited.map(Waited::Exited).or_else(|| {
-            thread::sleep(SystemShell::POLL);
-            None
-        }))
     }
 
     fn collected(reading: Option<JoinHandle<io::Result<String>>>) -> Result<Printed, DispatchFailure> {

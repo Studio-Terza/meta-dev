@@ -1,10 +1,11 @@
 use std::path::Path;
 
 use design_messages::PullNumber;
-use dispatch_ports::{Ran, Timeout};
+use dispatch_ports::Ran;
 use file_ports::{Bytes, Files, Kind};
 use json_ports::{Fields, Json, Opaque};
 use store_ports::Store;
+use timer_ports::Timeout;
 
 use super::super::super::Ground;
 use super::super::super::crew::{Asked, Cut, Tape};

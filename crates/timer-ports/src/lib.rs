@@ -1,9 +1,8 @@
+mod clock;
 mod elapsed;
-mod moment;
-mod monotonic;
-mod timer;
+mod ignored;
+mod wall;
 
+pub use clock::{Clock, ClockFiller, SystemClock, clock_ops};
 pub use elapsed::Elapsed;
-pub use moment::Moment;
-pub use monotonic::Monotonic;
-pub use timer::{Timer, TimerFiller};
+pub use wall::{Deadline, Due, Pause, Timeout, Wall};

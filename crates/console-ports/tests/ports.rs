@@ -2,11 +2,11 @@ use std::ffi::{OsStr, OsString};
 
 use std::process::ExitCode;
 
-use console_ports::{Answer, Complaint, Environment, Process, Shown, Variables};
+use console_ports::{Answer, Complaint, Environment, Inherited, Process, Shown, Variables};
 
 #[test]
 fn the_process_answers_with_its_arguments_and_the_answer_s_code() {
-    let expected = std::env::args_os().skip(1).collect::<Vec<OsString>>();
+    let expected = Inherited.arguments();
     let code = Process::tell(|arguments| Answer::new(ExitCode::from(u8::from(arguments != expected))));
     assert_eq!(code, ExitCode::SUCCESS);
     assert_eq!(Process::tell(|_| Answer::new(ExitCode::FAILURE)), ExitCode::FAILURE);

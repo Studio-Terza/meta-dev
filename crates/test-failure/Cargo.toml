@@ -11,6 +11,7 @@ doctest = false
 bench = false
 
 [dependencies]
+console-ports = { path = "../console-ports" }
 json-ports = { path = "../json-ports" }
 toml-ports = { path = "../toml-ports" }
 

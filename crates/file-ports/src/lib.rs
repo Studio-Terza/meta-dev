@@ -1,6 +1,5 @@
 mod absent;
 mod bytes;
-mod cached;
 mod disk;
 mod file_failure;
 mod files;
@@ -15,7 +14,6 @@ mod text;
 
 pub use absent::Absent;
 pub use bytes::Bytes;
-pub use cached::Cached;
 pub use disk::Disk;
 pub use file_failure::FileFailure;
 pub use files::Files;
@@ -23,6 +21,6 @@ pub use kind::Kind;
 pub use memory::Memory;
 pub use offset::Offset;
 pub use size::Size;
-pub use stamps::{Epoch, Stamp, Stamps};
+pub use stamps::{Stamp, Stamps};
 pub use tail::Tail;
 pub use text::Text;

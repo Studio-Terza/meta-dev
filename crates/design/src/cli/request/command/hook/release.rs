@@ -4,11 +4,12 @@ mod install;
 use std::path::{Path, PathBuf};
 
 use design_messages::PullNumber;
-use dispatch_ports::{Ran, Timeout};
+use dispatch_ports::Ran;
 use file_ports::Files;
 use grammar::git::Worktrees;
 use newtype::Wrapping;
 use store_ports::Store;
+use timer_ports::Timeout;
 
 use super::super::Ground;
 use super::super::crew::{Asked, Cut, Tape};

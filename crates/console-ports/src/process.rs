@@ -1,12 +1,11 @@
 mod ignored;
 
-use std::env;
 use std::ffi::{OsStr, OsString};
 use std::io::{self, Stderr, Stdout, Write};
 use std::process::ExitCode;
 
 use crate::process::ignored::Ignored;
-use crate::{Answer, Complaint, Environment, Heard, Shown, Variables};
+use crate::{Answer, Complaint, Environment, Heard, Inherited, Shown, Variables};
 use invariants::Ignoring;
 use port_core::Real;
 
@@ -17,11 +16,11 @@ impl Real for Process {}
 
 impl Process {
     pub fn stream<Ended>(respond: impl FnOnce(Vec<OsString>, &mut Stdout, &mut Stderr) -> Ended) -> Ended {
-        respond(env::args_os().skip(1).collect(), &mut io::stdout(), &mut io::stderr())
+        respond(Inherited.arguments(), &mut io::stdout(), &mut io::stderr())
     }
 
     pub fn tell(parse: impl FnOnce(Vec<OsString>) -> Answer) -> ExitCode {
-        Process::written(&parse(env::args_os().skip(1).collect()))
+        Process::written(&parse(Inherited.arguments()))
     }
 
     fn written(answer: &Answer) -> ExitCode {
@@ -36,11 +35,11 @@ impl Process {
 
 impl Environment for Process {
     fn variable(&self, name: &OsStr) -> Option<OsString> {
-        env::var_os(name)
+        Inherited.variable(name)
     }
 
     fn variables(&self) -> Variables {
-        env::vars_os().collect()
+        Inherited.variables()
     }
 
     fn input(&self) -> io::Result<Heard> {

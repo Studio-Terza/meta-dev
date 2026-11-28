@@ -3,12 +3,13 @@ use std::ffi::OsStr;
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 
-use file_ports::{Bytes, Epoch, Offset, Size, Stamp, Stamps, Tail};
+use file_ports::{Bytes, Offset, Size, Stamp, Stamps, Tail};
 use grammar::Grammar;
 use grammar::notice::TaskFile;
 use invariants::Ignoring;
 use newtype::Wrapping;
 use pipeline::Measure;
+use timer_ports::{Elapsed, Timeout, Wall};
 use transcript_ports::{Body, TaskId, Turn};
 
 use crate::cli::request::ignored::Ignored;
@@ -113,8 +114,8 @@ impl Runner {
         }
     }
 
-    fn status(self, ending: Option<Ended>, stamps: Stamps, now: Epoch) -> Status {
-        let within = |stamp: Stamp, limit: i64| now.into_inner() - stamps.dated(stamp).into_inner() < limit;
+    fn status(self, ending: Option<Ended>, stamps: Stamps, now: Wall) -> Status {
+        let within = |stamp: Stamp, limit: Timeout| now.since(stamps.dated(stamp)) < Elapsed::from(limit);
         let open = || {
             within(Stamp::from(self), Task::QUIET)
                 .then_some(Status::Live)
@@ -159,12 +160,12 @@ impl From<Runner> for Stamp {
 
 impl Task {
     const TRAILERS: [&'static str; 2] = ["[exited with code", "[killed]"];
-    const QUIET: i64 = 20 * 60;
-    const GONE: i64 = 60 * 60;
+    const QUIET: Timeout = Timeout::new(20 * 60);
+    const GONE: Timeout = Timeout::new(60 * 60);
     const CONTINUATION: u8 = 0b1100_0000;
     const FOLLOWER: u8 = 0b1000_0000;
 
-    pub fn new(Output { runner, name, .. }: Output, tail: &Bytes, stamps: Stamps, now: Epoch) -> Option<Task> {
+    pub fn new(Output { runner, name, .. }: Output, tail: &Bytes, stamps: Stamps, now: Wall) -> Option<Task> {
         let whole: Vec<u8> =
             tail.as_ref().iter().copied().skip_while(|byte| byte & Self::CONTINUATION == Self::FOLLOWER).collect();
         let text = String::from_utf8(whole).ignoring(Ignored::Untasked)?;

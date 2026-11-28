@@ -1,5 +1,5 @@
-# Calls the system shell runs together; tests/ran.txt holds what each returns.
-pause = 0
+# Calls the system shell runs together; tests/ran.txt holds what each returns. A call whose deadline
+# is already due is killed at once, however long it would run.
 
 [[call]]
 program = "sh"
@@ -18,8 +18,8 @@ arguments = ["-c", "cat; printf 'read nothing'"]
 seconds = 3
 
 [[call]]
-program = "sleep"
-arguments = ["2"]
+program = "tail"
+arguments = ["-f", "/dev/null"]
 seconds = 0
 
 [[call]]

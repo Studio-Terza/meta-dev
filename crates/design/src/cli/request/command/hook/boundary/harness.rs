@@ -2,8 +2,9 @@ mod boundary;
 
 use std::path::{Path, PathBuf};
 
-use file_ports::{Epoch, Files, Kind, Tail};
+use file_ports::{Files, Kind};
 use invariants::Ignoring;
+use timer_ports::Wall;
 
 use crate::cli::request::ignored::Ignored;
 pub use boundary::{Halt, Stopped, Tasks};
@@ -13,43 +14,31 @@ use boundary::{Output, Task};
 pub struct Harness<'files, F: Files> {
     files: &'files F,
     root: Option<&'files Path>,
-    now: Epoch,
+    now: Wall,
 }
 
 impl<'files, F: Files> Harness<'files, F> {
     const TASKS: &'static str = "tasks";
     const SUBAGENTS: &'static str = "subagents";
 
-    pub fn new(files: &'files F, root: Option<&'files Path>, now: Epoch) -> Harness<'files, F> {
+    pub fn new(files: &'files F, root: Option<&'files Path>, now: Wall) -> Harness<'files, F> {
         Harness { files, root, now }
     }
 
     pub fn tasks(&self, transcript: &Path) -> Tasks {
         let listed: Vec<PathBuf> = self
-            .files
-            .entries_many(&self.folders(transcript))
-            .into_iter()
-            .flat_map(|entries| entries.ignoring(Ignored::Untasked).unwrap_or_default())
+            .folders(transcript)
+            .iter()
+            .flat_map(|folder| self.files.entries(folder).ignoring(Ignored::Untasked).unwrap_or_default())
             .collect();
-        let outputs: Vec<Output> = listed.iter().filter_map(|path| Output::listed(path)).collect();
-        let sizes = self.files.sizes(&outputs);
-        let tailed: Vec<Option<Tail>> = sizes
-            .into_iter()
-            .zip(&outputs)
-            .map(|(size, output)| output.tailed(size.ignoring(Ignored::Untasked)?))
-            .collect();
-        let reads: Vec<Tail> = tailed.iter().flatten().cloned().collect();
-        let tails = self.files.read_tails(&reads);
-        let stamps = self.files.stamps_many(&reads);
-        outputs
-            .into_iter()
-            .zip(tailed)
-            .filter_map(|(output, tail)| tail.map(|_read| output))
-            .zip(tails)
-            .zip(stamps)
-            .filter_map(|((output, tail), stamped)| {
-                let read = tail.ignoring(Ignored::Untasked)?;
-                Task::new(output, &read, stamped.ignoring(Ignored::Untasked)?, self.now)
+        listed
+            .iter()
+            .filter_map(|path| Output::listed(path))
+            .filter_map(|output| {
+                let tail = output.tailed(self.files.size(output.as_ref()).ignoring(Ignored::Untasked)?)?;
+                let read = self.files.read_from(tail.as_ref(), tail.offset()).ignoring(Ignored::Untasked)?;
+                let stamped = self.files.stamps(tail.as_ref()).ignoring(Ignored::Untasked)?;
+                Task::new(output, &read, stamped, self.now)
             })
             .collect()
     }
@@ -63,13 +52,6 @@ impl<'files, F: Files> Harness<'files, F> {
             .zip(stem)
             .map(|((root, project), session)| root.join(project).join(session).join(Self::TASKS));
         let subagents = transcript.with_extension("").join(Self::SUBAGENTS);
-        let candidates: Vec<PathBuf> = tasks.into_iter().chain([subagents]).collect();
-        let kinds = self.files.kinds(&candidates);
-        candidates
-            .into_iter()
-            .zip(kinds)
-            .filter(|(_folder, kind)| *kind == Kind::Directory)
-            .map(|(folder, _kind)| folder)
-            .collect()
+        tasks.into_iter().chain([subagents]).filter(|folder| self.files.kind(folder) == Kind::Directory).collect()
     }
 }

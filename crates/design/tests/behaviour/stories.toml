@@ -88,6 +88,21 @@ input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s
 heard = ["Unrun"]
 
 [[story]]
+name = "a shell whose exit notice has scrolled out of its tail is still running"
+records = [
+  '{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}',
+  '{"message":{"content":[{"text":"Understood.","type":"text"}],"model":"claude"},"origin":null,"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"assistant","uuid":"p1"}',
+]
+shells = [
+  { file = "b2.output", text = "[exited with code 0]\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n" },
+]
+
+[[story.step]]
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false}'
+heard = ["Unrun"]
+
+[[story]]
 name = "an agent quiet under twenty minutes passes"
 records = [
   '{"message":{"content":"Merge only when CI is green.","model":"claude"},"origin":{"kind":"human"},"parentUuid":null,"sessionId":"s","timestamp":"2026-01-01T00:00:00Z","type":"user","uuid":"o1"}',

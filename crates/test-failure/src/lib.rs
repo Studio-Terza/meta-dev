@@ -1,10 +1,10 @@
-use std::env;
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
+use console_ports::Inherited;
 use json_ports::Decode;
 use toml_ports::Toml;
 
@@ -36,10 +36,10 @@ impl Machine {
     fn read() -> &'static Machine {
         static MACHINE: OnceLock<Machine> = OnceLock::new();
         MACHINE.get_or_init(|| {
-            let home = env::var_os(Machine::HOME).map(PathBuf::from);
-            let roots = home.into_iter().chain([env::temp_dir()]).map(|root| root.components().collect());
+            let home = Inherited.variable(OsStr::new(Machine::HOME)).map(PathBuf::from);
+            let roots = home.into_iter().chain([Inherited.temporary()]).map(|root| root.components().collect());
             Machine {
-                recording: env::var_os(Machine::RECORD),
+                recording: Inherited.variable(OsStr::new(Machine::RECORD)),
                 roots: roots.filter(|root: &PathBuf| root.parent().is_some()).collect(),
             }
         })

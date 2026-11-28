@@ -11,11 +11,11 @@ use test_failure::{Cases, Failed, Golden};
 
 use console_ports::{Complaint, Heard, Shown, Variables};
 use design::{Answer, Asked, Cli, Failure};
-use dispatch_ports::Wall;
 use grammar::letters::Letters;
 use newtype::Wrapping;
 use serde::Deserialize;
 use tempfile::TempDir;
+use timer_ports::Wall;
 
 use ports::Design;
 
@@ -72,12 +72,12 @@ struct Step {
 #[derive(Debug)]
 struct Home {
     directory: TempDir,
-    at: SystemTime,
+    at: Wall,
 }
 
 impl Home {
     fn new() -> Result<Home, Failed> {
-        let home = Home { directory: TempDir::new()?, at: SystemTime::now() };
+        let home = Home { directory: TempDir::new()?, at: Wall::now() };
         fs::create_dir_all(home.root().join(WORKSPACE).join(".meta"))?;
         fs::create_dir_all(home.root().join(PLACED))?;
         Ok(home)
@@ -135,7 +135,10 @@ impl Home {
         fs::create_dir_all(&folder)?;
         let written = folder.join(&task.file);
         fs::write(&written, &task.text)?;
-        File::options().write(true).open(&written)?.set_modified(self.at - Duration::from_mins(task.quiet))?;
+        File::options()
+            .write(true)
+            .open(&written)?
+            .set_modified(SystemTime::from(self.at) - Duration::from_mins(task.quiet))?;
         Ok(())
     }
 
@@ -154,7 +157,7 @@ impl Home {
             .hearing(Heard::new(step.input.clone()));
         let rooted = ["--workspace", WORKSPACE, "--harness", HARNESS].map(str::to_owned);
         let spoken = rooted.into_iter().chain(step.words.iter().cloned()).map(OsString::from);
-        let start = Wall::from(self.at);
+        let start = self.at;
         let uttered = Cli::new(&environment).recorded(spoken, start, &step.heard);
         let shown = AsRef::<Shown>::as_ref(&uttered).clone();
         let calls: String = AsRef::<[Asked]>::as_ref(&uttered).iter().map(|asked| self.call(start, asked)).collect();
@@ -178,7 +181,7 @@ impl Home {
                     let elsewhere = Some(shown).filter(|directory| *directory != Path::new(AGENT));
                     let place = elsewhere.map_or_else(String::new, |directory| format!(" in {}", directory.display()));
                     let fed = call.input().map_or_else(String::new, |prompt| format!(" fed:\n{prompt}\n"));
-                    let after = call.deadline().into_inner().into_inner() - start.into_inner();
+                    let after = Duration::from(call.deadline().into_inner().since(start)).as_secs();
                     format!("+{after} {}{place}{fed}\n", spoken.collect::<Vec<_>>().join(" "))
                 })
                 .collect::<Vec<String>>()

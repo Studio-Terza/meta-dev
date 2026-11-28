@@ -3,7 +3,9 @@ use std::path::{Path, PathBuf};
 use newtype::{Display, Newtype};
 use port_core::port;
 
-use crate::{Deadline, DispatchFailure};
+use timer_ports::Deadline;
+
+use crate::DispatchFailure;
 
 #[port]
 pub trait Shell {
@@ -14,11 +16,18 @@ pub trait Shell {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Call {
-    program: &'static str,
+    program: String,
     arguments: Vec<String>,
     directory: PathBuf,
     deadline: Deadline,
     fed: Option<String>,
+    output: Output,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Output {
+    Captured,
+    Inherited,
 }
 
 #[derive(Newtype, Display, Clone, Debug, Default, PartialEq, Eq)]
@@ -33,8 +42,8 @@ pub enum Ran {
 
 impl Call {
     #[must_use]
-    pub fn new(program: &'static str, arguments: Vec<String>, directory: PathBuf, deadline: Deadline) -> Call {
-        Call { program, arguments, directory, deadline, fed: None }
+    pub fn new(program: impl Into<String>, arguments: Vec<String>, directory: PathBuf, deadline: Deadline) -> Call {
+        Call { program: program.into(), arguments, directory, deadline, fed: None, output: Output::Captured }
     }
 
     #[must_use]
@@ -43,8 +52,17 @@ impl Call {
     }
 
     #[must_use]
-    pub fn program(&self) -> &'static str {
-        self.program
+    pub fn inherited(self) -> Call {
+        Call { output: Output::Inherited, ..self }
+    }
+
+    #[must_use]
+    pub fn program(&self) -> &str {
+        &self.program
+    }
+
+    pub(crate) fn output(&self) -> Output {
+        self.output
     }
 
     #[must_use]

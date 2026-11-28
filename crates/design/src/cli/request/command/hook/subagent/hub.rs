@@ -4,10 +4,11 @@ use std::num::{NonZeroU32, NonZeroU64};
 use std::path::Path;
 
 use design_messages::{CheckName, CommitSha, PullNumber};
-use dispatch_ports::{Deadline, Due, Pause, Ran, Timeout};
+use dispatch_ports::Ran;
 use grammar::spec_line::Attachment;
 use invariants::Ignoring;
 use json_ports::{Decode, Json};
+use timer_ports::{Deadline, Due, Pause, Timeout};
 
 use super::super::super::crew::{Asked, Cut, Tape};
 use super::boundary::{Branch, Branched, Compared, FailedJob, First, JobId, Opened, Pushed};

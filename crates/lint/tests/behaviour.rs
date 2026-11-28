@@ -7,7 +7,6 @@ use std::process::ExitCode;
 use file_ports::{Disk, Files};
 use lint::{Cli, Verdict};
 use test_failure::{Failed, Golden};
-use timer_ports::Monotonic;
 
 const FIXTURES: &str = "tests/.fixtures";
 const GOLDENS: &str = "tests/goldens";
@@ -70,7 +69,7 @@ mod ports {
 fn output_that_cannot_be_written_refuses_the_run() -> Result<(), Failed> {
     let mut err = Vec::new();
     let working = Case::fixture("budget_met");
-    let verdict = Cli::from_args([]).verdict(&Disk, &working, Monotonic::default(), &mut Unwritable, &mut err);
+    let verdict = Cli::from_args([]).verdict(&Disk, &working, &mut Unwritable, &mut err);
     assert_eq!((verdict, String::from_utf8(err)?), (Verdict::Refused, "cannot write the output: refused\n".to_owned()));
     Ok(())
 }
@@ -91,7 +90,7 @@ impl Shown {
         let mut out = Vec::new();
         let mut err = Vec::new();
         let given = arguments.iter().map(OsString::from);
-        let verdict = Cli::from_args(given).verdict(&Disk, working, Monotonic::default(), &mut out, &mut err);
+        let verdict = Cli::from_args(given).verdict(&Disk, working, &mut out, &mut err);
         Ok(Shown { verdict, out: String::from_utf8(out)?, err: String::from_utf8(err)? })
     }
 
