@@ -71,6 +71,51 @@
                         fed: None,
                     },
                     Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "pr",
+                            "edit",
+                            "12",
+                            "--remove-label",
+                            "mutants",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "pr",
+                            "edit",
+                            "12",
+                            "--add-label",
+                            "mutants",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
+                        after: 60,
+                        program: "gh",
+                        arguments: [
+                            "pr",
+                            "checks",
+                            "12",
+                            "--json",
+                            "name,bucket,link",
+                            "-R",
+                            "o/r",
+                        ],
+                        directory: "/work/agent",
+                        fed: None,
+                    },
+                    Asked {
                         after: 1200,
                         program: "gh",
                         arguments: [
@@ -79,21 +124,6 @@
                             "12",
                             "--watch",
                             "--fail-fast",
-                            "-R",
-                            "o/r",
-                        ],
-                        directory: "/work/agent",
-                        fed: None,
-                    },
-                    Asked {
-                        after: 70,
-                        program: "gh",
-                        arguments: [
-                            "pr",
-                            "checks",
-                            "12",
-                            "--json",
-                            "name,bucket,link",
                             "-R",
                             "o/r",
                         ],
@@ -117,7 +147,7 @@
                     },
                 ],
                 repeated: Count(
-                    3,
+                    4,
                 ),
                 last: Some(
                     Asked {

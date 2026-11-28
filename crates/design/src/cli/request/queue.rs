@@ -58,6 +58,7 @@ pub(crate) enum UnreadStep {
     Ending,
     Head,
     Mergeable,
+    Label,
     Overdue,
     Checks,
     NoRepository,
