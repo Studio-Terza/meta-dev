@@ -1,11 +1,10 @@
 use syn::spanned::Spanned;
 use syn::{FnArg, GenericArgument, ItemImpl, Macro, PathArguments, Signature, Type, TypePath};
 
-use crate::finding::{Findings, Found};
+use crate::finding::Found;
 use crate::gate::Gate;
 use crate::hooks::{Descent, Expanded, Hooks};
-use crate::lint::{Lint, Reads};
-use crate::source::Source;
+use crate::lint::style;
 
 #[derive(Debug, Default)]
 pub(crate) struct VecOutParams {
@@ -65,18 +64,8 @@ impl Hooks for VecOutParams {
     }
 }
 
-impl<'file> Lint<'file> for VecOutParams {
-    const HEADLINE: &'static str =
-        "a &mut Vec parameter lets any caller push without the checks; give the collection a type that owns its rules";
-    const READS: Reads = Reads::Ungated;
-
-    type Fact = Findings;
-
-    fn new(_: &'file Source) -> VecOutParams {
-        VecOutParams::default()
-    }
-
-    fn fact(self, source: &'file Source) -> Findings {
-        Findings::found(VecOutParams::HEADLINE, source.shown(), self.found)
-    }
-}
+style!(
+    VecOutParams,
+    Ungated,
+    "a &mut Vec parameter lets any caller push without the checks; give the collection a type that owns its rules"
+);

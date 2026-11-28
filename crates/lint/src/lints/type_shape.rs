@@ -6,11 +6,10 @@ use syn::{
     Signature, Type, TypePath, TypeTuple,
 };
 
-use crate::finding::{Findings, Found};
+use crate::finding::Found;
 use crate::gate::Gate;
 use crate::hooks::{Descent, Expanded, Hooks};
-use crate::lint::{Lint, Reads};
-use crate::source::Source;
+use crate::lint::style;
 
 #[derive(Debug, Default)]
 pub(crate) struct TypeShape {
@@ -167,18 +166,4 @@ impl Hooks for TypeShape {
     }
 }
 
-impl<'file> Lint<'file> for TypeShape {
-    const HEADLINE: &'static str =
-        "types carry their meaning: no bool fields, no tuples in signatures, no String errors";
-    const READS: Reads = Reads::Ungated;
-
-    type Fact = Findings;
-
-    fn new(_: &'file Source) -> TypeShape {
-        TypeShape::default()
-    }
-
-    fn fact(self, source: &'file Source) -> Findings {
-        Findings::found(TypeShape::HEADLINE, source.shown(), self.found)
-    }
-}
+style!(TypeShape, Ungated, "types carry their meaning: no bool fields, no tuples in signatures, no String errors");

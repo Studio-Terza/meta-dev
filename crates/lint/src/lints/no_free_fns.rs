@@ -1,9 +1,8 @@
 use syn::{ItemFn, Macro};
 
-use crate::finding::{Findings, Found};
+use crate::finding::Found;
 use crate::hooks::{Descent, Expanded, Hooks};
-use crate::lint::{Lint, Reads};
-use crate::source::Source;
+use crate::lint::style;
 
 #[derive(Debug, Default)]
 pub(crate) struct NoFreeFns {
@@ -40,17 +39,4 @@ impl Hooks for NoFreeFns {
     }
 }
 
-impl<'file> Lint<'file> for NoFreeFns {
-    const HEADLINE: &'static str = "free functions are not allowed; make them associated functions or methods";
-    const READS: Reads = Reads::Every;
-
-    type Fact = Findings;
-
-    fn new(_: &'file Source) -> NoFreeFns {
-        NoFreeFns::default()
-    }
-
-    fn fact(self, source: &'file Source) -> Findings {
-        Findings::found(NoFreeFns::HEADLINE, source.shown(), self.found)
-    }
-}
+style!(NoFreeFns, Every, "free functions are not allowed; make them associated functions or methods");

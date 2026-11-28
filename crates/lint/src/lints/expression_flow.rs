@@ -9,12 +9,11 @@ use syn::{
     ImplItemFn, ItemConst, ItemFn, ItemImpl, ItemTrait, Local, Macro, Pat, Signature, Stmt, Token, TraitItemFn,
 };
 
-use crate::finding::{Findings, Found};
+use crate::finding::Found;
 use crate::gate::Gate;
 use crate::hooks::{Descent, Expanded, Hooks};
 use crate::ignored::Ignored;
-use crate::lint::{Lint, Reads};
-use crate::source::Source;
+use crate::lint::style;
 
 #[derive(Debug, Default)]
 pub(crate) struct ExpressionFlow {
@@ -242,17 +241,4 @@ impl Hooks for ExpressionFlow {
     }
 }
 
-impl<'file> Lint<'file> for ExpressionFlow {
-    const HEADLINE: &'static str = "control flow is an expression; every branch yields the value the function returns";
-    const READS: Reads = Reads::Shipped;
-
-    type Fact = Findings;
-
-    fn new(_: &'file Source) -> ExpressionFlow {
-        ExpressionFlow::default()
-    }
-
-    fn fact(self, source: &'file Source) -> Findings {
-        Findings::found(ExpressionFlow::HEADLINE, source.shown(), self.found)
-    }
-}
+style!(ExpressionFlow, Shipped, "control flow is an expression; every branch yields the value the function returns");

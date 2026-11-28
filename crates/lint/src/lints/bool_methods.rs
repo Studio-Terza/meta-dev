@@ -1,10 +1,9 @@
 use syn::{Attribute, ImplItemFn, ItemFn, ItemImpl, ItemTrait, ReturnType, Signature, TraitItemFn, Type};
 
-use crate::finding::{Findings, Found};
+use crate::finding::Found;
 use crate::gate::Gate;
 use crate::hooks::{Descent, Hooks};
-use crate::lint::{Lint, Reads};
-use crate::source::Source;
+use crate::lint::style;
 
 #[derive(Debug, Default)]
 pub(crate) struct BoolMethods {
@@ -53,18 +52,4 @@ impl Hooks for BoolMethods {
     }
 }
 
-impl<'file> Lint<'file> for BoolMethods {
-    const HEADLINE: &'static str =
-        "a function returning bool forgets what it found and makes the caller branch on a flag";
-    const READS: Reads = Reads::Shipped;
-
-    type Fact = Findings;
-
-    fn new(_: &'file Source) -> BoolMethods {
-        BoolMethods::default()
-    }
-
-    fn fact(self, source: &'file Source) -> Findings {
-        Findings::found(BoolMethods::HEADLINE, source.shown(), self.found)
-    }
-}
+style!(BoolMethods, Shipped, "a function returning bool forgets what it found and makes the caller branch on a flag");

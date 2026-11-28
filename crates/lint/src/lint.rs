@@ -57,3 +57,24 @@ impl Fact for Findings {
         self.into_iter().collect()
     }
 }
+
+macro_rules! style {
+    ($lint:ident, $reads:ident, $headline:literal) => {
+        impl<'file> $crate::lint::Lint<'file> for $lint {
+            const HEADLINE: &'static str = $headline;
+            const READS: $crate::lint::Reads = $crate::lint::Reads::$reads;
+
+            type Fact = $crate::finding::Findings;
+
+            fn new(_: &'file $crate::source::Source) -> $lint {
+                $lint::default()
+            }
+
+            fn fact(self, source: &'file $crate::source::Source) -> $crate::finding::Findings {
+                $crate::finding::Findings::found($headline, source.shown(), self.found)
+            }
+        }
+    };
+}
+
+pub(crate) use style;
