@@ -21,9 +21,13 @@ struct Spoken {
 
 impl Spoken {
     fn call(&self, now: Wall) -> Call {
-        let program: &'static str = self.program.clone().leak();
         let deadline = Deadline::after(now, Timeout::new(self.seconds));
-        let call = Call::new(program, self.arguments.clone(), PathBuf::from(env!("CARGO_MANIFEST_DIR")), deadline);
+        let call = Call::new(
+            self.program.clone(),
+            self.arguments.clone(),
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")),
+            deadline,
+        );
         match self.fed.clone() {
             Some(fed) => call.fed(fed),
             None => call,

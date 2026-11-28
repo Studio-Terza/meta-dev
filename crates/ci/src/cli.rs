@@ -2,10 +2,15 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 
 use console_ports::Answer;
+use dispatch_ports::ShellFiller;
+use file_ports::Files;
+use port_core::Run;
+use timer_ports::ClockFiller;
 
 use crate::failure::Failure;
 use crate::kills::Kills;
 use crate::mutants::Plan;
+use crate::ports::Ports;
 use crate::timed::Timed;
 
 #[derive(Debug)]
@@ -41,12 +46,15 @@ impl Cli {
         }
     }
 
-    #[must_use]
-    pub fn answer(self) -> Answer {
+    pub fn answer(self, files: &impl Files, clock: impl ClockFiller, shell: impl ShellFiller) -> Answer {
+        let run = Run::root();
+        let wall = run.port(clock);
+        let programs = run.port(shell);
+        let ports = Ports::new(files, &wall, &programs);
         Answer::answered(match self {
-            Cli::Timed(timed) => timed.answered(),
-            Cli::Plan(plan) => plan.answered(),
-            Cli::Kills(kills) => kills.answered(),
+            Cli::Timed(timed) => timed.answered(&ports),
+            Cli::Plan(plan) => plan.answered(&ports),
+            Cli::Kills(kills) => kills.answered(&ports),
             Cli::Usage => Err(Failure::Usage),
         })
     }

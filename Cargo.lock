@@ -90,13 +90,17 @@ name = "ci"
 version = "0.1.0"
 dependencies = [
  "console-ports",
+ "dispatch-ports",
+ "file-ports",
  "grammar",
  "json-ports",
  "pipeline",
+ "port-core",
  "serde",
  "tempfile",
  "test-failure",
  "thiserror",
+ "timer-ports",
  "toml-ports",
 ]
 

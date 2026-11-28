@@ -7,13 +7,16 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use console_ports::Answer;
+use dispatch_ports::Shell;
+use file_ports::Files;
 use json_ports::Json;
 use pipeline::Pipeline;
+use timer_ports::Clock;
 
 use crate::failure::Failure;
 use crate::kills::outcomes::{Ran, Shard};
 use crate::kills::report::{Matrix, Report};
-use crate::ports::Disk;
+use crate::ports::Ports;
 
 #[derive(Debug)]
 pub struct Kills {
@@ -35,10 +38,11 @@ impl Kills {
         Kills { report: PathBuf::from(report), shards: shards.iter().map(PathBuf::from).collect() }
     }
 
-    pub(crate) fn answered(&self) -> Result<Answer, Failure> {
-        let shards = self.shards.iter().map(|shard| Shard::read(shard)).collect::<Result<Vec<Vec<Ran>>, Failure>>()?;
+    pub(crate) fn answered(&self, ports: &Ports<'_, impl Files, impl Clock, impl Shell>) -> Result<Answer, Failure> {
+        let read = self.shards.iter().map(|shard| Shard::read(shard, |path| ports.read(path)));
+        let shards = read.collect::<Result<Vec<Vec<Ran>>, Failure>>()?;
         let reported = KillMatrix.run(shards.into_iter().flatten())?;
-        Disk::write(&self.report, &reported.json)?;
+        ports.write(&self.report, &reported.json)?;
         Ok(Answer::new(ExitCode::SUCCESS).showing(reported.summary))
     }
 }

@@ -18,9 +18,13 @@ bench = false
 
 [dependencies]
 console-ports = { path = "../console-ports" }
+dispatch-ports = { path = "../dispatch-ports" }
+file-ports = { path = "../file-ports" }
 grammar = { path = "../grammar" }
 json-ports = { path = "../json-ports" }
 pipeline = { path = "../pipeline" }
+port-core = { path = "../port-core" }
+timer-ports = { path = "../timer-ports" }
 serde.workspace = true
 thiserror.workspace = true
 toml-ports = { path = "../toml-ports" }

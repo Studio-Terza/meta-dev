@@ -4,12 +4,15 @@ use std::path::{Component, Path, PathBuf};
 use std::process::ExitCode;
 
 use console_ports::Answer;
+use dispatch_ports::Shell;
+use file_ports::Files;
 use grammar::lines::{Fields, Lines};
 use json_ports::Json;
 use pipeline::Measure;
+use timer_ports::Clock;
 
 use crate::failure::Failure;
-use crate::ports::Disk;
+use crate::ports::Ports;
 
 #[derive(Debug)]
 pub struct Plan {
@@ -42,17 +45,18 @@ impl Plan {
         Plan { workspace, diff, changed, unselected, output }
     }
 
-    pub(crate) fn answered(&self) -> Result<Answer, Failure> {
-        let workspace = Mutant::listed(&self.workspace)?;
-        let in_diff: BTreeSet<String> = Mutant::listed(&self.diff)?.into_iter().map(|mutant| mutant.name).collect();
-        let tested = Changed::tested(&Disk::read(&self.changed)?)?;
+    pub(crate) fn answered(&self, ports: &Ports<'_, impl Files, impl Clock, impl Shell>) -> Result<Answer, Failure> {
+        let [listed, diff, changed] = [&self.workspace, &self.diff, &self.changed].map(|path| ports.read(path));
+        let workspace = Mutant::listed(&listed?)?;
+        let in_diff: BTreeSet<String> = Mutant::listed(&diff?)?.into_iter().map(|mutant| mutant.name).collect();
+        let tested = Changed::tested(&changed?)?;
         let count = workspace.len();
         let Partition { selected, unselected } =
             Partition::total(workspace.into_iter().map(|mutant| mutant.parted(&in_diff, &tested)));
         let shards = Shards(selected.len().div_ceil(Plan::PER_SHARD).max(1));
         let names: String = unselected.iter().map(|mutant| [mutant.name.as_str(), "\n"].concat()).collect();
-        Disk::write(&self.unselected, &names)?;
-        Disk::append(&self.output, &format!("shards={shards}\n"))?;
+        ports.write(&self.unselected, &names)?;
+        ports.append(&self.output, &format!("shards={shards}\n"))?;
         let crates: Vec<String> = tested.iter().map(|path| path.display().to_string()).collect();
         Ok(Answer::new(ExitCode::SUCCESS).showing(format_args!(
             "mutants: every one in the crates whose tests changed: [{}]\nmutants: {} of {count} selected, {} in the diff; every one tested, in {} shards\n",
@@ -65,9 +69,8 @@ impl Plan {
 }
 
 impl Mutant {
-    fn listed(path: &Path) -> Result<Vec<Mutant>, Failure> {
-        let text = Disk::read(path)?;
-        Ok(Json::first(&text).unwrap_or_else(|| Ok(Vec::new()))?)
+    fn listed(text: &str) -> Result<Vec<Mutant>, Failure> {
+        Ok(Json::first(text).unwrap_or_else(|| Ok(Vec::new()))?)
     }
 
     fn parted(self, in_diff: &BTreeSet<String>, tested: &BTreeSet<PathBuf>) -> Partition {

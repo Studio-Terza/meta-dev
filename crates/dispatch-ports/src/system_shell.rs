@@ -10,6 +10,7 @@ use port_core::{Pass, Real};
 use timer_ports::{Deadline, Due, Wall};
 
 use crate::ignored::Ignored;
+use crate::shell::Output;
 use crate::{Call, DispatchFailure, Printed, Ran, ShellFiller, shell_ops};
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -37,13 +38,17 @@ impl SystemShell {
 
     fn started(call: &Call) -> Result<Running, DispatchFailure> {
         let input = call.input().map_or_else(Stdio::null, |_fed| Stdio::piped());
+        let [stdout, stderr] = match call.output() {
+            Output::Captured => [Stdio::piped(), Stdio::null()],
+            Output::Inherited => [Stdio::inherit(), Stdio::inherit()],
+        };
         let mut child = Command::new(call.program())
             .args(call.arguments())
             .current_dir(call.directory())
             .process_group(0)
             .stdin(input)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stdout(stdout)
+            .stderr(stderr)
             .spawn()
             .map_err(DispatchFailure::Spawn)?;
         call.input()

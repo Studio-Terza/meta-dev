@@ -4,7 +4,6 @@ use json_ports::Json;
 
 use crate::failure::Failure;
 use crate::kills::log::Log;
-use crate::ports::Disk;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, serde::Deserialize, serde::Serialize)]
 #[serde(transparent)]
@@ -64,17 +63,17 @@ enum Summary {
 impl Shard {
     const OUTCOMES: &'static str = "outcomes.json";
 
-    pub(crate) fn read(directory: &Path) -> Result<Vec<Ran>, Failure> {
+    pub(crate) fn read(directory: &Path, text: impl Fn(&Path) -> Result<String, Failure>) -> Result<Vec<Ran>, Failure> {
         let path = directory.join(Shard::OUTCOMES);
-        let text = Disk::read(&path)?;
-        let outcomes: Outcomes = Json::read(&text).map_err(|source| Failure::Outcomes { path, source })?;
-        outcomes.outcomes.into_iter().map(|outcome| outcome.ran(directory)).collect()
+        let read = text(&path)?;
+        let outcomes: Outcomes = Json::read(&read).map_err(|source| Failure::Outcomes { path, source })?;
+        outcomes.outcomes.into_iter().map(|outcome| outcome.ran(directory, &text)).collect()
     }
 }
 
 impl Outcome {
-    fn ran(self, directory: &Path) -> Result<Ran, Failure> {
-        let log = Log::read(&Disk::read(&directory.join(&self.log_path))?);
+    fn ran(self, directory: &Path, text: impl Fn(&Path) -> Result<String, Failure>) -> Result<Ran, Failure> {
+        let log = Log::read(&text(&directory.join(&self.log_path))?);
         Ok(Ran { scenario: self.scenario, summary: self.summary, log })
     }
 }

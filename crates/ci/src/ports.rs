@@ -1,70 +1,44 @@
-use std::ffi::{OsStr, OsString};
-use std::fs::{self, OpenOptions};
-use std::io::Write;
 use std::path::Path;
-use std::process::{Command, ExitStatus};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use grammar::lines::Lines;
+use dispatch_ports::Shell;
+use file_ports::{Bytes, Files};
+use timer_ports::Clock;
 
 use crate::failure::Failure;
 
 #[derive(Debug)]
-pub(crate) struct Ran {
-    status: ExitStatus,
-    spent: Duration,
+pub(crate) struct Ports<'run, F, C, S> {
+    files: &'run F,
+    clock: &'run C,
+    shell: &'run S,
 }
 
-#[derive(Debug)]
-pub(crate) struct Disk;
-
-#[derive(Debug)]
-pub(crate) struct Mark;
-
-impl Mark {
-    pub(crate) fn elapsed(path: &Path) -> Result<Duration, Failure> {
-        let text = Disk::read(path)?;
-        let first = Lines::from(text.as_str()).into_iter().next().unwrap_or_default();
-        let seconds: f64 = first.parse().map_err(|_unparsed| Failure::Unmarked(path.to_path_buf()))?;
-        let start = UNIX_EPOCH + Duration::try_from_secs_f64(seconds)?;
-        SystemTime::now().duration_since(start).map_err(|_later| Failure::Unmarked(path.to_path_buf()))
-    }
-}
-
-impl Ran {
-    pub(crate) fn started(program: &OsStr, arguments: &[OsString]) -> Result<Ran, Failure> {
-        let start = Instant::now();
-        let status = Command::new(program)
-            .args(arguments)
-            .status()
-            .map_err(|source| Failure::Unstarted { program: program.to_string_lossy().into_owned(), source })?;
-        Ok(Ran { status, spent: start.elapsed() })
+impl<'run, F: Files, C: Clock, S: Shell> Ports<'run, F, C, S> {
+    pub(crate) fn new(files: &'run F, clock: &'run C, shell: &'run S) -> Ports<'run, F, C, S> {
+        Ports { files, clock, shell }
     }
 
-    pub(crate) fn status(&self) -> ExitStatus {
-        self.status
+    pub(crate) fn clock(&self) -> &C {
+        self.clock
     }
 
-    pub(crate) fn spent(&self) -> Duration {
-        self.spent
-    }
-}
-
-impl Disk {
-    pub(crate) fn read(path: &Path) -> Result<String, Failure> {
-        fs::read_to_string(path).map_err(|source| Failure::Unreadable { path: path.to_path_buf(), source })
+    pub(crate) fn shell(&self) -> &S {
+        self.shell
     }
 
-    pub(crate) fn write(path: &Path, text: &str) -> Result<(), Failure> {
-        fs::write(path, text).map_err(|source| Failure::Unwritable { path: path.to_path_buf(), source })
+    pub(crate) fn read(&self, path: &Path) -> Result<String, Failure> {
+        let text =
+            self.files.read_text(path).map_err(|source| Failure::Unreadable { path: path.to_path_buf(), source })?;
+        Ok(AsRef::<str>::as_ref(&text).to_owned())
     }
 
-    pub(crate) fn append(path: &Path, text: &str) -> Result<(), Failure> {
-        OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)
-            .and_then(|mut file| file.write_all(text.as_bytes()))
-            .map_err(|source| Failure::Unwritable { path: path.to_path_buf(), source })
+    pub(crate) fn write(&self, path: &Path, text: &str) -> Result<(), Failure> {
+        let written = self.files.write(path, Bytes::from(text));
+        written.map_err(|source| Failure::Unwritable { path: path.to_path_buf(), source })
+    }
+
+    pub(crate) fn append(&self, path: &Path, text: &str) -> Result<(), Failure> {
+        let appended = self.files.append(path, &Bytes::from(text));
+        appended.map_err(|source| Failure::Unwritable { path: path.to_path_buf(), source })
     }
 }
