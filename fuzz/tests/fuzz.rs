@@ -1,9 +1,9 @@
-use std::env;
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::iter;
 use std::path::Path;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
+use console_ports::Inherited;
 use file_ports::{Bytes, Memory};
 use invariants::{Ignoring, ignored};
 use lint::{Cli, Verdict};
@@ -11,6 +11,7 @@ use proptest::collection::vec;
 use proptest::prelude::{BoxedStrategy, Strategy, any, prop_assert_eq, prop_oneof};
 use proptest::sample::{Index, select};
 use proptest::test_runner::{Config, TestCaseError, TestError, TestRunner};
+use timer_ports::{Elapsed, Wall};
 
 ignored! {
     enum Ignored {
@@ -90,10 +91,11 @@ struct Syntax;
 
 #[test]
 fn no_input_panics_the_runner_or_breaks_its_promises() -> Result<(), TestError<Input>> {
-    let seconds = env::var(SECONDS).ignoring(Ignored::Unset).and_then(|text| text.parse().ignoring(Ignored::Unset));
-    let deadline = Instant::now() + Duration::from_secs(seconds.unwrap_or(DEFAULT_SECONDS));
+    let seconds =
+        Inherited.variable(OsStr::new(SECONDS)).and_then(|text| text.to_str()?.parse().ignoring(Ignored::Unset));
+    let deadline = Wall::now().after(Elapsed::from(Duration::from_secs(seconds.unwrap_or(DEFAULT_SECONDS))));
     let inputs = Input::all();
-    iter::repeat_with(Instant::now).take_while(|now| *now < deadline).try_for_each(|_| {
+    iter::repeat_with(Wall::now).take_while(|now| *now < deadline).try_for_each(|_| {
         TestRunner::new(Config { cases: BATCH, failure_persistence: None, ..Config::default() })
             .run(&inputs, Input::checked)
     })

@@ -1,3 +1,4 @@
+mod ambient_reads;
 mod bool_methods;
 mod expression_flow;
 mod hand_measures;
@@ -16,6 +17,7 @@ mod target_optouts;
 mod type_shape;
 mod vec_out_params;
 
+pub(crate) use ambient_reads::AmbientReads;
 pub(crate) use bool_methods::BoolMethods;
 pub(crate) use expression_flow::ExpressionFlow;
 pub(crate) use hand_measures::HandMeasures;

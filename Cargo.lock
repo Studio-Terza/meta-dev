@@ -362,10 +362,12 @@ dependencies = [
 name = "fuzz"
 version = "0.1.0"
 dependencies = [
+ "console-ports",
  "file-ports",
  "invariants",
  "lint",
  "proptest",
+ "timer-ports",
 ]
 
 [[package]]
@@ -953,6 +955,7 @@ dependencies = [
 name = "syntax"
 version = "0.1.0"
 dependencies = [
+ "console-ports",
  "digest-ports",
  "hex",
  "invariants",
@@ -987,6 +990,7 @@ dependencies = [
 name = "test-failure"
 version = "0.1.0"
 dependencies = [
+ "console-ports",
  "json-ports",
  "tempfile",
  "toml-ports",

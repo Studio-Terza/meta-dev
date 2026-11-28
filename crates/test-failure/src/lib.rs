@@ -1,7 +1,9 @@
+use std::ffi::OsStr;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use console_ports::Inherited;
 use json_ports::Decode;
 use toml_ports::Toml;
 
@@ -26,7 +28,7 @@ impl Golden {
     }
 
     pub fn checked(&self, shown: &str) -> Result<(), Failed> {
-        std::env::var_os(Golden::RECORD).map_or(Ok(()), |_| fs::write(&self.0, shown))?;
+        Inherited.variable(OsStr::new(Golden::RECORD)).map_or(Ok(()), |_| fs::write(&self.0, shown))?;
         let golden = fs::read_to_string(&self.0)?;
         (golden == shown).then_some(()).ok_or_else(|| {
             Failed(format!(

@@ -1,8 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::env;
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use console_ports::Inherited;
 use proc_macro2::TokenStream;
 use rusqlite::{Connection, Statement};
 use serde::Serialize;
@@ -186,7 +187,8 @@ fn every_cached_query_is_what_the_schema_describes_and_no_other_is_cached() -> R
     let held = cache.held()?;
     let drifted: BTreeSet<&String> =
         wanted.keys().chain(held.keys()).filter(|name| wanted.get(*name) != held.get(*name)).collect();
-    let unrecorded = env::var_os(Cache::RECORD)
+    let unrecorded = Inherited
+        .variable(OsStr::new(Cache::RECORD))
         .filter(|switch| *switch == "1")
         .map_or_else(|| Ok(drifted.clone()), |_record| cache.rewritten(&wanted, &drifted).map(|()| BTreeSet::new()))?;
     assert_eq!(
