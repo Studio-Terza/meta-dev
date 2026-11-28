@@ -1,0 +1,14 @@
+notice "<task-notification>\n<task-id>bhyzfnpyp</task-id>\n<status>killed</status>\n</task-notification>": Some("bhyzfnpyp")
+notice "<task-id>a26ca09f4c3ef4cfd</task-id><task-id>second</task-id>": Some("a26ca09f4c3ef4cfd")
+notice "<task-id></task-id>": None
+notice "<task-id>open": None
+notice "no notice here": None
+notice "": None
+stem "bjjcy92fd": Some([Some("bjjcy92fd"), None])
+stem "a26ca09f4c3ef4cfd": Some([Some("a26ca09f4c3ef4cfd"), None])
+stem "agent-a26ca09f4c3ef4cfd": Some([Some("a26ca09f4c3ef4cfd"), None])
+stem "agent-anoskip-0bb9aacb9e503d6c": Some([Some("anoskip-0bb9aacb9e503d6c"), Some("noskip")])
+stem "agent-ab0-sample-83f6552a698d193e": Some([Some("ab0-sample-83f6552a698d193e"), Some("b0-sample")])
+stem "agent-abusy": Some([Some("agent-abusy"), None])
+stem "a/b": None
+stem "": None

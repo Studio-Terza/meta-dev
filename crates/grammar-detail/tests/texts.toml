@@ -1,0 +1,2 @@
+# Texts the detail lexer reads; tests/lexed.txt holds what it reads them as.
+cited = ["process-rebuild#D1", "process-rebuild#D1, process-rebuild#D2", "a#D1,b#D2 c", "none", ""]

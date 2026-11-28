@@ -1,0 +1,25 @@
+[package]
+name = "grammar-letters"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[package.metadata.lexer]
+format = "letters"
+
+[lib]
+test = false
+doctest = false
+bench = false
+
+[dependencies]
+grammar = { path = "../grammar" }
+
+[dev-dependencies]
+serde.workspace = true
+test-failure = { path = "../test-failure" }
+toml.workspace = true
+
+[lints]
+workspace = true

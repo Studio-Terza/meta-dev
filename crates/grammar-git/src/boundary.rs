@@ -1,7 +1,8 @@
 use std::num::NonZeroU32;
 
 use grammar::logos::Logos;
-use grammar::{BranchName, Ignoring, Unlexed};
+use grammar::{Ignoring, Unlexed};
+use grammar_report::BranchName;
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]

@@ -16,7 +16,7 @@ use dispatch_ports::{
     Call, ClockFiller, DispatchFailure, Pause, Printed, Ran, ShellFiller, Wall, clock_ops, shell_ops,
 };
 use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Offset, Size, Stamps, Text};
-use grammar::Letters;
+use grammar_letters::Letters;
 use invariants::{Unpoisoned, invariant, invariants};
 use newtype::Wrapping;
 use port_core::Pass;

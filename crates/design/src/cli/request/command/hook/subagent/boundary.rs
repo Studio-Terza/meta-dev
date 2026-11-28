@@ -4,7 +4,8 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use design_messages::PullNumber;
-use grammar::{AgentReport, BranchName, Ended, JobLink, SpecTrailer, Target};
+use grammar_report::{AgentReport, BranchName, Ended, JobLink, Target};
+use grammar_repository::SpecTrailer;
 use grammar_spec_line::Attachment;
 use hex::FromHex;
 use invariants::Ignoring;

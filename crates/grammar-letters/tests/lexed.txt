@@ -1,0 +1,4 @@
+slug "/Users/me/my_repo": "-Users-me-my-repo"
+slug "abc123": "abc123"
+slug "a.b é": "a-b--"
+slug "": ""

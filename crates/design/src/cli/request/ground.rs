@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use file_ports::{Bytes, Files, Kind};
-use grammar::Lines;
-use grammar::{Cited, Heading};
+use grammar_detail::{Cited, Heading};
+use grammar_lines::Lines;
 use grammar_spec_line::Attachment;
 use invariants::Ignoring;
 use port_core::{Port, Run};

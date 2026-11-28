@@ -6,7 +6,8 @@ use std::str::FromStr;
 
 use design_messages::CheckName;
 use file_ports::Kind;
-use grammar::{Cited as Detail, Lines};
+use grammar_detail::Cited as Detail;
+use grammar_lines::Lines;
 use grammar_spec_line::{Attachment, Line};
 use invariants::Ignoring;
 use serde::{Deserialize, Serialize};
