@@ -8,7 +8,9 @@ pub struct CacheFile(String);
 
 #[derive(Debug, thiserror::Error)]
 pub enum Unexpanded {
-    #[error("no {0} in any .sqlx above this crate; regenerate the query cache with cargo test -p query-cache")]
+    #[error(
+        "no {0} in any .sqlx above this crate; regenerate the query cache with FIXTURE_RECORD=1 cargo test -p query-cache"
+    )]
     Uncached(CacheFile),
     #[error("cannot read the cached query {}: {source}", path.display())]
     Unread { path: PathBuf, source: std::io::Error },
