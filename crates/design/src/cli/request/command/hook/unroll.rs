@@ -3,14 +3,13 @@ use std::fmt;
 use std::path::{Component, Path, PathBuf};
 
 use console_ports::Environment;
-use dispatch_ports::{Clock, Shell};
 use file_ports::{Files, Kind};
 use grammar::shell::{Deletion, Directory, Edit, Edited, Editor, Plain, Target, Unreadable};
 use serde::Deserialize;
 use store_ports::Store;
 
 use super::super::Ground;
-use super::super::crew::Crew;
+use super::super::crew::Tape;
 use super::brief::Brief;
 use super::reply::{Hook, Reply};
 use crate::cli::failure::Failure;
@@ -56,15 +55,15 @@ struct Judging<'ground, 'run, F: Files, S: Store, E: Environment> {
 }
 
 impl Hook for Running {
-    fn answered<F: Files + Clone, S: Store, C: Clock, G: Shell>(
+    fn answered<F: Files + Clone, S: Store>(
         &self,
         environment: &impl Environment,
         ground: &Ground<'_, F, S>,
-        crew: &Crew<'_, C, G>,
+        tape: &Tape<'_>,
     ) -> Result<Reply<'_>, Failure> {
         match &self.tool {
             Tool::Bash(input) => Ok(Judging { ground, environment, cwd: &self.cwd }.judged(input)),
-            Tool::Agent(brief) | Tool::SendMessage(brief) => brief.told(ground, crew),
+            Tool::Agent(brief) | Tool::SendMessage(brief) => brief.told(ground, tape),
         }
     }
 }

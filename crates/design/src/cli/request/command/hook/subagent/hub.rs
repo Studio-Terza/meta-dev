@@ -231,12 +231,13 @@ impl<'hook> Hub<'hook> {
         branched: &Branched,
         spec: &Attachment,
         title: &str,
-    ) -> Result<Pushed, Cut<UnreadStep>> {
+    ) -> Result<Pushed, Cut<Unopened>> {
         let branch = branched.branch().to_string();
         let body = Body(spec).to_string();
+        let unopened = Unopened::Unread(UnreadStep::Open);
         let asked = ["pr", "create", "--head", &branch, "--base", Self::BASE, "--title", title, "--body", &body];
-        self.ran(tape, &asked, Self::QUICK)?.as_ref().and_then(Ran::succeeded).ok_or(Cut::Failed(UnreadStep::Open))?;
-        let opened: Opened = self.read(tape, &["pr", "view", &branch, "--json", "number"], UnreadStep::Open)?;
+        self.ran(tape, &asked, Self::QUICK)?.as_ref().and_then(Ran::succeeded).ok_or(Cut::Failed(unopened))?;
+        let opened: Opened = self.read(tape, &["pr", "view", &branch, "--json", "number"], unopened)?;
         Ok(Pushed::new(opened.pull(), branched.head()))
     }
 

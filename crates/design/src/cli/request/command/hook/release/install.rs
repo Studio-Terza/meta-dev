@@ -1,14 +1,14 @@
 use std::path::Path;
 
 use design_messages::PullNumber;
-use dispatch_ports::{Clock, Ran, Shell, Timeout};
+use dispatch_ports::{Ran, Timeout};
 use file_ports::{Bytes, Files, Kind};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use store_ports::Store;
 
 use super::super::super::Ground;
-use super::super::super::crew::{Asked, Crew, Cut, Tape};
+use super::super::super::crew::{Asked, Cut, Tape};
 use crate::cli::request::InstallStep;
 use crate::cli::request::ignored::Ignored;
 use invariants::Ignoring;
@@ -45,14 +45,17 @@ impl<'used> Installing<'used> {
         Installing { directory, pull, workspace }
     }
 
-    pub fn installed<F: Files, S: Store, C: Clock, G: Shell>(
+    pub fn installed<F: Files, S: Store>(
         &self,
         ground: &Ground<'_, F, S>,
-        crew: &Crew<'_, C, G>,
-    ) -> Result<(), InstallStep> {
-        ground.prepared(crew.scratch()).map_err(|_unmade| InstallStep::Checkout)?;
-        let hooks = crew.driven(|tape| Cut::settled(self.printed(tape)))?;
-        Self::hooked(ground, hooks).ok_or(InstallStep::Settings)
+        tape: &Tape<'_>,
+    ) -> Result<Result<(), InstallStep>, Asked> {
+        let prepared = ground.prepared(tape.scratch()).map_err(|_unmade| InstallStep::Checkout);
+        let printed = match prepared {
+            Ok(()) => Cut::settled(self.printed(tape))?,
+            Err(step) => Err(step),
+        };
+        Ok(printed.and_then(|hooks| Self::hooked(ground, hooks).ok_or(InstallStep::Settings)))
     }
 
     fn printed(&self, tape: &Tape<'_>) -> Result<Value, Cut<InstallStep>> {

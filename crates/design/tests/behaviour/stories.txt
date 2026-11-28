@@ -638,9 +638,14 @@ Ok(Hooked(SubagentStop)) ExitCode(unix_exit_status(0)) ""
 +60 gh pr edit 12 --add-label mutants -R o/r
 +60 gh pr checks 12 --json name,bucket,link -R o/r
 +1200 gh pr checks 12 --watch --fail-fast -R o/r
+pause 10
++70 gh pr checks 12 --json name,bucket,link -R o/r
 +1210 gh pr checks 12 --watch --fail-fast -R o/r
-+90 gh run list --commit 0123456789abcdef0123456789abcdef01234567 --json databaseId,attempt -R o/r
-  ...and 4 more calls repeating those above, the last:
+pause 10
++80 gh pr checks 12 --json name,bucket,link -R o/r
++1220 gh pr checks 12 --watch --fail-fast -R o/r
+pause 10
++90 gh pr checks 12 --json name,bucket,link -R o/r
 +90 gh run list --commit 0123456789abcdef0123456789abcdef01234567 --json databaseId,attempt -R o/r
 queue:
 [[item]]
@@ -847,9 +852,7 @@ Ok(Escalated) ExitCode(unix_exit_status(0)) ""
 +60 gh pr checks 12 --json name,bucket,link -R o/r
 +60 gh pr checks 12 --json name,bucket,link -R o/r
 +1200 gh pr checks 12 --watch --fail-fast -R o/r
-+1210 gh pr checks 12 --watch --fail-fast -R o/r
-  ...and 237 more calls repeating those above, the last:
-+2390 gh pr checks 12 --watch --fail-fast -R o/r
+pause 10
 queue:
 [[item]]
 

@@ -7,6 +7,7 @@ use port_core::{ReleaseFailures, Snapshot};
 use store_ports::{Busy, StoreFailure, Unlock};
 use transcript_ports::ReadFailure;
 
+use super::request::Asked;
 use crate::Outcome;
 
 #[derive(Debug, thiserror::Error)]
@@ -43,10 +44,18 @@ pub enum Failure {
     Unwritten(#[source] toml::ser::Error),
     #[error("cannot render the hook settings: {0}")]
     Render(#[source] serde_json::Error),
+    #[error("no answer is recorded for the call it made next")]
+    Unanswered,
     #[error("a resource was not released cleanly: {0}")]
     Released(#[from] ReleaseFailures),
     #[error("{command}; on the way out, a resource was not released cleanly either: {released}")]
     Unreleased { command: Box<Failure>, released: ReleaseFailures },
+}
+
+impl From<Asked> for Failure {
+    fn from(_asked: Asked) -> Failure {
+        Failure::Unanswered
+    }
 }
 
 impl Failure {

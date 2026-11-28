@@ -2,24 +2,18 @@
 
 use std::ffi::OsString;
 use std::fs::{self, File};
-use std::io::{self, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::thread;
 use std::time::{Duration, SystemTime};
 use test_failure::{Cases, Failed, Golden};
 
 use console_ports::{Complaint, Heard, Shown, Variables};
-use design::{Agents, Cli, Failure};
-use dispatch_ports::{
-    Call, ClockFiller, DispatchFailure, Pause, Printed, Ran, ShellFiller, Wall, clock_ops, shell_ops,
-};
+use design::{Answer, Asked, Cli, Failure};
+use dispatch_ports::Wall;
 use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Offset, Size, Stamps, Text};
 use grammar::letters::Letters;
-use invariants::{Unpoisoned, invariant, invariants};
 use newtype::Wrapping;
-use port_core::Pass;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sqlite_ports::SqliteOpener;
@@ -35,164 +29,6 @@ const TEMPORARY: &str = "/private/tmp";
 const ROOT: &str = "/home";
 const TEMPORARY_REAL: &str = "tmp";
 const LOCAL: &str = "queue = \"/home/placed/queue.toml\"\nspecs = \"/home/placed/specs\"\nrepository = \"o/r\"\n";
-const READS: i64 = 10_000;
-
-invariants! {
-    enum Invariant {
-        Endless => "a story step reads the fixed test clock fewer than ten thousand times",
-    }
-}
-
-#[derive(Debug)]
-struct Stepping {
-    now: SystemTime,
-    slept: AtomicU64,
-    reads: AtomicI64,
-}
-
-impl Stepping {
-    fn wall(&self) -> Wall {
-        Wall::from(self.now + Duration::from_secs(self.slept.load(Ordering::Relaxed)))
-    }
-}
-
-impl ClockFiller for Stepping {
-    fn now(&self, _pass: Pass<'_, clock_ops::Now>) -> Wall {
-        invariant!(self.reads.fetch_add(1, Ordering::Relaxed) < READS, Invariant::Endless);
-        self.wall()
-    }
-
-    fn paused(&self, _pass: Pass<'_, clock_ops::Paused>, pause: Pause) -> Wall {
-        self.slept.fetch_add(u64::from(pause.into_inner()), Ordering::Relaxed);
-        self.wall()
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize)]
-#[serde(rename_all = "lowercase")]
-enum Tool {
-    #[default]
-    Gh,
-    Git,
-    Cargo,
-    Design,
-    Claude,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize)]
-enum Answered {
-    Succeeded,
-    Failed,
-    Overdue,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-struct Scripted {
-    #[serde(default)]
-    tool: Tool,
-    asked: String,
-    ran: Answered,
-    #[serde(default)]
-    printed: String,
-}
-
-#[derive(Debug)]
-struct Script<'story> {
-    answers: Vec<&'story Scripted>,
-    asked: Mutex<Vec<Asked>>,
-    at: SystemTime,
-    files: Rerooted,
-}
-
-#[derive(Debug)]
-struct Asked {
-    spoken: String,
-    line: String,
-}
-
-impl Scripted {
-    fn ran(&self) -> Ran {
-        let printed = Printed::new(self.printed.clone());
-        match self.ran {
-            Answered::Succeeded => Ran::Succeeded(printed),
-            Answered::Failed => Ran::Failed(printed),
-            Answered::Overdue => Ran::Overdue,
-        }
-    }
-
-    fn answers(&self, call: &Call, spoken: &str) -> Option<()> {
-        match self.tool {
-            Tool::Gh | Tool::Git | Tool::Cargo | Tool::Design => {
-                (spoken == format!("{} {}", self.tool.program(), self.asked)).then_some(())
-            }
-            Tool::Claude => (call.program() == Tool::Claude.program()
-                && call.input().is_some_and(|fed| fed.contains(&self.asked)))
-            .then_some(()),
-        }
-    }
-}
-
-impl Tool {
-    fn program(self) -> &'static str {
-        match self {
-            Tool::Gh => "gh",
-            Tool::Git => "git",
-            Tool::Cargo => "cargo",
-            Tool::Design => "design",
-            Tool::Claude => "claude",
-        }
-    }
-}
-
-impl Script<'_> {
-    fn answered(&self, call: &Call) -> Result<Ran, DispatchFailure> {
-        let spoken = [call.program().to_owned()]
-            .into_iter()
-            .chain(call.arguments().iter().cloned())
-            .collect::<Vec<_>>()
-            .join(" ");
-        let start = Wall::from(self.at).into_inner();
-        let elsewhere = Some(call.directory()).filter(|directory| *directory != Path::new(AGENT));
-        let place = elsewhere.map_or_else(String::new, |directory| format!(" in {}", directory.display()));
-        let fed = call.input().map_or_else(String::new, |prompt| format!(" fed:\n{prompt}\n"));
-        let line = format!("+{} {spoken}{place}{fed}\n", call.deadline().into_inner().into_inner() - start);
-        let mut log = self.asked.lock().unpoisoned();
-        let matching: Vec<&&Scripted> =
-            self.answers.iter().filter(|answer| answer.answers(call, &spoken).is_some()).collect();
-        let key = format!("{spoken}{fed}");
-        let earlier = log.iter().filter(|before| before.spoken == key).count();
-        log.push(Asked { spoken: key, line });
-        let homeless = call.input().filter(|_fed| self.files.kind(call.directory()) == Kind::Missing);
-        homeless.map_or(Ok(()), |_fed| Err(DispatchFailure::Spawn(io::Error::from(io::ErrorKind::NotFound))))?;
-        matching.get(earlier).or(matching.last()).map(|answer| answer.ran()).ok_or(DispatchFailure::Unjoined)
-    }
-
-    fn timeline(&self) -> String {
-        let log = self.asked.lock().unpoisoned();
-        let shown: Vec<&Asked> = log
-            .iter()
-            .enumerate()
-            .filter(|(at, asked)| log.iter().take(*at).filter(|before| before.spoken == asked.spoken).count() < 2)
-            .map(|(_at, asked)| asked)
-            .collect();
-        let hidden = log.len() - shown.len();
-        let lines: String = shown.iter().map(|asked| asked.line.as_str()).collect();
-        let repeated = log.last().filter(|_last| hidden > 0).map_or_else(String::new, |last| {
-            format!("  ...and {hidden} more calls repeating those above, the last:\n{}", last.line)
-        });
-        format!("{lines}{repeated}")
-    }
-}
-
-impl ShellFiller for &Script<'_> {
-    fn ran(&self, _pass: Pass<'_, shell_ops::Ran>, call: &Call) -> Result<Ran, DispatchFailure> {
-        self.answered(call)
-    }
-
-    fn fanned(&self, _pass: Pass<'_, shell_ops::Fanned>, calls: &[Call]) -> Vec<Result<Ran, DispatchFailure>> {
-        calls.iter().map(|call| self.answered(call)).collect()
-    }
-}
 
 #[derive(Clone, Debug)]
 struct Rerooted {
@@ -297,8 +133,6 @@ struct Story {
     agents: Vec<Task>,
     #[serde(default)]
     repositories: Vec<PathBuf>,
-    #[serde(default)]
-    answers: Vec<Scripted>,
     step: Vec<Step>,
 }
 
@@ -315,7 +149,7 @@ struct Step {
     #[serde(flatten)]
     hooked: Hooked,
     #[serde(default)]
-    answers: Vec<Scripted>,
+    heard: Vec<Answer>,
     #[serde(default)]
     append: Vec<[String; 3]>,
 }
@@ -463,7 +297,7 @@ impl Home {
         Ok(())
     }
 
-    fn heard(&self, words: &[String], input: &str, script: &Script<'_>) -> String {
+    fn heard(&self, words: &[String], input: &str, heard: &[Answer]) -> String {
         let environment: Variables =
             [(OsString::from("HOME"), OsString::from(ROOT)), (OsString::from("PWD"), OsString::from(ROOT))]
                 .into_iter()
@@ -471,14 +305,32 @@ impl Home {
                 .hearing(Heard::new(input.to_owned()));
         let spoken =
             ["--workspace", "work"].map(str::to_owned).into_iter().chain(words.iter().cloned()).map(OsString::from);
-        let clock = Stepping { now: self.at, slept: AtomicU64::default(), reads: AtomicI64::default() };
-        let uttered =
-            Cli::new(&environment, self.files(), Rehomed(self.files()), Agents::new(clock, script)).rooted(spoken);
+        let start = Wall::from(self.at);
+        let uttered = Cli::new(&environment, self.files(), Rehomed(self.files())).recorded(spoken, start, heard);
         let shown = AsRef::<Shown>::as_ref(&uttered).clone();
+        let calls: String = AsRef::<[Asked]>::as_ref(&uttered).iter().map(|asked| Home::call(start, asked)).collect();
         let ended = uttered.ended().map_err(|failure: Failure| failure.to_string());
         let answer = console_ports::Answer::reported(ended.as_ref()).showing(&shown);
         let complaint: &Complaint = answer.as_ref();
-        format!("{shown}{ended:?} {:?} {:?}\n", answer.code(), AsRef::<str>::as_ref(complaint))
+        format!("{shown}{ended:?} {:?} {:?}\n{calls}", answer.code(), AsRef::<str>::as_ref(complaint))
+    }
+
+    fn call(start: Wall, asked: &Asked) -> String {
+        match asked {
+            Asked::Paused(pause) => format!("pause {}\n", pause.into_inner()),
+            Asked::Ran(calls) => calls
+                .iter()
+                .map(|call| {
+                    let spoken = [call.program().to_owned()].into_iter().chain(call.arguments().iter().cloned());
+                    let elsewhere = Some(call.directory()).filter(|directory| *directory != Path::new(AGENT));
+                    let place = elsewhere.map_or_else(String::new, |directory| format!(" in {}", directory.display()));
+                    let fed = call.input().map_or_else(String::new, |prompt| format!(" fed:\n{prompt}\n"));
+                    let after = call.deadline().into_inner().into_inner() - start.into_inner();
+                    format!("+{after} {}{place}{fed}\n", spoken.collect::<Vec<_>>().join(" "))
+                })
+                .collect::<Vec<String>>()
+                .concat(),
+        }
     }
 }
 
@@ -565,14 +417,8 @@ impl Story {
             .map(|step| {
                 home.appended(&step.append.iter().map(Home::line).collect::<Vec<_>>())?;
                 let Spoken { words, input } = step.spoken();
-                let script = Script {
-                    answers: step.answers.iter().chain(&self.answers).collect(),
-                    asked: Mutex::default(),
-                    at: home.at,
-                    files: home.files(),
-                };
-                let said = home.heard(&words, &input, &script);
-                Ok(format!("$ {} < {input}\n{said}{}", words.join(" "), script.timeline()))
+                let said = home.heard(&words, &input, &step.heard);
+                Ok(format!("$ {} < {input}\n{said}", words.join(" ")))
             })
             .collect::<Result<_, Failed>>()?;
         let queue = match fs::read_to_string(home.real(&Home::placed().join("queue.toml"))) {

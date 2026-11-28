@@ -14,7 +14,7 @@ use store_ports::Opens;
 
 use super::failure::Failure;
 use command::Command;
-pub use command::Crew;
+pub use command::{Answer, Asked, Crew, Tape};
 pub use ground::Ground;
 pub use local::{Local, Repository, Rooted};
 use projects::Projects;
@@ -49,7 +49,7 @@ impl Request {
         self.command.opened(located.kept(Kept::Store), opens)
     }
 
-    pub fn command(self) -> Command {
+    pub fn command(&self) -> Command {
         self.command
     }
 }

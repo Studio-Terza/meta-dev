@@ -20,7 +20,7 @@ pub enum Kept {
     Local,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Located {
     transcripts: PathBuf,
     workspace: PathBuf,

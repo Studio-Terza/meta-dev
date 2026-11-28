@@ -1,5 +1,4 @@
 use design_messages::OwnerHistory;
-use dispatch_ports::{Clock, Shell};
 use file_ports::Files;
 use invariants::Ignoring;
 use serde::Deserialize;
@@ -8,7 +7,7 @@ use store_ports::Store;
 use transcript_ports::Body;
 
 use super::super::Ground;
-use super::super::crew::Crew;
+use super::super::crew::Tape;
 use super::super::ingest::Ingest;
 use super::answers::{Answers, Moment};
 use super::reply::{Reply, Telling, Told};
@@ -36,21 +35,19 @@ enum Said {
 struct Message(Option<Body>);
 
 impl Brief {
-    pub fn told<F: Files + Clone, S: Store, C: Clock, G: Shell>(
+    pub fn told<F: Files + Clone, S: Store>(
         &self,
         ground: &Ground<'_, F, S>,
-        crew: &Crew<'_, C, G>,
+        tape: &Tape<'_>,
     ) -> Result<Reply<'_>, Failure> {
         let passed = || Ok(Reply::Pass(Outcome::Hooked(HookEvent::PreToolUse)));
         self.said.body().map_or_else(passed, |body| {
             let store = ground.store();
-            ground.prepared(crew.scratch())?;
+            ground.prepared(tape.scratch())?;
             Ingest::read(store, &ground.transcripts())?;
-            let answers = store
-                .read(OwnerHistory)
-                .ignoring(Ignored::Unanswered)
-                .and_then(|history| crew.driven(|tape| Answers::searched(tape, body, Moment::Briefing, &history)));
-            answers.map_or_else(passed, |found| {
+            let history = store.read(OwnerHistory).ignoring(Ignored::Unanswered);
+            let answers = history.map(|said| Answers::searched(tape, body, Moment::Briefing, &said)).transpose()?;
+            answers.flatten().map_or_else(passed, |found| {
                 let said = self.said.telling(format!("{body}\n\n{found}"));
                 Ok(Reply::Rewrite { input: Told::new(said, &self.rest) })
             })

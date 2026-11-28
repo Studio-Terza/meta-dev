@@ -1,10 +1,11 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::slice;
 
-use dispatch_ports::{Call, Clock, Deadline, Pause, Ran, Shell, Timeout, Wall};
+use dispatch_ports::{Call, Clock, Deadline, Pause, Printed, Ran, Shell, Timeout, Wall};
 use invariants::Ignoring;
+use newtype::Wrapping;
 use serde::Deserialize;
 
 use crate::cli::request::ignored::Ignored;
@@ -13,7 +14,6 @@ use crate::cli::request::ignored::Ignored;
 pub struct Crew<'ports, C: Clock, G: Shell> {
     clock: &'ports C,
     shell: &'ports G,
-    scratch: PathBuf,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -22,18 +22,29 @@ pub enum Asked {
     Paused(Pause),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Heard {
-    at: Wall,
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(from = "Recorded")]
+pub struct Answer {
+    took: i64,
     ran: Vec<Option<Ran>>,
+}
+
+#[derive(Debug, Deserialize)]
+enum Recorded {
+    Succeeded(String),
+    Failed(String),
+    Overdue,
+    Unrun,
+    Paused(i64),
 }
 
 #[derive(Debug)]
 pub struct Tape<'heard> {
     start: Wall,
-    scratch: &'heard Path,
-    heard: &'heard [Heard],
+    scratch: PathBuf,
+    heard: &'heard [Answer],
     read: Cell<usize>,
+    asked: RefCell<Vec<Asked>>,
 }
 
 #[derive(Debug)]
@@ -63,41 +74,28 @@ enum Subtype {
 }
 
 impl<'ports, C: Clock, G: Shell> Crew<'ports, C, G> {
-    pub fn new(clock: &'ports C, shell: &'ports G, scratch: PathBuf) -> Crew<'ports, C, G> {
-        Crew { clock, shell, scratch }
+    pub fn new(clock: &'ports C, shell: &'ports G) -> Crew<'ports, C, G> {
+        Crew { clock, shell }
     }
 
     pub fn now(&self) -> Wall {
         self.clock.now()
     }
 
-    pub fn scratch(&self) -> &Path {
-        &self.scratch
-    }
-
-    pub fn driven<T>(&self, machine: impl Fn(&Tape<'_>) -> Result<T, Asked>) -> T {
-        self.replayed(&machine, self.clock.now(), Vec::new())
-    }
-
-    fn replayed<T>(&self, machine: &impl Fn(&Tape<'_>) -> Result<T, Asked>, start: Wall, heard: Vec<Heard>) -> T {
-        match machine(&Tape { start, scratch: &self.scratch, heard: &heard, read: Cell::default() }) {
-            Ok(done) => done,
-            Err(asked) => self.replayed(machine, start, [heard, vec![self.performed(asked)]].concat()),
-        }
-    }
-
-    fn performed(&self, asked: Asked) -> Heard {
-        match asked {
-            Asked::Ran(calls) => {
-                let ran = self.shell.fanned(&calls).into_iter().map(|ran| ran.ignoring(Ignored::Unrun)).collect();
-                Heard { at: self.clock.now(), ran }
-            }
-            Asked::Paused(pause) => Heard { at: self.clock.paused(pause), ran: Vec::new() },
-        }
+    pub fn performed(&self, start: Wall, heard: &[Answer], asked: &Asked) -> Answer {
+        let before = Tape::elapsed(start, heard);
+        let (after, ran) = match asked {
+            Asked::Ran(calls) => (
+                self.clock.now(),
+                self.shell.fanned(calls).into_iter().map(|ran| ran.ignoring(Ignored::Unrun)).collect(),
+            ),
+            Asked::Paused(pause) => (self.clock.paused(*pause), Vec::new()),
+        };
+        Answer { took: after.into_inner().saturating_sub(before.into_inner()), ran }
     }
 }
 
-impl Tape<'_> {
+impl<'heard> Tape<'heard> {
     const MODEL: &'static str = "claude";
     const ASKED: [&'static str; 10] = [
         "-p",
@@ -112,16 +110,29 @@ impl Tape<'_> {
         "haiku",
     ];
 
+    pub fn new(start: Wall, scratch: PathBuf, heard: &'heard [Answer]) -> Tape<'heard> {
+        Tape { start, scratch, heard, read: Cell::default(), asked: RefCell::default() }
+    }
+
+    fn elapsed(start: Wall, heard: &[Answer]) -> Wall {
+        let took: i64 = heard.iter().map(|answer| answer.took).sum();
+        Wall::new(start.into_inner().saturating_add(took))
+    }
+
     pub fn now(&self) -> Wall {
-        let last = self.read.get().checked_sub(1).and_then(|last| self.heard.get(last));
-        last.map_or(self.start, |heard| heard.at)
+        Tape::elapsed(self.start, self.heard.get(..self.read.get()).unwrap_or_default())
     }
 
     pub fn scratch(&self) -> &Path {
-        self.scratch
+        &self.scratch
     }
 
-    fn heard(&self, asked: Asked) -> Result<&Heard, Asked> {
+    pub fn asked(self) -> Vec<Asked> {
+        self.asked.into_inner()
+    }
+
+    fn heard(&self, asked: Asked) -> Result<&Answer, Asked> {
+        self.asked.borrow_mut().push(asked.clone());
         let at = self.read.get();
         let heard = self.heard.get(at).ok_or(asked)?;
         self.read.set(at + 1);
@@ -141,7 +152,8 @@ impl Tape<'_> {
     }
 
     pub fn paused(&self, pause: Pause) -> Result<Wall, Asked> {
-        self.heard(Asked::Paused(pause)).map(|heard| heard.at)
+        self.heard(Asked::Paused(pause))?;
+        Ok(self.now())
     }
 
     pub fn replied(&self, prompt: &Prompt, timeout: Timeout) -> Result<Option<Reply>, Asked> {
@@ -153,12 +165,13 @@ impl Tape<'_> {
         let asked: Vec<String> = Self::ASKED.map(str::to_owned).to_vec();
         let calls: Vec<Call> = prompts
             .iter()
-            .map(|prompt| {
-                Call::new(Self::MODEL, asked.clone(), self.scratch.to_path_buf(), deadline).fed(prompt.0.clone())
-            })
+            .map(|prompt| Call::new(Self::MODEL, asked.clone(), self.scratch.clone(), deadline).fed(prompt.0.clone()))
             .collect();
-        let heard = self.heard(Asked::Ran(calls))?;
-        Ok(heard.ran.iter().map(|ran| ran.as_ref().and_then(Ran::succeeded).and_then(Reply::read)).collect())
+        let ran = match calls.first() {
+            Some(_first) => self.heard(Asked::Ran(calls))?.ran.clone(),
+            None => Vec::new(),
+        };
+        Ok(ran.iter().map(|call| call.as_ref().and_then(Ran::succeeded).and_then(Reply::read)).collect())
     }
 }
 
@@ -178,6 +191,19 @@ impl<E> From<Asked> for Cut<E> {
     }
 }
 
+impl From<Recorded> for Answer {
+    fn from(recorded: Recorded) -> Answer {
+        let ran = |ran: Option<Ran>| Answer { took: 0, ran: vec![ran] };
+        match recorded {
+            Recorded::Succeeded(printed) => ran(Some(Ran::Succeeded(Printed::new(printed)))),
+            Recorded::Failed(printed) => ran(Some(Ran::Failed(Printed::new(printed)))),
+            Recorded::Overdue => ran(Some(Ran::Overdue)),
+            Recorded::Unrun => ran(None),
+            Recorded::Paused(took) => Answer { took, ran: Vec::new() },
+        }
+    }
+}
+
 impl<Shown: fmt::Display> From<&Shown> for Prompt {
     fn from(shown: &Shown) -> Prompt {
         Prompt(shown.to_string())
@@ -185,7 +211,7 @@ impl<Shown: fmt::Display> From<&Shown> for Prompt {
 }
 
 impl Reply {
-    fn read(printed: &dispatch_ports::Printed) -> Option<Reply> {
+    fn read(printed: &Printed) -> Option<Reply> {
         let envelope: Envelope = serde_json::from_str(printed.as_ref()).ignoring(Ignored::Unreplied)?;
         (envelope.subtype == Subtype::Success).then_some(envelope.result).flatten().map(Reply)
     }

@@ -5,14 +5,14 @@ use std::path::{Path, PathBuf};
 
 use console_ports::Environment;
 use design_messages::PullNumber;
-use dispatch_ports::{Clock, Ran, Shell, Timeout};
+use dispatch_ports::{Ran, Timeout};
 use file_ports::Files;
 use grammar::git::Worktrees;
 use newtype::Wrapping;
 use store_ports::Store;
 
 use super::super::Ground;
-use super::super::crew::{Asked, Crew, Cut, Tape};
+use super::super::crew::{Asked, Cut, Tape};
 use super::reply::{Hook, Reply};
 use super::subagent::Hub;
 use crate::cli::failure::Failure;
@@ -48,31 +48,31 @@ struct Holding {
 }
 
 impl Hook for Used {
-    fn answered<F: Files + Clone, S: Store, C: Clock, G: Shell>(
+    fn answered<F: Files + Clone, S: Store>(
         &self,
         _environment: &impl Environment,
         ground: &Ground<'_, F, S>,
-        crew: &Crew<'_, C, G>,
+        tape: &Tape<'_>,
     ) -> Result<Reply<'_>, Failure> {
         let untouched = || Ok(Reply::Pass(Outcome::Hooked(HookEvent::PostToolUse)));
-        self.merged().map_or_else(untouched, |pull| self.released(pull, ground, crew))
+        self.merged().map_or_else(untouched, |pull| self.released(pull, ground, tape))
     }
 }
 
 impl Used {
-    fn released<F: Files, S: Store, C: Clock, G: Shell>(
+    fn released<F: Files, S: Store>(
         &self,
         pull: PullNumber,
         ground: &Ground<'_, F, S>,
-        crew: &Crew<'_, C, G>,
+        tape: &Tape<'_>,
     ) -> Result<Reply<'static>, Failure> {
         let local = ground.local();
         let releasing = Releasing { directory: self.directory(), pull };
-        let landing = match crew.driven(|tape| Cut::settled(releasing.landed(tape, &local))) {
+        let landing = match Cut::settled(releasing.landed(tape, &local))? {
             Ok(landed) => match landed.state() {
                 State::Merged => Landing::Merged {
-                    released: crew.driven(|tape| Cut::settled(releasing.released(tape, &landed))),
-                    installed: Installing::new(self.directory(), pull, ground.workspace()).installed(ground, crew),
+                    released: Cut::settled(releasing.released(tape, &landed))?,
+                    installed: Installing::new(self.directory(), pull, ground.workspace()).installed(ground, tape)?,
                 },
                 State::Open | State::Closed => Landing::Unmerged,
             },

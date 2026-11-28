@@ -1,5 +1,4 @@
 use console_ports::{Environment, Heard, Shown};
-use dispatch_ports::{Clock, Shell};
 use file_ports::Files;
 use newtype::Wrapping;
 use serde::Serialize;
@@ -8,7 +7,7 @@ use serde_json::{Map, Value};
 use store_ports::Store;
 
 use super::super::Ground;
-use super::super::crew::Crew;
+use super::super::crew::Tape;
 use crate::cli::failure::Failure;
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
@@ -18,11 +17,11 @@ pub trait Hook: DeserializeOwned {
         serde_json::from_str(&heard.into_inner()).map_err(Failure::Unheard)
     }
 
-    fn answered<F: Files + Clone, S: Store, C: Clock, G: Shell>(
+    fn answered<F: Files + Clone, S: Store>(
         &self,
         environment: &impl Environment,
         ground: &Ground<'_, F, S>,
-        crew: &Crew<'_, C, G>,
+        tape: &Tape<'_>,
     ) -> Result<Reply<'_>, Failure>;
 }
 
