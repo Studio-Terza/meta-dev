@@ -23,7 +23,14 @@ design-messages = { path = "../design-messages" }
 dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports" }
 grammar = { path = "../grammar" }
+grammar-detail = { path = "../grammar-detail" }
 grammar-git = { path = "../grammar-git" }
+grammar-letters = { path = "../grammar-letters" }
+grammar-lines = { path = "../grammar-lines" }
+grammar-notice = { path = "../grammar-notice" }
+grammar-report = { path = "../grammar-report" }
+grammar-repository = { path = "../grammar-repository" }
+grammar-shell = { path = "../grammar-shell" }
 grammar-spec-line = { path = "../grammar-spec-line" }
 hex.workspace = true
 newtype = { path = "../newtype" }

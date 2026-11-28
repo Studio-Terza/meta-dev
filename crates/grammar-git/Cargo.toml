@@ -15,6 +15,7 @@ bench = false
 
 [dependencies]
 grammar = { path = "../grammar" }
+grammar-report = { path = "../grammar-report" }
 
 [dev-dependencies]
 

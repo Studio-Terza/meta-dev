@@ -4,7 +4,7 @@ use std::path::{Component, Path, PathBuf};
 use console_ports::{Heard, Shown};
 use dispatch_ports::{Clock, Shell};
 use file_ports::{Files, Kind};
-use grammar::{Construct, Directory, Edit, Edited, Editor, Flagged, Nested};
+use grammar_shell::{Construct, Directory, Edit, Edited, Editor, Flagged, Nested};
 use newtype::Wrapping;
 use serde::{Deserialize, Serialize};
 use store_ports::Store;

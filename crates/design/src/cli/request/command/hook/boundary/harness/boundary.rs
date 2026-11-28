@@ -4,7 +4,8 @@ use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, Epoch, Offset, Size, Stamp, Stamps, Tail};
-use grammar::{Lines, TaskFile};
+use grammar_lines::Lines;
+use grammar_notice::TaskFile;
 use invariants::Ignoring;
 use newtype::Wrapping;
 use serde::Deserialize;

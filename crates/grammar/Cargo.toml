@@ -19,10 +19,5 @@ invariants = { path = "../invariants" }
 logos.workspace = true
 thiserror.workspace = true
 
-[dev-dependencies]
-serde.workspace = true
-test-failure = { path = "../test-failure" }
-toml.workspace = true
-
 [lints]
 workspace = true

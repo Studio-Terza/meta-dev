@@ -1,4 +1,4 @@
-use grammar::Bare;
+use grammar_bare::Bare;
 use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype};
 
 #[derive(Debug, thiserror::Error)]

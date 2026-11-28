@@ -9,7 +9,7 @@ use console_ports::{Heard, Shown};
 use design_messages::{LastSaid, Overran, Overruns, OwnerHistory, Said};
 use dispatch_ports::{Clock, Shell, Wall};
 use file_ports::{Epoch, Files};
-use grammar::Lines;
+use grammar_lines::Lines;
 use grammar_spec_line::Attachment;
 use newtype::Wrapping;
 use serde::{Deserialize, Serialize};
