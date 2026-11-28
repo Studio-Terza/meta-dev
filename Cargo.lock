@@ -368,8 +368,18 @@ dependencies = [
 name = "grammar"
 version = "0.1.0"
 dependencies = [
+ "fixture",
+ "grammar-bare",
+ "grammar-detail",
+ "grammar-letters",
+ "grammar-lines",
+ "grammar-notice",
+ "grammar-shell",
+ "grammar-spec-line",
  "invariants",
  "logos",
+ "proptest",
+ "serde",
  "thiserror",
 ]
 
@@ -377,18 +387,14 @@ dependencies = [
 name = "grammar-bare"
 version = "0.1.0"
 dependencies = [
- "fixture",
  "grammar",
- "serde",
 ]
 
 [[package]]
 name = "grammar-detail"
 version = "0.1.0"
 dependencies = [
- "fixture",
  "grammar",
- "serde",
 ]
 
 [[package]]
@@ -403,18 +409,14 @@ dependencies = [
 name = "grammar-letters"
 version = "0.1.0"
 dependencies = [
- "fixture",
  "grammar",
- "serde",
 ]
 
 [[package]]
 name = "grammar-lines"
 version = "0.1.0"
 dependencies = [
- "fixture",
  "grammar",
- "serde",
  "thiserror",
 ]
 
@@ -422,9 +424,7 @@ dependencies = [
 name = "grammar-notice"
 version = "0.1.0"
 dependencies = [
- "fixture",
  "grammar",
- "serde",
 ]
 
 [[package]]
@@ -452,20 +452,15 @@ dependencies = [
 name = "grammar-shell"
 version = "0.1.0"
 dependencies = [
- "fixture",
  "grammar",
- "serde",
 ]
 
 [[package]]
 name = "grammar-spec-line"
 version = "0.1.0"
 dependencies = [
- "fixture",
  "grammar",
  "newtype",
- "proptest",
- "serde",
  "thiserror",
 ]
 

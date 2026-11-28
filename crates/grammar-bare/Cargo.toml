@@ -16,9 +16,5 @@ bench = false
 [dependencies]
 grammar = { path = "../grammar" }
 
-[dev-dependencies]
-fixture = { path = "../fixture" }
-serde.workspace = true
-
 [lints]
 workspace = true

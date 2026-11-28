@@ -19,5 +19,17 @@ invariants = { path = "../invariants" }
 logos.workspace = true
 thiserror.workspace = true
 
+[dev-dependencies]
+fixture = { path = "../fixture" }
+grammar-bare = { path = "../grammar-bare" }
+grammar-detail = { path = "../grammar-detail" }
+grammar-letters = { path = "../grammar-letters" }
+grammar-lines = { path = "../grammar-lines" }
+grammar-notice = { path = "../grammar-notice" }
+grammar-shell = { path = "../grammar-shell" }
+grammar-spec-line = { path = "../grammar-spec-line" }
+proptest.workspace = true
+serde.workspace = true
+
 [lints]
 workspace = true

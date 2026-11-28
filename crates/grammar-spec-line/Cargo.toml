@@ -18,10 +18,5 @@ grammar = { path = "../grammar" }
 newtype = { path = "../newtype" }
 thiserror.workspace = true
 
-[dev-dependencies]
-fixture = { path = "../fixture" }
-proptest.workspace = true
-serde.workspace = true
-
 [lints]
 workspace = true
