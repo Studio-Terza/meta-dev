@@ -2,8 +2,7 @@ pub(crate) mod ignored;
 
 use file_ports::Offset;
 use newtype::Wrapping;
-use store_ports::Record as _;
-use store_ports::{Columns, Done, Execute, Prepared, StoreFailure};
+use store_ports::{Columns, Execute, Prepared, StoreFailure};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Uuid};
 
 #[derive(Debug)]
@@ -16,10 +15,8 @@ pub struct MessageRow {
     body: Body,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Columns, store_ports::Record)]
-#[record(table = "cursors")]
+#[derive(Clone, Debug, PartialEq, Eq, Columns)]
 pub struct CursorRow {
-    #[record(key)]
     session: SessionId,
     read_to: Offset,
 }
@@ -79,26 +76,23 @@ FROM
         &self.session
     }
 
-    pub(crate) fn written<D: Done>(&self, statements: &mut impl Execute) -> Result<D, StoreFailure> {
-        let stored = statements.rows(CursorRow::fetched(&self.session))?;
-        self.reconciled(stored.first(), statements)
-    }
-
-    fn reconciled<D: Done>(
-        &self,
-        stored: Option<&CursorRow>,
-        statements: &mut impl Execute,
-    ) -> Result<D, StoreFailure> {
-        match stored {
-            None => statements.one(CursorRow::created(&CursorRowNew::from(self))).map(|_created| D::changed(1)),
-            Some(found) => self.revising(found, statements),
-        }
-    }
-
-    fn revising<D: Done>(&self, found: &CursorRow, statements: &mut impl Execute) -> Result<D, StoreFailure> {
-        Some(found)
-            .filter(|stored| *stored != self)
-            .map_or_else(|| Ok(D::default()), |_changed| statements.done(self.updated()))
+    pub(crate) fn upserted(&self) -> Prepared<()> {
+        let CursorRow { session, read_to } = self;
+        store_ports::query!(
+            r#"
+INSERT INTO
+  cursors (session, read_to)
+VALUES
+  (?1, ?2)
+ON CONFLICT (session) DO UPDATE
+SET
+  read_to = excluded.read_to
+WHERE
+  read_to != excluded.read_to
+"#,
+            session: SessionId,
+            read_to: Offset
+        )
     }
 }
 

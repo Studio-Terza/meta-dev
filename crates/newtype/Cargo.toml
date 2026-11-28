@@ -11,8 +11,8 @@ doctest = false
 bench = false
 
 [dependencies]
+derive = { path = "../derive" }
 invariants = { path = "../invariants" }
-newtype-derive = { path = "../newtype-derive" }
 proptest.workspace = true
 serde.workspace = true
 strum.workspace = true

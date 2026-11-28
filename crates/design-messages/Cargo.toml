@@ -16,6 +16,7 @@ file-ports = { path = "../file-ports" }
 grammar = { path = "../grammar" }
 hex.workspace = true
 newtype = { path = "../newtype" }
+pipeline = { path = "../pipeline" }
 port-core = { path = "../port-core" }
 serde.workspace = true
 store-ports = { path = "../store-ports" }

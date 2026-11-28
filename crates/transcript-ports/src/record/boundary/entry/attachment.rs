@@ -1,6 +1,8 @@
 use invariants::Ignoring;
+use serde::Deserialize;
 
 use super::classified::Classified;
+use super::closing::Closing;
 use super::object::Object;
 use super::said::Said;
 use super::stamp::Stamp;
@@ -60,17 +62,38 @@ enum Annex {
     Unknown(Unrecognised),
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+enum Event {
+    SubagentStop,
+    #[serde(other)]
+    Other,
+}
+
 #[derive(Debug)]
 pub struct Attached {
     stamp: Stamp,
     attachment: Annex,
+    event: Option<Event>,
 }
 
 impl Attached {
     const ATTACHMENT: &'static str = "attachment";
+    const EVENT: &'static str = "hookEvent";
 
     pub fn read(entry: Object<'_>) -> Result<Attached, serde_json::Error> {
-        Ok(Attached { stamp: entry.whole()?, attachment: Annex::read(entry.required(Self::ATTACHMENT)?)? })
+        let attachment = entry.required(Self::ATTACHMENT)?;
+        let event = attachment.field(Self::EVENT).ignoring(Ignored::NotKnown).flatten();
+        Ok(Attached { stamp: entry.whole()?, attachment: Annex::read(attachment)?, event })
+    }
+
+    pub fn closing(&self) -> Closing {
+        match (&self.attachment, self.event) {
+            (Annex::Known(Carried::PromptSnapshot), _)
+            | (Annex::Known(Carried::HookSuccess | Carried::HookNonBlockingError), Some(Event::SubagentStop)) => {
+                Closing::Trails
+            }
+            (Annex::Known(_) | Annex::Unknown(_), _) => Closing::Leaves,
+        }
     }
 }
 

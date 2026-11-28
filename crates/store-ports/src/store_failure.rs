@@ -16,6 +16,4 @@ pub enum StoreFailure {
     Referenced(#[source] Cause),
     #[error("a stored column does not read back as its type: {0}")]
     Column(#[from] ColumnFailure),
-    #[error("a statement that reads one row found none")]
-    Missing,
 }

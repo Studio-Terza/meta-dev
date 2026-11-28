@@ -4,7 +4,7 @@ use std::fmt;
 use design_messages::{Cursors, SessionCursors, SessionRecords};
 use newtype::Wrapping;
 use pipeline::Measure;
-use store_ports::{Counted, Store, Written};
+use store_ports::{Store, Written};
 use transcript_ports::{Authorship, Cursor, Kind, Line, Session, SessionId, Transcripts};
 
 use crate::cli::Count;
@@ -14,14 +14,6 @@ use crate::cli::failure::Failure;
 struct ReadTo {
     session: SessionId,
     cursor: Cursor,
-}
-
-#[derive(Debug)]
-struct Ingested {
-    end: ReadTo,
-    authors: Vec<Authorship>,
-    unrecognised: Vec<Kind>,
-    written: Written,
 }
 
 #[derive(Debug, Measure)]
@@ -50,32 +42,20 @@ impl<'ports, T: Transcripts, S: Store> Ingest<'ports, T, S> {
                 session.unread(ingest.cursors.resuming(session.stem())).map(|cursor| (session, cursor))
             })
             .map(|(session, cursor)| ingest.session(session, cursor))
-            .collect::<Result<Vec<_>, Failure>>()?;
+            .collect::<Result<Vec<Tally>, Failure>>()?;
         lock.end()?;
-        Ok(Tally::total(ingested.into_iter().map(Tally::from)))
+        Ok(Tally::total(ingested))
     }
 
-    fn session(&self, session: &Session, cursor: Cursor) -> Result<Ingested, Failure> {
+    fn session(&self, session: &Session, cursor: Cursor) -> Result<Tally, Failure> {
         let read = self.transcripts.read_from(session, cursor)?;
         let end = ReadTo { session: session.stem().clone(), cursor: read.cursor() };
         let lines: Vec<Line> = read.into_iter().collect();
         let records = SessionRecords::read(&end.session, end.cursor, &lines);
-        let authors = records.authors().collect();
-        let unrecognised = records.unrecognised().to_vec();
-        let written = self.store.write(Counted::new(records))?;
-        Ok(Ingested { end, authors, unrecognised, written })
-    }
-}
-
-impl From<Ingested> for Tally {
-    fn from(session: Ingested) -> Tally {
-        let Ingested { end, authors, unrecognised, written } = session;
-        Tally {
-            ends: vec![end],
-            authorship: BTreeMap::total(authors.into_iter().map(|author| BTreeMap::from([(author, Count::new(1))]))),
-            unrecognised: BTreeMap::total(unrecognised.into_iter().map(|kind| BTreeMap::from([(kind, Count::new(1))]))),
-            written,
-        }
+        let authorship = BTreeMap::total(records.authors().map(|author| BTreeMap::from([(author, Count::new(1))])));
+        let unrecognised =
+            BTreeMap::total(records.unrecognised().iter().map(|kind| BTreeMap::from([(kind.clone(), Count::new(1))])));
+        Ok(Tally { ends: vec![end], authorship, unrecognised, written: self.store.write(records)? })
     }
 }
 
