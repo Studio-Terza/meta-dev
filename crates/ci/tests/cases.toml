@@ -3,9 +3,9 @@
 
 [[case]]
 arguments = ["timed", "limits.toml", "lint", "true"]
-files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 0\n" }
+files = { "limits.toml" = "[lint]\nwarn = 1\nblock = 1\n" }
 code = 0
-out = "lint: within warn 0 s and block 0 s, took 0.0 s\n"
+out = "lint: within warn 1 s and block 1 s, took 0.0 s\n"
 
 [[case]]
 arguments = ["timed", "limits.toml", "lint", "--since", "mark", "true"]
@@ -15,9 +15,9 @@ out = "::warning::lint: above warn 0 s, within block 99999999999 s, took 1"
 
 [[case]]
 arguments = ["timed", "limits.toml", "lint", "sleep", "0.15"]
-files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 0\n" }
+files = { "limits.toml" = "[lint]\nwarn = 0.1\nblock = 0.1\n" }
 code = 1
-out = "::error::lint: above block 0 s, took 0.1 s\n"
+out = "::error::lint: above block 0.1 s, took "
 
 [[case]]
 arguments = ["timed", "limits.toml", "lint", "false"]
@@ -56,9 +56,9 @@ err = "cannot read limits.toml: "
 
 [[case]]
 arguments = ["timed", "limits.toml", "lint", "sh", "-c", "exit 0"]
-files = { "limits.toml" = "[lint]\nwarn = 0\nblock = 0\n" }
+files = { "limits.toml" = "[lint]\nwarn = 1\nblock = 1\n" }
 code = 0
-out = "lint: within warn 0 s and block 0 s, took 0.0 s\n"
+out = "lint: within warn 1 s and block 1 s, took 0.0 s\n"
 
 [[case]]
 arguments = ["timed", "limits.toml", "lint", "--since", "mark", "true"]
@@ -345,6 +345,35 @@ arguments = ["kill-matrix", "report.json", "."]
 code = 1
 err = "cannot read ./baseline.log: "
 files = { "outcomes.json" = '{ "outcomes": [{ "scenario": "Baseline", "summary": "Success", "log_path": "baseline.log" }] }' }
+
+# A test is in the matrix if any run names it: one only the baseline ran, one only a missed
+# mutant's run reached and one only an unviable mutant's run reached are all tautological.
+[[case]]
+arguments = ["kill-matrix", "report.json", "."]
+code = 0
+out = "kill matrix: 0 mutants caught, 0 by no named test, 1 missed, 1 unviable; 3 tests, 0 golden: 3 tautological, 0 in 0 redundant groups, 0 pinning\n"
+[case.files]
+"outcomes.json" = '''
+{
+  "outcomes": [
+    { "scenario": "Baseline", "summary": "Success", "log_path": "baseline.log" },
+    { "scenario": { "Mutant": { "name": "a.rs:1:1: m1" } }, "summary": "MissedMutant", "log_path": "missed.log" },
+    { "scenario": { "Mutant": { "name": "a.rs:2:1: m2" } }, "summary": "Unviable", "log_path": "unviable.log" }
+  ]
+}
+'''
+"baseline.log" = '''
+     Running `/t/target/debug/build/ci/0123456789abcdef/out/behaviour-0123456789abcdef`
+test only_in_the_baseline ... ok
+'''
+"missed.log" = '''
+     Running `/t/target/debug/build/ci/0123456789abcdef/out/behaviour-0123456789abcdef`
+test only_past_a_missed_mutant ... ok
+'''
+"unviable.log" = '''
+     Running `/t/target/debug/build/ci/0123456789abcdef/out/behaviour-0123456789abcdef`
+test only_past_an_unviable_mutant ... ok
+'''
 
 [[case]]
 arguments = ["kill-matrix", "absent/report.json", "."]

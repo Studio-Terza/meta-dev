@@ -3,46 +3,34 @@ use std::fmt;
 use std::path::Path;
 use std::time::Duration;
 
+use pipeline::{Limit, Verdict};
 use toml_ports::Toml;
 
 use crate::failure::Failure;
 use crate::ports::Disk;
 
 #[derive(Debug, serde::Deserialize)]
-struct Limits(BTreeMap<String, Limit>);
+struct Limits(BTreeMap<String, Stage>);
 
 #[derive(Clone, Copy, Debug, serde::Deserialize)]
-pub(crate) struct Limit {
+#[serde(deny_unknown_fields)]
+pub(crate) struct Stage {
     warn: f64,
     block: f64,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Verdict {
-    Within,
-    Warned,
-    Blocked,
-}
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+pub(crate) struct Took(Duration);
 
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct Tenths(Duration);
-
-impl Limit {
-    pub(crate) fn read(path: &Path, stage: &str) -> Result<Limit, Failure> {
+impl Stage {
+    pub(crate) fn read(path: &Path, stage: &str) -> Result<Stage, Failure> {
         let Limits(stages) = Toml::read(&Disk::read(path)?)?;
         stages.get(stage).copied().ok_or_else(|| Failure::Unlimited(stage.to_owned()))
     }
 
-    pub(crate) fn judged(self, spent: Tenths) -> Result<Verdict, Failure> {
-        let warn = Duration::try_from_secs_f64(self.warn)?;
-        let block = Duration::try_from_secs_f64(self.block)?;
-        Ok(if spent.0 > block {
-            Verdict::Blocked
-        } else if spent.0 > warn {
-            Verdict::Warned
-        } else {
-            Verdict::Within
-        })
+    pub(crate) fn judged(self, spent: Took) -> Result<Verdict, Failure> {
+        let [warn, block] = [self.warn, self.block].map(Duration::try_from_secs_f64);
+        Ok(Limit::warned(Took(warn?), Took(block?)).judged(&spent))
     }
 
     pub(crate) fn warn(self) -> f64 {
@@ -54,18 +42,13 @@ impl Limit {
     }
 }
 
-impl From<Duration> for Tenths {
-    fn from(spent: Duration) -> Tenths {
-        let tenths = u64::from(spent.subsec_millis() / Tenths::MILLIS);
-        Tenths(Duration::from_secs(spent.as_secs()) + Duration::from_millis(tenths * u64::from(Tenths::MILLIS)))
+impl From<Duration> for Took {
+    fn from(spent: Duration) -> Took {
+        Took(spent)
     }
 }
 
-impl Tenths {
-    const MILLIS: u32 = 100;
-}
-
-impl fmt::Display for Tenths {
+impl fmt::Display for Took {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{:.1} s", self.0.as_secs_f64())
     }

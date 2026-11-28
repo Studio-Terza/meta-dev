@@ -19,8 +19,8 @@ bench = false
 [dependencies]
 console-ports = { path = "../console-ports" }
 grammar = { path = "../grammar" }
-invariants = { path = "../invariants" }
 json-ports = { path = "../json-ports" }
+pipeline = { path = "../pipeline" }
 serde.workspace = true
 thiserror.workspace = true
 toml-ports = { path = "../toml-ports" }

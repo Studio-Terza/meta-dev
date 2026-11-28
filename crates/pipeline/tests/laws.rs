@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
 
-use pipeline::Measure;
+use pipeline::{Limit, Measure, Verdict};
 use proptest::prelude::*;
 use proptest::test_runner::{Config, RngSeed};
 
@@ -28,5 +28,12 @@ proptest! {
         prop_assert_eq!(set.clone().joined(joined.clone()).joined(widest.clone()), set.joined(joined.joined(widest)));
         prop_assert_eq!([BTreeMap::default().joined(map.clone()), map.clone().joined(BTreeMap::default())], [map.clone(), map.clone()]);
         prop_assert_eq!(map.clone().joined(merged.clone()).joined(fullest.clone()), map.joined(merged.joined(fullest)));
+    }
+
+    #[test]
+    fn a_limit_passes_each_level_and_judges_only_what_lies_beyond_it(warn in 0..100_u8, gap in 1..100_u8) {
+        let limit = Limit::warned(warn, warn + gap);
+        let judged = [warn, warn + 1, warn + gap, warn + gap + 1].map(|measured| limit.judged(&measured));
+        prop_assert_eq!(judged, [Verdict::Within, Verdict::Warned, Verdict::Warned, Verdict::Over]);
     }
 }
