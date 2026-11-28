@@ -19,7 +19,7 @@ seconds = 3
 
 [[call]]
 program = "sleep"
-arguments = ["30"]
+arguments = ["2"]
 seconds = 0
 
 [[call]]

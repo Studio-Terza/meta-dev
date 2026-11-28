@@ -1,7 +1,7 @@
 ["-c", "cat"] Some("a prompt handed on standard input") -> Ok(Succeeded(Printed("a prompt handed on standard input")))
 ["-c", "printf 'printed'; exit 3"] None -> Ok(Failed(Printed("printed")))
 ["-c", "cat; printf 'read nothing'"] None -> Ok(Succeeded(Printed("read nothing")))
-["30"] None -> Ok(Overdue)
+["2"] None -> Ok(Overdue)
 [] None -> Err("cannot start the program: No such file or directory (os error 2)")
 alone Some("a prompt handed on standard input") true
 paused forward true
