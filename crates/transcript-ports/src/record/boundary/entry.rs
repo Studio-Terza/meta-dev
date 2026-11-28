@@ -1,6 +1,7 @@
 mod assistant;
 mod attachment;
 mod classified;
+mod closing;
 mod object;
 mod said;
 mod stamp;
@@ -14,6 +15,7 @@ use crate::{Ignored, Line, Unrecognised};
 use assistant::Assistant;
 use attachment::Attached;
 use classified::Classified;
+pub use closing::Closing;
 use object::Object;
 use stamp::Passing;
 use user::User;
@@ -60,6 +62,16 @@ enum Tag {
 pub enum Entry {
     Known(Known),
     Unknown(Unrecognised),
+}
+
+impl Entry {
+    pub fn closing(&self) -> Closing {
+        match self {
+            Entry::Known(Known::Assistant(assistant)) => assistant.closing(),
+            Entry::Known(Known::Attachment(attached)) => attached.closing(),
+            Entry::Known(Known::User(_) | Known::Passing(_)) | Entry::Unknown(_) => Closing::Leaves,
+        }
+    }
 }
 
 impl Known {

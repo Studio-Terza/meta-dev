@@ -1,4 +1,4 @@
 mod measure;
 
+pub use derive::Measure;
 pub use measure::Measure;
-pub use newtype_derive::Measure;

@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use invariants::{Ignoring, ignored};
+use newtype::Arbitrary;
 use newtype::{Checked, CheckedDeserialize, Deserialize, Display, Newtype, Serialize, Wrapping};
-use newtype_derive::Arbitrary;
 use proptest::prelude::{any, prop_assert, prop_assert_eq, proptest};
 use proptest::strategy::{Strategy, ValueTree};
 use proptest::test_runner::{Config, RngSeed, TestError, TestRunner};
