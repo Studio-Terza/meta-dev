@@ -30,15 +30,15 @@ jobs:
       - name: the target key, as ci's clippy job computes it
         id: target
         run: |
-          {
-            grep -B2 '^source = ' Cargo.lock
-            cat rust-toolchain.toml Cargo.toml
-            env | grep -E '^(RUSTFLAGS|RUSTC_WRAPPER|CARGO_[A-Z_]+)=' | sort
-          } | sha256sum | cut -c1-64 | sed 's/^/key=clippy-${{ runner.os }}-/' >> "$GITHUB_OUTPUT"
+          build=$({ cat rust-toolchain.toml; awk '/^\[/ { profile = /^\[profile/ } profile' Cargo.toml; env | grep -E '^(RUSTFLAGS|RUSTC_WRAPPER|CARGO_[A-Z_]+)=' | sort; } | sha256sum | cut -c1-64)
+          registry=$(grep -B2 '^source = ' Cargo.lock | sha256sum | cut -c1-64)
+          echo "prefix=clippy-${{ runner.os }}-$build-" >> "$GITHUB_OUTPUT"
+          echo "key=clippy-${{ runner.os }}-$build-$registry" >> "$GITHUB_OUTPUT"
       - uses: actions/cache/restore@v4
         with:
           path: target
           key: ${{ steps.target.outputs.key }}
+          restore-keys: ${{ steps.target.outputs.prefix }}
       - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
       - uses: actions/cache/save@v4
         if: always()
@@ -55,15 +55,15 @@ jobs:
       - name: the target key, as ci's test job computes it
         id: target
         run: |
-          {
-            grep -B2 '^source = ' Cargo.lock
-            cat rust-toolchain.toml Cargo.toml
-            env | grep -E '^(RUSTFLAGS|RUSTC_WRAPPER|CARGO_[A-Z_]+)=' | sort
-          } | sha256sum | cut -c1-64 | sed 's/^/key=target-${{ runner.os }}-/' >> "$GITHUB_OUTPUT"
+          build=$({ cat rust-toolchain.toml; awk '/^\[/ { profile = /^\[profile/ } profile' Cargo.toml; env | grep -E '^(RUSTFLAGS|RUSTC_WRAPPER|CARGO_[A-Z_]+)=' | sort; } | sha256sum | cut -c1-64)
+          registry=$(grep -B2 '^source = ' Cargo.lock | sha256sum | cut -c1-64)
+          echo "prefix=target-${{ runner.os }}-$build-" >> "$GITHUB_OUTPUT"
+          echo "key=target-${{ runner.os }}-$build-$registry" >> "$GITHUB_OUTPUT"
       - uses: actions/cache/restore@v4
         with:
           path: target
           key: ${{ steps.target.outputs.key }}
+          restore-keys: ${{ steps.target.outputs.prefix }}
       - run: cargo test --locked --workspace --no-run
       - uses: actions/cache/save@v4
         if: always()
