@@ -61,9 +61,12 @@ stop = {}
 stop = { untranscribed = "Yes" }
 
 [[story]]
-name = "a shell still running passes"
+name = "a shell still running passes, even past an exit notice that has scrolled out of its tail"
 transcript = [["user", "o1", "Merge only when CI is green."], ["assistant", "p1", "Understood."]]
-shells = [{ file = "b1.output", text = "building\n" }]
+shells = [
+  { file = "b1.output", text = "building\n" },
+  { file = "b2.output", text = "[exited with code 0]\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n" },
+]
 
 [[story.step]]
 stop = {}

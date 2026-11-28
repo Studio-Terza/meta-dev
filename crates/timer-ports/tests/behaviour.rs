@@ -26,13 +26,13 @@ fn a_deadline_is_pending_before_its_timeout_and_passed_from_it_on() {
 }
 
 #[test]
-fn the_system_clock_moves_forward_across_a_pause() {
+fn the_system_clock_moves_forward_by_at_least_a_pause() {
     let run = Run::root();
     let forward = {
         let clock = run.port(SystemClock);
         let first = clock.now();
-        let paused = clock.paused(Pause::new(0));
-        [paused >= first, clock.now() >= paused]
+        let paused = clock.paused(Pause::new(1));
+        [paused.since(first) >= Elapsed::from(Duration::from_secs(1)), clock.now() >= paused]
     };
     assert_eq!(forward, [true, true]);
     let measured = run.finish();

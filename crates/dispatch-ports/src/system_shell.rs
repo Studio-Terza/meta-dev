@@ -87,16 +87,15 @@ impl SystemShell {
     fn waited(child: &mut Child, deadline: Deadline) -> Result<Waited, DispatchFailure> {
         iter::repeat_with(Wall::now)
             .take_while(|now| deadline.due(*now) == Due::Pending)
-            .find_map(|_| SystemShell::checked(child).transpose())
+            .find_map(|_| match child.try_wait() {
+                Ok(Some(status)) => Some(Ok(Waited::Exited(status))),
+                Ok(None) => {
+                    thread::sleep(SystemShell::POLL);
+                    None
+                }
+                Err(failure) => Some(Err(DispatchFailure::Collect(failure))),
+            })
             .unwrap_or(Ok(Waited::Overdue))
-    }
-
-    fn checked(child: &mut Child) -> Result<Option<Waited>, DispatchFailure> {
-        let exited = child.try_wait().map_err(DispatchFailure::Collect)?;
-        Ok(exited.map(Waited::Exited).or_else(|| {
-            thread::sleep(SystemShell::POLL);
-            None
-        }))
     }
 
     fn collected(reading: Option<JoinHandle<io::Result<String>>>) -> Result<Printed, DispatchFailure> {
