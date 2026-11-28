@@ -4,7 +4,7 @@ use std::ops::Not;
 use std::path::Path;
 
 use design_messages::{CheckName, PullNumber};
-use dispatch_ports::{Clock, Deadline, Due, Pause, Ran, Shell, Timeout};
+use dispatch_ports::{Clock, Deadline, Due, Pause, Printed, Ran, Shell, Timeout};
 use file_ports::Files;
 use grammar_spec_line::Attachment;
 use invariants::Ignoring;
@@ -13,8 +13,8 @@ use serde::de::DeserializeOwned;
 use store_ports::Store;
 
 use super::super::super::Ground;
-use super::super::super::crew::Crew;
-use super::boundary::{Branch, Branched, CommitSha, Compared, First, JobId, Opened, Pushed};
+use super::super::super::crew::{Crew, Program};
+use super::boundary::{Branch, Branched, CommitSha, Compared, First, JobId, Link, Opened, Pushed};
 use super::{FailedJob, UnreadStep};
 use crate::cli::request::ignored::Ignored;
 use crate::cli::request::{Landed, Local, Repository};
@@ -77,10 +77,6 @@ enum State {
     Waiting,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
-#[serde(from = "String")]
-struct Link(Option<JobId>);
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Unopened {
     Unpushed(Option<CommitSha>),
@@ -117,7 +113,6 @@ struct Oid {
 }
 
 impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
-    const PROGRAM: &'static str = "gh";
     const QUICK: Timeout = Timeout::new(60);
     const WATCH: Timeout = Timeout::new(20 * 60);
     const POLL: Pause = Pause::new(10);
@@ -135,17 +130,20 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
         Hub { crew, directory, repository }
     }
 
-    fn ran(&self, arguments: &[&str], timeout: Timeout) -> Option<Ran> {
-        let named = self.repository.to_string();
-        self.spoke(&[arguments, &["-R", &named]].concat(), timeout)
+    fn ran(&self, arguments: impl IntoIterator<Item: fmt::Display>, timeout: Timeout) -> Option<Ran> {
+        let named = ["-R".to_owned(), self.repository.to_string()];
+        self.spoke(arguments.into_iter().map(|word| word.to_string()).chain(named), timeout)
     }
 
-    fn spoke(&self, arguments: &[&str], timeout: Timeout) -> Option<Ran> {
-        self.crew.spoke(Hub::<C, G>::PROGRAM, arguments, self.directory, timeout)
+    fn spoke(&self, arguments: impl IntoIterator<Item: fmt::Display>, timeout: Timeout) -> Option<Ran> {
+        self.crew.spoke(Program::Gh, arguments, self.directory, timeout)
     }
 
-    pub(crate) fn viewed<T: DeserializeOwned>(&self, pull: PullNumber, fields: &str) -> Option<T> {
-        let ran = self.ran(&["pr", "view", &pull.to_string(), "--json", fields], Self::QUICK);
+    pub(crate) fn viewed<T: DeserializeOwned>(&self, pull: PullNumber, fields: impl fmt::Display) -> Option<T> {
+        let ran = self.ran(
+            ["pr".to_owned(), "view".to_owned(), pull.to_string(), "--json".to_owned(), fields.to_string()],
+            Self::QUICK,
+        );
         let printed = ran.as_ref().and_then(Ran::succeeded)?;
         serde_json::from_str(printed.as_ref()).ignoring(Ignored::Unviewed)
     }
@@ -231,9 +229,9 @@ impl<'crew, C: Clock, G: Shell> Hub<'crew, C, G> {
         listed.map_or(Ok(None), |checks| Verdict::read(&checks))
     }
 
-    pub(crate) fn log(&self, job: JobId) -> String {
+    pub(crate) fn log(&self, job: JobId) -> Printed {
         let ran = self.ran(&["run", "view", "--job", &job.to_string(), "--log-failed"], Self::QUICK);
-        ran.as_ref().and_then(Ran::succeeded).map_or_else(|| Hub::<C, G>::UNLOGGED.to_owned(), ToString::to_string)
+        ran.as_ref().and_then(Ran::succeeded).cloned().unwrap_or_else(|| Printed::new(Hub::<C, G>::UNLOGGED.to_owned()))
     }
 }
 
@@ -262,7 +260,7 @@ impl Verdict {
 
 impl Check {
     fn failed(&self) -> Option<FailedJob> {
-        self.link.0.map(|job| FailedJob::new(self.name.clone(), job))
+        self.link.job().map(|job| FailedJob::new(self.name.clone(), job))
     }
 }
 
@@ -273,12 +271,6 @@ impl Bucket {
             Bucket::Fail | Bucket::Cancel => State::Failed,
             Bucket::Pending => State::Waiting,
         }
-    }
-}
-
-impl From<String> for Link {
-    fn from(link: String) -> Link {
-        Link(JobId::linked(&link))
     }
 }
 

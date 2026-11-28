@@ -1,5 +1,6 @@
 mod boundary;
 
+use std::fmt;
 use std::path::{Path, PathBuf};
 
 use console_ports::Heard;
@@ -11,7 +12,7 @@ use newtype::Wrapping;
 use store_ports::Store;
 
 use super::super::Ground;
-use super::super::crew::Crew;
+use super::super::crew::{Crew, Program};
 use super::subagent::Hub;
 use crate::cli::failure::Failure;
 use crate::cli::request::{Held, Item, Local};
@@ -75,7 +76,6 @@ impl Used {
 }
 
 impl<C: Clock, G: Shell> Releasing<'_, '_, C, G> {
-    const PROGRAM: &'static str = "git";
     const QUICK: Timeout = Timeout::new(60);
 
     fn released(&self, local: &Local) -> Result<Released, Holding> {
@@ -108,8 +108,8 @@ impl<C: Clock, G: Shell> Releasing<'_, '_, C, G> {
         removed.as_ref().and_then(Ran::succeeded).map(|_removed| Released::Removed).ok_or_else(|| held(Held::Unremoved))
     }
 
-    fn git(&self, arguments: &[&str], directory: &Path) -> Option<Ran> {
-        self.crew.spoke(Self::PROGRAM, arguments, directory, Self::QUICK)
+    fn git(&self, arguments: impl IntoIterator<Item: fmt::Display>, directory: &Path) -> Option<Ran> {
+        self.crew.spoke(Program::Git, arguments, directory, Self::QUICK)
     }
 }
 

@@ -4,13 +4,15 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use design_messages::PullNumber;
-use grammar::{AgentReport, BranchName, Ended, JobLink, SpecTrailer, Target};
+use dispatch_ports::Printed;
+use grammar::{AgentReport, BranchName, Ended, JobLink, Lines, SpecTrailer, Target};
 use grammar_spec_line::Attachment;
 use hex::FromHex;
 use invariants::Ignoring;
 use newtype::{Display, Newtype};
 use serde::Deserialize;
 
+use super::{FailedJob, Logged};
 use crate::cli::request::ignored::Ignored;
 
 #[derive(Debug, Deserialize)]
@@ -241,5 +243,46 @@ impl fmt::Display for CommitSha {
 impl JobId {
     pub(crate) fn linked(link: &str) -> Option<JobId> {
         JobLink::read(link).map(|linked| JobId::new(linked.job()))
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Excerpt {
+    failed: FailedJob,
+    lines: Vec<String>,
+}
+
+#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(from = "String")]
+pub(crate) struct Link(Option<JobId>);
+
+impl Excerpt {
+    pub(crate) fn tailed(failed: FailedJob, log: &Printed) -> Excerpt {
+        let whole: Vec<String> = match log.as_ref().parse::<Lines>() {
+            Ok(lines) => lines.into_iter().collect(),
+            Err(unsplit) => match unsplit {},
+        };
+        let skipped = whole.len().saturating_sub(Logged::LINES);
+        Excerpt { failed, lines: whole.into_iter().skip(skipped).collect() }
+    }
+}
+
+impl fmt::Display for Excerpt {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let FailedJob { check, job } = &self.failed;
+        write!(formatter, "\n{check} (job {job}):\n")?;
+        self.lines.iter().try_for_each(|line| writeln!(formatter, "{line}"))
+    }
+}
+
+impl Link {
+    pub(crate) fn job(self) -> Option<JobId> {
+        self.0
+    }
+}
+
+impl From<String> for Link {
+    fn from(link: String) -> Link {
+        Link(JobId::linked(&link))
     }
 }

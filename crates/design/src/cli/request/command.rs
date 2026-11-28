@@ -1,3 +1,4 @@
+mod boundary;
 mod crew;
 mod hook;
 mod ingest;
@@ -8,13 +9,12 @@ use console_ports::{Environment, Shown};
 use dispatch_ports::{Clock, Shell};
 use file_ports::Files;
 use store_ports::{Opens, Store};
-use strum::VariantArray;
 
 use super::Ground;
 use super::persistence::Persistence;
+use crate::Outcome;
 use crate::cli::failure::Failure;
 use crate::cli::uttered::Uttered;
-use crate::{HookEvent, Outcome};
 pub(crate) use crew::Crew;
 use hook::Hook;
 use ingest::Ingest;
@@ -26,21 +26,6 @@ pub(crate) enum Command {
 }
 
 impl Command {
-    const INGEST: &'static str = "ingest";
-    const DRY_RUN: &'static str = "--dry-run";
-    const HOOK: &'static str = "hook";
-    const SETTINGS: &'static str = "--settings";
-
-    pub(crate) fn spoken(words: &[&str]) -> Result<Command, Failure> {
-        match words {
-            [Self::INGEST] => Ok(Command::Ingest(Persistence::File)),
-            [Self::INGEST, Self::DRY_RUN] => Ok(Command::Ingest(Persistence::DryRun)),
-            [Self::HOOK, Self::SETTINGS] => Ok(Command::Hook(Hook::Settings)),
-            [Self::HOOK, event] => Hook::named(event).map(Command::Hook),
-            _ => Err(Failure::Usage),
-        }
-    }
-
     pub(crate) fn opened<O: Opens>(self, path: PathBuf, opens: &O) -> O::Store {
         match self {
             Command::Ingest(persistence) => persistence.opened(path, opens),
@@ -59,15 +44,5 @@ impl Command {
                 .map(|tally| Uttered::new(Shown::said(tally), Ok(Outcome::Ingested))),
             Command::Hook(hook) => hook.answered(environment, ground, crew),
         }
-    }
-}
-
-impl Hook {
-    fn named(event: &str) -> Result<Hook, Failure> {
-        HookEvent::VARIANTS
-            .iter()
-            .find(|known| <&str>::from(**known) == event)
-            .map(|known| Hook::On(*known))
-            .ok_or(Failure::Usage)
     }
 }

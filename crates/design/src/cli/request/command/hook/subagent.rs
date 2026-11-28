@@ -8,7 +8,6 @@ use console_ports::Heard;
 use design_messages::{CheckName, FailedBefore, Failing};
 use dispatch_ports::{Clock, Shell};
 use file_ports::Files;
-use grammar::Lines;
 use invariants::Ignoring;
 use newtype::Wrapping;
 use store_ports::Store;
@@ -19,10 +18,10 @@ use super::boundary::Decision;
 use crate::cli::failure::Failure;
 pub(crate) use crate::cli::request::UnreadStep;
 use crate::cli::request::ignored::Ignored;
-use crate::cli::request::{Cause as Escalation, Item, Local, Target};
+use crate::cli::request::{Cause as Escalation, HeadRef, Item, Local, Target};
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
-use boundary::{At, Branched, JobId, Pushed, Reminder, Report, Said};
+use boundary::{At, Branched, Excerpt, JobId, Pushed, Reminder, Report, Said};
 pub(crate) use boundary::{Branch, CommitSha, Finishing};
 pub(crate) use hub::Hub;
 use hub::{Mergeability, Unopened, Verdict};
@@ -73,12 +72,6 @@ struct Stale<'report> {
 struct Logged {
     pushed: Pushed,
     jobs: Vec<Excerpt>,
-}
-
-#[derive(Debug)]
-struct Excerpt {
-    failed: FailedJob,
-    lines: Vec<String>,
 }
 
 impl Finishing {
@@ -197,17 +190,6 @@ impl Logged {
     }
 }
 
-impl Excerpt {
-    fn tailed(failed: FailedJob, log: &str) -> Excerpt {
-        let whole: Vec<String> = match log.parse::<Lines>() {
-            Ok(lines) => lines.into_iter().collect(),
-            Err(unsplit) => match unsplit {},
-        };
-        let skipped = whole.len().saturating_sub(Logged::LINES);
-        Excerpt { failed, lines: whole.into_iter().skip(skipped).collect() }
-    }
-}
-
 impl From<&Pushed> for Target {
     fn from(pushed: &Pushed) -> Target {
         Target::Pull(pushed.pull().into_inner())
@@ -216,7 +198,7 @@ impl From<&Pushed> for Target {
 
 impl From<&Branched> for Target {
     fn from(branched: &Branched) -> Target {
-        Target::Branch(branched.branch().to_string())
+        Target::Branch(HeadRef::from(branched.branch()))
     }
 }
 
@@ -284,9 +266,6 @@ impl fmt::Display for Logged {
             "CI failed on #{pull} at {}. Fix these jobs, push, then end with DONE #{pull} <full sha>.",
             self.pushed.head()
         )?;
-        self.jobs.iter().try_for_each(|Excerpt { failed: FailedJob { check, job }, lines }| {
-            write!(formatter, "\n{check} (job {job}):\n")?;
-            lines.iter().try_for_each(|line| writeln!(formatter, "{line}"))
-        })
+        self.jobs.iter().try_for_each(|excerpt| write!(formatter, "{excerpt}"))
     }
 }

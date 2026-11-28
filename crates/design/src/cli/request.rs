@@ -19,7 +19,7 @@ pub(crate) use ground::Ground;
 pub(crate) use local::{Local, Repository, Rooted};
 use projects::Projects;
 pub(crate) use projects::{Kept, Located};
-pub(crate) use queue::{Cause, Held, Item, Landed, Named, Queue, Target, UnreadStep};
+pub(crate) use queue::{Cause, HeadRef, Held, Item, Landed, Named, Queue, Target, UnreadStep};
 
 #[derive(Debug)]
 pub(crate) struct Request {
