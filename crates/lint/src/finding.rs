@@ -17,6 +17,7 @@ pub(crate) enum Rule {
     ExpressionFlow,
     ManualIteration,
     ProcessStarters,
+    PublicSurface,
     PublicApiTests,
     NoTestOnlyApi,
     BoolMethods,
@@ -39,6 +40,7 @@ impl fmt::Display for Rule {
             Rule::ExpressionFlow => "control flow is an expression; every branch yields the value the function returns",
             Rule::ManualIteration => "iterators are driven by combinators, not by hand",
             Rule::ProcessStarters => "only ports start processes",
+            Rule::PublicSurface => "a crate exports exactly what another crate uses",
             Rule::PublicApiTests => "tests go through public APIs",
             Rule::NoTestOnlyApi => "shipped code has no test-only API",
             Rule::BoolMethods => {

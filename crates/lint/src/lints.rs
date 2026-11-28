@@ -10,6 +10,7 @@ mod no_test_only_api;
 mod primitive_boundary;
 mod process_starters;
 mod public_api_tests;
+mod public_surface;
 mod test_shape;
 mod type_shape;
 mod vec_out_params;
@@ -36,12 +37,14 @@ pub(crate) use no_test_only_api::NoTestOnlyApi;
 pub(crate) use primitive_boundary::PrimitiveBoundary;
 pub(crate) use process_starters::ProcessStarters;
 pub(crate) use public_api_tests::{ApiFact, Emitters, PublicApiTests};
+pub(crate) use public_surface::{PublicSurface, SurfaceFact};
 pub(crate) use test_shape::TestShape;
 pub(crate) use type_shape::TypeShape;
 pub(crate) use vec_out_params::VecOutParams;
 
 #[derive(Debug, Default)]
 pub(crate) struct Facts {
+    surface: Vec<SurfaceFact>,
     api: Vec<ApiFact>,
     test_only: Vec<Finding>,
     dead: Vec<DeadFact>,
@@ -73,6 +76,7 @@ impl<'run> Lints<'run> {
             process_starters: lints.style(),
             bool_methods: lints.style(),
             no_dyn: lints.style(),
+            public_surface: lints.graph(),
             public_api_tests: lints.graph(),
             emitters: Pausable::admitted(Emitters::default(), lints.entered),
             no_test_only_api: lints.graph(),
@@ -91,6 +95,7 @@ impl<'run> Lints<'run> {
             process_starters,
             bool_methods,
             no_dyn,
+            public_surface,
             public_api_tests,
             emitters,
             no_test_only_api,
@@ -114,8 +119,12 @@ impl<'run> Lints<'run> {
             lints.found(test_shape),
         ];
         let api = Lints::facts(public_api_tests).into_iter().chain(emitters.woken().map_or_default(Emitters::facts));
-        let facts =
-            Facts { api: api.collect(), test_only: Lints::facts(no_test_only_api), dead: Lints::facts(dead_code) };
+        let facts = Facts {
+            surface: Lints::facts(public_surface),
+            api: api.collect(),
+            test_only: Lints::facts(no_test_only_api),
+            dead: Lints::facts(dead_code),
+        };
         let budget = Budget::of_file(source, &test_scan.woken().unwrap_or_default(), gate);
         Linted { found: found.into_iter().flatten().collect(), facts, budget }
     }
@@ -143,6 +152,7 @@ impl<'run> Lints<'run> {
 impl Facts {
     pub(crate) fn joined(self, later: Facts) -> Facts {
         Facts {
+            surface: self.surface.into_iter().chain(later.surface).collect(),
             api: self.api.into_iter().chain(later.api).collect(),
             test_only: self.test_only.into_iter().chain(later.test_only).collect(),
             dead: self.dead.into_iter().chain(later.dead).collect(),
@@ -150,9 +160,10 @@ impl Facts {
     }
 
     pub(crate) fn reduced(self, packages: &[Arc<Package>]) -> Vec<Finding> {
+        let surface = PublicSurface::reduce(self.surface, packages);
         let api = PublicApiTests::reduce(self.api, packages);
         let test_only = NoTestOnlyApi::reduce(self.test_only, packages);
         let dead = DeadCode::reduce(self.dead, packages);
-        api.into_iter().chain(test_only).chain(dead).collect()
+        surface.into_iter().chain(api).chain(test_only).chain(dead).collect()
     }
 }
