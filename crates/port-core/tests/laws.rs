@@ -6,6 +6,7 @@ use newtype::Wrapping;
 use port_core::{
     Calls, Counted, Held, Measured, Metered, Op, Pass, Port, Release, ReleaseReceipt, Released, Resource, Run, port,
 };
+use test_failure::{Failed, Golden};
 
 ignored! {
     enum Ignored {
@@ -218,10 +219,7 @@ impl Session {
 }
 
 #[test]
-fn every_scenario_counts_and_releases_as_its_golden_says() -> Result<(), std::io::Error> {
+fn every_scenario_counts_and_releases_as_its_golden_says() -> Result<(), Failed> {
     let shown: String = Scenario::ALL.iter().map(Scenario::shown).collect();
-    let golden = Path::new(env!("CARGO_MANIFEST_DIR")).join(GOLDEN);
-    std::env::var_os("RECORD_GOLDENS").map_or(Ok(()), |_| std::fs::write(&golden, &shown))?;
-    assert_eq!(shown, std::fs::read_to_string(golden)?);
-    Ok(())
+    Golden::at(Path::new(env!("CARGO_MANIFEST_DIR")), GOLDEN).checked(&shown)
 }

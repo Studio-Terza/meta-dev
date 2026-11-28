@@ -8,7 +8,7 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::thread;
 use std::time::{Duration, SystemTime};
-use test_failure::Failed;
+use test_failure::{Cases, Failed, Golden};
 
 use console_ports::{Complaint, Heard, Shown, Variables};
 use design::{Agents, Cli, Failure};
@@ -553,8 +553,7 @@ impl Story {
     }
 
     fn all() -> Result<Vec<Story>, Failed> {
-        let written = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(STORIES))?;
-        Ok(toml::from_str::<Stories>(&written)?.story)
+        Ok(Cases::read::<Stories>(&Path::new(env!("CARGO_MANIFEST_DIR")).join(STORIES))?.story)
     }
 
     fn shown(&self) -> Result<String, Failed> {
@@ -605,10 +604,7 @@ fn every_story_says_what_its_golden_says() -> Result<(), Failed> {
         Story::joined(running)
     });
     let shown: String = told.into_iter().collect::<Result<_, Untold>>()?;
-    let golden = Path::new(env!("CARGO_MANIFEST_DIR")).join(GOLDEN);
-    std::env::var_os("RECORD_GOLDENS").map_or(Ok(()), |_| fs::write(&golden, &shown))?;
-    assert_eq!(shown, fs::read_to_string(golden)?);
-    Ok(())
+    Golden::at(Path::new(env!("CARGO_MANIFEST_DIR")), GOLDEN).checked(&shown)
 }
 
 mod ports {

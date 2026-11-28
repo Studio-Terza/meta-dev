@@ -203,7 +203,6 @@ dependencies = [
  "serde",
  "test-failure",
  "thiserror",
- "toml",
 ]
 
 [[package]]
@@ -319,7 +318,6 @@ dependencies = [
  "grammar",
  "serde",
  "test-failure",
- "toml",
 ]
 
 [[package]]
@@ -329,7 +327,6 @@ dependencies = [
  "grammar",
  "serde",
  "test-failure",
- "toml",
 ]
 
 [[package]]
@@ -347,7 +344,6 @@ dependencies = [
  "grammar",
  "serde",
  "test-failure",
- "toml",
 ]
 
 [[package]]
@@ -358,7 +354,6 @@ dependencies = [
  "serde",
  "test-failure",
  "thiserror",
- "toml",
 ]
 
 [[package]]
@@ -368,7 +363,6 @@ dependencies = [
  "grammar",
  "serde",
  "test-failure",
- "toml",
 ]
 
 [[package]]
@@ -399,7 +393,6 @@ dependencies = [
  "grammar",
  "serde",
  "test-failure",
- "toml",
 ]
 
 [[package]]
@@ -419,7 +412,6 @@ dependencies = [
  "grammar",
  "serde",
  "test-failure",
- "toml",
 ]
 
 [[package]]
@@ -616,6 +608,7 @@ dependencies = [
  "newtype",
  "pipeline",
  "port-derive",
+ "test-failure",
  "thiserror",
 ]
 
@@ -945,6 +938,11 @@ dependencies = [
 [[package]]
 name = "test-failure"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "tempfile",
+ "toml",
+]
 
 [[package]]
 name = "thiserror"

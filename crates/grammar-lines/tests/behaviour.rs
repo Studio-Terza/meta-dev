@@ -1,9 +1,8 @@
-use std::fs;
 use std::path::Path;
 
 use grammar_lines::{Fields, KeptLines, Lines};
 use serde::Deserialize;
-use test_failure::Failed;
+use test_failure::{Cases, Failed, Golden};
 
 #[derive(Debug, Deserialize)]
 struct Texts {
@@ -12,8 +11,8 @@ struct Texts {
 
 #[test]
 fn the_lines_lexer_reads_its_fixture_texts_as_its_golden_says() -> Result<(), Failed> {
-    let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
-    let texts: Texts = toml::from_str(&fs::read_to_string(directory.join("texts.toml"))?)?;
+    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let texts: Texts = Cases::read(&manifest.join("tests/texts.toml"))?;
     let shown: Vec<String> = texts
         .lines
         .iter()
@@ -27,9 +26,5 @@ fn the_lines_lexer_reads_its_fixture_texts_as_its_golden_says() -> Result<(), Fa
             format!("lines {text:?}: {lines:?} {kept:?} {fields:?}")
         })
         .collect();
-    let golden = directory.join("lexed.txt");
-    let said = shown.join("\n");
-    std::env::var_os("RECORD_GOLDENS").map_or(Ok(()), |_| fs::write(&golden, &said))?;
-    assert_eq!(said, fs::read_to_string(golden)?);
-    Ok(())
+    Golden::at(manifest, "tests/lexed.txt").checked(&shown.join("\n"))
 }
