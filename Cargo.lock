@@ -508,6 +508,24 @@ dependencies = [
 [[package]]
 name = "invariants"
 version = "0.1.0"
+dependencies = [
+ "design-messages",
+ "dispatch-doubles",
+ "dispatch-ports",
+ "file-doubles",
+ "file-ports",
+ "fixture",
+ "grammar-spec-line",
+ "newtype",
+ "port-core",
+ "proptest",
+ "serde",
+ "serde_json",
+ "sqlite-ports",
+ "store-ports",
+ "tempfile",
+ "transcript-ports",
+]
 
 [[package]]
 name = "itoa"
@@ -1059,26 +1077,19 @@ checksum = "06bdbd8cfc056b8d2e2e85f29b56a3bdbecb527cef81eb39e3e7b98af4652770"
 name = "transcript-ports"
 version = "0.1.0"
 dependencies = [
- "design-messages",
- "dispatch-doubles",
- "dispatch-ports",
  "file-doubles",
  "file-ports",
  "fixture",
  "grammar-bare",
  "grammar-lines",
  "grammar-notice",
- "grammar-spec-line",
  "invariants",
  "newtype",
  "port-core",
  "proptest",
  "serde",
  "serde_json",
- "sqlite-ports",
- "store-ports",
  "strum",
- "tempfile",
  "thiserror",
 ]
 

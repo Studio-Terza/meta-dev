@@ -24,16 +24,9 @@ strum.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-design-messages = { path = "../design-messages" }
-dispatch-doubles = { path = "../dispatch-doubles" }
-dispatch-ports = { path = "../dispatch-ports" }
 file-doubles = { path = "../file-doubles" }
 fixture = { path = "../fixture" }
-grammar-spec-line = { path = "../grammar-spec-line" }
 proptest.workspace = true
-sqlite-ports = { path = "../sqlite-ports" }
-store-ports = { path = "../store-ports" }
-tempfile.workspace = true
 
 [lints]
 workspace = true
