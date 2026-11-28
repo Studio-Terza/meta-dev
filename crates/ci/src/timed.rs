@@ -6,7 +6,7 @@ use console_ports::Answer;
 use pipeline::Verdict;
 
 use crate::failure::Failure;
-use crate::limits::{Stage, Tenths};
+use crate::limits::{Stage, Took};
 use crate::ports::{Mark, Ran};
 
 #[derive(Debug)]
@@ -37,7 +37,7 @@ impl Timed {
     pub(crate) fn answered(&self) -> Result<Answer, Failure> {
         let limit = Stage::read(&self.limits, &self.stage)?;
         let ran = Ran::started(&self.program, &self.arguments)?;
-        let spent = Tenths::from(self.since.as_deref().map_or(Ok(ran.spent()), Mark::elapsed)?);
+        let spent = Took::from(self.since.as_deref().map_or(Ok(ran.spent()), Mark::elapsed)?);
         let verdict = limit.judged(spent)?;
         let (stage, block, status) = (&self.stage, limit.block(), ran.status());
         let failed = (!status.success()).then(|| format!("::error::{stage} failed: {status}\n"));

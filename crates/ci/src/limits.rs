@@ -19,7 +19,7 @@ pub(crate) struct Stage {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-pub(crate) struct Tenths(Duration);
+pub(crate) struct Took(Duration);
 
 impl Stage {
     pub(crate) fn read(path: &Path, stage: &str) -> Result<Stage, Failure> {
@@ -27,8 +27,8 @@ impl Stage {
         stages.get(stage).copied().ok_or_else(|| Failure::Unlimited(stage.to_owned()))
     }
 
-    pub(crate) fn judged(self, spent: Tenths) -> Result<Verdict, Failure> {
-        Ok(Limit::at(Tenths(Duration::try_from_secs_f64(self.block)?)).judged(&spent))
+    pub(crate) fn judged(self, spent: Took) -> Result<Verdict, Failure> {
+        Ok(Limit::at(Took(Duration::try_from_secs_f64(self.block)?)).judged(&spent))
     }
 
     pub(crate) fn block(self) -> f64 {
@@ -36,18 +36,13 @@ impl Stage {
     }
 }
 
-impl From<Duration> for Tenths {
-    fn from(spent: Duration) -> Tenths {
-        let tenths = u64::from(spent.subsec_millis() / Tenths::MILLIS);
-        Tenths(Duration::from_secs(spent.as_secs()) + Duration::from_millis(tenths * u64::from(Tenths::MILLIS)))
+impl From<Duration> for Took {
+    fn from(spent: Duration) -> Took {
+        Took(spent)
     }
 }
 
-impl Tenths {
-    const MILLIS: u32 = 100;
-}
-
-impl fmt::Display for Tenths {
+impl fmt::Display for Took {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{:.1} s", self.0.as_secs_f64())
     }
