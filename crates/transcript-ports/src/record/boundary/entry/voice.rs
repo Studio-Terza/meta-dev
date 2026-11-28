@@ -1,4 +1,5 @@
-use grammar_notice::TaskNotice;
+use grammar::Grammar;
+use grammar::notice::TaskNotice;
 use invariants::Ignoring;
 
 use super::object::Object;

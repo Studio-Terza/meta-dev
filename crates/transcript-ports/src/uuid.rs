@@ -1,4 +1,5 @@
-use grammar_bare::Bare;
+use grammar::Grammar;
+use grammar::bare::Bare;
 use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype};
 
 #[derive(Debug, thiserror::Error)]
@@ -13,6 +14,6 @@ impl Checked for Uuid {
     type Error = Unbare;
 
     fn checked(text: &String) -> Result<&String, Unbare> {
-        Bare::word(text).map(|_bare| text).ok_or_else(|| Unbare(text.clone()))
+        Bare::read(text).map(|_bare| text).ok_or_else(|| Unbare(text.clone()))
     }
 }

@@ -1,5 +1,6 @@
-use grammar_lines::Lines;
-use grammar_test_log::{TestLine, Verdict};
+use grammar::Grammar;
+use grammar::lines::Lines;
+use grammar::test_log::{TestLine, Verdict};
 use serde::Serialize;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize)]
@@ -48,8 +49,7 @@ impl Test {
 
 impl Log {
     pub(crate) fn read(text: &str) -> Log {
-        let reading =
-            text.parse::<Lines>().into_iter().flatten().fold(Reading::default(), |reading, line| reading.line(&line));
+        let reading = Lines::from(text).into_iter().fold(Reading::default(), |reading, line| reading.line(&line));
         Log { runs: reading.runs }
     }
 

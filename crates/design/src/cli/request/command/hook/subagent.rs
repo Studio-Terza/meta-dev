@@ -8,8 +8,9 @@ use console_ports::Heard;
 use design_messages::{CheckName, CommitSha, FailedBefore, Failing};
 use dispatch_ports::{Clock, Shell};
 use file_ports::Files;
-use grammar_lines::Lines;
-use grammar_report::MissedMutant;
+use grammar::Grammar;
+use grammar::lines::Lines;
+use grammar::report::MissedMutant;
 use invariants::Ignoring;
 use newtype::Wrapping;
 use store_ports::Store;
@@ -200,10 +201,7 @@ impl Logged {
 
 impl Excerpt {
     fn excerpted(failed: FailedJob, log: &str) -> Excerpt {
-        let whole: Vec<String> = match log.parse::<Lines>() {
-            Ok(lines) => lines.into_iter().collect(),
-            Err(unsplit) => match unsplit {},
-        };
+        let whole: Vec<String> = Lines::from(log).into_iter().collect();
         let missed: Vec<String> = whole.iter().filter(|line| MissedMutant::read(line).is_some()).cloned().collect();
         let skipped = whole.len().saturating_sub(Logged::LINES);
         let lines = if missed.is_empty() { whole.into_iter().skip(skipped).collect() } else { missed };

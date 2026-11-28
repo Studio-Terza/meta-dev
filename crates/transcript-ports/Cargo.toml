@@ -12,9 +12,7 @@ bench = false
 
 [dependencies]
 file-ports = { path = "../file-ports" }
-grammar-bare = { path = "../grammar-bare" }
-grammar-lines = { path = "../grammar-lines" }
-grammar-notice = { path = "../grammar-notice" }
+grammar = { path = "../grammar" }
 invariants = { path = "../invariants" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
