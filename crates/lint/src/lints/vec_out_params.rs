@@ -3,9 +3,9 @@ use syn::{FnArg, GenericArgument, ItemImpl, ItemMod, Macro, PathArguments, Signa
 
 use crate::finding::{Found, Rule};
 use crate::gate::Gate;
+use crate::hooks::{Descent, Expanded, Hooks};
 use crate::source::Source;
 use crate::style::{Reads, Style};
-use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Debug, Default)]
 pub(crate) struct VecOutParams {

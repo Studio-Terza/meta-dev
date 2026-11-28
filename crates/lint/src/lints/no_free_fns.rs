@@ -1,9 +1,9 @@
 use syn::{ItemFn, Macro};
 
 use crate::finding::{Found, Rule};
+use crate::hooks::{Descent, Expanded, Hooks};
 use crate::source::Source;
 use crate::style::{Reads, Style};
-use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Debug, Default)]
 pub(crate) struct NoFreeFns {

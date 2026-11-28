@@ -20,6 +20,7 @@ pub(crate) enum Rule {
     NoTestOnlyApi,
     BoolMethods,
     NoDyn,
+    ModuleCycles,
 }
 
 impl Rule {
@@ -44,6 +45,7 @@ impl Rule {
             Rule::NoDyn => {
                 "no dyn: every type is known at compile time, so code takes a generic, returns impl Trait or names an enum instead of a trait object"
             }
+            Rule::ModuleCycles => "modules inside a crate never import each other in a cycle",
         }
     }
 }

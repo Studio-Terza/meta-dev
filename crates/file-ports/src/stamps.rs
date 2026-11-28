@@ -3,7 +3,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use invariants::Ignoring;
 use newtype::{Arbitrary, Newtype};
 
-use crate::Ignored;
+use crate::ignored::Ignored;
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Epoch(i64);

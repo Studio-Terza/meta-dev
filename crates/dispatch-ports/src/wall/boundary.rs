@@ -3,7 +3,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use invariants::Ignoring;
 
 use super::{Deadline, Timeout, Wall};
-use crate::Ignored;
+use crate::ignored::Ignored;
 
 impl Deadline {
     #[must_use]

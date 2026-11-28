@@ -2,7 +2,8 @@ use std::path::{Path, PathBuf};
 
 use invariants::Ignoring;
 
-use crate::{Bytes, FileFailure, Ignored, Kind, Offset, Size, Stamps, Tail, Text};
+use crate::ignored::Ignored;
+use crate::{Bytes, FileFailure, Kind, Offset, Size, Stamps, Tail, Text};
 
 pub trait Files {
     fn read(&self, path: &Path) -> Result<Bytes, FileFailure>;

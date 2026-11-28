@@ -1,7 +1,9 @@
+use port_core::Op;
 use store_ports::{Columns, Execute, Prepared, Query, StoreFailure};
 use transcript_ports::TaskId;
 
-use super::EndedTasks;
+#[derive(Clone, Copy, Debug, Op)]
+pub struct EndedTasks;
 
 #[derive(Clone, Debug, PartialEq, Eq, Columns)]
 pub(crate) struct EndedRow {

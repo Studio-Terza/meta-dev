@@ -1,13 +1,33 @@
+use std::collections::BTreeMap;
 use std::fmt;
 
 use grammar_prose::Prose;
 use invariants::Ignoring;
-use store_ports::{Execute, Query, StoreFailure};
-use transcript_ports::{Authorship, Body, Instant, Uuid};
+use port_core::Op;
+use store_ports::{Columns, Execute, Query, StoreFailure};
+use transcript_ports::{Authorship, Body, Instant, SessionId, Uuid};
 
-use super::{LastSaid, OwnerHistory};
-use crate::boundary::SaidRow;
 use crate::boundary::ignored::Ignored;
+
+#[derive(Clone, Copy, Debug, Op)]
+pub struct OwnerHistory;
+
+#[derive(Clone, Debug, Op)]
+pub struct LastSaid(SessionId);
+
+#[derive(Debug, Columns)]
+struct SaidRow {
+    uuid: Uuid,
+    at: Instant,
+    author: Authorship,
+    body: Body,
+}
+
+#[derive(Debug, Default)]
+struct Exchanges {
+    lead: Option<Body>,
+    owned: Vec<Said>,
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Said {
@@ -36,6 +56,83 @@ impl Query for OwnerHistory {
 
     fn rows(self, statements: &mut impl Execute) -> Result<Vec<Said>, StoreFailure> {
         SaidRow::owned(statements)
+    }
+}
+
+impl From<SessionId> for LastSaid {
+    fn from(session: SessionId) -> LastSaid {
+        LastSaid(session)
+    }
+}
+
+impl From<SaidRow> for Said {
+    fn from(row: SaidRow) -> Said {
+        Said::new(row.uuid, row.at, row.body, None)
+    }
+}
+
+impl Exchanges {
+    fn heard(self, row: SaidRow) -> Exchanges {
+        match row.author {
+            Authorship::Lead => Exchanges { lead: Some(row.body), ..self },
+            Authorship::Owner => {
+                let said = Said::new(row.uuid, row.at, row.body, self.lead.as_ref());
+                let mut owned = self.owned;
+                owned.push(said);
+                Exchanges { owned, ..self }
+            }
+        }
+    }
+}
+
+impl SaidRow {
+    fn last_in(
+        session: &SessionId,
+        author: Authorship,
+        statements: &mut impl Execute,
+    ) -> Result<Vec<SaidRow>, StoreFailure> {
+        statements.rows(store_ports::query!(
+            SaidRow,
+            r#"
+SELECT
+  uuid,
+  at,
+  author,
+  body
+FROM
+  messages
+WHERE
+  session = ?1
+  AND author = ?2
+ORDER BY
+  at DESC
+LIMIT
+  1
+"#,
+            session: SessionId,
+            author: Authorship
+        ))
+    }
+
+    fn owned(statements: &mut impl Execute) -> Result<Vec<Said>, StoreFailure> {
+        let ordered: BTreeMap<(Instant, Uuid), SaidRow> =
+            SaidRow::all(statements)?.into_iter().map(|row| ((row.at.clone(), row.uuid.clone()), row)).collect();
+        Ok(ordered.into_values().fold(Exchanges::default(), Exchanges::heard).owned)
+    }
+
+    fn all(statements: &mut impl Execute) -> Result<Vec<SaidRow>, StoreFailure> {
+        statements.rows(store_ports::query!(
+            SaidRow,
+            r#"
+SELECT
+  uuid,
+  at,
+  author,
+  body
+FROM
+  messages
+"#
+        ))
     }
 }
 

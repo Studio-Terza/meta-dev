@@ -7,9 +7,9 @@ use syn::{Item, ItemUse, Macro, Visibility};
 
 use crate::finding::{Finding, Found, Rule};
 use crate::graph::Graph;
+use crate::hooks::{Descent, Expanded, Hooks};
 use crate::source::{Place, Source};
 use crate::use_leaf::UseLeaf;
-use crate::walk::{Descent, Expanded, Hooks};
 use crate::workspace::Package;
 
 #[derive(Debug)]

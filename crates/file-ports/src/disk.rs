@@ -4,7 +4,8 @@ use std::path::{Path, PathBuf};
 
 use invariants::Ignoring;
 
-use crate::{Bytes, Epoch, FileFailure, Files, Ignored, Kind, Offset, Size, Stamps, Text};
+use crate::ignored::Ignored;
+use crate::{Bytes, Epoch, FileFailure, Files, Kind, Offset, Size, Stamps, Text};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Disk;

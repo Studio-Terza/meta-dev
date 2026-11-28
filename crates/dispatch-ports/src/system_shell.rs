@@ -8,7 +8,8 @@ use std::time::{Duration, SystemTime};
 use invariants::Ignoring;
 use port_core::Pass;
 
-use crate::{Call, Deadline, DispatchFailure, Due, Ignored, Printed, Ran, ShellFiller, Wall, shell_ops};
+use crate::ignored::Ignored;
+use crate::{Call, Deadline, DispatchFailure, Due, Printed, Ran, ShellFiller, Wall, shell_ops};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SystemShell;

@@ -2,9 +2,9 @@ use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 
 use super::boundary::Spelling;
+use super::definition::{Declared, Rendered};
 use super::method::Method;
 use super::names::CallerName;
-use super::{Declared, Rendered};
 
 pub struct Ops;
 

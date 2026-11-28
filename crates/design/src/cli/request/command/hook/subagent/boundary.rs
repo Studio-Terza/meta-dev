@@ -3,7 +3,7 @@ use std::num::{NonZeroU32, NonZeroU64};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use design_messages::PullNumber;
+use design_messages::{CheckName, PullNumber};
 use grammar_lines::Lines;
 use grammar_report::{AgentReport, BranchName, Ended, JobLink, Target};
 use grammar_repository::SpecTrailer;
@@ -105,6 +105,12 @@ pub struct CommitSha([u8; 20]);
 
 #[derive(Newtype, Display, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct JobId(NonZeroU64);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FailedJob {
+    check: CheckName,
+    job: JobId,
+}
 
 #[derive(Debug, thiserror::Error)]
 #[error("not a full commit sha of forty hexadecimal digits")]
@@ -249,6 +255,20 @@ impl TryFrom<String> for CommitSha {
 impl fmt::Display for CommitSha {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&hex::encode(self.0))
+    }
+}
+
+impl FailedJob {
+    pub fn new(check: CheckName, job: JobId) -> FailedJob {
+        FailedJob { check, job }
+    }
+
+    pub fn check(&self) -> &CheckName {
+        &self.check
+    }
+
+    pub fn job(&self) -> JobId {
+        self.job
     }
 }
 

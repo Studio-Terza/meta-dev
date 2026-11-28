@@ -9,7 +9,8 @@ mod boundary;
 
 use boundary::Recall;
 
-use crate::{Bytes, FileFailure, Files, Ignored, Kind, Size, Stamps, Text};
+use crate::ignored::Ignored;
+use crate::{Bytes, FileFailure, Files, Kind, Size, Stamps, Text};
 
 #[derive(Debug)]
 pub struct Cached<'files, F> {

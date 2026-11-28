@@ -1,0 +1,7 @@
+Violations
+--- out
+test budget: 0 of 30 lines are tests, at most 18% may be
+--- err
+modules inside a crate never import each other in a cycle:
+src/looped.rs:1: modules crate::looped, crate::right import each other: crate::looped names crate::right at src/looped.rs:1, crate::right names crate::looped at src/right.rs:1; move what they share into a module that names neither, or split the crate along the cycle
+src/parent.rs:3: modules crate::parent, crate::parent::child import each other: crate::parent names crate::parent::child at src/parent.rs:3, crate::parent::child names crate::parent at src/parent/child.rs:1; move what they share into a module that names neither, or split the crate along the cycle

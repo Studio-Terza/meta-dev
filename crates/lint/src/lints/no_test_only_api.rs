@@ -6,8 +6,8 @@ use syn::{Attribute, Field, ImplItem, Item, ItemImpl, ItemMod, Lit, Macro, Meta,
 use crate::finding::{Finding, Found, Rule};
 use crate::gate::Gate;
 use crate::graph::Graph;
+use crate::hooks::{Descent, Expanded, Hooks};
 use crate::source::{Place, Source};
-use crate::walk::{Descent, Expanded, Hooks};
 use crate::workspace::Package;
 
 #[derive(Debug)]

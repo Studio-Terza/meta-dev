@@ -1,6 +1,7 @@
 mod bool_methods;
 mod expression_flow;
 mod manual_iteration;
+mod module_cycles;
 mod named_lifetimes;
 mod no_comments;
 mod no_dyn;
@@ -25,6 +26,7 @@ use crate::workspace::Package;
 pub(crate) use bool_methods::BoolMethods;
 pub(crate) use expression_flow::ExpressionFlow;
 pub(crate) use manual_iteration::ManualIteration;
+pub(crate) use module_cycles::{ModuleCycles, ModuleFact};
 pub(crate) use named_lifetimes::NamedLifetimes;
 use no_comments::NoComments;
 pub(crate) use no_dyn::NoDyn;
@@ -41,6 +43,7 @@ pub(crate) struct Facts {
     surface: Vec<SurfaceFact>,
     api: Vec<ApiFact>,
     test_only: Vec<Finding>,
+    modules: Vec<ModuleFact>,
 }
 
 #[derive(Debug, Default)]
@@ -74,6 +77,7 @@ impl<'run> Lints<'run> {
             emitters: Pausable::admitted(Emitters::default(), lints.entered),
             no_test_only_api: lints.graph(),
             test_scan: Pausable::admitted(TestScan::default(), Some(())),
+            module_cycles: Pausable::admitted(ModuleCycles::new(source), Some(())),
         };
         let Lineup {
             no_free_fns,
@@ -90,6 +94,7 @@ impl<'run> Lints<'run> {
             emitters,
             no_test_only_api,
             test_scan,
+            module_cycles,
         } = Walker::walked(lineup, file);
         let found = [
             lints.found(lints.style::<NoComments>()),
@@ -108,6 +113,7 @@ impl<'run> Lints<'run> {
             surface: Lints::facts(public_surface),
             api: api.collect(),
             test_only: Lints::facts(no_test_only_api),
+            modules: Lints::facts(module_cycles),
         };
         let budget = Budget::of_file(source, test_scan.woken().unwrap_or_default(), gate);
         Linted { found: found.into_iter().flatten().collect(), facts, budget }
@@ -139,6 +145,7 @@ impl Facts {
             surface: self.surface.into_iter().chain(later.surface).collect(),
             api: self.api.into_iter().chain(later.api).collect(),
             test_only: self.test_only.into_iter().chain(later.test_only).collect(),
+            modules: self.modules.into_iter().chain(later.modules).collect(),
         }
     }
 
@@ -146,6 +153,7 @@ impl Facts {
         let surface = PublicSurface::reduce(self.surface, packages);
         let api = PublicApiTests::reduce(self.api, packages);
         let test_only = NoTestOnlyApi::reduce(self.test_only, packages);
-        surface.into_iter().chain(api).chain(test_only).collect()
+        let modules = ModuleCycles::reduce(self.modules, packages);
+        surface.into_iter().chain(api).chain(test_only).chain(modules).collect()
     }
 }

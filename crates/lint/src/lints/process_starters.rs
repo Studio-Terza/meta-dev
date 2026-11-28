@@ -3,10 +3,10 @@ use syn::spanned::Spanned;
 use syn::{ItemMod, ItemUse, Macro, Path};
 
 use crate::finding::{Found, Rule};
+use crate::hooks::{Descent, Expanded, Hooks};
 use crate::source::Source;
 use crate::style::{Reads, Style};
 use crate::use_leaf::UseLeaf;
-use crate::walk::{Descent, Expanded, Hooks};
 
 #[derive(Debug)]
 pub(crate) struct ProcessStarters {

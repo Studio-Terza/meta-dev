@@ -1,10 +1,41 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{GenericParam, LifetimeParam, WherePredicate, parse_quote};
+use syn::{DeriveInput, GenericParam, Generics, Ident, LifetimeParam, WherePredicate, parse_quote};
 
-use super::Wrapped;
+use super::only_field::OnlyField;
 use crate::marked::Marked;
-use crate::settings::Checking;
+use crate::settings::{Checking, Settings};
+
+pub struct Wrapped {
+    ident: Ident,
+    generics: Generics,
+    field: OnlyField,
+    settings: Settings,
+}
+
+impl Wrapped {
+    pub fn expanded<Derived: Expansion>(tokens: TokenStream) -> TokenStream {
+        match syn::parse2(tokens).map(Self::derived::<Derived>) {
+            Ok(expansion) => expansion,
+            Err(error) => error.to_compile_error(),
+        }
+    }
+
+    pub fn derived<Derived: Expansion>(input: DeriveInput) -> TokenStream {
+        match Self::split(input).map(Derived::of) {
+            Ok(expansion) => expansion,
+            Err(error) => error.to_compile_error(),
+        }
+    }
+
+    fn split(DeriveInput { attrs, vis, ident, generics, data }: DeriveInput) -> syn::Result<Wrapped> {
+        match OnlyField::taken(data) {
+            Ok(field) => Settings::declared(&attrs).map(|settings| Wrapped { ident, generics, field, settings }),
+            Err(refused) => Settings::declared(&attrs)
+                .and_then(|_| Err(OnlyField::refused(DeriveInput { attrs, vis, ident, generics, data: refused }))),
+        }
+    }
+}
 
 pub trait Expansion {
     fn of(wrapped: Wrapped) -> TokenStream;

@@ -2,9 +2,9 @@ use syn::{Attribute, ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, ReturnTyp
 
 use crate::finding::{Found, Rule};
 use crate::gate::Gate;
+use crate::hooks::{Descent, Hooks};
 use crate::source::Source;
 use crate::style::{Reads, Style};
-use crate::walk::{Descent, Hooks};
 
 #[derive(Debug, Default)]
 pub(crate) struct BoolMethods {

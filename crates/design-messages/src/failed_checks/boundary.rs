@@ -1,9 +1,17 @@
 use std::num::NonZeroU32;
 
 use newtype::{Checked, CheckedDeserialize, Display, Newtype, Serialize};
+use port_core::Op;
 use store_ports::{Batch, Columns, Execute, Prepared, Query, StoreFailure};
 
-use super::{FailedBefore, Failing};
+#[derive(Clone, Copy, Debug, Op)]
+pub struct FailedBefore(PullNumber);
+
+#[derive(Debug, Op)]
+pub struct Failing {
+    pull: PullNumber,
+    checks: Vec<CheckName>,
+}
 
 #[derive(Newtype, Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PullNumber(NonZeroU32);
@@ -27,6 +35,19 @@ impl Checked for CheckName {
     fn checked(text: &String) -> Result<&String, Unnamed> {
         let named = text.chars().next().is_some() && text.chars().all(|letter| !letter.is_control());
         named.then_some(text).ok_or(Unnamed)
+    }
+}
+
+impl From<PullNumber> for FailedBefore {
+    fn from(pull: PullNumber) -> FailedBefore {
+        FailedBefore(pull)
+    }
+}
+
+impl Failing {
+    #[must_use]
+    pub fn new(pull: PullNumber, checks: Vec<CheckName>) -> Failing {
+        Failing { pull, checks }
     }
 }
 
