@@ -12,6 +12,12 @@ impl From<Duration> for Elapsed {
     }
 }
 
+impl From<Elapsed> for Duration {
+    fn from(elapsed: Elapsed) -> Duration {
+        elapsed.0
+    }
+}
+
 impl fmt::Display for Elapsed {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let milliseconds = self.0.as_millis().to_string();

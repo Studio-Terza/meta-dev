@@ -1,11 +1,10 @@
+use std::io;
 use std::path::PathBuf;
 
-use file_ports::FileFailure;
-
 #[derive(Debug, thiserror::Error)]
-pub(crate) enum Failure {
+pub enum Failure {
     #[error("cannot read {path}: {source}", path = path.display())]
-    Read { path: PathBuf, source: FileFailure },
+    Unread { path: PathBuf, source: io::Error },
     #[error("cannot parse {path}:{line}: {source}", path = path.display())]
     Parse { path: PathBuf, line: usize, source: syn::Error },
     #[error("cannot parse {path}: {source}", path = path.display())]

@@ -4,24 +4,22 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use file_ports::FileFailure;
 use invariants::Unpoisoned;
 use pipeline::Measure;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use syn::Item;
-use timer_ports::Timer;
 
 use crate::failure::Failure;
 use crate::gate::Gate;
 use crate::source::{ModulePath, Source};
-use crate::spent::{Spent, Stage};
+use crate::spent::{Clock, Spent, Stage};
 use crate::tree::Tree;
 use crate::walk::{Facts, Walker};
 use crate::workspace::{CrateKind, CrateRoot, Package};
 
 pipeline::measured! {
     #[derive(Debug)]
-    pub(crate) struct Read {
+    pub struct Read {
         pub failures: Vec<Failure>,
         pub facts: Facts,
         pub spent: Spent,
@@ -29,7 +27,7 @@ pipeline::measured! {
 }
 
 impl Read {
-    pub(crate) fn failed(failure: Failure) -> Read {
+    fn failed(failure: Failure) -> Read {
         Read { failures: vec![failure], ..Read::default() }
     }
 }
@@ -58,20 +56,20 @@ struct Declared {
 }
 
 #[derive(Debug)]
-pub(crate) struct Reader<'run, T> {
+pub struct Reader<'run, T> {
     timer: &'run T,
     tree: &'run Tree,
     seen: Mutex<BTreeSet<Arc<Path>>>,
 }
 
-impl<'run, T: Timer + Sync> Reader<'run, T> {
+impl<'run, T: Clock + Sync> Reader<'run, T> {
     const MODULE_FILE: &'static str = "mod.rs";
 
-    pub(crate) fn new(timer: &'run T, tree: &'run Tree) -> Reader<'run, T> {
+    pub fn new(timer: &'run T, tree: &'run Tree) -> Reader<'run, T> {
         Reader { timer, tree, seen: Mutex::default() }
     }
 
-    pub(crate) fn read(&self, roots: Vec<CrateRoot>) -> Read {
+    pub fn read(&self, roots: Vec<CrateRoot>) -> Read {
         let (binaries, others): (Vec<Module>, Vec<Module>) = roots
             .into_iter()
             .map(|root| Module {
@@ -178,9 +176,9 @@ impl<'run, T: Timer + Sync> Reader<'run, T> {
             .iter()
             .map(|candidate| Tree::lexical(candidate))
             .find(|resolved| self.tree.text(resolved).is_some())
-            .ok_or_else(|| Failure::Read {
+            .ok_or_else(|| Failure::Unread {
                 path: candidates.first().map_or_default(|first| self.tree.shown(first).to_path_buf()),
-                source: FileFailure::Missing(io::Error::from(io::ErrorKind::NotFound)),
+                source: io::Error::from(io::ErrorKind::NotFound),
             })?;
         let nesting = if chosen.file_name() == Some(OsStr::new(Reader::<T>::MODULE_FILE)) {
             Nesting::Beside

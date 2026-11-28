@@ -22,13 +22,8 @@ file-ports = { path = "../file-ports" }
 invariants = { path = "../invariants" }
 pipeline = { path = "../pipeline" }
 port-core = { path = "../port-core" }
-proc-macro2.workspace = true
-rayon = "1.12.0"
-rustc_lexer.workspace = true
-syn.workspace = true
-thiserror.workspace = true
+syntax = { path = "../syntax" }
 timer-ports = { path = "../timer-ports" }
-toml-ports = { path = "../toml-ports" }
 
 [dev-dependencies]
 test-failure = { path = "../test-failure" }

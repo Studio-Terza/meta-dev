@@ -3,7 +3,6 @@ use std::ffi::OsStr;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
-use file_ports::{Files, Kind, Text};
 use invariants::Ignoring;
 use syn::{Attribute, Expr, ExprLit, Lit, Meta, MetaNameValue};
 
@@ -11,58 +10,27 @@ use crate::failure::Failure;
 use crate::ignored::Ignored;
 
 #[derive(Debug)]
-pub(crate) struct Tree {
+pub struct Tree {
     given: PathBuf,
     canonical: PathBuf,
-    texts: BTreeMap<PathBuf, Text>,
+    texts: BTreeMap<PathBuf, String>,
 }
 
 impl Tree {
     const CURRENT: &'static str = ".";
-    pub(crate) const MANIFEST: &'static str = "Cargo.toml";
-    const BUILD_OUTPUT: &'static str = "target";
-    const HIDDEN: u8 = b'.';
-    const SOURCE_EXTENSION: &'static str = "rs";
+    pub const MANIFEST: &'static str = "Cargo.toml";
+    pub const BUILD_OUTPUT: &'static str = "target";
+    pub const SOURCE_EXTENSION: &'static str = "rs";
     const PATH_ATTRIBUTE: &'static str = "path";
 
-    pub(crate) fn read(files: &impl Files, working: &Path, given: &Path) -> Result<Tree, Failure> {
-        let canonical = files
-            .canonical(&working.join(given))
-            .map_err(|source| Failure::Read { path: given.to_path_buf(), source })?;
-        let above: BTreeMap<PathBuf, Text> = canonical
-            .ancestors()
-            .skip(1)
-            .filter_map(|directory| {
-                let manifest = directory.join(Tree::MANIFEST);
-                files.read_text(&manifest).ignoring(Ignored::Unlisted).map(|text| (manifest, text))
-            })
-            .collect();
-        let outline = Tree { given: given.to_path_buf(), canonical, texts: above };
-        let below = Tree::listed(files, &outline.canonical).into_iter().map(|path| match files.read_text(&path) {
-            Ok(text) => Ok((path, text)),
-            Err(source) => Err(Failure::Read { path: outline.shown(&path).to_path_buf(), source }),
-        });
-        let read = below.collect::<Result<Vec<(PathBuf, Text)>, Failure>>()?;
-        Ok(Tree { texts: outline.texts.into_iter().chain(read).collect(), ..outline })
+    #[must_use]
+    pub fn new(given: PathBuf, canonical: PathBuf, texts: BTreeMap<PathBuf, String>) -> Tree {
+        Tree { given, canonical, texts }
     }
 
-    fn listed(files: &impl Files, directory: &Path) -> Vec<PathBuf> {
-        let manifested = files.kind(&directory.join(Tree::MANIFEST));
-        let entries = files.entries(directory).ignoring(Ignored::Unlisted).unwrap_or_default();
-        entries
-            .into_iter()
-            .flat_map(|entry| {
-                let name = entry.file_name().unwrap_or_default();
-                let hidden = name.as_encoded_bytes().first() == Some(&Tree::HIDDEN);
-                let built = manifested == Kind::File && name == Tree::BUILD_OUTPUT;
-                let source = name == Tree::MANIFEST || entry.extension() == Some(OsStr::new(Tree::SOURCE_EXTENSION));
-                match files.kind(&entry) {
-                    Kind::Directory if !hidden && !built => Tree::listed(files, &entry),
-                    Kind::File if source => vec![entry],
-                    Kind::Directory | Kind::File | Kind::Link | Kind::Missing => Vec::new(),
-                }
-            })
-            .collect()
+    #[must_use]
+    pub fn with(self, texts: BTreeMap<PathBuf, String>) -> Tree {
+        Tree { texts: self.texts.into_iter().chain(texts).collect(), ..self }
     }
 
     pub(crate) fn text(&self, path: &Path) -> Option<&str> {
@@ -78,11 +46,13 @@ impl Tree {
         self.texts.keys().map(PathBuf::as_path).filter(|path| path.file_name() == Some(OsStr::new(Tree::MANIFEST)))
     }
 
-    pub(crate) fn root(&self) -> &Path {
+    #[must_use]
+    pub fn root(&self) -> &Path {
         &self.canonical
     }
 
-    pub(crate) fn shown(&self, real: &Path) -> Arc<Path> {
+    #[must_use]
+    pub fn shown(&self, real: &Path) -> Arc<Path> {
         let inside = real.strip_prefix(&self.canonical).ignoring(Ignored::Outside);
         let shown = inside.map_or_else(
             || real.to_path_buf(),

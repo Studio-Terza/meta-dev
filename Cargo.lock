@@ -417,14 +417,9 @@ dependencies = [
  "invariants",
  "pipeline",
  "port-core",
- "proc-macro2",
- "ra-ap-rustc_lexer",
- "rayon",
- "syn",
+ "syntax",
  "test-failure",
- "thiserror",
  "timer-ports",
- "toml-ports",
 ]
 
 [[package]]
@@ -804,8 +799,11 @@ dependencies = [
  "hex",
  "invariants",
  "json-ports",
+ "pipeline",
  "proc-macro2",
  "quote",
+ "ra-ap-rustc_lexer",
+ "rayon",
  "rusqlite",
  "serde",
  "serde_json",
@@ -814,6 +812,7 @@ dependencies = [
  "syn",
  "test-failure",
  "thiserror",
+ "toml-ports",
  "variant-ports",
 ]
 

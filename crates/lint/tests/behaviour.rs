@@ -50,7 +50,7 @@ fn every_fixture_and_case_prints_its_golden_output() -> Result<(), Failed> {
 fn the_binary_exits_by_its_verdict() {
     let exits = [Verdict::Violations, Verdict::Refused].map(ExitCode::from);
     assert_eq!(format!("{exits:?}"), format!("{:?}", [ExitCode::FAILURE, ExitCode::FAILURE]));
-    assert_eq!(["/nowhere", "."].map(ports::Binary::exit), [Some(1_i32), Some(0_i32)]);
+    assert_eq!(["/nowhere", "tests/.fixtures/budget_met"].map(ports::Binary::exit), [Some(1_i32), Some(0_i32)]);
 }
 
 mod ports {

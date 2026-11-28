@@ -2,12 +2,16 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::io::{self, Write};
 use std::mem;
+use std::time::Duration;
 
 use pipeline::Measure;
-use timer_ports::{Elapsed, Timer};
+
+pub trait Clock {
+    fn now(&self) -> Duration;
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum Stage {
+pub enum Stage {
     Run,
     Find,
     Parse,
@@ -17,21 +21,21 @@ pub(crate) enum Stage {
 
 pipeline::measured! {
     #[derive(Debug)]
-    pub(crate) struct Spent(BTreeMap<Stage, Elapsed>);
+    pub struct Spent(BTreeMap<Stage, Duration>);
 }
 
 impl Spent {
-    pub(crate) fn timed<Made>(&mut self, timer: &impl Timer, stage: Stage, work: impl FnOnce() -> Made) -> Made {
-        let start = timer.now();
+    pub fn timed<Made>(&mut self, clock: &impl Clock, stage: Stage, work: impl FnOnce() -> Made) -> Made {
+        let start = clock.now();
         let made = work();
-        let spent = Spent(BTreeMap::from([(stage, timer.now().since(start))]));
+        let spent = Spent(BTreeMap::from([(stage, clock.now().saturating_sub(start))]));
         *self = mem::take(self).joined(spent);
         made
     }
 
-    pub(crate) fn written(&self, out: &mut impl Write) -> io::Result<()> {
+    pub fn written(&self, out: &mut impl Write) -> io::Result<()> {
         writeln!(out, "lint timings in milliseconds, each stage summed over files and threads:")?;
-        self.0.iter().try_for_each(|(stage, elapsed)| writeln!(out, "{elapsed:>7}  {stage}"))
+        self.0.iter().try_for_each(|(stage, spent)| writeln!(out, "{:>7}  {stage}", spent.as_millis()))
     }
 }
 
