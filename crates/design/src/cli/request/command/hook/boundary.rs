@@ -90,6 +90,20 @@ struct Naming<'ground, 'run, F: Files, S: Store> {
     owners: Vec<Said>,
 }
 
+#[derive(Debug)]
+struct Stop {
+    halt: Halt,
+    fresh: Vec<Body>,
+    answers: Option<Answers>,
+    queue: Option<Drained>,
+}
+
+#[derive(Debug)]
+enum Drained {
+    Unread(String),
+    Read { file: Rooted, queue: Queue, changed: Option<()>, shown: Option<String> },
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Continuing;
 
@@ -183,7 +197,7 @@ impl Stopping {
     ) -> Reply<'static> {
         let stopped = match self.continuation.0 {
             Some(Continuing) => Vec::new(),
-            None => observed.blocking(crew, self),
+            None => observed.acted(observed.measured(crew, self)),
         };
         stopped
             .first()
@@ -213,7 +227,7 @@ impl<'ground, 'run, F: Files, S: Store> Observed<'ground, 'run, F, S> {
         Observed { ground, tasks }
     }
 
-    fn blocking<C: Clock, G: Shell>(&self, crew: &Crew<'_, C, G>, stopping: &Stopping) -> Vec<String> {
+    fn measured<C: Clock, G: Shell>(&self, crew: &Crew<'_, C, G>, stopping: &Stopping) -> Stop {
         let store = self.ground.store();
         let last = stopping.said.clone().or_else(|| stopping.stored(store));
         let answers = last
@@ -225,32 +239,53 @@ impl<'ground, 'run, F: Files, S: Store> Observed<'ground, 'run, F, S> {
             self.tasks.iter().flat_map(Tasks::hung).filter(|task| reported.contains(task).not()).cloned().collect();
         let halt =
             fresh.first().map_or_else(|| self.tasks.as_ref().map_or(Halt::Live, Halt::from), |_first| Halt::Overrun);
-        let queued = (halt == Halt::Stalled).then(|| self.queued(crew)).flatten();
-        store.write(Overran::from(fresh.clone())).ignoring(Ignored::Unanswered);
-        Stopping::lead(halt, &fresh).into_iter().chain(answers.as_ref().map(Answers::to_string)).chain(queued).collect()
+        let queue = (halt == Halt::Stalled).then(|| self.queued(crew)).flatten();
+        Stop { halt, fresh, answers, queue }
     }
 
-    fn queued<C: Clock, G: Shell>(&self, crew: &Crew<'_, C, G>) -> Option<String> {
+    fn acted(&self, stop: Stop) -> Vec<String> {
+        let Stop { halt, fresh, answers, queue } = stop;
+        self.ground.store().write(Overran::from(fresh.clone())).ignoring(Ignored::Unanswered);
+        let shown = queue.and_then(|drained| match drained {
+            Drained::Unread(said) => Some(said),
+            Drained::Read { file, queue: kept, changed, shown } => {
+                changed.map(|()| self.ground.queued(&file, &kept).ignoring(Ignored::Unrewritten));
+                shown
+            }
+        });
+        Stopping::lead(halt, &fresh).into_iter().chain(answers.as_ref().map(Answers::to_string)).chain(shown).collect()
+    }
+
+    fn queued<C: Clock, G: Shell>(&self, crew: &Crew<'_, C, G>) -> Option<Drained> {
         let local = self.ground.local();
         let file = local.queue()?;
         match self.ground.queue(file) {
-            Ok(queue) => self.drained(crew, &local, &queue),
-            Err(unread) => Some(unread.to_string()),
+            Ok(queue) => self.drained(crew, &local, file, &queue),
+            Err(unread) => Some(Drained::Unread(unread.to_string())),
         }
     }
 
-    fn drained<C: Clock, G: Shell>(&self, crew: &Crew<'_, C, G>, local: &Local, queue: &Queue) -> Option<String> {
+    fn drained<C: Clock, G: Shell>(
+        &self,
+        crew: &Crew<'_, C, G>,
+        local: &Local,
+        file: &Rooted,
+        queue: &Queue,
+    ) -> Option<Drained> {
         queue.items().first()?;
         let landed = local
             .repository()
             .and_then(|repository| Hub::new(crew, crew.scratch(), repository).landed())
             .unwrap_or_default();
         let drained = queue.clone().drained(&landed, |path| self.ground.kind(path));
-        let file = local.queue().filter(|_file| drained != *queue);
-        file.map(|rewritten| self.ground.queued(rewritten, &drained).ignoring(Ignored::Unrewritten));
+        let changed = (drained != *queue).then_some(());
         let owners = self.ground.store().read(OwnerHistory).ignoring(Ignored::Unanswered).unwrap_or_default();
         let naming = Naming { ground: self.ground, specs: local.specs(), owners };
-        drained.items().first().map(|_open| Queued { queue: &drained, landed: &landed, naming: &naming }.to_string())
+        let shown = drained
+            .items()
+            .first()
+            .map(|_open| Queued { queue: &drained, landed: &landed, naming: &naming }.to_string());
+        Some(Drained::Read { file: file.clone(), queue: drained, changed, shown })
     }
 }
 
