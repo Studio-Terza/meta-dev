@@ -49,10 +49,10 @@ code = 1
 err = "cannot read limits.toml: "
 
 [[case]]
-arguments = ["timed", "limits.toml", "lint", "sh", "-c", "exit 0"]
+arguments = ["timed", "limits.toml", "lint", "sh", "-c", "printf 'printed by the timed program\n'"]
 files = { "limits.toml" = "[lint]\nwarn = 1\nblock = 1\n" }
 code = 0
-out = "lint: within warn 1 s and block 1 s, took 0."
+out = "printed by the timed program\nlint: within warn 1 s and block 1 s, took 0."
 
 [[case]]
 arguments = ["timed", "limits.toml", "lint", "--since", "mark", "true"]
