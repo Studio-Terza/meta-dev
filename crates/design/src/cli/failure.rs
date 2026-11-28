@@ -9,12 +9,13 @@ use store_ports::{Busy, StoreFailure, Unlock};
 use toml_ports::TomlFailure;
 use transcript_ports::ReadFailure;
 
+use super::request::Asked;
 use crate::Outcome;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
     #[error(
-        "usage: design [--workspace <dir>] (ingest [--dry-run] | hook (stop | subagent-stop | pre-tool-use | post-tool-use | --settings))"
+        "usage: design [--workspace <dir>] [--harness <dir>] (ingest [--dry-run] | hook (stop | subagent-stop | pre-tool-use | post-tool-use | --settings))"
     )]
     Usage,
     #[error("the environment does not name {0:?}")]
@@ -37,18 +38,28 @@ pub enum Failure {
     Unheard(#[source] JsonFailure),
     #[error("cannot write the queue: {0}")]
     Unqueued(#[source] FileFailure),
-    #[error("cannot write the queue: the workspace local.toml names no absolute queue path")]
+    #[error("cannot write the queue: the workspace local.toml names no queue path")]
     Unplaced,
     #[error("the queue does not read as its typed TOML, so it is left as it is: {0}")]
     Unparsed(#[source] TomlFailure),
     #[error("cannot render the queue as TOML: {0}")]
     Unwritten(#[source] TomlFailure),
+    #[error("cannot read the user id that names the harness folder")]
+    Unidentified,
     #[error("cannot render the hook settings: {0}")]
     Render(#[source] JsonFailure),
+    #[error("no answer is recorded for the call it made next")]
+    Unanswered,
     #[error("a resource was not released cleanly: {0}")]
     Released(#[from] ReleaseFailures),
     #[error("{command}; on the way out, a resource was not released cleanly either: {released}")]
     Unreleased { command: Box<Failure>, released: ReleaseFailures },
+}
+
+impl From<Asked> for Failure {
+    fn from(_asked: Asked) -> Failure {
+        Failure::Unanswered
+    }
 }
 
 impl Failure {

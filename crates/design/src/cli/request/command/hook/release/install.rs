@@ -1,21 +1,19 @@
 use std::path::Path;
 
 use design_messages::PullNumber;
-use dispatch_ports::{Clock, Ran, Shell, Timeout};
+use dispatch_ports::{Ran, Timeout};
 use file_ports::{Bytes, Files, Kind};
 use json_ports::{Fields, Json, Opaque};
 use store_ports::Store;
 
 use super::super::super::Ground;
-use super::super::super::crew::Crew;
-use crate::cli::request::InstallStep;
+use super::super::super::crew::{Asked, Cut, Tape};
 use crate::cli::request::ignored::Ignored;
+use crate::cli::request::{InstallStep, Kept};
 use invariants::Ignoring;
 
-#[derive(Debug)]
-pub struct Installing<'used, 'crew, C: Clock, G: Shell> {
-    crew: &'crew Crew<'crew, C, G>,
-    directory: &'used Path,
+#[derive(Clone, Copy, Debug)]
+pub struct Installing {
     pull: PullNumber,
 }
 
@@ -32,47 +30,59 @@ struct Configured {
     rest: Fields,
 }
 
-impl<'used, 'crew, C: Clock, G: Shell> Installing<'used, 'crew, C, G> {
+impl Installing {
     const GIT: &'static str = "git";
     const CARGO: &'static str = "cargo";
     const DESIGN: &'static str = "design";
     const CHECKOUT: &'static str = "install-";
+    const HERE: &'static str = ".";
     const QUICK: Timeout = Timeout::new(120);
     const BUILD: Timeout = Timeout::new(20 * 60);
 
-    pub fn new(
-        crew: &'crew Crew<'crew, C, G>,
-        directory: &'used Path,
-        pull: PullNumber,
-    ) -> Installing<'used, 'crew, C, G> {
-        Installing { crew, directory, pull }
+    pub fn new(pull: PullNumber) -> Installing {
+        Installing { pull }
     }
 
-    pub fn installed<F: Files, S: Store>(&self, ground: &Ground<'_, F, S>) -> Result<(), InstallStep> {
-        let checkout = self.crew.scratch().join(format!("{}{}", Self::CHECKOUT, self.pull));
+    pub fn installed<F: Files, S: Store>(
+        self,
+        ground: &Ground<'_, F, S>,
+        tape: &Tape<'_>,
+    ) -> Result<Result<(), InstallStep>, Asked> {
+        let prepared = ground.prepared(tape.scratch()).map_err(|_unmade| InstallStep::Checkout);
+        let printed = match prepared {
+            Ok(()) => Cut::settled(self.printed(tape, ground.workspace()))?,
+            Err(step) => Err(step),
+        };
+        Ok(printed.and_then(|hooks| Self::hooked(ground, hooks).ok_or(InstallStep::Settings)))
+    }
+
+    fn printed(self, tape: &Tape<'_>, workspace: &Path) -> Result<Opaque, Cut<InstallStep>> {
+        let checkout = Kept::Agents.within().join(format!("{}{}", Self::CHECKOUT, self.pull));
         let path = checkout.to_string_lossy();
-        ground.prepared(self.crew.scratch()).map_err(|_unmade| InstallStep::Checkout)?;
-        self.ran(Self::GIT, &["fetch", "origin", "main"], self.directory, Self::QUICK).ok_or(InstallStep::Fetch)?;
-        self.ran(Self::GIT, &["worktree", "add", "--detach", &path, "origin/main"], self.directory, Self::QUICK)
-            .ok_or(InstallStep::Checkout)?;
-        let built = self
-            .ran(Self::CARGO, &["install", "--path", "crates/design", "--locked", "--force"], &checkout, Self::BUILD)
+        let quick = |program, arguments: &[&str], step| {
+            Self::ran(tape, program, arguments, workspace, Self::QUICK)?.ok_or(Cut::Failed(step))
+        };
+        quick(Self::GIT, &["fetch", "origin", "main"], InstallStep::Fetch)?;
+        quick(Self::GIT, &["worktree", "add", "--detach", &path, "origin/main"], InstallStep::Checkout)?;
+        let installed = ["install", "--path", "crates/design", "--locked", "--force"];
+        let built = Self::ran(tape, Self::CARGO, &installed, &workspace.join(&checkout), Self::BUILD)?
             .ok_or(InstallStep::Build);
-        let removed = self
-            .ran(Self::GIT, &["worktree", "remove", "--force", &path], self.directory, Self::QUICK)
-            .ok_or(InstallStep::Unchecked);
-        built.and(removed)?;
-        let workspace = ground.workspace().to_string_lossy();
-        let printed = self
-            .ran(Self::DESIGN, &["--workspace", &workspace, "hook", "--settings"], self.directory, Self::QUICK)
-            .ok_or(InstallStep::Print)?;
-        let settings: Printed = Json::read(&printed).map_err(|_unprinted| InstallStep::Print)?;
-        Self::hooked(ground, settings.hooks).ok_or(InstallStep::Settings)
+        let removed = Self::ran(tape, Self::GIT, &["worktree", "remove", "--force", &path], workspace, Self::QUICK)?;
+        built.and(removed.ok_or(InstallStep::Unchecked)).map_err(Cut::Failed)?;
+        let printed = quick(Self::DESIGN, &["--workspace", Self::HERE, "hook", "--settings"], InstallStep::Print)?;
+        let settings: Printed = Json::read(&printed).map_err(|_unprinted| Cut::Failed(InstallStep::Print))?;
+        Ok(settings.hooks)
     }
 
-    fn ran(&self, program: &'static str, arguments: &[&str], directory: &Path, timeout: Timeout) -> Option<String> {
-        let ran = self.crew.spoke(program, arguments, directory, timeout);
-        ran.as_ref().and_then(Ran::succeeded).map(|printed| AsRef::<str>::as_ref(printed).to_owned())
+    fn ran(
+        tape: &Tape<'_>,
+        program: &'static str,
+        arguments: &[&str],
+        directory: &Path,
+        timeout: Timeout,
+    ) -> Result<Option<String>, Asked> {
+        let ran = tape.spoke(program, arguments, directory, timeout)?;
+        Ok(ran.as_ref().and_then(Ran::succeeded).map(|printed| AsRef::<str>::as_ref(printed).to_owned()))
     }
 
     fn hooked<F: Files, S: Store>(ground: &Ground<'_, F, S>, hooks: Opaque) -> Option<()> {

@@ -2,19 +2,15 @@ use std::ffi::OsStr;
 use std::fmt;
 use std::path::{Component, Path, PathBuf};
 
-use console_ports::{Environment, Heard, Shown};
-use dispatch_ports::{Clock, Shell};
 use file_ports::{Files, Kind};
 use grammar::shell::{Deletion, Directory, Edit, Edited, Editor, Plain, Target, Unreadable};
-use json_ports::Json;
-use newtype::Wrapping;
 use store_ports::Store;
 
 use super::super::Ground;
-use super::super::crew::Crew;
+use super::super::crew::Tape;
 use super::brief::Brief;
+use super::reply::{Hook, Reply};
 use crate::cli::failure::Failure;
-use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
 
 #[derive(Debug, serde::Deserialize)]
@@ -44,62 +40,40 @@ enum Refusal {
     Unreadable(Unreadable),
     Unruled(Deletion),
     InPlace(Editor),
-    Wrote { path: PathBuf, repository: PathBuf },
-    Moved { path: PathBuf, repository: PathBuf },
+    Wrote(Placed),
+    Moved(Placed),
     Unresolved { written: String },
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Placed {
+    path: PathBuf,
+    repository: PathBuf,
+}
+
 #[derive(Debug)]
-struct Judging<'ground, 'run, F: Files, S: Store, E: Environment> {
+struct Judging<'ground, 'run, F: Files, S: Store> {
     ground: &'ground Ground<'run, F, S>,
-    environment: &'ground E,
     cwd: &'ground Path,
 }
 
-#[derive(Debug, serde::Serialize)]
-struct Denial {
-    #[serde(rename = "hookSpecificOutput")]
-    output: Specific,
-}
-
-#[derive(Debug, serde::Serialize)]
-struct Specific {
-    #[serde(rename = "hookEventName")]
-    event: HookEvent,
-    #[serde(rename = "permissionDecision")]
-    decision: Permission,
-    #[serde(rename = "permissionDecisionReason")]
-    reason: String,
-}
-
-#[derive(Clone, Copy, Debug, serde::Serialize)]
-enum Permission {
-    #[serde(rename = "deny")]
-    Deny,
-}
-
-impl Running {
-    pub fn heard(heard: Heard) -> Result<Running, Failure> {
-        Json::read(&heard.into_inner()).map_err(Failure::Unheard)
-    }
-
-    pub fn answered<F: Files + Clone, S: Store, C: Clock, G: Shell>(
+impl Hook for Running {
+    fn answered<F: Files + Clone, S: Store>(
         &self,
-        environment: &impl Environment,
         ground: &Ground<'_, F, S>,
-        crew: &Crew<'_, C, G>,
-    ) -> Result<Uttered, Failure> {
+        tape: &Tape<'_>,
+    ) -> Result<Reply<'_>, Failure> {
         match &self.tool {
-            Tool::Bash(input) => Judging { ground, environment, cwd: &self.cwd }.judged(input),
-            Tool::Agent(brief) | Tool::SendMessage(brief) => brief.told(ground, crew),
+            Tool::Bash(input) => Ok(Judging { ground, cwd: &ground.resolved(&self.cwd) }.judged(input)),
+            Tool::Agent(brief) | Tool::SendMessage(brief) => brief.told(ground, tape),
         }
     }
 }
 
-impl<F: Files, S: Store, E: Environment> Judging<'_, '_, F, S, E> {
+impl<F: Files, S: Store> Judging<'_, '_, F, S> {
     const REPOSITORY: &'static str = ".git";
 
-    fn judged(&self, input: &Input) -> Result<Uttered, Failure> {
+    fn judged(&self, input: &Input) -> Reply<'static> {
         let command = input.command.as_deref().unwrap_or_default();
         let refused = match Plain::read(command) {
             Ok(plain) => plain
@@ -109,8 +83,9 @@ impl<F: Files, S: Store, E: Environment> Judging<'_, '_, F, S, E> {
                 .or_else(|| plain.edits().iter().find_map(|edited| self.refusal(edited))),
             Err(unreadable) => Some(Refusal::Unreadable(unreadable)),
         };
-        refused
-            .map_or_else(|| Ok(Uttered::silent(Ok(Outcome::Hooked(HookEvent::PreToolUse)))), |refusal| refusal.denied())
+        refused.map_or(Reply::Pass(Outcome::Hooked(HookEvent::PreToolUse)), |refusal| Reply::Deny {
+            reason: refusal.to_string(),
+        })
     }
 
     fn refusal(&self, edited: &Edited) -> Option<Refusal> {
@@ -119,7 +94,7 @@ impl<F: Files, S: Store, E: Environment> Judging<'_, '_, F, S, E> {
         match edited.edit() {
             Edit::InPlace(editor) => Some(Refusal::InPlace(*editor)),
             Edit::Wrote(written) => match self.resolved(written, directory) {
-                Some(path) => self.repository(&path).map(|repository| Refusal::Wrote { path, repository }),
+                Some(path) => self.repository(&path).map(|repository| Refusal::Wrote(self.placed(&path, &repository))),
                 None => Some(unresolved(written)),
             },
             Edit::Moved { sources, destination } => {
@@ -132,7 +107,7 @@ impl<F: Files, S: Store, E: Environment> Judging<'_, '_, F, S, E> {
                 blind.or_else(|| {
                     sources.iter().filter_map(|source| self.resolved(source, directory)).find_map(|path| {
                         let repository = self.repository(&path).filter(|held| landing.as_ref() != Some(held))?;
-                        Some(Refusal::Moved { path, repository })
+                        Some(Refusal::Moved(self.placed(&path, &repository)))
                     })
                 })
             }
@@ -153,9 +128,8 @@ impl<F: Files, S: Store, E: Environment> Judging<'_, '_, F, S, E> {
     }
 
     fn expanded(&self, target: &Target) -> Option<String> {
-        target.resolved(|name| {
-            self.environment.variable(OsStr::new(name)).and_then(|value| value.to_str().map(str::to_owned))
-        })
+        target
+            .resolved(|name| self.ground.variable(OsStr::new(name)).and_then(|value| value.to_str().map(str::to_owned)))
     }
 
     fn folded(path: &Path) -> PathBuf {
@@ -166,6 +140,11 @@ impl<F: Files, S: Store, E: Environment> Judging<'_, '_, F, S, E> {
         })
     }
 
+    fn placed(&self, path: &Path, repository: &Path) -> Placed {
+        let rendered = |given| self.ground.rendered(given).to_path_buf();
+        Placed { path: rendered(path), repository: rendered(repository) }
+    }
+
     fn repository(&self, path: &Path) -> Option<PathBuf> {
         path.ancestors()
             .find(|directory| self.ground.kind(&directory.join(Self::REPOSITORY)) != Kind::Missing)
@@ -174,14 +153,6 @@ impl<F: Files, S: Store, E: Environment> Judging<'_, '_, F, S, E> {
 }
 
 impl Refusal {
-    fn denied(&self) -> Result<Uttered, Failure> {
-        let denial = Denial {
-            output: Specific { event: HookEvent::PreToolUse, decision: Permission::Deny, reason: self.to_string() },
-        };
-        let json = Json::written(&denial).map_err(Failure::Render)?;
-        Ok(Uttered::new(Shown::said(format_args!("{json}\n")), Ok(Outcome::Blocked)))
-    }
-
     const fn word(deletion: Deletion) -> &'static str {
         match deletion {
             Deletion::Rm => "rm",
@@ -226,14 +197,14 @@ impl fmt::Display for Refusal {
                 "Refused: `{}` edits a file in place. Edit files only with the Edit or Write tools.",
                 Refusal::editor(*editor)
             ),
-            Refusal::Wrote { path, repository } => write!(
+            Refusal::Wrote(Placed { path, repository }) => write!(
                 formatter,
                 "Refused: a shell write into {}, under the repository at {}. Write files there only with the Edit \
                  or Write tools.",
                 path.display(),
                 repository.display()
             ),
-            Refusal::Moved { path, repository } => write!(
+            Refusal::Moved(Placed { path, repository }) => write!(
                 formatter,
                 "Refused: `mv` takes {} out of the repository at {}, and a move out of a repository is a delete. \
                  Use `git mv` to move it within the repository, or `git rm` to delete it.",

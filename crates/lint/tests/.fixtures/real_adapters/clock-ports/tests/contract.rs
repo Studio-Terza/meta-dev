@@ -1,1 +1,1 @@
-use clock_ports::SystemClock;
+use clock_ports::{ClockFiller, SystemClock}; impl ClockFiller for Stepped {}

@@ -4,8 +4,7 @@ mod ingest;
 
 use std::path::PathBuf;
 
-use console_ports::{Environment, Shown};
-use dispatch_ports::{Clock, Shell};
+use console_ports::{Environment, Heard, Shown};
 use file_ports::Files;
 use newtype::Enumerated;
 use store_ports::{Opens, Store};
@@ -15,14 +14,14 @@ use super::persistence::Persistence;
 use crate::cli::failure::Failure;
 use crate::cli::uttered::Uttered;
 use crate::{HookEvent, Outcome};
-pub use crew::Crew;
-use hook::Hook;
+pub use crew::{Answer, Asked, Crew, Tape};
+use hook::Hooked;
 use ingest::Ingest;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Command {
     Ingest(Persistence),
-    Hook(Hook),
+    Hook(Hooked),
 }
 
 impl Command {
@@ -35,8 +34,8 @@ impl Command {
         match words {
             [Self::INGEST] => Ok(Command::Ingest(Persistence::File)),
             [Self::INGEST, Self::DRY_RUN] => Ok(Command::Ingest(Persistence::DryRun)),
-            [Self::HOOK, Self::SETTINGS] => Ok(Command::Hook(Hook::Settings)),
-            [Self::HOOK, event] => Hook::named(event).map(Command::Hook),
+            [Self::HOOK, Self::SETTINGS] => Ok(Command::Hook(Hooked::Settings)),
+            [Self::HOOK, event] => Hooked::named(event).map(Command::Hook),
             _ => Err(Failure::Usage),
         }
     }
@@ -48,26 +47,33 @@ impl Command {
         }
     }
 
-    pub fn written<F: Files + Clone, S: Store, C: Clock, G: Shell>(
+    pub fn heard(self, environment: &impl Environment) -> Result<Option<Heard>, Failure> {
+        match self {
+            Command::Hook(Hooked::On(_)) => environment.input().map(Some).map_err(Failure::Deaf),
+            Command::Ingest(_) | Command::Hook(Hooked::Settings) => Ok(None),
+        }
+    }
+
+    pub fn written<F: Files + Clone, S: Store>(
         self,
-        environment: &impl Environment,
+        heard: Option<&Heard>,
         ground: &Ground<'_, F, S>,
-        crew: &Crew<'_, C, G>,
+        tape: &Tape<'_>,
     ) -> Result<Uttered, Failure> {
         match self {
             Command::Ingest(_) => Ingest::read(ground.store(), &ground.transcripts())
                 .map(|tally| Uttered::new(Shown::said(tally), Ok(Outcome::Ingested))),
-            Command::Hook(hook) => hook.answered(environment, ground, crew),
+            Command::Hook(hook) => hook.answered(heard, ground, tape),
         }
     }
 }
 
-impl Hook {
-    fn named(event: &str) -> Result<Hook, Failure> {
+impl Hooked {
+    fn named(event: &str) -> Result<Hooked, Failure> {
         HookEvent::VARIANTS
             .iter()
             .find(|known| <&str>::from(**known) == event)
-            .map(|known| Hook::On(*known))
+            .map(|known| Hooked::On(*known))
             .ok_or(Failure::Usage)
     }
 }

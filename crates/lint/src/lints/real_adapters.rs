@@ -1,9 +1,9 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::sync::Arc;
 
 use proc_macro2::Ident;
-use syn::{ItemImpl, ItemUse, Macro, Type};
+use syn::{ItemImpl, ItemTrait, ItemUse, Macro, Type};
 
 use pipeline::Measure;
 
@@ -18,6 +18,8 @@ use crate::workspace::Package;
 pub(crate) enum AdapterFact {
     Real { crate_name: String, name: String },
     Named { crate_name: String, name: String, path: Arc<Path>, line: usize },
+    Port { crate_name: String, name: String },
+    Doubled { crate_name: String, name: String, path: Arc<Path>, line: usize },
 }
 
 #[derive(Debug, Measure)]
@@ -27,7 +29,14 @@ pub(crate) struct AdapterFacts(Vec<AdapterFact>);
 pub(crate) struct RealAdapters<'file> {
     source: &'file Source,
     admitted: Admitted,
+    imported: BTreeMap<String, Imported>,
     facts: Vec<AdapterFact>,
+}
+
+#[derive(Clone, Debug)]
+struct Imported {
+    crate_name: String,
+    name: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -39,7 +48,28 @@ enum Admitted {
 
 impl RealAdapters<'_> {
     const MARK: &'static str = "Real";
+    const PORT: &'static str = "port";
+    const FILLER: &'static str = "Filler";
     const FIX: &'static str = "build over a double here, and wire the real adapter in a binary's main.rs";
+    const DOUBLED: &'static str = "record the input and feed it through the production pipeline";
+
+    fn doubled(&self, item: &ItemImpl) -> Option<AdapterFact> {
+        (self.source.place() == Place::Tests).then_some(())?;
+        let (_negated, trait_path, _for) = item.trait_.as_ref()?;
+        let last = trait_path.segments.last().map(|segment| &segment.ident)?;
+        let written = match trait_path.segments.first().map(|segment| &segment.ident) {
+            Some(first) if trait_path.segments.len() > 1 => {
+                Some(Imported { crate_name: first.to_string(), name: last.to_string() })
+            }
+            Some(_) | None => self.imported.get(&last.to_string()).cloned(),
+        }?;
+        (written.crate_name != self.source.package().crate_name()).then(|| AdapterFact::Doubled {
+            crate_name: written.crate_name,
+            name: written.name,
+            path: Arc::clone(self.source.shown()),
+            line: last.span().start().line,
+        })
+    }
 
     fn marked(item: &ItemImpl) -> Option<&Ident> {
         let (_negated, trait_path, _for) = item.trait_.as_ref()?;
@@ -73,16 +103,36 @@ impl Hooks for RealAdapters<'_> {
             crate_name: self.source.package().crate_name(),
             name: adapter.to_string(),
         });
-        self.facts.extend(fact);
+        let doubled = self.doubled(item);
+        self.facts.extend(fact.into_iter().chain(doubled));
+        Descent::Into
+    }
+
+    fn item_trait(&mut self, item: &ItemTrait) -> Descent {
+        let crate_name = self.source.package().crate_name();
+        let declared = item.ident.to_string();
+        let ported = item.attrs.iter().any(|attribute| {
+            attribute.path().segments.last().is_some_and(|segment| segment.ident == RealAdapters::PORT)
+        });
+        let filled = ported.then(|| format!("{declared}{}", RealAdapters::FILLER));
+        let ports = self.source.ported().map(|()| [Some(declared), filled].into_iter().flatten()).into_iter().flatten();
+        self.facts.extend(ports.map(|name| AdapterFact::Port { crate_name: crate_name.clone(), name }));
         Descent::Into
     }
 
     fn item_use(&mut self, item: &ItemUse) -> Descent {
-        let named: Vec<AdapterFact> = UseLeaf::of_tree(&item.tree)
+        let leaves = UseLeaf::of_tree(&item.tree);
+        let named: Vec<AdapterFact> = leaves
             .iter()
             .filter_map(|leaf| leaf.end().original().and_then(|name| self.named(leaf.path().first().copied(), name)))
             .collect();
         self.facts.extend(named);
+        let imported = leaves.iter().filter_map(|leaf| {
+            let crate_name = leaf.path().first()?.to_string();
+            let name = leaf.end().original()?.to_string();
+            Some((leaf.end().bound()?.to_string(), Imported { crate_name, name }))
+        });
+        self.imported.extend(imported);
         Descent::Over
     }
 
@@ -99,7 +149,7 @@ impl Hooks for RealAdapters<'_> {
 }
 
 impl<'file> Lint<'file> for RealAdapters<'file> {
-    const HEADLINE: &'static str = "a port's real adapter is named only in a binary's main.rs and in its own port crate's tests; everything else builds over doubles";
+    const HEADLINE: &'static str = "a port's real adapter is named only in a binary's main.rs and in its own port crate's tests, and only that crate's tests implement its traits";
     const READS: Reads = Reads::Every;
 
     type Fact = AdapterFacts;
@@ -110,7 +160,7 @@ impl<'file> Lint<'file> for RealAdapters<'file> {
             (None, Place::Tests) => Admitted::Own(source.package().crate_name()),
             (None, Place::Shipped | Place::Elsewhere) => Admitted::Nothing,
         };
-        RealAdapters { source, admitted, facts: Vec::new() }
+        RealAdapters { source, admitted, imported: BTreeMap::new(), facts: Vec::new() }
     }
 
     fn fact(self, _: &'file Source) -> AdapterFacts {
@@ -125,7 +175,14 @@ impl Fact for AdapterFacts {
             .iter()
             .filter_map(|fact| match fact {
                 AdapterFact::Real { crate_name, name } => Some((crate_name.as_str(), name.as_str())),
-                AdapterFact::Named { .. } => None,
+                AdapterFact::Named { .. } | AdapterFact::Port { .. } | AdapterFact::Doubled { .. } => None,
+            })
+            .collect();
+        let ports: BTreeSet<(&str, &str)> = facts
+            .iter()
+            .filter_map(|fact| match fact {
+                AdapterFact::Port { crate_name, name } => Some((crate_name.as_str(), name.as_str())),
+                AdapterFact::Named { .. } | AdapterFact::Real { .. } | AdapterFact::Doubled { .. } => None,
             })
             .collect();
         facts
@@ -141,7 +198,14 @@ impl Fact for AdapterFacts {
                         .in_file(RealAdapters::HEADLINE, path)
                     })
                 }
-                AdapterFact::Real { .. } => None,
+                AdapterFact::Doubled { crate_name, name, path, line } => {
+                    ports.get(&(crate_name.as_str(), name.as_str())).map(|_port| {
+                        let said =
+                            format_args!("a test implements {crate_name}::{name}, a port's trait, outside its crate");
+                        Found::at(*line, said, RealAdapters::DOUBLED).in_file(RealAdapters::HEADLINE, path)
+                    })
+                }
+                AdapterFact::Real { .. } | AdapterFact::Port { .. } => None,
             })
             .collect()
     }
