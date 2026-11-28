@@ -63,7 +63,7 @@ jobs:
           pattern: kill-shard-*
           path: ${{ runner.temp }}/shards
       - name: the kill matrix, reduced to tautological, redundant and pinning tests and missed mutants
-        run: cargo run --locked -q --bin ci -- kill-matrix "$RUNNER_TEMP/shards" "$RUNNER_TEMP/kill-report.json"
+        run: cargo run --locked -q --bin ci -- kill-matrix "$RUNNER_TEMP/kill-report.json" "$RUNNER_TEMP"/shards/*
       - uses: actions/upload-artifact@v4
         with:
           name: kill-report

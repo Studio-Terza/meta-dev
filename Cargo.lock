@@ -55,6 +55,7 @@ version = "0.1.0"
 dependencies = [
  "console-ports",
  "grammar-lines",
+ "grammar-test-log",
  "invariants",
  "serde",
  "serde_json",
@@ -405,6 +406,16 @@ dependencies = [
  "newtype",
  "proptest",
  "thiserror",
+]
+
+[[package]]
+name = "grammar-test-log"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "serde",
+ "test-failure",
+ "toml",
 ]
 
 [[package]]

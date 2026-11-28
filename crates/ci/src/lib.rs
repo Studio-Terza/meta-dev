@@ -1,6 +1,7 @@
 mod cli;
 mod failure;
 mod ignored;
+mod kills;
 mod limits;
 mod mutants;
 mod ports;
