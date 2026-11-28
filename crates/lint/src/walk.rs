@@ -10,7 +10,7 @@ use crate::budget::TestScan;
 use crate::expansion::Expansion;
 use crate::lints::{
     BoolMethods, DeadCode, Emitters, ExpressionFlow, ManualIteration, NamedLifetimes, NoDyn, NoFreeFns, NoTestOnlyApi,
-    PrimitiveBoundary, ProcessStarters, PublicApiTests, PublicSurface, TestShape, TypeShape, VecOutParams,
+    PrimitiveBoundary, ProcessStarters, PublicApiTests, TestShape, TypeShape, VecOutParams,
 };
 use crate::terms::Depth;
 
@@ -240,7 +240,6 @@ walker! {
         process_starters: ProcessStarters,
         bool_methods: BoolMethods,
         no_dyn: NoDyn,
-        public_surface: PublicSurface<'file>,
         public_api_tests: PublicApiTests<'file>,
         emitters: Emitters,
         no_test_only_api: NoTestOnlyApi<'file>,
