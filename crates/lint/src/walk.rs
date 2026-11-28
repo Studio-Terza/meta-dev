@@ -142,7 +142,7 @@ macro_rules! lineup {
             $($lint: Option<Expanded>,)*
         }
 
-        #[derive(Debug, Default, Measure)]
+        #[derive(Debug, Measure)]
         pub(crate) struct Facts {
             $(pub $lint: $fact,)*
         }

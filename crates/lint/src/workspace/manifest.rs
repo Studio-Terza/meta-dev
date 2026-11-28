@@ -4,6 +4,8 @@ use std::path::{Component, Path, PathBuf};
 
 use toml::de::{DeTable, DeValue};
 
+use crate::tree::Tree;
+
 #[derive(Debug, Default)]
 struct Members {
     listed: Vec<String>,
@@ -74,7 +76,7 @@ impl Manifest {
             .flat_map(|dependencies| dependencies.iter().map(|(_, dependency)| dependency.get_ref()))
             .filter_map(|dependency| dependency.as_table().and_then(|inner| inner.get("path")))
             .filter_map(|path| path.get_ref().as_str())
-            .map(|path| Manifest::lexical(&directory.join(path)))
+            .map(|path| Tree::lexical(&directory.join(path)))
             .collect();
         Manifest { packaged: table.get("package").map(|_| ()), members: workspace.map(Members::of), depends, directory }
     }
@@ -122,13 +124,5 @@ impl Manifest {
             reached.first().map(|_| known.union(&reached).cloned().collect())
         });
         widened.last().unwrap_or_default()
-    }
-
-    fn lexical(path: &Path) -> PathBuf {
-        path.components().fold(PathBuf::new(), |folded, component| match component {
-            Component::ParentDir => folded.parent().map_or_else(|| folded.join(component), Path::to_path_buf),
-            Component::CurDir => folded,
-            Component::Prefix(_) | Component::RootDir | Component::Normal(_) => folded.join(component),
-        })
     }
 }

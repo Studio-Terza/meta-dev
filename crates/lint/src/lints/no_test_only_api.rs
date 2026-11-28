@@ -12,7 +12,7 @@ use crate::lint::{Fact, Lint, Reads};
 use crate::source::{Place, Source};
 use crate::workspace::Package;
 
-#[derive(Debug, Default, Measure)]
+#[derive(Debug, Measure)]
 pub(crate) struct TestOnlyFacts(Findings);
 
 #[derive(Debug)]

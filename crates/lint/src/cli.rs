@@ -5,18 +5,28 @@ use std::process::ExitCode;
 
 use file_ports::Files;
 use invariants::Ignoring;
-use pipeline::{Measure, Pipeline};
+use pipeline::Measure;
 use port_core::Run;
 use rayon::ThreadPoolBuilder;
 use timer_ports::{Timer, TimerFiller};
 
+use crate::budget::Budget;
 use crate::failure::Failure;
+use crate::finding::Findings;
 use crate::ignored::Ignored;
-use crate::linting::{Judged, Linting};
 use crate::reading::{Read, Reader};
 use crate::spent::{Spent, Stage};
+use crate::tree::Tree;
 use crate::walk::Walker;
-use crate::workspace::{Tree, Workspace};
+use crate::workspace::Workspace;
+
+#[derive(Debug, Measure)]
+struct Judged {
+    failures: Vec<Failure>,
+    findings: Findings,
+    budget: Budget,
+    spent: Spent,
+}
 
 #[derive(Debug)]
 pub struct Cli {
@@ -57,6 +67,7 @@ impl Cli {
     pub fn verdict(
         &self,
         files: &(impl Files + Sync),
+        working: &Path,
         timer: impl TimerFiller + Sync,
         out: &mut impl Write,
         err: &mut impl Write,
@@ -64,7 +75,7 @@ impl Cli {
         let run = Run::root();
         let clock = run.port(timer);
         let judged = match ThreadPoolBuilder::new().stack_size(Cli::STACK_BYTES).build() {
-            Ok(pool) => pool.install(|| self.read(files, &clock)),
+            Ok(pool) => pool.install(|| self.read(files, working, &clock)),
             Err(failure) => Judged::failed(Failure::Threads(failure)),
         };
         let decided = Cli::decided(&judged);
@@ -77,28 +88,26 @@ impl Cli {
         }
     }
 
-    fn read(&self, files: &(impl Files + Sync), timer: &(impl Timer + Sync)) -> Judged {
+    fn read(&self, files: &(impl Files + Sync), working: &Path, timer: &(impl Timer + Sync)) -> Judged {
         let mut judged = Judged::default();
-        let whole = judged
-            .spent
-            .timed(timer, Stage::Run, || Judged::total(self.roots.iter().map(|root| Cli::tree(files, timer, root))));
+        let whole = judged.spent.timed(timer, Stage::Run, || {
+            Judged::total(self.roots.iter().map(|root| Cli::tree(files, working, timer, root)))
+        });
         judged.joined(whole)
     }
 
-    fn tree(files: &(impl Files + Sync), timer: &(impl Timer + Sync), root: &Path) -> Judged {
+    fn tree(files: &(impl Files + Sync), working: &Path, timer: &(impl Timer + Sync), root: &Path) -> Judged {
         let mut spent = Spent::default();
         let found = spent.timed(timer, Stage::Find, || {
-            Tree::opened(files, root).and_then(|tree| Workspace::found(files, &tree).map(|workspace| (tree, workspace)))
+            Tree::read(files, working, root).and_then(|tree| Workspace::found(&tree).map(|workspace| (tree, workspace)))
         });
         match found {
             Ok((tree, workspace)) => {
                 let packages = workspace.packages().to_vec();
-                let linting = Linting::over(&packages);
-                let Read { failures, facts, spent: reading } =
-                    Reader::new(files, timer, &tree, &linting).read(workspace.into_roots());
-                let measured = spent.timed(timer, Stage::Reduce, || linting.act(linting.measured(facts)));
-                let read = Judged { failures, spent: spent.joined(reading), ..Judged::default() };
-                read.joined(measured)
+                let Read { failures, facts, spent: reading } = Reader::new(timer, &tree).read(workspace.into_roots());
+                let budget = facts.test_budget;
+                let findings = spent.timed(timer, Stage::Reduce, || Findings::from(facts.findings(&packages)));
+                Judged { failures, findings, budget, spent: spent.joined(reading) }
             }
             Err(failure) => Judged { spent, ..Judged::failed(failure) },
         }
@@ -121,6 +130,12 @@ impl Cli {
             Mode::Timings => spent.written(out),
             Mode::Gate => Ok(()),
         }
+    }
+}
+
+impl Judged {
+    fn failed(failure: Failure) -> Judged {
+        Judged { failures: vec![failure], ..Judged::default() }
     }
 }
 

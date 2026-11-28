@@ -6,7 +6,7 @@ use pipeline::Measure;
 use super::calls::Calls;
 use super::op::{Op, OpName};
 
-#[derive(Clone, Debug, PartialEq, Eq, Default, Measure)]
+#[derive(Clone, Debug, PartialEq, Eq, Measure)]
 pub struct Snapshot(BTreeMap<OpName, Calls>);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

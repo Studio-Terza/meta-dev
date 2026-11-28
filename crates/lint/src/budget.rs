@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::fmt;
 use std::sync::Arc;
 
@@ -13,7 +12,7 @@ use crate::lint::{Fact, Lint, Reads};
 use crate::source::{Place, Source};
 use crate::workspace::Package;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Measure)]
+#[derive(Clone, Copy, Debug, Measure)]
 pub(crate) struct Budget {
     lines: usize,
     test_lines: usize,
@@ -31,16 +30,10 @@ pub(crate) struct Exceeded(Budget);
 impl Budget {
     const PERCENT_OF_LINES: usize = 18;
     const WHOLE: usize = 100;
-    const LIMIT: Limit<Budget> = Limit::at(Budget { lines: Budget::WHOLE, test_lines: Budget::PERCENT_OF_LINES });
 
     pub(crate) fn exceeded(self) -> Option<Exceeded> {
-        (Budget::LIMIT.judged(&self) == Verdict::Over).then_some(Exceeded(self))
-    }
-}
-
-impl PartialOrd for Budget {
-    fn partial_cmp(&self, other: &Budget) -> Option<Ordering> {
-        (self.test_lines * other.lines).partial_cmp(&(other.test_lines * self.lines))
+        let limit = Limit::at(self.lines * Budget::PERCENT_OF_LINES);
+        (limit.judged(&(self.test_lines * Budget::WHOLE)) == Verdict::Over).then_some(Exceeded(self))
     }
 }
 

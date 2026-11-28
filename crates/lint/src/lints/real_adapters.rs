@@ -20,7 +20,7 @@ pub(crate) enum AdapterFact {
     Named { crate_name: String, name: String, path: Arc<Path>, line: usize },
 }
 
-#[derive(Debug, Default, Measure)]
+#[derive(Debug, Measure)]
 pub(crate) struct AdapterFacts(Vec<AdapterFact>);
 
 #[derive(Debug)]

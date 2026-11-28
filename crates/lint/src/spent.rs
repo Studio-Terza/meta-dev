@@ -15,7 +15,7 @@ pub(crate) enum Stage {
     Reduce,
 }
 
-#[derive(Debug, Default, Measure)]
+#[derive(Debug, Measure)]
 pub(crate) struct Spent(BTreeMap<Stage, Elapsed>);
 
 impl Spent {
@@ -37,8 +37,8 @@ impl fmt::Display for Stage {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Stage::Run => formatter.write_str("run: wall time of the whole run"),
-            Stage::Find => formatter.write_str("find: list the packages and their crate roots"),
-            Stage::Parse => formatter.write_str("parse: read and parse each file once"),
+            Stage::Find => formatter.write_str("find: read the tree once and list its packages and crate roots"),
+            Stage::Parse => formatter.write_str("parse: parse each file once"),
             Stage::Visit => {
                 formatter.write_str("visit: walk each file's tree once through every lint and the test budget")
             }

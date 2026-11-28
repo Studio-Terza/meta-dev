@@ -34,7 +34,7 @@ pub(crate) struct Finding {
     found: Found,
 }
 
-#[derive(Debug, Default, Measure)]
+#[derive(Debug, Measure)]
 pub(crate) struct Findings(Vec<Finding>);
 
 impl Findings {

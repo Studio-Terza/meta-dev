@@ -40,7 +40,7 @@ enum Used {
     Globbed,
 }
 
-#[derive(Debug, Default, Measure)]
+#[derive(Debug, Measure)]
 pub(crate) struct SurfaceFacts(Vec<SurfaceFact>);
 
 #[derive(Debug)]

@@ -1,0 +1,4 @@
+Clean
+--- out
+test budget: 0 of 106 lines are tests, at most 18% may be
+--- err

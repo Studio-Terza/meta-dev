@@ -21,7 +21,7 @@ pub(crate) enum ModuleFact {
     Named(Naming),
 }
 
-#[derive(Debug, Default, Measure)]
+#[derive(Debug, Measure)]
 pub(crate) struct ModuleFacts(Vec<ModuleFact>);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

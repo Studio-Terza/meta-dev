@@ -57,7 +57,7 @@ pub struct Task {
 #[derive(Debug, Default)]
 pub struct Stopped(BTreeSet<TaskId>);
 
-#[derive(Debug, Default, Measure)]
+#[derive(Debug, Measure)]
 pub struct Tasks {
     shells: usize,
     agents: usize,

@@ -4,23 +4,22 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use file_ports::{FileFailure, Files, Kind};
-use invariants::{Ignoring, Unpoisoned};
-use pipeline::{Measure, Pipeline};
+use file_ports::FileFailure;
+use invariants::Unpoisoned;
+use pipeline::Measure;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use syn::{Expr, ExprLit, Item, ItemMod, Lit, Meta};
+use syn::Item;
 use timer_ports::Timer;
 
 use crate::failure::Failure;
 use crate::gate::Gate;
-use crate::ignored::Ignored;
-use crate::linting::{Lexed, Linting};
 use crate::source::{ModulePath, Source};
 use crate::spent::{Spent, Stage};
-use crate::walk::Facts;
-use crate::workspace::{CrateKind, CrateRoot, Package, Tree};
+use crate::tree::Tree;
+use crate::walk::{Facts, Walker};
+use crate::workspace::{CrateKind, CrateRoot, Package};
 
-#[derive(Debug, Default, Measure)]
+#[derive(Debug, Measure)]
 pub(crate) struct Read {
     pub failures: Vec<Failure>,
     pub facts: Facts,
@@ -57,25 +56,17 @@ struct Declared {
 }
 
 #[derive(Debug)]
-pub(crate) struct Reader<'run, F, T> {
-    files: &'run F,
+pub(crate) struct Reader<'run, T> {
     timer: &'run T,
     tree: &'run Tree,
-    linting: &'run Linting<'run>,
     seen: Mutex<BTreeSet<Arc<Path>>>,
 }
 
-impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
+impl<'run, T: Timer + Sync> Reader<'run, T> {
     const MODULE_FILE: &'static str = "mod.rs";
-    const PATH_ATTRIBUTE: &'static str = "path";
 
-    pub(crate) fn new(
-        files: &'run F,
-        timer: &'run T,
-        tree: &'run Tree,
-        linting: &'run Linting<'run>,
-    ) -> Reader<'run, F, T> {
-        Reader { files, timer, tree, linting, seen: Mutex::default() }
+    pub(crate) fn new(timer: &'run T, tree: &'run Tree) -> Reader<'run, T> {
+        Reader { timer, tree, seen: Mutex::default() }
     }
 
     pub(crate) fn read(&self, roots: Vec<CrateRoot>) -> Read {
@@ -99,23 +90,17 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
 
     fn claimed(&self, module: &Module) -> Read {
         let fresh = self.seen.lock().unpoisoned().insert(Arc::clone(&module.real));
-        if fresh { self.fresh(module) } else { Read::default() }
+        if fresh { self.parsed(module) } else { Read::default() }
     }
 
-    fn fresh(&self, module: &Module) -> Read {
+    fn parsed(&self, module: &Module) -> Read {
         let shown = self.tree.shown(&module.real);
-        match self.files.read_text(&module.real) {
-            Ok(text) => self.parsed(module, shown, text.as_ref().to_owned()),
-            Err(source) => Read::failed(Failure::Read { path: shown.to_path_buf(), source }),
-        }
-    }
-
-    fn parsed(&self, module: &Module, shown: Arc<Path>, text: String) -> Read {
+        let text = self.tree.text(&module.real).unwrap_or_default().to_owned();
         let mut spent = Spent::default();
         let parsed = spent.timed(self.timer, Stage::Parse, || syn::parse_file(&text));
         match parsed {
             Ok(file) => {
-                let declared = Reader::<F, T>::declared(&file.items, &[], module.path.gate());
+                let declared = Reader::<T>::declared(&file.items, &[], module.path.gate());
                 let children: Vec<Result<Module, Failure>> =
                     declared.iter().map(|declaration| self.child(module, declaration)).collect();
                 let source = Source::new(
@@ -126,7 +111,7 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
                     module.kind,
                     text,
                 );
-                let facts = spent.timed(self.timer, Stage::Visit, || self.linting.parsed(Lexed::new(source, file)));
+                let facts = spent.timed(self.timer, Stage::Visit, || Walker::walked(&source, &file));
                 self.below(Read { failures: Vec::new(), facts, spent }, children)
             }
             Err(source) => {
@@ -158,29 +143,17 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
                 match &module.content {
                     Some((_, inner)) => {
                         let deeper: Vec<String> = inline.iter().cloned().chain([name]).collect();
-                        Reader::<F, T>::declared(inner, &deeper, gated)
+                        Reader::<T>::declared(inner, &deeper, gated)
                     }
                     None => vec![Declared {
                         name,
                         inline: inline.to_vec(),
-                        path: Reader::<F, T>::path_attribute(module),
+                        path: Tree::path_attribute(&module.attrs),
                         gate: gated,
                     }],
                 }
             })
             .collect()
-    }
-
-    fn path_attribute(module: &ItemMod) -> Option<String> {
-        module.attrs.iter().filter(|attribute| attribute.path().is_ident(Reader::<F, T>::PATH_ATTRIBUTE)).find_map(
-            |attribute| match &attribute.meta {
-                Meta::NameValue(pair) => match &pair.value {
-                    Expr::Lit(ExprLit { lit: Lit::Str(path), .. }) => Some(path.value()),
-                    _ => None,
-                },
-                Meta::Path(_) | Meta::List(_) => None,
-            },
-        )
     }
 
     fn child(&self, parent: &Module, declared: &Declared) -> Result<Module, Failure> {
@@ -196,18 +169,18 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
             Some(path) => vec![nested.join(path)],
             None => vec![
                 nested.join(format!("{}.rs", declared.name)),
-                nested.join(&declared.name).join(Reader::<F, T>::MODULE_FILE),
+                nested.join(&declared.name).join(Reader::<T>::MODULE_FILE),
             ],
         };
         let chosen = candidates
             .iter()
-            .filter_map(|candidate| self.files.canonical(candidate).ignoring(Ignored::Missing))
-            .find(|resolved| self.files.kind(resolved) == Kind::File)
+            .map(|candidate| Tree::lexical(candidate))
+            .find(|resolved| self.tree.text(resolved).is_some())
             .ok_or_else(|| Failure::Read {
                 path: candidates.first().map_or_default(|first| self.tree.shown(first).to_path_buf()),
                 source: FileFailure::Missing(io::Error::from(io::ErrorKind::NotFound)),
             })?;
-        let nesting = if chosen.file_name() == Some(OsStr::new(Reader::<F, T>::MODULE_FILE)) {
+        let nesting = if chosen.file_name() == Some(OsStr::new(Reader::<T>::MODULE_FILE)) {
             Nesting::Beside
         } else {
             Nesting::Below

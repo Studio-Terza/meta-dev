@@ -1,9 +1,9 @@
 use std::collections::BTreeSet;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use pipeline::Measure;
-use syn::{Attribute, Expr, ExprLit, ImplItemFn, ItemFn, ItemImpl, ItemMacro, ItemMod, Lit, Macro, Meta};
+use syn::{Attribute, ImplItemFn, ItemFn, ItemImpl, ItemMacro, ItemMod, Macro};
 
 use crate::expansion::Expansion;
 use crate::finding::{Finding, Found};
@@ -11,6 +11,7 @@ use crate::gate::{Gate, TestMark};
 use crate::hooks::{Descent, Expanded, Hooks};
 use crate::lint::{Fact, Lint, Reads};
 use crate::source::{Place, Source};
+use crate::tree::Tree;
 use crate::workspace::Package;
 
 #[derive(Debug)]
@@ -20,7 +21,7 @@ pub(crate) enum ApiFact {
     Invoked { name: String, path: Arc<Path>, line: usize },
 }
 
-#[derive(Debug, Default, Measure)]
+#[derive(Debug, Measure)]
 pub(crate) struct ApiFacts(Vec<ApiFact>);
 
 #[derive(Debug)]
@@ -34,7 +35,6 @@ pub(crate) struct PublicApiTests<'file> {
 impl PublicApiTests<'_> {
     const IN_SOURCE: &'static str = "test code in src";
     const IN_SOURCE_FIX: &'static str = "move it to the package's tests directory and call the public API from there";
-    const PATH_ATTRIBUTE: &'static str = "path";
     const SOURCE_DIRECTORY: &'static str = "src";
 
     fn in_source(&mut self, line: usize) {
@@ -74,21 +74,11 @@ impl PublicApiTests<'_> {
     }
 
     fn reached(&mut self, module: &ItemMod) {
-        let target =
-            module.attrs.iter().filter(|attribute| attribute.path().is_ident(PublicApiTests::PATH_ATTRIBUTE)).find_map(
-                |attribute| match &attribute.meta {
-                    Meta::NameValue(pair) => match &pair.value {
-                        Expr::Lit(ExprLit { lit: Lit::Str(path), .. }) => Some(path.value()),
-                        _ => None,
-                    },
-                    Meta::Path(_) | Meta::List(_) => None,
-                },
-            );
         let directory = self.source.real().parent().map_or_default(Path::to_path_buf);
-        let source = PublicApiTests::lexical(&self.source.package().directory().join(PublicApiTests::SOURCE_DIRECTORY));
+        let source = Tree::lexical(&self.source.package().directory().join(PublicApiTests::SOURCE_DIRECTORY));
         let within = self.inline.iter().fold(PathBuf::new(), |inside, name| inside.join(name));
-        let reaching =
-            target.filter(|path| PublicApiTests::lexical(&directory.join(&within).join(path)).starts_with(&source));
+        let reaching = Tree::path_attribute(&module.attrs)
+            .filter(|path| Tree::lexical(&directory.join(&within).join(path)).starts_with(&source));
         self.facts.extend(reaching.map(|_| {
             let found = Found::spanned(
                 module.ident.span(),
@@ -97,17 +87,6 @@ impl PublicApiTests<'_> {
             );
             ApiFact::Found(found.in_file(PublicApiTests::HEADLINE, self.source.shown()))
         }));
-    }
-
-    fn lexical(path: &Path) -> PathBuf {
-        path.components().fold(PathBuf::new(), |folded, component| match component {
-            Component::ParentDir => match folded.file_name() {
-                Some(_) => folded.parent().map_or_default(Path::to_path_buf),
-                None => folded.join(component),
-            },
-            Component::CurDir => folded,
-            Component::Prefix(_) | Component::RootDir | Component::Normal(_) => folded.join(component),
-        })
     }
 
     fn emitter(definition: &ItemMacro) -> Option<ApiFact> {
