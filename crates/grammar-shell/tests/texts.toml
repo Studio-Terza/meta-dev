@@ -123,6 +123,7 @@ shell = [
     "cd src* && echo a > x",
     "find . -name *.o -print",
     "S=/tmp/s; echo a > $S/gold.txt",
+    "S=/tmp/s; echo $(echo a > $S/x)",
     "export D=\"$HOME/w\" && cd $D && echo a > ${D}/x",
     "echo a > $UNSET/x; X=1 echo b > $X",
     "S=/tmp; S=$S/deeper; mv a $S/a",
