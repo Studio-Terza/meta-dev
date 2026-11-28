@@ -1,15 +1,14 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::fmt;
 
-use json_ports::Json;
+use pipeline::{Edges, Measure};
 
-use crate::failure::Failure;
 use crate::kills::log::{Kind, Test};
 use crate::kills::outcomes::{Fate, Mutant, Ran};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Measure)]
 pub(crate) struct Matrix {
-    kills: BTreeMap<Test, BTreeSet<Mutant>>,
+    kills: Edges<Test, Mutant>,
     caught: BTreeSet<Mutant>,
     missed: BTreeSet<Mutant>,
     unviable: BTreeSet<Mutant>,
@@ -35,91 +34,54 @@ struct Row {
 }
 
 impl Matrix {
-    pub(crate) fn with(self, ran: &Ran) -> Matrix {
-        let seen = ran.log().tests().fold(self, Matrix::seen);
+    pub(crate) fn of(ran: &Ran) -> Matrix {
+        let seen = Edges::total(ran.log().tests().cloned().map(Edges::node));
+        let fated = |mutant: &Mutant| BTreeSet::from([mutant.clone()]);
         match ran.fate() {
-            Fate::Inventory => seen,
+            Fate::Inventory => Matrix { kills: seen, ..Matrix::default() },
             Fate::Caught(mutant) => {
-                ran.log().failed().fold(seen, |matrix, test| matrix.killed(test, mutant)).caught(mutant)
+                let killed = ran.log().failed().map(|test| Edges::edge(test.clone(), mutant.clone()));
+                Matrix { kills: seen.joined(Edges::total(killed)), caught: fated(mutant), ..Matrix::default() }
             }
-            Fate::Missed(mutant) => seen.missed(mutant),
-            Fate::Unviable(mutant) => seen.unviable(mutant),
+            Fate::Missed(mutant) => Matrix { kills: seen, missed: fated(mutant), ..Matrix::default() },
+            Fate::Unviable(mutant) => Matrix { kills: seen, unviable: fated(mutant), ..Matrix::default() },
         }
-    }
-
-    fn seen(mut self, test: &Test) -> Matrix {
-        self.kills.entry(test.clone()).or_default();
-        self
-    }
-
-    fn killed(mut self, test: &Test, mutant: &Mutant) -> Matrix {
-        self.kills.entry(test.clone()).or_default().insert(mutant.clone());
-        self
-    }
-
-    fn caught(mut self, mutant: &Mutant) -> Matrix {
-        self.caught.insert(mutant.clone());
-        self
-    }
-
-    fn missed(mut self, mutant: &Mutant) -> Matrix {
-        self.missed.insert(mutant.clone());
-        self
-    }
-
-    fn unviable(mut self, mutant: &Mutant) -> Matrix {
-        self.unviable.insert(mutant.clone());
-        self
     }
 }
 
 impl From<Matrix> for Report {
     fn from(matrix: Matrix) -> Report {
-        let attributed: BTreeSet<&Mutant> = matrix.kills.values().flatten().collect();
-        let golden: Vec<&Test> = matrix.kills.keys().filter(|test| test.kind() == Kind::Golden).collect();
-        let noticed: BTreeSet<&Mutant> = golden.iter().filter_map(|test| matrix.kills.get(*test)).flatten().collect();
-        let twins = matrix.kills.iter().filter(|(_, killed)| !killed.is_empty()).fold(
-            BTreeMap::<&BTreeSet<Mutant>, Vec<Test>>::new(),
-            |mut twins, (test, killed)| {
-                twins.entry(killed).or_default().push(test.clone());
-                twins
-            },
-        );
+        let kills = &matrix.kills;
+        let attributed = kills.reached();
+        let golden: Vec<&Test> = kills.nodes().filter(|test| test.kind() == Kind::Golden).collect();
+        let noticed: BTreeSet<Mutant> =
+            golden.iter().filter_map(|test| kills.targets(test)).flatten().cloned().collect();
+        let killed = |test: &Test| kills.targets(test).cloned().unwrap_or_default();
+        let twins = kills.neighbourhoods().crowded();
         Report {
             caught: matrix.caught.len(),
             unviable: matrix.unviable.len(),
             missed: matrix.missed.iter().cloned().collect(),
             unattributed: matrix.caught.iter().filter(|mutant| !attributed.contains(mutant)).cloned().collect(),
             golden: golden.into_iter().cloned().collect(),
-            tautological: matrix
-                .kills
-                .iter()
-                .filter(|(_, killed)| killed.is_empty())
-                .map(|(test, _)| test.clone())
+            tautological: kills.bare().cloned().collect(),
+            redundant: twins
+                .nodes()
+                .filter(|shared| !shared.is_empty())
+                .filter_map(|shared| twins.targets(shared))
+                .map(|tests| tests.iter().cloned().collect())
                 .collect(),
-            redundant: twins.into_values().filter(|tests| tests.len() > 1).collect(),
-            pinning: matrix
-                .kills
-                .iter()
-                .filter(|(test, killed)| {
-                    test.kind() == Kind::Other
-                        && !killed.is_empty()
-                        && killed.iter().all(|mutant| !noticed.contains(mutant))
-                })
-                .map(|(test, _)| test.clone())
+            pinning: kills
+                .nodes()
+                .filter(|test| test.kind() == Kind::Other)
+                .filter(|test| killed(test).first().is_some() && killed(test).is_disjoint(&noticed))
+                .cloned()
                 .collect(),
-            kills: matrix
-                .kills
-                .iter()
-                .map(|(test, killed)| Row { test: test.clone(), killed: killed.iter().cloned().collect() })
+            kills: kills
+                .nodes()
+                .map(|test| Row { test: test.clone(), killed: killed(test).into_iter().collect() })
                 .collect(),
         }
-    }
-}
-
-impl Report {
-    pub(crate) fn json(&self) -> Result<String, Failure> {
-        Json::pretty(self).map(|json| [json.as_str(), "\n"].concat()).map_err(Failure::Unserialized)
     }
 }
 

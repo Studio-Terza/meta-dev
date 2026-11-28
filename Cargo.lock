@@ -55,8 +55,8 @@ version = "0.1.0"
 dependencies = [
  "console-ports",
  "grammar",
- "invariants",
  "json-ports",
+ "pipeline",
  "serde",
  "tempfile",
  "test-failure",

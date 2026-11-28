@@ -33,6 +33,4 @@ pub(crate) enum Failure {
     Unserialized(JsonFailure),
     #[error("a numstat row is not added, deleted and path separated by tabs: {0}")]
     Numstat(String),
-    #[error("cannot write the report: {0}")]
-    Report(#[from] io::Error),
 }
