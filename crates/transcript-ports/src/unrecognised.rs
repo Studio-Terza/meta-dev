@@ -9,8 +9,6 @@ pub struct Unrecognised {
     #[serde(rename = "type", alias = "kind")]
     kind: Kind,
     uuid: Option<Uuid>,
-    #[serde(rename = "parentUuid")]
-    parent: Option<Uuid>,
 }
 
 impl Unrecognised {
@@ -21,7 +19,7 @@ impl Unrecognised {
         &self.kind
     }
 
-    pub(crate) fn within(self, uuid: Uuid, parent: Option<Uuid>) -> Unrecognised {
-        Unrecognised { kind: self.kind, uuid: Some(uuid), parent }
+    pub(crate) fn within(self, uuid: Uuid) -> Unrecognised {
+        Unrecognised { kind: self.kind, uuid: Some(uuid) }
     }
 }

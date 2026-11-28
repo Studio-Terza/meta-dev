@@ -1,7 +1,6 @@
 CREATE TABLE messages (
     uuid TEXT PRIMARY KEY NOT NULL,
     session TEXT NOT NULL,
-    parent TEXT,
     at TEXT NOT NULL,
     author TEXT NOT NULL,
     body TEXT NOT NULL

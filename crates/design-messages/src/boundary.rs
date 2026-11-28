@@ -14,7 +14,6 @@ use crate::Said;
 pub(crate) struct MessageRow {
     uuid: Uuid,
     session: SessionId,
-    parent: Option<Uuid>,
     at: Instant,
     author: Authorship,
     body: Body,
@@ -41,7 +40,6 @@ impl From<&Record> for MessageRow {
         MessageRow {
             uuid: record.uuid().clone(),
             session: record.session().clone(),
-            parent: record.parent().cloned(),
             at: record.stamp().clone(),
             author: record.author(),
             body: record.text().clone(),
@@ -128,17 +126,16 @@ FROM
 
 impl MessageRow {
     pub(crate) fn inserted(&self) -> Prepared<()> {
-        let MessageRow { uuid, session, parent, at, author, body } = self;
+        let MessageRow { uuid, session, at, author, body } = self;
         store_ports::query!(
             r#"
 INSERT
-  OR IGNORE INTO messages (uuid, session, parent, at, author, body)
+  OR IGNORE INTO messages (uuid, session, at, author, body)
 VALUES
-  (?1, ?2, ?3, ?4, ?5, ?6)
+  (?1, ?2, ?3, ?4, ?5)
 "#,
             uuid: Uuid,
             session: SessionId,
-            parent: Option<Uuid>,
             at: Instant,
             author: Authorship,
             body: Body

@@ -14,7 +14,6 @@ impl Unrecognised {
         Unrecognised {
             kind: invariant!(holding Kind::try_new(Self::UNREADABLE.to_owned()), Invariant::UnreadableIsAKind),
             uuid: None,
-            parent: None,
         }
     }
 }

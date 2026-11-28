@@ -12,8 +12,6 @@ struct Chain(Option<Side>);
 #[derive(Debug, Deserialize)]
 pub struct Stamp {
     uuid: Uuid,
-    #[serde(rename = "parentUuid")]
-    parent: Option<Uuid>,
     #[serde(rename = "sessionId")]
     session: SessionId,
     timestamp: Instant,
@@ -27,8 +25,6 @@ struct Main(Stamp);
 #[derive(Debug, Deserialize)]
 pub struct Passing {
     uuid: Option<Uuid>,
-    #[serde(rename = "parentUuid")]
-    parent: Option<Uuid>,
 }
 
 impl From<bool> for Chain {
@@ -39,7 +35,7 @@ impl From<bool> for Chain {
 
 impl From<Stamp> for Skipped {
     fn from(stamp: Stamp) -> Skipped {
-        Skipped::new(stamp.uuid, stamp.parent)
+        Skipped::new(stamp.uuid)
     }
 }
 
@@ -52,19 +48,19 @@ impl Stamp {
     }
 
     pub fn unrecognised(self, unrecognised: Unrecognised) -> Line {
-        Line::Unrecognised(unrecognised.within(self.uuid, self.parent))
+        Line::Unrecognised(unrecognised.within(self.uuid))
     }
 }
 
 impl Main {
     fn voiced(self, author: Authorship, text: Body) -> Record {
-        let Main(Stamp { uuid, parent, session, timestamp, .. }) = self;
-        Record { uuid, parent, session, at: timestamp, author, text }
+        let Main(Stamp { uuid, session, timestamp, .. }) = self;
+        Record { uuid, session, at: timestamp, author, text }
     }
 }
 
 impl Passing {
     pub fn line(self) -> Option<Line> {
-        self.uuid.map(|uuid| Line::Skipped(Skipped::new(uuid, self.parent)))
+        self.uuid.map(|uuid| Line::Skipped(Skipped::new(uuid)))
     }
 }

@@ -1,0 +1,10 @@
+{
+  "query": "\nINSERT\n  OR IGNORE INTO messages (uuid, session, at, author, body)\nVALUES\n  (?1, ?2, ?3, ?4, ?5)\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  }
+}

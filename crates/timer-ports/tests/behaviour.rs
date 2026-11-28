@@ -2,9 +2,9 @@ use std::thread;
 use std::time::Duration;
 
 use fixture::{Failed, Fixture, Properties, Rows};
-use serde::Deserialize;
 use port_core::Run;
 use proptest::prelude::{Strategy, any, prop_assert_eq, proptest};
+use serde::Deserialize;
 use timer_ports::{Elapsed, Moment, Monotonic, Stopped, Timer};
 
 proptest! {

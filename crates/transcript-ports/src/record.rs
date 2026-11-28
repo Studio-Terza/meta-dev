@@ -5,7 +5,6 @@ use crate::{Authorship, Body, Instant, SessionId, Skipped, Uuid};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Record {
     uuid: Uuid,
-    parent: Option<Uuid>,
     session: SessionId,
     at: Instant,
     author: Authorship,
@@ -16,11 +15,6 @@ impl Record {
     #[must_use]
     pub fn uuid(&self) -> &Uuid {
         &self.uuid
-    }
-
-    #[must_use]
-    pub fn parent(&self) -> Option<&Uuid> {
-        self.parent.as_ref()
     }
 
     #[must_use]
@@ -47,6 +41,6 @@ impl Record {
 impl Skipped {
     #[must_use]
     pub fn said(&self, session: SessionId, at: Instant, author: Authorship, text: Body) -> Record {
-        Record { uuid: self.uuid().clone(), parent: self.parent().cloned(), session, at, author, text }
+        Record { uuid: self.uuid().clone(), session, at, author, text }
     }
 }
