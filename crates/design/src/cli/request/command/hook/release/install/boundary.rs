@@ -27,7 +27,13 @@ struct Configured {
 }
 
 impl<C: Clock, G: Shell> Installing<'_, '_, C, G> {
-    pub(super) fn ran(&self, program: Program, arguments: &[&str], directory: &Path, timeout: Timeout) -> Option<String> {
+    pub(super) fn ran(
+        &self,
+        program: Program,
+        arguments: &[&str],
+        directory: &Path,
+        timeout: Timeout,
+    ) -> Option<String> {
         let ran = self.crew.spoke(program, arguments, directory, timeout);
         ran.as_ref().and_then(Ran::succeeded).map(|printed| AsRef::<str>::as_ref(printed).to_owned())
     }

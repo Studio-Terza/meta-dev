@@ -1,7 +1,5 @@
-use std::env;
 use std::fmt::{self, Display, Formatter};
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
 
 use std::ops::Deref;
 
@@ -9,7 +7,6 @@ use file_doubles::Memory;
 use file_ports::Bytes;
 use newtype::{Arbitrary, Newtype};
 use proptest::sample::Index;
-use proptest::test_runner::Config;
 
 #[derive(Debug)]
 pub struct Campaign;
@@ -191,24 +188,10 @@ pub enum Item {
 impl Campaign {
     const ROOT: &'static str = "/fuzzed";
     const MANIFEST: &'static str = "[package]\nname = \"fuzzed\"\nversion = \"0.1.0\"\nedition = \"2024\"\n";
-    const SECONDS: &'static str = "FUZZ_SECONDS";
-    const DEFAULT_SECONDS: u64 = 5;
-    const BATCH: u32 = 64;
 
     #[must_use]
     pub fn root() -> PathBuf {
         PathBuf::from(Campaign::ROOT)
-    }
-
-    #[must_use]
-    pub fn deadline() -> Instant {
-        let given = env::var(Campaign::SECONDS).into_iter().find_map(|text| text.parse::<u64>().into_iter().next());
-        Instant::now() + Duration::from_secs(given.unwrap_or(Campaign::DEFAULT_SECONDS))
-    }
-
-    #[must_use]
-    pub fn batch() -> Config {
-        Config { cases: Campaign::BATCH, failure_persistence: None, ..Config::default() }
     }
 }
 

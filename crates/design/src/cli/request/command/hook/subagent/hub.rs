@@ -95,7 +95,6 @@ enum State {
     Waiting,
 }
 
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Unopened {
     Unpushed(Option<CommitSha>),

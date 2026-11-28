@@ -9,7 +9,7 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: "0"
   CARGO_PROFILE_DEV_DEBUG: "0"
-  FUZZ_SECONDS: "720"
+  PROPTEST_CASES: "7500"
 
 permissions:
   contents: read
@@ -21,5 +21,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/toolchain
-      - name: fuzz the runner for FUZZ_SECONDS; a failure prints its shrunk input
+      - name: fuzz the runner on PROPTEST_CASES inputs; a failure prints its shrunk input
         run: cargo test --locked -p fuzz --features campaign --test fuzz
