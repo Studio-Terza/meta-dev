@@ -2325,3 +2325,88 @@ pub use kept::{Named, Unnamed};
 pub struct Named;
 pub struct Unnamed;
 """
+
+[Lint.tested_exports]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.tested_exports.files]
+"Cargo.toml" = """
+[workspace]
+members = ["app", "lib"]
+"""
+"app/Cargo.toml" = """
+[package]
+name = "app"
+
+[dependencies]
+lib = { path = "../lib" }
+"""
+"app/src/main.rs" = """
+use lib::Shipped;
+
+fn main() {}
+"""
+"app/tests/tested.rs" = """
+use lib::Tested;
+use lib::inner::probe::Probe;
+"""
+"lib/Cargo.toml" = """
+[package]
+name = "lib"
+"""
+"lib/src/lib.rs" = """
+mod kept;
+pub mod inner;
+
+pub use kept::{Shipped, Tested};
+"""
+"lib/src/kept.rs" = """
+pub struct Shipped;
+pub struct Tested;
+"""
+"lib/src/inner.rs" = """
+pub mod probe {
+    pub struct Probe;
+}
+"""
+
+[Lint.own_tests_unseen]
+arguments = ["."]
+verdict = "Violations"
+
+[Lint.own_tests_unseen.files]
+"Cargo.toml" = """
+[workspace]
+members = ["app", "support"]
+"""
+"app/Cargo.toml" = """
+[package]
+name = "app"
+
+[dev-dependencies]
+support = { path = "../support" }
+"""
+"app/src/main.rs" = """
+fn main() {}
+"""
+"app/tests/aliased.rs" = """
+use support as helper;
+use helper::Aliased;
+"""
+"support/Cargo.toml" = """
+[package]
+name = "support"
+"""
+"support/src/lib.rs" = """
+mod kept;
+
+pub use kept::{Aliased, Owned};
+"""
+"support/src/kept.rs" = """
+pub struct Aliased;
+pub struct Owned;
+"""
+"support/tests/own.rs" = """
+use support::Owned;
+"""

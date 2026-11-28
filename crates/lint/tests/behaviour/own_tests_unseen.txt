@@ -1,0 +1,4 @@
+every pub item is named by another workspace crate:
+support/src/kept.rs:2: pub Owned is named by no other crate; make it private or delete it
+support/src/lib.rs:3: pub Owned is named by no other crate; make it private or delete it
+test budget: 8 of 9 lines are tests, at most 18% may be; cut test lines or test through fewer, table-driven cases

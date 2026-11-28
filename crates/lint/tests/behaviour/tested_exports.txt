@@ -1,0 +1,4 @@
+test budget: 2 of 14 lines are tests, at most 18% may be
+every pub item is named by another workspace crate:
+lib/src/lib.rs:2: inner is exported but no other crate names it; export it when a user appears
+lib/src/lib.rs:4: Tested is exported but no other crate names it; export it when a user appears
