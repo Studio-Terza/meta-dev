@@ -5,24 +5,29 @@ use store_ports::Schema;
 
 use super::Opened;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub(in super::super) struct Stamped {
-    sql: &'static str,
+    schema: Schema,
     stamp: i32,
 }
 
-impl Stamped {
-    pub(in super::super) fn of<S: Schema>() -> Stamped {
-        let digest = Sha256::digest(S::SQL.as_bytes());
+impl From<&Schema> for Stamped {
+    fn from(schema: &Schema) -> Stamped {
+        let digest = schema
+            .statements()
+            .fold(Sha256::new(), |hashed, statement| hashed.chain_update(statement.as_ref()).chain_update([u8::MIN]))
+            .finalize();
         let [first, second, third, fourth, ..]: [u8; 32] = digest.into();
-        Stamped { sql: S::SQL, stamp: i32::from_be_bytes([first, second, third, fourth]) }
+        Stamped { schema: schema.clone(), stamp: i32::from_be_bytes([first, second, third, fourth]) }
+    }
+}
+
+impl Stamped {
+    pub(super) fn schema(&self) -> &Schema {
+        &self.schema
     }
 
-    pub(super) fn sql(self) -> &'static str {
-        self.sql
-    }
-
-    pub(super) fn stamp(self) -> i32 {
+    pub(super) fn stamp(&self) -> i32 {
         self.stamp
     }
 }

@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use console_ports::{Environment, Shown};
 use dispatch_ports::{Clock, Shell};
 use file_ports::Files;
-use store_ports::{Opens, Store};
+use store_ports::{Opens, Schema, Store};
 
 use super::Ground;
 use super::persistence::Persistence;
@@ -26,10 +26,10 @@ pub(crate) enum Command {
 }
 
 impl Command {
-    pub(crate) fn opened<O: Opens>(self, path: PathBuf, opens: &O) -> O::Store {
+    pub(crate) fn opened<O: Opens>(self, schema: &Schema, path: PathBuf, opens: &O) -> O::Store {
         match self {
-            Command::Ingest(persistence) => persistence.opened(path, opens),
-            Command::Hook(_) => Persistence::File.opened(path, opens),
+            Command::Ingest(persistence) => persistence.opened(schema, path, opens),
+            Command::Hook(_) => Persistence::File.opened(schema, path, opens),
         }
     }
 

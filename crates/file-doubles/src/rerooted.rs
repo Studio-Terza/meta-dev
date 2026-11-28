@@ -1,3 +1,5 @@
+mod boundary;
+
 use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, Disk, FileFailure, FilesFiller, Kind, Offset, Size, Stamps, Text, files_ops};
@@ -28,12 +30,12 @@ impl FromIterator<(PathBuf, PathBuf)> for Rerooted {
 impl Opens for Rerooted {
     type Store = <SqliteOpener as Opens>::Store;
 
-    fn file<S: Schema>(&self, path: PathBuf) -> Self::Store {
-        SqliteOpener.file::<S>(self.real(&path))
+    fn file(&self, schema: &Schema, path: PathBuf) -> Self::Store {
+        SqliteOpener.file(schema, self.real(&path))
     }
 
-    fn in_memory<S: Schema>(&self) -> Self::Store {
-        SqliteOpener.in_memory::<S>()
+    fn in_memory(&self, schema: &Schema) -> Self::Store {
+        SqliteOpener.in_memory(schema)
     }
 }
 

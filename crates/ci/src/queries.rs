@@ -5,7 +5,7 @@ use design_messages::StreamSchema;
 use port_core::Run;
 use query_cache::Cache;
 use sqlite_ports::SqliteOpener;
-use store_ports::Opens;
+use store_ports::{Opens, Parses};
 
 use crate::cli::Exit;
 use crate::failure::Failure;
@@ -33,7 +33,7 @@ impl Queries {
     pub(crate) fn run(&self, out: &mut impl Write) -> Result<Exit, Failure> {
         let run = Run::root();
         let files = run.port(file_ports::Disk);
-        let store = run.port(SqliteOpener.in_memory::<StreamSchema>());
+        let store = run.port(SqliteOpener.in_memory(&SqliteOpener.parsed(StreamSchema::SQL)?));
         let cache = Cache::rooted(&self.root);
         let exit = match self.mode {
             Mode::Checked => {

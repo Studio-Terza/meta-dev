@@ -1,3 +1,3 @@
-pub trait Schema: 'static {
-    const SQL: &'static str;
-}
+mod boundary;
+
+pub use boundary::{Parses, Schema, Statement};

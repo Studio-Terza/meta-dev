@@ -12,6 +12,8 @@ pub(crate) enum Failure {
     Usage,
     #[error("cannot check the query cache: {0}")]
     Queries(#[from] query_cache::Uncached),
+    #[error("cannot parse the store's schema: {0}")]
+    Schema(#[from] store_ports::StoreFailure),
     #[error("cannot read {}: {source}", path.display())]
     Unreadable { path: PathBuf, source: io::Error },
     #[error("cannot write {}: {source}", path.display())]

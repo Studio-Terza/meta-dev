@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
-use design_messages::StreamSchema;
-use store_ports::Opens;
+use store_ports::{Opens, Schema};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Persistence {
@@ -10,10 +9,10 @@ pub(crate) enum Persistence {
 }
 
 impl Persistence {
-    pub(crate) fn opened<O: Opens>(self, path: PathBuf, opens: &O) -> O::Store {
+    pub(crate) fn opened<O: Opens>(self, schema: &Schema, path: PathBuf, opens: &O) -> O::Store {
         match self {
-            Persistence::File => opens.file::<StreamSchema>(path),
-            Persistence::DryRun => opens.in_memory::<StreamSchema>(),
+            Persistence::File => opens.file(schema, path),
+            Persistence::DryRun => opens.in_memory(schema),
         }
     }
 }

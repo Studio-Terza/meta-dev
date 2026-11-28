@@ -1,11 +1,11 @@
 use std::path::PathBuf;
 
-use crate::{Schema, StoreFiller};
+use crate::{Parses, Schema, StoreFiller};
 
-pub trait Opens {
+pub trait Opens: Parses {
     type Store: StoreFiller;
 
-    fn file<S: Schema>(&self, path: PathBuf) -> Self::Store;
+    fn file(&self, schema: &Schema, path: PathBuf) -> Self::Store;
 
-    fn in_memory<S: Schema>(&self) -> Self::Store;
+    fn in_memory(&self, schema: &Schema) -> Self::Store;
 }

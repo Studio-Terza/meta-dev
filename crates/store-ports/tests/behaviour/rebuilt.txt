@@ -1,0 +1,66 @@
+(
+    Schema {
+        statements: [
+            Statement(
+                "CREATE TABLE cursors (\n    session TEXT PRIMARY KEY NOT NULL CHECK (session <> ''),\n    read_to INTEGER NOT NULL CHECK (read_to >= 0)\n) STRICT;",
+            ),
+            Statement(
+                "\n\nCREATE TABLE altered (\n    kept INTEGER NOT NULL\n) STRICT;",
+            ),
+        ],
+    },
+    Schema {
+        statements: [
+            Statement(
+                "\nCREATE TABLE messages (\n    uuid TEXT PRIMARY KEY NOT NULL,\n    session TEXT NOT NULL,\n    at TEXT NOT NULL,\n    author TEXT NOT NULL,\n    body TEXT NOT NULL\n) STRICT;",
+            ),
+            Statement(
+                "\n\nCREATE INDEX messages_by_session ON messages (session, author, at);",
+            ),
+            Statement(
+                "\n\nCREATE TABLE cursors (\n    session TEXT PRIMARY KEY NOT NULL CHECK (session <> ''),\n    read_to INTEGER NOT NULL CHECK (read_to >= 0)\n) STRICT;",
+            ),
+            Statement(
+                "\n\nCREATE TABLE ended (\n    task TEXT PRIMARY KEY NOT NULL CHECK (task <> '')\n) STRICT;",
+            ),
+            Statement(
+                "\n\nCREATE TABLE overruns (\n    task TEXT PRIMARY KEY NOT NULL CHECK (task <> '')\n) STRICT;",
+            ),
+            Statement(
+                "\n\nCREATE TABLE failed_checks (\n    pull INTEGER NOT NULL CHECK (pull > 0),\n    name TEXT NOT NULL CHECK (name <> ''),\n    PRIMARY KEY (pull, name)\n) STRICT;",
+            ),
+        ],
+    },
+    Cursor(
+        Offset(
+            1148232145316254621,
+        ),
+    ),
+    Written(
+        1,
+    ),
+    (
+        Cursor(
+            Offset(
+                1148232145316254621,
+            ),
+        ),
+        Err(
+            Statement(
+                Cause(
+                    "no such table: ended",
+                ),
+            ),
+        ),
+    ),
+    (
+        Cursor(
+            Offset(
+                0,
+            ),
+        ),
+        Ok(
+            [],
+        ),
+    ),
+)

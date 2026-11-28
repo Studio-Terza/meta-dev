@@ -19,7 +19,7 @@ impl Place {
     pub(super) fn opened(
         &self,
         prepare: impl FnOnce(&Path) -> io::Result<()>,
-        schema: Stamped,
+        schema: &Stamped,
     ) -> Result<Opened, StoreFailure> {
         match self {
             Place::File(path) => {

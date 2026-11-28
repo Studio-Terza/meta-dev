@@ -8,7 +8,7 @@ use newtype::Wrapping;
 use port_core::{Counted, Op, Released, Resource, Run};
 use serde::Deserialize;
 use sqlite_ports::SqliteOpener;
-use store_ports::{Opens, Store, StoreLock};
+use store_ports::{Opens, Parses, Store, StoreLock};
 
 #[derive(Fixture, Deserialize, Debug)]
 struct Clocked {
@@ -47,7 +47,7 @@ fn a_per_type_op_counts_under_its_own_name_and_a_held_lock_is_released_once_when
     let drifted = Cases::<Stored>::drifted(|case| {
         let run = Run::root();
         let observed = {
-            let store = run.port(SqliteOpener.in_memory::<StreamSchema>());
+            let store = run.port(SqliteOpener.in_memory(&SqliteOpener.parsed(StreamSchema::SQL)?));
             let reads = case.row().reads.into_inner();
             let cursors =
                 iter::repeat_with(|| store.read(SessionCursors)).take(reads).collect::<Result<Vec<_>, _>>()?;

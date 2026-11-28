@@ -21,7 +21,7 @@ pub use opens::Opens;
 pub use prepared::{Execute, Prepared, Values};
 pub use query::Query;
 pub use record::{Created, Record};
-pub use schema::Schema;
+pub use schema::{Parses, Schema, Statement};
 pub use store::{Store, StoreFiller, store_ops};
 pub use store_failure::StoreFailure;
 pub use store_lock::{Claim, StoreLock};

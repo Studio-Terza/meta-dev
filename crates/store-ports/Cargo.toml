@@ -23,6 +23,7 @@ sqlite-ports = { path = "../sqlite-ports" }
 design-messages = { path = "../design-messages" }
 file-ports = { path = "../file-ports" }
 proptest.workspace = true
+serde.workspace = true
 tempfile.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 

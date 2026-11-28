@@ -10,7 +10,7 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 use console_ports::Environment;
-use store_ports::Opens;
+use store_ports::{Opens, Schema};
 
 use super::failure::Failure;
 use command::Command;
@@ -45,8 +45,8 @@ impl Request {
         Projects::located(environment, self.workspace.as_deref().map(Path::new))
     }
 
-    pub(crate) fn opened<O: Opens>(&self, located: &Located, opens: &O) -> O::Store {
-        self.command.opened(located.kept(Kept::Store), opens)
+    pub(crate) fn opened<O: Opens>(&self, located: &Located, schema: &Schema, opens: &O) -> O::Store {
+        self.command.opened(schema, located.kept(Kept::Store), opens)
     }
 
     pub(crate) fn command(self) -> Command {

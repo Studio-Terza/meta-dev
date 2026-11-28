@@ -23,14 +23,14 @@ impl Opened {
     const BUSY: std::time::Duration = std::time::Duration::from_secs(5);
     const STATEMENTS: usize = 100;
 
-    pub(super) fn filed(path: &Path, schema: Stamped) -> Result<Opened, StoreFailure> {
+    pub(super) fn filed(path: &Path, schema: &Stamped) -> Result<Opened, StoreFailure> {
         let opened = Opened::configured(Connection::open(path).map_err(Unopened::from)?)?;
         let stamp: i32 =
             opened.connection.pragma_query_value(None, Self::STAMP, |row| row.get(0)).map_err(Unopened::from)?;
         if stamp == schema.stamp() { Ok(opened) } else { opened.emptied(schema) }
     }
 
-    fn emptied(self, schema: Stamped) -> Result<Opened, StoreFailure> {
+    fn emptied(self, schema: &Stamped) -> Result<Opened, StoreFailure> {
         let connection = &self.connection;
         connection.set_db_config(DbConfig::SQLITE_DBCONFIG_RESET_DATABASE, true).map_err(Unbuilt::from)?;
         connection.execute_batch(Self::EMPTIED).map_err(Unbuilt::from)?;
@@ -38,7 +38,7 @@ impl Opened {
         self.stamped(schema)
     }
 
-    pub(super) fn fresh(schema: Stamped) -> Result<Opened, StoreFailure> {
+    pub(super) fn fresh(schema: &Stamped) -> Result<Opened, StoreFailure> {
         Opened::configured(Connection::open_in_memory().map_err(Unopened::from)?)?.stamped(schema)
     }
 
@@ -61,10 +61,14 @@ impl Opened {
         Ok(Opened { connection })
     }
 
-    fn stamped(self, schema: Stamped) -> Result<Opened, StoreFailure> {
+    fn stamped(self, schema: &Stamped) -> Result<Opened, StoreFailure> {
         self.settled(|connected| {
             let connection = connected.connection();
-            connection.execute_batch(schema.sql()).map_err(Unbuilt::from)?;
+            schema
+                .schema()
+                .statements()
+                .try_for_each(|statement| connection.execute_batch(statement.as_ref()))
+                .map_err(Unbuilt::from)?;
             connection.pragma_update(None, Self::STAMP, schema.stamp()).map_err(Unbuilt::from)?;
             Ok::<(), StoreFailure>(())
         })?;

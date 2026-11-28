@@ -7,6 +7,7 @@ pub(crate) mod uttered;
 use std::ffi::OsString;
 
 use console_ports::Environment;
+use design_messages::StreamSchema;
 use dispatch_ports::{ClockFiller, ShellFiller};
 use file_ports::FilesFiller;
 use port_core::Run;
@@ -65,7 +66,8 @@ impl<'environment, E: Environment, F: FilesFiller + Clone, O: Opens, C: ClockFil
     fn answered(self, run: &Run, arguments: impl Iterator<Item = OsString>) -> Result<Uttered, Failure> {
         let request = Request::parsed(arguments)?;
         let located = request.located(self.environment)?;
-        let store = run.port(request.opened(&located, &self.opened));
+        let schema = self.opened.parsed(StreamSchema::SQL)?;
+        let store = run.port(request.opened(&located, &schema, &self.opened));
         let scratch = located.kept(Kept::Agents);
         let clock = run.port(self.agents.clock);
         let shell = run.port(self.agents.shell);

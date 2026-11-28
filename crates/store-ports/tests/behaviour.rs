@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
 use std::num::NonZeroU32;
+use std::path::PathBuf;
 
-use design_messages::{CheckName, PullNumber, SessionCursors, SessionRecords, StreamSchema};
-use file_ports::Offset;
-use fixture::{Failed, Properties};
+use design_messages::{CheckName, EndedTasks, PullNumber, SessionCursors, SessionRecords, StreamSchema};
+use file_ports::{Disk, Files, Offset};
+use fixture::{Cases, Debugged, Failed, Fixture, Properties};
 use invariants::{Ignoring, ignored};
 use newtype::Counter;
 use port_core::Run;
@@ -13,8 +14,9 @@ use proptest::prelude::{any, prop_assert_eq, proptest};
 use proptest::sample::Index;
 use proptest::strategy::{Strategy, ValueTree};
 use proptest::test_runner::TestRunner;
+use serde::Deserialize;
 use sqlite_ports::SqliteOpener;
-use store_ports::{Busy, Column, Counted, Opens, Store, Written};
+use store_ports::{Busy, Column, Counted, Opens, Parses, Store, Written};
 use tempfile::TempDir;
 use transcript_ports::{Authorship, Body, Cursor, Instant, SessionId, TaskId, Uuid};
 
@@ -22,6 +24,37 @@ ignored! {
     enum Ignored {
         Unread => "a raw value that does not read back is None, which the roundtrip compares",
     }
+}
+
+#[derive(Fixture, Deserialize, Debug)]
+struct Schemas {
+    older: PathBuf,
+}
+
+#[test]
+fn a_store_kept_under_an_older_schema_is_rebuilt_under_the_current_one() -> Result<(), Failed> {
+    let drifted = Cases::<Schemas>::drifted(|case| {
+        let reading = Run::root();
+        let text = reading.port(Disk).read_text(&case.directory().join(&case.row().older))?;
+        reading.finish();
+        let (older, current) = (SqliteOpener.parsed(text.as_ref())?, SqliteOpener.parsed(StreamSchema::SQL)?);
+        let mut runner = TestRunner::new(Properties::settled());
+        let (session, cursor) = (any::<SessionId>(), any::<Cursor>()).new_tree(&mut runner)?.current();
+        let scratch = TempDir::new()?;
+        let place = scratch.path().join(scratch.path().file_name().unwrap_or_default());
+        let run = Run::root();
+        let kept = run.port(SqliteOpener.file(&older, place.clone()));
+        let written = kept.write::<Counted<SessionRecords>>(Counted::new(SessionRecords::read(&session, cursor, &[])))?;
+        let before = (kept.read(SessionCursors)?.resuming(&session), kept.read(EndedTasks));
+        drop(kept);
+        let rebuilt = run.port(SqliteOpener.file(&current, place));
+        let after = (rebuilt.read(SessionCursors)?.resuming(&session), rebuilt.read(EndedTasks));
+        drop(rebuilt);
+        run.finish();
+        Ok(Debugged((older, current, cursor, written, before, after)).to_string())
+    })?;
+    assert_eq!(drifted, Vec::new());
+    Ok(())
 }
 
 #[test]
@@ -37,8 +70,9 @@ fn a_store_opens_on_its_first_op_and_keeps_each_session_s_last_cursor_when_reope
     let scratch = TempDir::new()?;
     let named = scratch.path().file_name().unwrap_or_default();
     let place = scratch.path().join(named).join(named);
+    let schema = SqliteOpener.parsed(StreamSchema::SQL)?;
     let run = Run::root();
-    let store = run.port(SqliteOpener.file::<StreamSchema>(place.clone()));
+    let store = run.port(SqliteOpener.file(&schema, place.clone()));
     let before = place.exists();
     let written = visits
         .iter()
@@ -54,7 +88,7 @@ fn a_store_opens_on_its_first_op_and_keeps_each_session_s_last_cursor_when_reope
             .map(|(_, kept)| kept)
             != Some(cursor)
     });
-    let reopened = run.port(SqliteOpener.file::<StreamSchema>(place.clone()));
+    let reopened = run.port(SqliteOpener.file(&schema, place.clone()));
     let read = reopened.read(SessionCursors)?;
     let unkept: Vec<_> = last.iter().filter(|(session, cursor)| read.resuming(session) != **cursor).collect();
     assert!(!before && place.exists());
@@ -101,11 +135,12 @@ fn every_named_column_reads_back_as_its_variant() {
 fn a_held_lock_refuses_other_file_handles_and_a_second_memory_lock_until_dropped() -> Result<(), Failed> {
     let scratch = TempDir::new()?;
     let place = scratch.path().join(scratch.path().file_name().unwrap_or_default());
+    let schema = SqliteOpener.parsed(StreamSchema::SQL)?;
     let run = Run::root();
     let (first, second, memory) = (
-        run.port(SqliteOpener.file::<StreamSchema>(place.clone())),
-        run.port(SqliteOpener.file::<StreamSchema>(place)),
-        run.port(SqliteOpener.in_memory::<StreamSchema>()),
+        run.port(SqliteOpener.file(&schema, place.clone())),
+        run.port(SqliteOpener.file(&schema, place)),
+        run.port(SqliteOpener.in_memory(&schema)),
     );
     let (held, claimed) = (first.lock()?, memory.lock()?);
     assert!(matches!((second.lock(), memory.lock()), (Err(Busy::Taken(_)), Err(Busy::Claimed))));

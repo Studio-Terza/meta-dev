@@ -34,8 +34,8 @@ struct Shared {
 }
 
 impl Sqlite {
-    fn placed<S: Schema>(place: Place) -> Sqlite {
-        let shared = Shared { place, schema: Stamped::of::<S>(), opened: Mutex::default(), claim: Arc::default() };
+    fn placed(schema: &Schema, place: Place) -> Sqlite {
+        let shared = Shared { place, schema: Stamped::from(schema), opened: Mutex::default(), claim: Arc::default() };
         Sqlite { shared: Arc::new(shared) }
     }
 }
@@ -47,7 +47,7 @@ impl Shared {
     ) -> Result<T, Failure> {
         let mut slot = self.opened.lock().unpoisoned();
         let opened =
-            slot.take().map_or_else(|| self.place.opened(|path: &Path| fs::create_dir_all(path), self.schema), Ok)?;
+            slot.take().map_or_else(|| self.place.opened(|path: &Path| fs::create_dir_all(path), &self.schema), Ok)?;
         body(slot.insert(opened))
     }
 }
@@ -78,11 +78,11 @@ impl StoreFiller for Sqlite {
 impl Opens for SqliteOpener {
     type Store = Sqlite;
 
-    fn file<S: Schema>(&self, path: PathBuf) -> Sqlite {
-        Sqlite::placed::<S>(Place::File(path))
+    fn file(&self, schema: &Schema, path: PathBuf) -> Sqlite {
+        Sqlite::placed(schema, Place::File(path))
     }
 
-    fn in_memory<S: Schema>(&self) -> Sqlite {
-        Sqlite::placed::<S>(Place::Memory)
+    fn in_memory(&self, schema: &Schema) -> Sqlite {
+        Sqlite::placed(schema, Place::Memory)
     }
 }
