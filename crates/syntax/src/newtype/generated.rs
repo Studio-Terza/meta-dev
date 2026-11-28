@@ -63,8 +63,8 @@ impl Generated<'_> {
             .collect();
         let strategies = drawn.iter().map(|(strategy, _)| strategy);
         let union = quote! {
-            ::newtype::proptest::strategy::Union::new([
-                #(::newtype::proptest::strategy::Strategy::boxed(#strategies)),*
+            ::proptest::strategy::Union::new([
+                #(::proptest::strategy::Strategy::boxed(#strategies)),*
             ])
         };
         let required = drawn.iter().flat_map(|(_, required)| required.iter().cloned()).collect();
@@ -82,12 +82,12 @@ impl Generated<'_> {
         predicates.extend(required);
         let (implemented, arguments, bounds) = generics.split_for_impl();
         quote! {
-            impl #implemented ::newtype::proptest::arbitrary::Arbitrary for #name #arguments #bounds {
+            impl #implemented ::proptest::arbitrary::Arbitrary for #name #arguments #bounds {
                 type Parameters = ();
-                type Strategy = ::newtype::proptest::strategy::BoxedStrategy<Self>;
+                type Strategy = ::proptest::strategy::BoxedStrategy<Self>;
 
                 fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
-                    ::newtype::proptest::strategy::Strategy::boxed(#strategy)
+                    ::proptest::strategy::Strategy::boxed(#strategy)
                 }
             }
         }
@@ -142,16 +142,16 @@ impl From<&Fields> for Drawn {
         let types: Vec<_> = fields.iter().map(|field| &field.ty).collect();
         Drawn {
             source: types.first().map_or_else(
-                || quote!(::newtype::proptest::strategy::Just(())),
-                |_| quote!((#(::newtype::proptest::arbitrary::any::<#types>(),)*)),
+                || quote!(::proptest::strategy::Just(())),
+                |_| quote!((#(::proptest::arbitrary::any::<#types>(),)*)),
             ),
             names: (0..types.len()).map(|index| format_ident!("drawn{}", index)).collect(),
             required: types
                 .iter()
                 .flat_map(|ty| {
                     vec![
-                        parse_quote!(#ty: ::newtype::proptest::arbitrary::Arbitrary + 'static),
-                        parse_quote!(<#ty as ::newtype::proptest::arbitrary::Arbitrary>::Strategy: 'static),
+                        parse_quote!(#ty: ::proptest::arbitrary::Arbitrary + 'static),
+                        parse_quote!(<#ty as ::proptest::arbitrary::Arbitrary>::Strategy: 'static),
                     ]
                 })
                 .collect(),
@@ -164,7 +164,7 @@ impl Drawn {
         let Drawn { source, names, .. } = self;
         let kept = Drawn::kept(built, checking);
         quote! {
-            ::newtype::proptest::strategy::Strategy::prop_filter_map(
+            ::proptest::strategy::Strategy::prop_filter_map(
                 #source,
                 "the constructor refuses this value",
                 |(#(#names,)*)| #kept,

@@ -5,9 +5,8 @@ use syn::parse::{Parse, ParseStream};
 use syn::{Token, Type};
 
 use crate::store::cache::Described;
-use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 #[serde(try_from = "String")]
 pub struct ColumnName {
     ident: Ident,

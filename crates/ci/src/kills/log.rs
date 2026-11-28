@@ -1,9 +1,8 @@
 use grammar::Grammar;
 use grammar::lines::Lines;
 use grammar::test_log::{TestLine, Verdict};
-use serde::Serialize;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
 pub(crate) struct Test {
     package: String,
     binary: String,

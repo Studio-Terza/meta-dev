@@ -1,7 +1,7 @@
 use invariants::Ignoring;
+use json_ports::{JsonFailure, Object};
 
 use super::classified::Classified;
-use super::object::Object;
 use super::said::Said;
 use super::stamp::Stamp;
 use super::voice::{Listener, Origin};
@@ -46,7 +46,7 @@ impl User {
     const MESSAGE: &'static str = "message";
     const CONTENT: &'static str = "content";
 
-    pub fn read(entry: Object<'_>) -> Result<User, serde_json::Error> {
+    pub fn read(entry: Object<'_>) -> Result<User, JsonFailure> {
         let origin = entry.present(Self::ORIGIN).map(Origin::read).transpose()?;
         let content = Wording::read(entry.required(Self::MESSAGE)?.required(Self::CONTENT)?)?;
         Ok(User { stamp: entry.whole()?, origin, content })
@@ -54,7 +54,7 @@ impl User {
 }
 
 impl Wording {
-    pub fn read(content: Object<'_>) -> Result<Wording, serde_json::Error> {
+    pub fn read(content: Object<'_>) -> Result<Wording, JsonFailure> {
         content.whole().ignoring(Ignored::NotKnown).map_or_else(
             || content.each()?.into_iter().map(Block::read).collect::<Result<_, _>>().map(Wording::Blocks),
             |typed| Ok(Wording::Typed(typed)),
@@ -63,7 +63,7 @@ impl Wording {
 }
 
 impl Block {
-    fn read(block: Object<'_>) -> Result<Block, serde_json::Error> {
+    fn read(block: Object<'_>) -> Result<Block, JsonFailure> {
         Heard::read(block).map_or_else(|| block.whole().map(Block::Unknown), |heard| Ok(Block::Known(heard)))
     }
 }

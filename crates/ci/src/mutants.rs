@@ -4,7 +4,7 @@ use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
 use grammar::lines::{Fields, Lines};
-use serde::Deserialize;
+use json_ports::Json;
 
 use crate::exit::Exit;
 use crate::failure::Failure;
@@ -19,7 +19,7 @@ pub struct Plan {
     output: PathBuf,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize)]
 struct Mutant {
     name: String,
     file: String,
@@ -62,7 +62,7 @@ impl Plan {
 impl Mutant {
     fn listed(path: &Path) -> Result<Vec<Mutant>, Failure> {
         let text = Disk::read(path)?;
-        Ok(serde_json::Deserializer::from_str(&text).into_iter().next().unwrap_or_else(|| Ok(Vec::new()))?)
+        Ok(Json::first(&text).unwrap_or_else(|| Ok(Vec::new()))?)
     }
 
     fn selected(&self, in_diff: &BTreeSet<String>, tested: &BTreeSet<PathBuf>) -> Option<()> {

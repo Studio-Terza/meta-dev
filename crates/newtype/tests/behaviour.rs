@@ -169,12 +169,12 @@ struct Pairs;
 struct Json;
 
 impl Json {
-    fn written<Written: newtype::serde::Serialize>(value: &Written) -> Option<String> {
-        serde_json::to_string(value).ignoring(Ignored::Unserialised)
+    fn written<Written: json_ports::Encode>(value: &Written) -> Option<String> {
+        json_ports::Json::written(value).ignoring(Ignored::Unserialised)
     }
 
-    fn read<Read: newtype::serde::de::DeserializeOwned>(text: Option<&str>) -> Option<Read> {
-        text.and_then(|json| serde_json::from_str(json).ignoring(Ignored::Unserialised))
+    fn read<Read: json_ports::Decode>(text: Option<&str>) -> Option<Read> {
+        text.and_then(|json| json_ports::Json::read(json).ignoring(Ignored::Unserialised))
     }
 
     fn word(text: &String) -> Option<Word> {

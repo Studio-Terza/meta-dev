@@ -3,8 +3,7 @@ use std::path::Path;
 use design_messages::PullNumber;
 use dispatch_ports::{Clock, Ran, Shell, Timeout};
 use file_ports::{Bytes, Files, Kind};
-use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
+use json_ports::{Fields, Json, Opaque};
 use store_ports::Store;
 
 use super::super::super::Ground;
@@ -20,17 +19,17 @@ pub struct Installing<'used, 'crew, C: Clock, G: Shell> {
     pull: PullNumber,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Printed {
-    hooks: Value,
+    hooks: Opaque,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, serde::Deserialize, serde::Serialize)]
 struct Configured {
     #[serde(default)]
-    hooks: Value,
+    hooks: Opaque,
     #[serde(flatten)]
-    rest: Map<String, Value>,
+    rest: Fields,
 }
 
 impl<'used, 'crew, C: Clock, G: Shell> Installing<'used, 'crew, C, G> {
@@ -67,7 +66,7 @@ impl<'used, 'crew, C: Clock, G: Shell> Installing<'used, 'crew, C, G> {
         let printed = self
             .ran(Self::DESIGN, &["--workspace", &workspace, "hook", "--settings"], self.directory, Self::QUICK)
             .ok_or(InstallStep::Print)?;
-        let settings: Printed = serde_json::from_str(&printed).map_err(|_unprinted| InstallStep::Print)?;
+        let settings: Printed = Json::read(&printed).map_err(|_unprinted| InstallStep::Print)?;
         Self::hooked(ground, settings.hooks).ok_or(InstallStep::Settings)
     }
 
@@ -76,17 +75,16 @@ impl<'used, 'crew, C: Clock, G: Shell> Installing<'used, 'crew, C, G> {
         ran.as_ref().and_then(Ran::succeeded).map(|printed| AsRef::<str>::as_ref(printed).to_owned())
     }
 
-    fn hooked<F: Files, S: Store>(ground: &Ground<'_, F, S>, hooks: Value) -> Option<()> {
+    fn hooked<F: Files, S: Store>(ground: &Ground<'_, F, S>, hooks: Opaque) -> Option<()> {
         let file = ground.settings();
         let configured: Configured = match ground.kind(&file) {
             Kind::Missing => Configured::default(),
             Kind::File | Kind::Directory | Kind::Link => {
                 let text = ground.files().read_text(&file).ignoring(Ignored::Unhooked)?;
-                serde_json::from_str(text.as_ref()).ignoring(Ignored::Unhooked)?
+                Json::read(text.as_ref()).ignoring(Ignored::Unhooked)?
             }
         };
-        let written =
-            serde_json::to_string_pretty(&Configured { hooks, rest: configured.rest }).ignoring(Ignored::Unhooked)?;
+        let written = Json::pretty(&Configured { hooks, rest: configured.rest }).ignoring(Ignored::Unhooked)?;
         ground.prepared(file.parent()?).ignoring(Ignored::Unhooked)?;
         ground.files().write(&file, Bytes::new(format!("{written}\n").into_bytes())).ignoring(Ignored::Unhooked)
     }

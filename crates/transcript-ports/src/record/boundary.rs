@@ -3,6 +3,7 @@ mod entry;
 use crate::lossy_text::LossyText;
 use grammar::lines::Lines;
 use invariants::Ignoring;
+use json_ports::{Document, JsonFailure};
 
 use crate::{Ignored, Line, Turn, Unrecognised};
 use entry::{Closing, Entry};
@@ -24,8 +25,8 @@ impl Line {
 }
 
 impl Entry {
-    fn lexed(line: &str) -> Result<Entry, serde_json::Error> {
-        serde_json::from_str::<serde_json::Value>(line).and_then(|value| Entry::read(&value))
+    fn lexed(line: &str) -> Result<Entry, JsonFailure> {
+        Document::read(line).and_then(|document| Entry::read(document.object()))
     }
 }
 

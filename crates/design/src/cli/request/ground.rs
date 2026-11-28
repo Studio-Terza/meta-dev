@@ -8,6 +8,7 @@ use grammar::spec_line::Attachment;
 use invariants::Ignoring;
 use port_core::{Port, Run};
 use store_ports::Store;
+use toml_ports::Toml;
 use transcript_ports::ClaudeCodeDir;
 
 use super::ignored::Ignored;
@@ -49,11 +50,11 @@ impl<'run, F: Files, S: Store> Ground<'run, F, S> {
         self.files
             .read_text(file.as_ref())
             .ignoring(Ignored::Unqueued)
-            .map_or(Ok(Queue::default()), |text| toml::from_str(text.as_ref()).map_err(Failure::Unparsed))
+            .map_or(Ok(Queue::default()), |text| Toml::read(text.as_ref()).map_err(Failure::Unparsed))
     }
 
     pub fn queued(&self, file: &Rooted, queue: &Queue) -> Result<(), Failure> {
-        let text = toml::to_string(queue).map_err(Failure::Unwritten)?;
+        let text = Toml::written(queue).map_err(Failure::Unwritten)?;
         self.files.write(file.as_ref(), Bytes::new(text.into_bytes())).map_err(Failure::Unqueued)
     }
 

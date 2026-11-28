@@ -2,6 +2,9 @@ use std::io;
 use std::path::PathBuf;
 use std::time::TryFromFloatSecsError;
 
+use json_ports::JsonFailure;
+use toml_ports::TomlFailure;
+
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum Failure {
     #[error(
@@ -13,7 +16,7 @@ pub(crate) enum Failure {
     #[error("cannot write {}: {source}", path.display())]
     Unwritable { path: PathBuf, source: io::Error },
     #[error("cannot read the limits: {0}")]
-    Limits(#[from] toml::de::Error),
+    Limits(#[from] TomlFailure),
     #[error("the limits hold no stage named {0}")]
     Unlimited(String),
     #[error("a limit is not a number of seconds: {0}")]
@@ -23,11 +26,11 @@ pub(crate) enum Failure {
     #[error("cannot start {program}: {source}")]
     Unstarted { program: String, source: io::Error },
     #[error("cannot read the mutants: {0}")]
-    Mutants(#[from] serde_json::Error),
+    Mutants(#[from] JsonFailure),
     #[error("cannot read the outcomes in {}: {source}", path.display())]
-    Outcomes { path: PathBuf, source: serde_json::Error },
+    Outcomes { path: PathBuf, source: JsonFailure },
     #[error("cannot write the kill report: {0}")]
-    Unserialized(serde_json::Error),
+    Unserialized(JsonFailure),
     #[error("a numstat row is not added, deleted and path separated by tabs: {0}")]
     Numstat(String),
     #[error("cannot write the report: {0}")]

@@ -1,9 +1,8 @@
 use invariants::Ignoring;
-use serde::Deserialize;
+use json_ports::{JsonFailure, Object};
 
 use super::classified::Classified;
 use super::closing::Closing;
-use super::object::Object;
 use super::said::Said;
 use super::stamp::Stamp;
 use super::user::Wording;
@@ -62,7 +61,7 @@ enum Annex {
     Unknown(Unrecognised),
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, serde::Deserialize, PartialEq, Eq)]
 enum Event {
     SubagentStop,
     #[serde(other)]
@@ -80,7 +79,7 @@ impl Attached {
     const ATTACHMENT: &'static str = "attachment";
     const EVENT: &'static str = "hookEvent";
 
-    pub fn read(entry: Object<'_>) -> Result<Attached, serde_json::Error> {
+    pub fn read(entry: Object<'_>) -> Result<Attached, JsonFailure> {
         let attachment = entry.required(Self::ATTACHMENT)?;
         let event = attachment.field(Self::EVENT).ignoring(Ignored::NotKnown).flatten();
         Ok(Attached { stamp: entry.whole()?, attachment: Annex::read(attachment)?, event })
@@ -98,7 +97,7 @@ impl Attached {
 }
 
 impl Annex {
-    fn read(attachment: Object<'_>) -> Result<Annex, serde_json::Error> {
+    fn read(attachment: Object<'_>) -> Result<Annex, JsonFailure> {
         Carried::read(attachment)
             .map_or_else(|| attachment.whole().map(Annex::Unknown), |carried| Ok(Annex::Known(carried)))
     }
@@ -116,7 +115,7 @@ impl Carried {
         }
     }
 
-    fn queued(attachment: Object<'_>) -> Result<Carried, serde_json::Error> {
+    fn queued(attachment: Object<'_>) -> Result<Carried, JsonFailure> {
         let origin = attachment.present(Self::ORIGIN).map(Origin::read).transpose()?;
         Ok(Carried::QueuedCommand { prompt: Wording::read(attachment.required(Self::PROMPT)?)?, origin })
     }
