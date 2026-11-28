@@ -6,27 +6,24 @@ use std::sync::{Arc, Mutex};
 
 use file_ports::{FileFailure, Files, Kind};
 use invariants::{Ignoring, Unpoisoned};
-use pipeline::Measure;
+use pipeline::{Measure, Pipeline};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use syn::{Expr, ExprLit, Item, ItemMod, Lit, Meta};
 use timer_ports::Timer;
 
-use crate::budget::Budget;
 use crate::failure::Failure;
-use crate::finding::Finding;
 use crate::gate::Gate;
 use crate::ignored::Ignored;
-use crate::lints::{Facts, Lints};
+use crate::linting::{Lexed, Linting};
 use crate::source::{ModulePath, Source};
 use crate::spent::{Spent, Stage};
+use crate::walk::Facts;
 use crate::workspace::{CrateKind, CrateRoot, Package, Tree};
 
 #[derive(Debug, Default, Measure)]
 pub(crate) struct Read {
     pub failures: Vec<Failure>,
-    pub findings: Vec<Finding>,
     pub facts: Facts,
-    pub budget: Budget,
     pub spent: Spent,
 }
 
@@ -42,7 +39,6 @@ struct Module {
     path: ModulePath,
     package: Arc<Package>,
     kind: CrateKind,
-    gate: Gate,
     nesting: Nesting,
 }
 
@@ -65,6 +61,7 @@ pub(crate) struct Reader<'run, F, T> {
     files: &'run F,
     timer: &'run T,
     tree: &'run Tree,
+    linting: &'run Linting<'run>,
     seen: Mutex<BTreeSet<Arc<Path>>>,
 }
 
@@ -72,8 +69,13 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
     const MODULE_FILE: &'static str = "mod.rs";
     const PATH_ATTRIBUTE: &'static str = "path";
 
-    pub(crate) fn new(files: &'run F, timer: &'run T, tree: &'run Tree) -> Reader<'run, F, T> {
-        Reader { files, timer, tree, seen: Mutex::default() }
+    pub(crate) fn new(
+        files: &'run F,
+        timer: &'run T,
+        tree: &'run Tree,
+        linting: &'run Linting<'run>,
+    ) -> Reader<'run, F, T> {
+        Reader { files, timer, tree, linting, seen: Mutex::default() }
     }
 
     pub(crate) fn read(&self, roots: Vec<CrateRoot>) -> Read {
@@ -84,7 +86,6 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
                 path: ModulePath::root(Arc::from(root.path())),
                 package: Arc::clone(root.package()),
                 kind: root.kind(),
-                gate: Gate::Entered,
                 nesting: Nesting::Beside,
             })
             .partition(|module| module.kind == CrateKind::Binary);
@@ -114,6 +115,9 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
         let parsed = spent.timed(self.timer, Stage::Parse, || syn::parse_file(&text));
         match parsed {
             Ok(file) => {
+                let declared = Reader::<F, T>::declared(&file.items, &[], module.path.gate());
+                let children: Vec<Result<Module, Failure>> =
+                    declared.iter().map(|declaration| self.child(module, declaration)).collect();
                 let source = Source::new(
                     Arc::clone(&module.package),
                     Arc::clone(&module.real),
@@ -122,7 +126,8 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
                     module.kind,
                     text,
                 );
-                self.linted(module, &source, &file, spent)
+                let facts = spent.timed(self.timer, Stage::Visit, || self.linting.parsed(Lexed::new(source, file)));
+                self.below(Read { failures: Vec::new(), facts, spent }, children)
             }
             Err(source) => {
                 Read::failed(Failure::Parse { path: shown.to_path_buf(), line: source.span().start().line, source })
@@ -130,14 +135,7 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
         }
     }
 
-    fn linted(&self, module: &Module, source: &Source, file: &syn::File, mut spent: Spent) -> Read {
-        let declared = Reader::<F, T>::declared(&file.items, &[], module.gate);
-        let children: Vec<Result<Module, Failure>> =
-            declared.iter().map(|declaration| self.child(module, declaration)).collect();
-        let gate = module.gate;
-        let linted = spent.timed(self.timer, Stage::Visit, || Lints::linted(source, file, gate));
-        let here =
-            Read { failures: Vec::new(), findings: linted.found, facts: linted.facts, budget: linted.budget, spent };
+    fn below(&self, here: Read, children: Vec<Result<Module, Failure>>) -> Read {
         let below = children
             .into_par_iter()
             .map(|child| match child {
@@ -216,10 +214,9 @@ impl<'run, F: Files + Sync, T: Timer + Sync> Reader<'run, F, T> {
         };
         Ok(Module {
             real: Arc::from(chosen),
-            path: parent.path.child(declared.inline.iter().cloned().chain([declared.name.clone()])),
+            path: parent.path.child(declared.inline.iter().cloned().chain([declared.name.clone()]), declared.gate),
             package: Arc::clone(&parent.package),
             kind: parent.kind,
-            gate: declared.gate,
             nesting,
         })
     }

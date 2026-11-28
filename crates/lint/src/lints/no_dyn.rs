@@ -1,10 +1,10 @@
 use proc_macro2::{TokenStream, TokenTree};
 use syn::{Macro, TypeTraitObject};
 
-use crate::finding::{Found, Rule};
+use crate::finding::{Findings, Found};
 use crate::hooks::{Descent, Expanded, Hooks};
+use crate::lint::{Lint, Reads};
 use crate::source::Source;
-use crate::style::{Reads, Style};
 
 #[derive(Debug, Default)]
 pub(crate) struct NoDyn {
@@ -46,15 +46,17 @@ impl Hooks for NoDyn {
     }
 }
 
-impl<'file> Style<'file> for NoDyn {
-    const RULE: Rule = Rule::NoDyn;
+impl<'file> Lint<'file> for NoDyn {
+    const HEADLINE: &'static str = "no dyn: every type is known at compile time, so code takes a generic, returns impl Trait or names an enum instead of a trait object";
     const READS: Reads = Reads::Every;
+
+    type Fact = Findings;
 
     fn new(_: &'file Source) -> NoDyn {
         NoDyn::default()
     }
 
-    fn found(self) -> Vec<Found> {
-        self.found
+    fn fact(self, source: &'file Source) -> Findings {
+        Findings::found(NoDyn::HEADLINE, source.shown(), self.found)
     }
 }

@@ -1,15 +1,13 @@
 use std::ptr;
 
 use syn::spanned::Spanned;
-use syn::{
-    Block, Expr, ExprForLoop, ExprMethodCall, ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, Local, Macro, Pat, Stmt,
-};
+use syn::{Block, Expr, ExprForLoop, ExprMethodCall, ImplItemFn, ItemFn, ItemImpl, ItemTrait, Local, Macro, Pat, Stmt};
 
-use crate::finding::{Found, Rule};
+use crate::finding::{Findings, Found};
 use crate::gate::Gate;
 use crate::hooks::{Descent, Expanded, Hooks};
+use crate::lint::{Lint, Reads};
 use crate::source::Source;
-use crate::style::{Reads, Style};
 
 #[derive(Debug, Default)]
 pub(crate) struct ManualIteration {
@@ -89,10 +87,6 @@ impl ManualIteration {
 }
 
 impl Hooks for ManualIteration {
-    fn item_mod(&mut self, module: &ItemMod) -> Descent {
-        Descent::from(Gate::of(&module.attrs).entered())
-    }
-
     fn item_impl(&mut self, item: &ItemImpl) -> Descent {
         Descent::from(Gate::of(&item.attrs).entered())
     }
@@ -175,15 +169,17 @@ impl Counting {
     }
 }
 
-impl<'file> Style<'file> for ManualIteration {
-    const RULE: Rule = Rule::ManualIteration;
+impl<'file> Lint<'file> for ManualIteration {
+    const HEADLINE: &'static str = "iterators are driven by combinators, not by hand";
     const READS: Reads = Reads::Shipped;
+
+    type Fact = Findings;
 
     fn new(_: &'file Source) -> ManualIteration {
         ManualIteration::default()
     }
 
-    fn found(self) -> Vec<Found> {
-        self.found
+    fn fact(self, source: &'file Source) -> Findings {
+        Findings::found(ManualIteration::HEADLINE, source.shown(), self.found)
     }
 }

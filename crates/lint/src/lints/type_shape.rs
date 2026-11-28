@@ -2,15 +2,15 @@ use std::ptr;
 
 use syn::spanned::Spanned;
 use syn::{
-    Field, FnArg, GenericArgument, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, Macro, PathArguments, ReturnType,
+    Field, FnArg, GenericArgument, ItemEnum, ItemImpl, ItemStruct, ItemType, Macro, PathArguments, ReturnType,
     Signature, Type, TypePath, TypeTuple,
 };
 
-use crate::finding::{Found, Rule};
+use crate::finding::{Findings, Found};
 use crate::gate::Gate;
 use crate::hooks::{Descent, Expanded, Hooks};
+use crate::lint::{Lint, Reads};
 use crate::source::Source;
-use crate::style::{Reads, Style};
 
 #[derive(Debug, Default)]
 pub(crate) struct TypeShape {
@@ -78,10 +78,6 @@ impl TypeShape {
 }
 
 impl Hooks for TypeShape {
-    fn item_mod(&mut self, module: &ItemMod) -> Descent {
-        Descent::from(Gate::of(&module.attrs).entered())
-    }
-
     fn item_impl(&mut self, item: &ItemImpl) -> Descent {
         Descent::from(Gate::inherent(item).entered())
     }
@@ -171,15 +167,18 @@ impl Hooks for TypeShape {
     }
 }
 
-impl<'file> Style<'file> for TypeShape {
-    const RULE: Rule = Rule::TypeShape;
-    const READS: Reads = Reads::Every;
+impl<'file> Lint<'file> for TypeShape {
+    const HEADLINE: &'static str =
+        "types carry their meaning: no bool fields, no tuples in signatures, no String errors";
+    const READS: Reads = Reads::Ungated;
+
+    type Fact = Findings;
 
     fn new(_: &'file Source) -> TypeShape {
         TypeShape::default()
     }
 
-    fn found(self) -> Vec<Found> {
-        self.found
+    fn fact(self, source: &'file Source) -> Findings {
+        Findings::found(TypeShape::HEADLINE, source.shown(), self.found)
     }
 }

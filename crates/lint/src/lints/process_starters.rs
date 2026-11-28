@@ -2,10 +2,10 @@ use proc_macro2::{TokenStream, TokenTree};
 use syn::spanned::Spanned;
 use syn::{ItemMod, ItemUse, Macro, Path};
 
-use crate::finding::{Found, Rule};
+use crate::finding::{Findings, Found};
 use crate::hooks::{Descent, Expanded, Hooks};
+use crate::lint::{Lint, Reads};
 use crate::source::Source;
-use crate::style::{Reads, Style};
 use crate::use_leaf::UseLeaf;
 
 #[derive(Debug)]
@@ -185,25 +185,24 @@ impl Hooks for ProcessStarters {
     }
 }
 
-impl<'file> Style<'file> for ProcessStarters {
-    const RULE: Rule = Rule::ProcessStarters;
+impl<'file> Lint<'file> for ProcessStarters {
+    const HEADLINE: &'static str = "only ports start processes";
     const READS: Reads = Reads::Every;
+
+    type Fact = Findings;
 
     fn new(source: &'file Source) -> ProcessStarters {
         ProcessStarters::scanning(source.ported())
     }
 
-    fn found(self) -> Vec<Found> {
-        let lines = self.starts();
-        lines
-            .into_iter()
-            .map(|line| {
-                Found::at(
-                    line,
-                    "starts a std::process::Command",
-                    "move it behind a port: a crate whose name ends in ports, or a module named ports",
-                )
-            })
-            .collect()
+    fn fact(self, source: &'file Source) -> Findings {
+        let found = self.starts().into_iter().map(|line| {
+            Found::at(
+                line,
+                "starts a std::process::Command",
+                "move it behind a port: a crate whose name ends in ports, or a module named ports",
+            )
+        });
+        Findings::found(ProcessStarters::HEADLINE, source.shown(), found.collect())
     }
 }

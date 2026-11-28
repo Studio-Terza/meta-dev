@@ -5,16 +5,17 @@ use std::process::ExitCode;
 
 use file_ports::Files;
 use invariants::Ignoring;
-use pipeline::Measure;
+use pipeline::{Measure, Pipeline};
 use port_core::Run;
 use rayon::ThreadPoolBuilder;
 use timer_ports::{Timer, TimerFiller};
 
 use crate::failure::Failure;
-use crate::finding::Findings;
 use crate::ignored::Ignored;
+use crate::linting::{Judged, Linting};
 use crate::reading::{Read, Reader};
-use crate::spent::Stage;
+use crate::spent::{Spent, Stage};
+use crate::walk::Walker;
 use crate::workspace::{Tree, Workspace};
 
 #[derive(Debug)]
@@ -62,12 +63,12 @@ impl Cli {
     ) -> Verdict {
         let run = Run::root();
         let clock = run.port(timer);
-        let read = match ThreadPoolBuilder::new().stack_size(Cli::STACK_BYTES).build() {
+        let judged = match ThreadPoolBuilder::new().stack_size(Cli::STACK_BYTES).build() {
             Ok(pool) => pool.install(|| self.read(files, &clock)),
-            Err(failure) => Read::failed(Failure::Threads(failure)),
+            Err(failure) => Judged::failed(Failure::Threads(failure)),
         };
-        let decided = Cli::decided(&read);
-        match self.written(read, out, err) {
+        let decided = Cli::decided(&judged);
+        match self.written(judged, out, err) {
             Ok(()) => decided,
             Err(failure) => {
                 writeln!(err, "cannot write the output: {failure}").ignoring(Ignored::Unwritable);
@@ -76,45 +77,45 @@ impl Cli {
         }
     }
 
-    fn read(&self, files: &(impl Files + Sync), timer: &(impl Timer + Sync)) -> Read {
-        let mut read = Read::default();
-        let whole = read.spent.timed(timer, Stage::Run, || {
-            self.roots.iter().map(|root| Cli::tree(files, timer, root)).fold(Read::default(), Read::joined)
-        });
-        read.joined(whole)
+    fn read(&self, files: &(impl Files + Sync), timer: &(impl Timer + Sync)) -> Judged {
+        let mut judged = Judged::default();
+        let whole = judged
+            .spent
+            .timed(timer, Stage::Run, || Judged::total(self.roots.iter().map(|root| Cli::tree(files, timer, root))));
+        judged.joined(whole)
     }
 
-    fn tree(files: &(impl Files + Sync), timer: &(impl Timer + Sync), root: &Path) -> Read {
-        let mut read = Read::default();
-        let found = read.spent.timed(timer, Stage::Find, || {
+    fn tree(files: &(impl Files + Sync), timer: &(impl Timer + Sync), root: &Path) -> Judged {
+        let mut spent = Spent::default();
+        let found = spent.timed(timer, Stage::Find, || {
             Tree::opened(files, root).and_then(|tree| Workspace::found(files, &tree).map(|workspace| (tree, workspace)))
         });
         match found {
             Ok((tree, workspace)) => {
                 let packages = workspace.packages().to_vec();
-                let sources = Reader::new(files, timer, &tree).read(workspace.into_roots());
-                let mut reduced = read.joined(sources);
-                let facts = std::mem::take(&mut reduced.facts);
-                let findings = reduced.spent.timed(timer, Stage::Reduce, || facts.reduced(&packages));
-                reduced.findings.extend(findings);
-                reduced
+                let linting = Linting::over(&packages);
+                let Read { failures, facts, spent: reading } =
+                    Reader::new(files, timer, &tree, &linting).read(workspace.into_roots());
+                let measured = spent.timed(timer, Stage::Reduce, || linting.act(linting.measured(facts)));
+                let read = Judged { failures, spent: spent.joined(reading), ..Judged::default() };
+                read.joined(measured)
             }
-            Err(failure) => read.joined(Read::failed(failure)),
+            Err(failure) => Judged { spent, ..Judged::failed(failure) },
         }
     }
 
-    fn decided(read: &Read) -> Verdict {
-        let failed = read.failures.first().map(|_| Verdict::Refused);
-        let violated = read.findings.first().map(|_| ()).or(read.budget.exceeded().map(|_| ()));
+    fn decided(judged: &Judged) -> Verdict {
+        let failed = judged.failures.first().map(|_| Verdict::Refused);
+        let violated = judged.findings.first().map(|_| ()).or(judged.budget.exceeded().map(|_| ()));
         failed.or(violated.map(|()| Verdict::Violations)).unwrap_or(Verdict::Clean)
     }
 
-    fn written(&self, read: Read, out: &mut impl Write, err: &mut impl Write) -> io::Result<()> {
-        let Read { failures, findings, budget, spent, .. } = read;
+    fn written(&self, judged: Judged, out: &mut impl Write, err: &mut impl Write) -> io::Result<()> {
+        let Judged { failures, findings, budget, spent } = judged;
         let mut said: Vec<String> = failures.iter().map(ToString::to_string).collect();
         said.sort();
         said.iter().try_for_each(|failure| writeln!(err, "{failure}"))?;
-        findings.into_iter().collect::<Findings>().written(err)?;
+        findings.written(&Walker::headlines(), err)?;
         budget.exceeded().map_or_else(|| writeln!(out, "{budget}"), |exceeded| writeln!(err, "{exceeded}"))?;
         match self.mode {
             Mode::Timings => spent.written(out),

@@ -5,9 +5,11 @@ use std::sync::Arc;
 use proc_macro2::Ident;
 use syn::{ItemImpl, ItemUse, Macro, Type};
 
-use crate::finding::{Finding, Found, Rule};
-use crate::graph::Graph;
+use pipeline::Measure;
+
+use crate::finding::{Finding, Found};
 use crate::hooks::{Descent, Expanded, Hooks};
+use crate::lint::{Fact, Lint, Reads};
 use crate::source::{Place, Source};
 use crate::use_leaf::UseLeaf;
 use crate::workspace::Package;
@@ -17,6 +19,9 @@ pub(crate) enum AdapterFact {
     Real { crate_name: String, name: String },
     Named { crate_name: String, name: String, path: Arc<Path>, line: usize },
 }
+
+#[derive(Debug, Default, Measure)]
+pub(crate) struct AdapterFacts(Vec<AdapterFact>);
 
 #[derive(Debug)]
 pub(crate) struct RealAdapters<'file> {
@@ -93,8 +98,11 @@ impl Hooks for RealAdapters<'_> {
     }
 }
 
-impl<'file> Graph<'file> for RealAdapters<'file> {
-    type Fact = AdapterFact;
+impl<'file> Lint<'file> for RealAdapters<'file> {
+    const HEADLINE: &'static str = "a port's real adapter is named only in a binary's main.rs and in its own port crate's tests; everything else builds over doubles";
+    const READS: Reads = Reads::Every;
+
+    type Fact = AdapterFacts;
 
     fn new(source: &'file Source) -> RealAdapters<'file> {
         let admitted = match (source.binary_root(), source.place()) {
@@ -105,11 +113,14 @@ impl<'file> Graph<'file> for RealAdapters<'file> {
         RealAdapters { source, admitted, facts: Vec::new() }
     }
 
-    fn facts(self) -> Vec<AdapterFact> {
-        self.facts
+    fn fact(self, _: &'file Source) -> AdapterFacts {
+        AdapterFacts(self.facts)
     }
+}
 
-    fn reduce(facts: Vec<AdapterFact>, _: &[Arc<Package>]) -> Vec<Finding> {
+impl Fact for AdapterFacts {
+    fn findings(self, _: &[Arc<Package>]) -> Vec<Finding> {
+        let facts = self.0;
         let real: BTreeSet<(&str, &str)> = facts
             .iter()
             .filter_map(|fact| match fact {
@@ -122,8 +133,12 @@ impl<'file> Graph<'file> for RealAdapters<'file> {
             .filter_map(|fact| match fact {
                 AdapterFact::Named { crate_name, name, path, line } => {
                     real.get(&(crate_name.as_str(), name.as_str())).map(|_real| {
-                        Found::at(*line, format_args!("names {crate_name}::{name}, a port's real adapter"), Self::FIX)
-                            .in_file(Rule::RealAdapters, path)
+                        Found::at(
+                            *line,
+                            format_args!("names {crate_name}::{name}, a port's real adapter"),
+                            RealAdapters::FIX,
+                        )
+                        .in_file(RealAdapters::HEADLINE, path)
                     })
                 }
                 AdapterFact::Real { .. } => None,

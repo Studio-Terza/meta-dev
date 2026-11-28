@@ -6,16 +6,15 @@ use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{
     Attribute, BinOp, Block, Expr, ExprAssign, ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprWhile, ImplItemConst,
-    ImplItemFn, ItemConst, ItemFn, ItemImpl, ItemMod, ItemTrait, Local, Macro, Pat, Signature, Stmt, Token,
-    TraitItemFn,
+    ImplItemFn, ItemConst, ItemFn, ItemImpl, ItemTrait, Local, Macro, Pat, Signature, Stmt, Token, TraitItemFn,
 };
 
-use crate::finding::{Found, Rule};
+use crate::finding::{Findings, Found};
 use crate::gate::Gate;
 use crate::hooks::{Descent, Expanded, Hooks};
 use crate::ignored::Ignored;
+use crate::lint::{Lint, Reads};
 use crate::source::Source;
-use crate::style::{Reads, Style};
 
 #[derive(Debug, Default)]
 pub(crate) struct ExpressionFlow {
@@ -117,10 +116,6 @@ impl ExpressionFlow {
 }
 
 impl Hooks for ExpressionFlow {
-    fn item_mod(&mut self, module: &ItemMod) -> Descent {
-        Descent::from(Gate::of(&module.attrs).entered())
-    }
-
     fn item_impl(&mut self, item: &ItemImpl) -> Descent {
         Descent::from(Gate::of(&item.attrs).entered())
     }
@@ -247,15 +242,17 @@ impl Hooks for ExpressionFlow {
     }
 }
 
-impl<'file> Style<'file> for ExpressionFlow {
-    const RULE: Rule = Rule::ExpressionFlow;
+impl<'file> Lint<'file> for ExpressionFlow {
+    const HEADLINE: &'static str = "control flow is an expression; every branch yields the value the function returns";
     const READS: Reads = Reads::Shipped;
+
+    type Fact = Findings;
 
     fn new(_: &'file Source) -> ExpressionFlow {
         ExpressionFlow::default()
     }
 
-    fn found(self) -> Vec<Found> {
-        self.found
+    fn fact(self, source: &'file Source) -> Findings {
+        Findings::found(ExpressionFlow::HEADLINE, source.shown(), self.found)
     }
 }

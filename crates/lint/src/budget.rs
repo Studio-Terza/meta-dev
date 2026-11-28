@@ -1,12 +1,17 @@
+use std::cmp::Ordering;
 use std::fmt;
+use std::sync::Arc;
 
-use pipeline::Measure;
+use pipeline::{Limit, Measure, Verdict};
 use syn::spanned::Spanned;
 use syn::{ItemMod, Macro};
 
+use crate::finding::Finding;
 use crate::gate::Gate;
 use crate::hooks::{Descent, Expanded, Hooks};
+use crate::lint::{Fact, Lint, Reads};
 use crate::source::{Place, Source};
+use crate::workspace::Package;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Measure)]
 pub(crate) struct Budget {
@@ -15,7 +20,7 @@ pub(crate) struct Budget {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub(crate) struct TestScan {
+pub(crate) struct TestBudget {
     test_lines: usize,
     gated: usize,
 }
@@ -26,19 +31,26 @@ pub(crate) struct Exceeded(Budget);
 impl Budget {
     const PERCENT_OF_LINES: usize = 18;
     const WHOLE: usize = 100;
-
-    pub(crate) fn of_file(source: &Source, scan: TestScan, gate: Gate) -> Budget {
-        let lines = source.text().bytes().filter(|byte| *byte == b'\n').count();
-        let shipped = gate.entered().filter(|()| source.place() == Place::Shipped);
-        Budget { lines, test_lines: shipped.map_or(lines, |()| scan.test_lines) }
-    }
+    const LIMIT: Limit<Budget> = Limit::at(Budget { lines: Budget::WHOLE, test_lines: Budget::PERCENT_OF_LINES });
 
     pub(crate) fn exceeded(self) -> Option<Exceeded> {
-        (self.test_lines * Budget::WHOLE > self.lines * Budget::PERCENT_OF_LINES).then_some(Exceeded(self))
+        (Budget::LIMIT.judged(&self) == Verdict::Over).then_some(Exceeded(self))
     }
 }
 
-impl Hooks for TestScan {
+impl PartialOrd for Budget {
+    fn partial_cmp(&self, other: &Budget) -> Option<Ordering> {
+        (self.test_lines * other.lines).partial_cmp(&(other.test_lines * self.lines))
+    }
+}
+
+impl Fact for Budget {
+    fn findings(self, _: &[Arc<Package>]) -> Vec<Finding> {
+        Vec::new()
+    }
+}
+
+impl Hooks for TestBudget {
     fn item_mod(&mut self, module: &ItemMod) -> Descent {
         let skipped = Gate::of(&module.attrs).entered().xor(Some(()));
         skipped.map_or_default(|()| {
@@ -56,6 +68,23 @@ impl Hooks for TestScan {
 
     fn macro_called(&mut self, _: &Macro) -> Expanded {
         Expanded::Nothing
+    }
+}
+
+impl<'file> Lint<'file> for TestBudget {
+    const HEADLINE: &'static str = "test budget";
+    const READS: Reads = Reads::All;
+
+    type Fact = Budget;
+
+    fn new(_: &'file Source) -> TestBudget {
+        TestBudget::default()
+    }
+
+    fn fact(self, source: &'file Source) -> Budget {
+        let lines = source.text().bytes().filter(|byte| *byte == b'\n').count();
+        let shipped = source.gate().entered().filter(|()| source.place() == Place::Shipped);
+        Budget { lines, test_lines: shipped.map_or(lines, |()| self.test_lines) }
     }
 }
 
