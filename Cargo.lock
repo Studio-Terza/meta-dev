@@ -166,6 +166,7 @@ dependencies = [
  "hex",
  "invariants",
  "newtype",
+ "pipeline",
  "port-core",
  "serde",
  "store-ports",
