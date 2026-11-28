@@ -55,6 +55,7 @@ version = "0.1.0"
 dependencies = [
  "console-ports",
  "design-messages",
+ "dispatch-ports",
  "file-ports",
  "fixture",
  "grammar",
@@ -467,6 +468,7 @@ name = "lint"
 version = "0.1.0"
 dependencies = [
  "console-ports",
+ "dispatch-ports",
  "file-doubles",
  "file-ports",
  "fixture",
@@ -478,6 +480,7 @@ dependencies = [
  "rayon",
  "serde",
  "syn",
+ "tempfile",
  "thiserror",
  "timer-ports",
  "toml",
@@ -962,6 +965,7 @@ dependencies = [
  "fixture",
  "port-core",
  "proptest",
+ "serde",
 ]
 
 [[package]]

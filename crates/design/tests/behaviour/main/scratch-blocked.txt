@@ -1,0 +1,37 @@
+(
+    [
+        (
+            [
+                "hook",
+                "stop",
+            ],
+            Err(
+                "cannot reach the transcripts: File exists (os error 17)",
+            ),
+            Answer {
+                shown: Shown(
+                    "",
+                ),
+                complaint: Complaint(
+                    "cannot reach the transcripts: File exists (os error 17)\n",
+                ),
+                code: ExitCode(
+                    unix_exit_status(
+                        1,
+                    ),
+                ),
+            },
+            Answering {
+                asked: [],
+                repeated: Count(
+                    0,
+                ),
+                last: None,
+                ..
+            },
+        ),
+    ],
+    Err(
+        NotFound,
+    ),
+)

@@ -7,8 +7,6 @@ mod laws;
 mod method;
 mod names;
 mod ops;
-#[cfg(not(feature = "laws"))]
-mod unscripted;
 
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -25,8 +23,6 @@ use laws::Laws;
 use method::Method;
 use names::{CallerName, FillerName, OpsName};
 use ops::Ops;
-#[cfg(not(feature = "laws"))]
-use unscripted::Laws;
 
 pub(crate) trait Rendered {
     fn rendered(declared: &Declared) -> TokenStream;
@@ -124,14 +120,20 @@ impl Declared {
     pub(crate) fn laws(&self) -> TokenStream {
         match self.scripting {
             Scripting::Unscripted => TokenStream::new(),
+            #[cfg(feature = "laws")]
             Scripting::Scripted => Laws::named(self),
+            #[cfg(not(feature = "laws"))]
+            Scripting::Scripted => TokenStream::new(),
         }
     }
 
     fn scripted(&self) -> TokenStream {
         match self.scripting {
             Scripting::Unscripted => TokenStream::new(),
+            #[cfg(feature = "laws")]
             Scripting::Scripted => Laws::rendered(self),
+            #[cfg(not(feature = "laws"))]
+            Scripting::Scripted => TokenStream::new(),
         }
     }
 

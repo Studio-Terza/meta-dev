@@ -16,6 +16,7 @@ port-core = { path = "../port-core" }
 [dev-dependencies]
 fixture = { path = "../fixture" }
 proptest.workspace = true
+serde.workspace = true
 
 [lints]
 workspace = true

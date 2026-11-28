@@ -1,0 +1,4 @@
+# Each pause is slept between two readings of a monotonic clock, which must have moved on.
+
+[[Paused]]
+pause = { secs = 0, nanos = 1000 }

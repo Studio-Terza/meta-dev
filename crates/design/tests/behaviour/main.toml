@@ -106,6 +106,14 @@ input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s
 words = ["hook", "stop"]
 input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":null}'
 
+# a stop whose agents' scratch directory cannot be made fails before asking any agent
+[Story.scratch-blocked.files]
+"/home/work/.meta/agents" = ""
+
+[[Story.scratch-blocked.step]]
+words = ["hook", "stop"]
+input = '{"hook_event_name":"Stop","last_assistant_message":null,"session_id":"s","stop_hook_active":false,"transcript_path":"/home/.claude/projects/-home-work/s.jsonl"}'
+
 # a shell still running passes
 [Story.shell-running.files]
 "/home/.claude/projects/-home-work/s.jsonl" = '''

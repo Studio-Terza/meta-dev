@@ -1,5 +1,8 @@
+[Exact.repair]
+shape = "repair: main"
+
 [Exact.written]
-shape = "repair: main|spec: ( ?[!-~]{1,8})( [!-~]{1,8}){0,3}"
+shape = "spec: ( ?[!-~]{1,8})( [!-~]{1,8}){0,3}"
 
 [Exact.printable]
 shape = "spec: [!-~]([ -~]{0,20}[!-~])?"

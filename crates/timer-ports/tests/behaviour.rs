@@ -1,6 +1,8 @@
+use std::thread;
 use std::time::Duration;
 
-use fixture::Properties;
+use fixture::{Failed, Fixture, Properties, Rows};
+use serde::Deserialize;
 use port_core::Run;
 use proptest::prelude::{Strategy, any, prop_assert_eq, proptest};
 use timer_ports::{Elapsed, Moment, Monotonic, Stopped, Timer};
@@ -20,12 +22,21 @@ proptest! {
     }
 }
 
+#[derive(Fixture, Deserialize, Debug)]
+struct Paused {
+    pause: Duration,
+}
+
 #[test]
-fn a_monotonic_clock_never_runs_backwards_and_a_stopped_clock_stands_still() {
+fn a_monotonic_clock_moves_on_across_a_pause_and_a_stopped_clock_stands_still() -> Result<(), Failed> {
     let run = Run::root();
     let monotonic = run.port(Monotonic::default());
-    let first = monotonic.now();
-    assert!(monotonic.now() >= first);
-    let stopped = run.port(Stopped::default());
-    assert_eq!(stopped.now(), Moment::default());
+    let stopped = run.port(Stopped);
+    Rows::<Paused>::read()?.iter().for_each(|paused| {
+        let first = monotonic.now();
+        thread::sleep(paused.pause);
+        assert!(monotonic.now() > first);
+        assert_eq!(stopped.now(), Moment::default());
+    });
+    Ok(())
 }
