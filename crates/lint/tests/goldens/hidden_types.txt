@@ -1,6 +1,6 @@
 Violations
 --- out
-test budget: 0 of 28 lines are tests, at most 18% may be
+test budget: 0 of 52 lines are tests, at most 18% may be
 --- err
 no dyn: every type is known at compile time, so code takes a generic, returns impl Trait or names an enum instead of a trait object:
 src/erased.rs:3: dyn trait object; take a generic, return impl Trait, or list the known types in an enum
@@ -10,3 +10,11 @@ src/erased.rs:6: TypeId erases a type; take a generic or name an enum of the kno
 src/erased.rs:7: type_id erases a type; take a generic or name an enum of the known types
 src/erased.rs:11: downcast erases a type; take a generic or name an enum of the known types
 src/renamed.rs:1: type Count renames a type; name the type itself, or make the alias a newtype
+src/untyped.rs:1: Map is untyped data outside a boundary module; parse it into typed structs inside a module named boundary
+src/untyped.rs:1: Value is untyped data outside a boundary module; parse it into typed structs inside a module named boundary
+src/untyped.rs:5: Value is untyped data outside a boundary module; parse it into typed structs inside a module named boundary
+src/untyped.rs:6: Map is untyped data outside a boundary module; parse it into typed structs inside a module named boundary
+src/untyped.rs:6: Value is untyped data outside a boundary module; parse it into typed structs inside a module named boundary
+src/untyped.rs:7: DeTable is untyped data outside a boundary module; parse it into typed structs inside a module named boundary
+src/untyped.rs:12: Value is untyped data outside a boundary module; parse it into typed structs inside a module named boundary
+src/untyped.rs:13: Value is untyped data outside a boundary module; parse it into typed structs inside a module named boundary
