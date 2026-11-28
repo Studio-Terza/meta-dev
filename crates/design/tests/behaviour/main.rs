@@ -288,11 +288,13 @@ fn the_design_binary_wires_the_real_ports_and_reads_its_event_from_standard_inpu
     let slug = Letters::slugged(&home.path().join(WORKSPACE).to_string_lossy());
     fs::create_dir_all(home.path().join(".claude/projects").join(slug))?;
     fs::create_dir_all(home.path().join(WORKSPACE))?;
-    let unreadable = Design::fed(home.path(), &["--workspace", WORKSPACE, "hook", "stop"], "not json")?;
-    let complaint = String::from_utf8(unreadable.stderr)?;
+    let edit = r#"{"cwd":"work","hook_event_name":"PreToolUse","session_id":"s","tool_input":{"command":"sed -i x y"},"tool_name":"Bash"}"#;
+    let ran = ["--workspace", WORKSPACE, "hook", "pre-tool-use"];
+    let [fed_edit, fed_garbage] = [edit, "not json"].map(|input| Design::fed(home.path(), &ran, input));
+    let [denied, unreadable] = [fed_edit?, fed_garbage?];
     assert_eq!(
-        (unreadable.status.code(), unreadable.stdout, complaint.as_str()),
-        (Some(1_i32), Vec::new(), "cannot read the hook input: expected ident at line 1 column 2\n")
+        (denied.status.code(), denied.stdout.is_empty(), unreadable.status.code(), unreadable.stdout.is_empty()),
+        (Some(0_i32), false, Some(1_i32), true)
     );
     let settings = Design::fed(home.path(), &["--workspace", WORKSPACE, "hook", "--settings"], "")?;
     let user = fs::metadata(home.path())?.uid();
