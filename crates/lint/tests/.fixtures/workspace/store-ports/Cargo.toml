@@ -1,2 +1,7 @@
 [package]
 name = "store-ports"
+
+[lib]
+test = false
+doctest = false
+bench = false
