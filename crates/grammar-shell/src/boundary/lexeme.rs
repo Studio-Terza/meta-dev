@@ -53,12 +53,15 @@ pub(super) enum Lexeme<'text> {
     Duplicate,
     #[token("\"")]
     Quote,
+    #[regex(r"[A-Za-z_][A-Za-z0-9_]*\+?=\(")]
+    #[token("${(")]
+    Unreadable,
     #[regex(r"'[^']*'", |lexer| Lexeme::inner(lexer.slice(), 1))]
     #[regex(r"\$'(\\(.|\n)|[^'\\])*'", |lexer| Lexeme::inner(lexer.slice(), 2))]
     Single(&'text str),
     #[regex(r"\\[^\n]", |lexer| lexer.slice().get(1..))]
     Escaped(&'text str),
-    #[regex(r"\$\{[^}]*\}", |lexer| lexer.slice())]
+    #[regex(r"\$\{([^(}][^}]*)?\}", |lexer| lexer.slice())]
     #[regex(r"\$([A-Za-z_][A-Za-z0-9_]*|[0-9@*#?$!-])", |lexer| lexer.slice())]
     Expansion(&'text str),
     #[regex(r#"[^ \t\n;&|()<>'"`$\\#][^ \t\n;&|()<>'"`$\\]*"#, |lexer| lexer.slice())]
@@ -77,9 +80,11 @@ pub(super) enum Quoted<'text> {
     Arithmetic,
     #[token("`")]
     Backtick,
+    #[token("${(")]
+    Unreadable,
     #[regex(r"\\(.|\n)", |lexer| lexer.slice().get(1..))]
     Escaped(&'text str),
-    #[regex(r"\$\{[^}]*\}", |lexer| lexer.slice())]
+    #[regex(r"\$\{([^(}][^}]*)?\}", |lexer| lexer.slice())]
     #[regex(r"\$([A-Za-z_][A-Za-z0-9_]*|[0-9@*#?$!-])", |lexer| lexer.slice())]
     #[regex(r#"[^"\\$`]+"#, |lexer| lexer.slice())]
     #[token("$", |lexer| lexer.slice())]
