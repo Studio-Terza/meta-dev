@@ -44,7 +44,8 @@ fn a_store_kept_under_an_older_schema_is_rebuilt_under_the_current_one() -> Resu
         let place = scratch.path().join(scratch.path().file_name().unwrap_or_default());
         let run = Run::root();
         let kept = run.port(SqliteOpener.file(&older, place.clone()));
-        let written = kept.write::<Counted<SessionRecords>>(Counted::new(SessionRecords::read(&session, cursor, &[])))?;
+        let written =
+            kept.write::<Counted<SessionRecords>>(Counted::new(SessionRecords::read(&session, cursor, &[])))?;
         let before = (kept.read(SessionCursors)?.resuming(&session), kept.read(EndedTasks));
         drop(kept);
         let rebuilt = run.port(SqliteOpener.file(&current, place));

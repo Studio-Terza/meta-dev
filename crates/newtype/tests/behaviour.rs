@@ -77,10 +77,11 @@ fn an_enum_generator_draws_the_values_its_golden_lists() -> Result<(), Failed> {
         let settled = Properties::settled();
         let cases = usize::try_from(settled.cases)?;
         let mut runner = TestRunner::new(settled);
-        let drawn =
-            iter::repeat_with(|| any::<store_ports::Value>().new_tree(&mut runner).map(|tree| mem::discriminant(&tree.current())))
-                .take(cases)
-                .collect::<Result<Vec<_>, _>>()?;
+        let drawn = iter::repeat_with(|| {
+            any::<store_ports::Value>().new_tree(&mut runner).map(|tree| mem::discriminant(&tree.current()))
+        })
+        .take(cases)
+        .collect::<Result<Vec<_>, _>>()?;
         Ok(Debugged(drawn).to_string())
     })?;
     assert_eq!(drifted, Vec::new());
